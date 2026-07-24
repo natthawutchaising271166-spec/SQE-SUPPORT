@@ -5803,41 +5803,54 @@ const WapOTManagement = (function() {
     }
 
     // ฟังก์ชันคำนวณชั่วโมง
+// แก้ไขภายใน WapOTManagement ในไฟล์ script.js
 function calcHours() {
     const startEl = document.getElementById('ot-start');
     const endEl   = document.getElementById('ot-end');
     const breakEl = document.getElementById('ot-f-break');
     const outEl   = document.getElementById('ot-f-computed');
 
-    if (!startEl || !endEl) {
-        console.warn('[OT] ไม่พบ input เวลา OT ในหน้านี้ — ข้าม calcHours');
-        return { raw: 0, actual: 0 };
-    }
+    if (!startEl || !endEl) return { raw: 0, actual: 0 };
 
-    const start = startEl.value.trim();
-    const end = endEl.value.trim();
+    // 1. ดึงค่าและเปลี่ยนจุด (.) เป็นโคลอน (:) เพื่อป้องกัน NaN
+    let start = startEl.value.trim().replace('.', ':');
+    let end = endEl.value.trim().replace('.', ':');
     const breakMin = breakEl ? (parseInt(breakEl.value) || 0) : 0;
 
+    // ตรวจสอบรูปแบบเวลา (HH:mm)
     const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
-    if ((!timeRegex.test(start)) || (!timeRegex.test(end) && end !== '24:00' && end !== '00:00')) {
+    
+    // กรณีพิเศษรองรับ 24:00 หรือ 00:00
+    const isValidStart = timeRegex.test(start) || start === "00:00";
+    const isValidEnd = timeRegex.test(end) || end === "24:00" || end === "00:00";
+
+    if (!isValidStart || !isValidEnd) {
         if (outEl) outEl.textContent = '0.00';
         return { raw: 0, actual: 0 };
     }
 
+    // 2. แปลงเวลาเป็นนาที
     const [sh, sm] = start.split(':').map(Number);
     let [eh, em] = end.split(':').map(Number);
-    if (eh === 0 && em === 0) eh = 24; // เที่ยงคืน = 24:00
 
-// ใน WapOTManagement.calcHours
-let mins = (eh * 60 + em) - (sh * 60 + sm);
-if (mins < 0) mins += 1440; // เพิ่ม 24 ชั่วโมง (1440 นาที) ถ้าค่าติดลบ
+    // ถ้าจบที่ 00:00 ให้ถือว่าเป็น 24:00 (ข้ามวัน)
+    if (eh === 0 && em === 0) eh = 24;
 
-    const rawHours = mins / 60;
-    const actualHours = Math.max(0, (mins - breakMin) / 60);
+    let startTotal = (sh * 60) + sm;
+    let endTotal = (eh * 60) + em;
 
-    if (outEl) outEl.textContent = actualHours.toFixed(2);
+    // ถ้าเวลาเลิกงานน้อยกว่าเวลาเริ่ม (เข้ากะดึก) ให้บวกไปอีก 24 ชม.
+    if (endTotal <= startTotal) endTotal += 1440;
 
-    return { raw: +rawHours.toFixed(2), actual: +actualHours.toFixed(2) };
+    const diffMins = endTotal - startTotal;
+    const actualHours = Math.max(0, (diffMins - breakMin) / 60);
+
+    // 3. แสดงผล
+    if (outEl) {
+        outEl.textContent = actualHours.toFixed(2);
+    }
+
+    return { raw: diffMins / 60, actual: actualHours };
 }
 
     // --- ดึงข้อมูลจาก Database ---
