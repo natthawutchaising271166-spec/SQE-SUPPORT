@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,7 +38,7 @@
     <div id="system-announcement" class="system-banner">
         <div class="banner-content">
             <span class="banner-icon">📢</span>
-            <span id="banner-text" class="banner-text">SYSTEM UPDATE: เวอร์ชั่น 5.6 รองรับการทำงานแบบ Offline เต็มรูปแบบแล้ว</span>
+            <span id="banner-text" class="banner-text">SYSTEM UPDATE: เวอร์ชั่น 1.0 รองรับการทำงานแบบ Offline เต็มรูปแบบแล้ว</span>
         </div>
         <button onclick="this.parentElement.style.display='none'" class="banner-close">✕</button>
     </div>
@@ -78,6 +80,7 @@
             <button onclick="changeLanguage('th')" id="lang-th" class="lang-btn">TH</button>
         </div>
     </div>
+    
             <div class="login-tab-switcher">
                 <button id="tab-support" onclick="switchLoginTab('staff')" class="login-tab-btn active">SQE SUPPORT</button>
                 <button id="tab-supervisor" onclick="switchLoginTab('supervisor')" class="login-tab-btn">SUPERVISOR</button>
@@ -139,7 +142,7 @@
         </div>
 
         <!-- ข้อความเวอร์ชั่นด้านล่าง -->
-        <p class="login-footer-info">Secure Enterprise Access System v2.1.5</p>
+        <p class="login-footer-info">Secure Enterprise Access System v1.0</p>
 
     </div> 
 </div>
@@ -170,7 +173,7 @@
         <p class="brand-title">SQE SUPPORT</p>
         <div class="brand-status">
             <span class="status-dot-pulse"></span>
-            <p class="brand-sub">WAPAPP & SQE SYSTEM V5.5</p>
+            <p class="brand-sub">WAPAPP & SQE SYSTEM V1.0</p>
         </div>
     </div>
 </div>
@@ -327,20 +330,20 @@
 </aside>
 <div id="sidebar-backdrop" onclick="toggleSidebar('close')"></div>
         <main class="flex-1 flex flex-col overflow-hidden bg-slate-50 min-w-0">
-<header class="bg-white border-b border-slate-100 px-4 h-14 flex items-center justify-between flex-shrink-0 gap-2">
+<header class="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-3 md:px-4 h-14 min-h-[56px] flex items-center justify-between gap-2 z-30 flex-nowrap overflow-x-auto scrollbar-none">
     <!-- [กลุ่มฝั่งซ้าย]: ปุ่มเมนูมือถือ + หัวข้อหน้า -->
-    <div class="flex items-center gap-2 min-w-0">
+    <div class="flex items-center gap-2 shrink-0">
         <button onclick="toggleSidebar('open')" class="sm:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200 mr-1">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <div class="min-w-0 flex-shrink-0">
+        <div class="min-w-0 shrink-0">
             <p class="text-[7px] text-slate-400 font-bold uppercase tracking-widest leading-none">CLAIM OPERATIONS</p>
-            <h2 id="header-title" class="font-bold text-slate-800 text-[11px] truncate uppercase">PART LINE CLAIM</h2>
+            <h2 id="header-title" class="font-bold text-slate-800 dark:text-slate-100 text-[11px] truncate uppercase">PART LINE CLAIM</h2>
         </div>
     </div>
 
     <!-- [กลุ่มตรงกลาง]: ปุ่มสลับ PART CLAIM / DASHBOARD + Theme + Lang -->
-    <div id="terminal-sub-nav" class="flex bg-slate-50 dark:bg-slate-800/50 p-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-inner items-center">
+    <div id="terminal-sub-nav" class="flex bg-slate-50 dark:bg-slate-800/50 p-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-inner items-center shrink-0">
         <button id="sub-btn-entry" onclick="switchSubTerminal('entry')" class="px-3 py-1 rounded-full text-[9px] font-black transition-all bg-blue-600 text-white shadow-sm">PART CLAIM</button>
         <button id="sub-btn-cockpit" onclick="switchSubTerminal('cockpit')" class="px-3 py-1 rounded-full text-[9px] font-black text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-all">DASHBOARD</button>
         
@@ -369,84 +372,46 @@
         </div>
     </div>
 
-    <!-- [กลุ่มฝั่งขวาสุด]: Online Badge + Staff Selector -->
-    <div class="flex items-center gap-3 ml-auto">
-        
-        
+    <!-- [กลุ่มฝั่งขวาสุด]: Online Badge + Staff Selector + Filter Bar -->
+    <div class="flex items-center gap-2 ml-auto shrink-0 flex-nowrap">
         <!-- ดรอปดาวน์พนักงาน -->
-        <div id="staff-selector-wrap" class="hidden items-center gap-2">
+        <div id="staff-selector-wrap" class="hidden items-center gap-1 shrink-0">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">:</span>
             <select id="staff-filter-select" class="staff-select" onchange="onStaffSelect(this.value)">
                 <option value="">-- เลือกพนักงาน --</option>
             </select>
         </div>
-    </div>
 
-<!-- 3. ส่วนขวาสุด: [วันที่เริ่ม -> วันที่จบ] [ปุ่ม Refresh] [Online Badge] [Staff Selector] -->
-    <div class="flex items-center gap-1.5 flex-shrink-0">
+        <!-- [FILTER TOOLBAR]: เฉพาะหน้า DASHBOARD -->
+        <div id="claim-dash-filter-wrap" class="hidden items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-md p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex-nowrap shrink-0">
+            <!-- ปุ่ม Preset -->
+            <div class="flex items-center gap-1 shrink-0">
+                <button id="cd-preset-today" onclick="applyClaimDashPreset('today')" class="h-6 px-2 text-[9px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs">Today</button>
+                <button id="cd-preset-month" onclick="applyClaimDashPreset('month')" class="h-6 px-2 text-[9px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs">Month</button>
+            </div>
 
-    <!-- [GROUP B] เฉพาะหน้า DASHBOARD: ฟิลเตอร์วันที่เดิมของคุณ -->
-    <div id="claim-dash-filter-wrap" class="hidden items-center gap-1 bg-white/40 backdrop-blur-md p-1 rounded-xl border border-slate-200 shadow-sm mr-2">
-        <button id="cd-preset-today" onclick="applyClaimDashPreset('today')" class="h-7 px-2.5 text-[9px] font-black bg-white text-slate-500 rounded-lg border border-slate-100 hover:border-blue-400 transition-all uppercase">Today</button>
-        <button id="cd-preset-month" onclick="applyClaimDashPreset('month')" class="h-7 px-2.5 text-[9px] font-black bg-white text-slate-500 rounded-lg border border-slate-100 hover:border-blue-400 transition-all uppercase">Month</button>
-        <div class="w-[1px] h-3 bg-slate-300 mx-0.5"></div>
+            <div class="w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
 
-        <div class="flex items-center gap-1 px-1">
-          <div id="vendor-divider" class="hidden w-[1px] h-3 bg-slate-300 mx-1"></div>
-            <input type="date" id="cd-start-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[10px] font-bold text-slate-600 outline-none w-[95px] h-6 cursor-pointer">
-            <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-width="3" stroke-linecap="round"></path></svg>
-            <input type="date" id="cd-end-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[10px] font-bold text-slate-600 outline-none w-[95px] h-6 cursor-pointer">
-                <!-- เพิ่มตรงนี้: เส้นแบ่งคั่นและตัวเลือก Vendor -->
-    <div class="w-[1px] h-3 bg-slate-300 mx-1"></div>
-<select id="claim-vendor-filter" onchange="updateAllModuleFilters()" 
-    class="hidden bg-transparent border-none text-[10px] font-black text-blue-600 outline-none w-[100px] h-6 cursor-pointer appearance-none truncate">
-    <option value="ALL">ALL VENDORS</option>
-</select>
+            <!-- ส่วนเลือกวันที่เอง (Custom Range) -->
+            <div class="cd-date-range-box flex items-center gap-1 px-1.5 py-0.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-700 shrink-0">
+                <input type="date" id="cd-start-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[88px] h-5 cursor-pointer">
+                <svg class="cd-date-arrow w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-width="2.5" stroke-linecap="round"></path></svg>
+                <input type="date" id="cd-end-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[88px] h-5 cursor-pointer">
+            </div>
+
+            <div id="vendor-divider" class="hidden w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
+            <select id="claim-vendor-filter" onchange="updateAllModuleFilters()" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-extrabold text-blue-600 dark:text-blue-400 outline-none h-6 px-1.5 cursor-pointer max-w-[100px] truncate shrink-0">
+                <option value="ALL">ALL VENDORS</option>
+            </select>
+
+            <div class="w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
+
+            <!-- ปุ่ม Reset -->
+            <button onclick="resetClaimDashFilter()" class="h-6 w-6 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 dark:hover:bg-rose-950/50 dark:hover:text-rose-400 transition-all shrink-0" title="Reset Filters" data-i18n-title="btn_reset_filter">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
         </div>
-        <div class="w-[1px] h-3 bg-slate-300 mx-0.5"></div>
-<!-- ปุ่ม Reset ใน Header -->
-<button onclick="resetClaimDashFilter()" 
-    class="h-7 w-7 flex items-center justify-center rounded-lg border transition-all active:scale-95
-           bg-white border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200
-           dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500 dark:hover:bg-rose-900/30 dark:hover:text-rose-400"
-    title="Reset Filters" data-i18n-title="btn_reset_filter">
-    
-    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" 
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
-        </path>
-    </svg>
-</button>
-<!-- ฟิลเตอร์วันที่แบบ Full Suite (Compact & Futuristic) -->
-<div id="claim-dash-filter-wrap" class="hidden items-center gap-1 bg-white/40 backdrop-blur-md p-1 rounded-xl border border-slate-200 shadow-sm mr-2">
-    <!-- ปุ่ม Preset -->
-    <button id="cd-preset-today" onclick="applyClaimDashPreset('today')" 
-        class="h-7 px-2.5 text-[9px] font-black bg-white text-slate-500 rounded-lg border border-slate-100 hover:border-blue-400 hover:text-blue-600 transition-all uppercase">Today</button>
-    
-    <button id="cd-preset-month" onclick="applyClaimDashPreset('month')" 
-        class="h-7 px-2.5 text-[9px] font-black bg-white text-slate-500 rounded-lg border border-slate-100 hover:border-blue-400 hover:text-blue-600 transition-all uppercase">Month</button>
-    
-    <div class="w-[1px] h-3 bg-slate-300 mx-0.5"></div>
-
-    <!-- ส่วนเลือกวันที่เอง (Custom Range) -->
-    <div class="flex items-center gap-1 px-1">
-        <input type="date" id="cd-start-date" onchange="onClaimDashDateChange()" 
-            class="bg-transparent border-none text-[10px] font-bold text-slate-600 outline-none w-[95px] h-6 cursor-pointer hover:text-blue-600 transition-colors">
-        
-        <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-width="3" stroke-linecap="round"></path></svg>
-        
-        <input type="date" id="cd-end-date" onchange="onClaimDashDateChange()" 
-            class="bg-transparent border-none text-[10px] font-bold text-slate-600 outline-none w-[95px] h-6 cursor-pointer hover:text-blue-600 transition-colors">
     </div>
-
-    <div class="w-[1px] h-3 bg-slate-300 mx-0.5"></div>
-    
-    <!-- ปุ่ม Reset -->
-    <button onclick="resetClaimDashFilter()" 
-        class="h-7 w-7 flex items-center justify-center bg-slate-50 text-slate-400 rounded-lg border border-slate-100 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 transition-all">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-    </button>
-
 </header>
                         
             
@@ -542,7 +507,6 @@
     </div>
 
     <!-- ส่วนตาราง (Table Panel) -->
-    <!-- ส่วนตาราง (Table Panel) -->
     <div id="table-panel" class="flex-1 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col min-w-0 relative">
         
         <!-- ปุ่มแสดงฟอร์ม (โผล่มาเมื่อซ่อนฟอร์ม) -->
@@ -551,39 +515,57 @@
             <span class="text-[7px] font-black tracking-tighter uppercase [writing-mode:vertical-lr]">FORM</span>
         </button>
 
-        <!-- แถบตัวกรองและปุ่มสั่งการ -->
+        <!-- แถบตัวกรองและปุ่มสั่งการ (SINGLE ROW ULTRA-SLEEK TOOLBAR) -->
         <div class="filter-container">
-            <div class="flex items-center gap-1 flex-wrap">
+            <!-- กลุ่มปุ่มตัวกรอง (Segmented Control Pills) -->
+            <div class="filter-pills-group">
                 <button class="f-btn active" data-filter="ALL" onclick="filterTable('ALL',this)">ALL</button>
                 <button class="f-btn" data-filter="SF" onclick="filterTable('SF',this)">SF</button>
                 <button class="f-btn" data-filter="VENDOR FAULT" onclick="filterTable('VENDOR FAULT',this)">VENDOR</button>
                 <button class="f-btn" data-filter="CTC" onclick="filterTable('CTC',this)">CTC</button>
                 <button class="f-btn" data-filter="CAN USE" onclick="filterTable('CAN USE',this)">CAN USE</button>
             </div>
+
+            <!-- ช่องค้นหาอัจฉริยะ (Smart Search Box) -->
             <div class="search-box-wrapper">
-                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="search-icon w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                 </svg>
                 <input type="text" class="search-box-input" id="filter-search" placeholder="ค้นหา Ref, Part No, Supplier..." oninput="debounceSearch()">
+                <button type="button" id="clear-search-btn" onclick="clearFilterSearch()" class="clear-search-btn hidden" title="ล้างการค้นหา">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
             
-            <!-- [ฝั่งขวา] รวมกลุ่มปุ่ม และ จำนวนรายการเข้าด้วยกัน -->
-            <div class="ml-auto flex items-center gap-2">
+            <!-- [ฝั่งขวา] กลุ่มปุ่มคำสั่ง และ จำนวนรายการ -->
+            <div class="action-tools-group">
                 <!-- กลุ่มปุ่ม IMPORT, EXPORT, CLEAR -->
                 <div class="flex items-center gap-1">
-                    <button onclick="triggerImport()" class="h-7 px-3 text-[10px] font-black bg-white text-blue-600 rounded-lg border border-slate-100 hover:border-blue-400 transition-all uppercase">Import</button>
+                    <button onclick="triggerImport()" class="btn-tool-action btn-import">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                        <span>Import</span>
+                    </button>
                     <input type="file" id="import-hidden-input" class="hidden" accept=".xlsx, .xls" onchange="handleImport(event)">
                     
-                    <button onclick="exportToCSV()" class="h-7 px-3 text-[10px] font-black bg-white text-slate-600 rounded-lg border border-slate-100 hover:border-slate-400 transition-all uppercase">Export</button>
+                    <button onclick="exportToCSV()" class="btn-tool-action btn-export">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Export</span>
+                    </button>
                     
-                    <button onclick="confirmClearAll()" class="h-7 px-3 text-[10px] font-black bg-rose-50 text-rose-600 rounded-lg border border-rose-100 hover:bg-rose-100 transition-all uppercase">Clear</button>
+                    <button onclick="confirmClearAll()" class="btn-tool-action btn-clear">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        <span>Clear</span>
+                    </button>
                 </div>
 
                 <!-- เส้นแบ่งคั่น -->
-                <div class="w-[1px] h-4 bg-slate-200 dark:bg-slate-700"></div>
+                <div class="v-divider"></div>
 
                 <!-- จำนวนรายการ -->
-                <span id="record-count" class="text-[10px] font-extrabold text-slate-500 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 whitespace-nowrap">0 รายการ</span>
+                <div class="record-counter-badge">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="record-count">0 รายการ</span>
+                </div>
             </div>
         </div>
 
@@ -591,462 +573,517 @@
         <div id="table-container" class="flex-1 overflow-auto scroll-custom"></div>
 
     </div>
+<!-- NEXUS Quick-Link Dock (Far Right) -->
 
 </div> <!-- ปิด entry-terminal-content -->
 
     <!-- ============================================================
          2. OVERVIEW COCKPIT (MAIN DASHBOARD)
          ============================================================ -->
-    <div id="overview-cockpit-content" class="hidden-view">
-
-
-        <!-- KPI 5 การ์ด -->
-        <div class="grid grid-cols-5 gap-2.5 flex-shrink-0">
-            <div class="kpi-card-new" style="border-color: #10b98133;">
-                <div class="flex justify-between items-start">
-                    <h3 class="text-[8px] font-black text-emerald-600 uppercase tracking-tighter">Production Summary</h3>
-                    <div class="w-6 h-6 bg-emerald-50 rounded flex items-center justify-center text-[10px]">📦</div>
-                </div>
-                <div class="flex items-baseline gap-1 mt-2">
-                    <span id="kpi-total" class="text-2xl font-black text-slate-800">0</span>
-                    <span class="text-[9px] font-bold text-slate-400">PCS</span>
-                </div>
-                <div class="flex justify-between items-end mt-auto pt-2">
-                    <div>
-                        <p class="stat-label">Verified</p>
-                        <p class="text-[11px] font-black text-slate-400"><span id="kpi-total-lots">0</span> <span class="text-[7px]">LOTS</span></p>
-                    </div>
-                    <div class="text-right">
-                        <p class="stat-label">Pass Rate</p>
-                        <div id="yield-pill" class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-black text-[10px]">0%</div>
-                    </div>
-                </div>
-            </div>
-            <div class="kpi-card-new" style="border-color: #f9731644;">
-                <div class="text-[7px] font-black text-orange-600 uppercase">SF Fault <span class="kpi-marker-icon">◆</span></div>
-                <p id="kpi-sf-pcs" class="text-2xl font-black text-slate-800 mt-1">0</p>
-                <div class="ppm-container"><p class="ppm-text">PPM: <span id="kpi-sf-ppm">0</span> (<span id="kpi-sf-pct">0</span>%)</p></div>
-                <div class="grid grid-cols-2 mt-1">
-                    <div><p class="stat-label">Total Lots</p><p id="kpi-sf-lots-val" class="stat-value-main">0</p></div>
-                    <div class="text-right"><p class="stat-label">Share</p><span id="kpi-sf-share" class="share-badge">0%</span></div>
-                </div>
-                <div class="kpi-line-accent bg-orange-500 w-full"></div>
-                <div class="pcs-pill"><span class="pcs-pill-label">PCS</span><span id="kpi-sf-footer-pcs" class="pcs-pill-val bg-orange-500">0</span></div>
-            </div>
-            <div class="kpi-card-new" style="border-color: #ef444444;">
-                <div class="text-[7px] font-black text-red-600 uppercase">CTC Fault <span class="kpi-marker-icon">●</span></div>
-                <p id="kpi-ctc-pcs" class="text-2xl font-black text-slate-800 mt-1">0</p>
-                <div class="ppm-container"><p class="ppm-text">PPM: <span id="kpi-ctc-ppm">0</span> (<span id="kpi-ctc-pct">0</span>%)</p></div>
-                <div class="grid grid-cols-2 mt-1">
-                    <div><p class="stat-label">Total Lots</p><p id="kpi-ctc-lots-val" class="stat-value-main">0</p></div>
-                    <div class="text-right"><p class="stat-label">Share</p><span id="kpi-ctc-share" class="share-badge">0%</span></div>
-                </div>
-                <div class="kpi-line-accent bg-red-500 w-1/4"></div>
-                <div class="pcs-pill"><span class="pcs-pill-label">PCS</span><span id="kpi-ctc-footer-pcs" class="pcs-pill-val bg-blue-600">0</span></div>
-            </div>
-            <div class="kpi-card-new" style="border-color: #10b98144;">
-                <div class="text-[7px] font-black text-emerald-600 uppercase">Can Use (OK) <span class="kpi-marker-icon">▲</span></div>
-                <p id="kpi-ok-pcs" class="text-2xl font-black text-slate-800 mt-1">0</p>
-                <div class="ppm-container"><p class="ppm-text">PPM: <span id="kpi-ok-ppm">0</span> (<span id="kpi-ok-pct">0</span>%)</p></div>
-                <div class="grid grid-cols-2 mt-1">
-                    <div><p class="stat-label">Total Lots</p><p id="kpi-ok-lots-val" class="stat-value-main">0</p></div>
-                    <div class="text-right"><p class="stat-label">Share</p><span id="kpi-ok-share" class="share-badge">0%</span></div>
-                </div>
-                <div class="kpi-line-accent bg-emerald-500 w-1/2"></div>
-                <div class="pcs-pill"><span class="pcs-pill-label">PCS</span><span id="kpi-ok-footer-pcs" class="pcs-pill-val bg-emerald-500">0</span></div>
-            </div>
-            <div class="kpi-card-new" style="border-color: #3b82f644;">
-                <div class="text-[7px] font-black text-blue-600 uppercase">Vendor Fault <span class="kpi-marker-icon">■</span></div>
-                <p id="kpi-vendor-pcs" class="text-2xl font-black text-slate-800 mt-1">0</p>
-                <div class="ppm-container"><p class="ppm-text">PPM: <span id="kpi-vendor-ppm">0</span> (<span id="kpi-vendor-pct">0</span>%)</p></div>
-                <div class="grid grid-cols-2 mt-1">
-                    <div><p class="stat-label">Total Lots</p><p id="kpi-vendor-lots-val" class="stat-value-main">0</p></div>
-                    <div class="text-right"><p class="stat-label">Share</p><span id="kpi-vendor-share" class="share-badge">0%</span></div>
-                </div>
-                <div class="kpi-line-accent bg-blue-500 w-1/6"></div>
-                <div class="pcs-pill"><span class="pcs-pill-label">PCS</span><span id="kpi-vendor-footer-pcs" class="pcs-pill-val bg-red-500">0</span></div>
-            </div>
-        </div>
-
-        <!-- แถววิเคราะห์หลัก -->
-        <div class="grid grid-cols-12 gap-3 flex-1 min-h-0">
-            <!-- ซ้าย: Charts 9 ส่วน -->
-            <div class="col-span-9 grid grid-rows-2 gap-3 min-h-0">
-                <!-- บน: Gauge + Trend -->
-                <div class="grid grid-cols-12 gap-3 min-h-0">
-                    <div class="col-span-4 card-base dash-card-flex relative overflow-hidden">
-                        <div class="flex justify-between items-center mb-1">
-                            <div>
-                                <p class="kpi-title">Quality Performance</p>
-                                <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Pass-Rate Dial</p>
-                            </div>
-                            <div class="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                            </div>
-                        </div>
-                        <div class="dial-container-modern flex-1">
-                            <div class="dial-glass-overlay"></div>
-                            <div id="yield-chart" class="w-full h-full"></div>
-                            <div id="dial-status-container"></div>
-                        </div>
-<div class="flex justify-between mt-2 pt-2 border-t border-slate-50">
-<div class="text-center flex-1 border-r border-slate-100">
-    <p class="text-[8px] font-bold text-slate-400 uppercase">Target</p>
-        <!-- ใส่ id="yield-target-value" ที่บรรทัดนี้ -->
-        <p id="yield-target-value" class="text-[11px] font-black text-slate-700">95.0%</p>
-    </div>
-    <div class="text-center flex-1">
-        <p class="text-[8px] font-bold text-slate-400 uppercase">Status</p>
-        <div id="yield-status-text" class="text-[10px] font-black text-slate-600">-</div>
-    </div>
-</div>
-                    </div>
-                    <div class="col-span-8 card-base dash-card-flex">
-                        <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
-                            <div class="min-w-0">
-                                <p class="kpi-title">Monthly Production Trends</p>
-                                <div class="flex items-center gap-2 mt-1 flex-wrap">
-                                    <p class="text-[9px] text-slate-400 font-medium">Monthly Performance Analysis</p>
-                                    <span id="trend-total-pcs" class="bg-blue-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md whitespace-nowrap">PCS 0</span>
-                                </div>
-                            </div>
-                            <div class="flex gap-2">
-                                <div class="perf-badge-mini"><p class="perf-badge-label">Max Peak</p><p id="trend-max" class="perf-badge-val text-emerald-500">0</p></div>
-                                <div class="perf-badge-mini"><p class="perf-badge-label">Minimum</p><p id="trend-min" class="perf-badge-val text-rose-500">0</p></div>
-                                <div class="perf-badge-mini"><p class="perf-badge-label">Average</p><p id="trend-avg" class="perf-badge-val text-blue-500">0</p></div>
-                            </div>
-                        </div>
-                        <div id="trend-chart" class="chart-container-grow"></div>
-                    </div>
-                </div>
-                <!-- ล่าง: Risk + Feed -->
-                <div class="grid grid-cols-2 gap-3 min-h-0">
-<!-- [REPLACED] New Live Incident Feed v2 -->
-<div class="risk-intel-card" style="background: #ffffff; border: 1px solid #f1f5f9; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
-    <div class="flex justify-between items-center mb-4">
-        <div class="flex items-center gap-2">
-            <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <h3 class="text-[10px] font-black text-slate-800 tracking-[0.15em] uppercase">Vendor Fault Feed</h3>
-        </div>
-        <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black border border-emerald-100">REAL-TIME</span>
-    </div>
+    <div id="overview-cockpit-content" class="dash-compact-layout hidden-view">
     
-    <!-- พื้นที่แสดง Feed -->
-    <div id="risk-intel-display-area" class="flex-1 overflow-y-auto pr-1 scroll-custom space-y-3">
-        <!-- ข้อมูลจะถูกเติมโดย JavaScript -->
-    </div>
-</div>
-
-<!-- ค้นหา <div class="card-base dash-card-flex"> ที่มี id="live-incident-feed" อยู่ข้างใน -->
-<div class="card-base dash-card-flex" style="background: #ffffff; border-color: #e0f2fe;">
-    <div class="flex justify-between items-center mb-4">
-        <div>
-            <p class="kpi-title" style="color: #0369a1;">Top Claim Lines Analysis</p>
-            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">สายการผลิตที่มีปัญหาการเคลมสูงสุด</p>
+    <!-- แถวที่ 1: KPI (5 กล่อง ยืดหดตามจอ) -->
+    <!-- แถวที่ 1: KPI (5 กล่อง สไตล์พรีเมียมตามภาพ) -->
+<div class="compact-kpi-grid">
+    
+    <!-- 1. PRODUCTION SUMMARY -->
+    <div class="kpi-card-v2 border-emerald-100">
+        <div class="flex justify-between items-start">
+            <span class="kpi-v2-label text-emerald-600">PRODUCTION SUMMARY</span>
+            <div class="w-6 h-6 bg-emerald-50 rounded flex items-center justify-center text-xs">📦</div>
         </div>
-        <span class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[8px] font-black border border-blue-100">
-            <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span> RANKING
-        </span>
-    </div>
-    <!-- พื้นที่แสดงข้อมูล -->
-    <div id="live-incident-feed" class="scroll-internal space-y-3">
-        <!-- JS จะสร้างข้อมูลใส่ตรงนี้ -->
-    </div>
-</div>
-                </div>
+        <div class="mt-2">
+            <h2 id="kpi-total" class="kpi-v2-val">0</h2>
+            <span class="text-[10px] font-bold text-slate-400 ml-1">PCS</span>
+        </div>
+        <div class="flex justify-between items-end mt-auto pt-2 border-t border-slate-50">
+            <div>
+                <p class="text-[8px] font-black text-slate-300 uppercase">Verified</p>
+                <p class="text-[11px] font-black text-slate-500"><span id="kpi-total-lots">0</span> LOTS</p>
             </div>
-            <!-- ขวา: Pareto 3 ส่วน -->
-            <div class="col-span-3 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col h-full overflow-hidden">
-                <div class="p-4 border-b border-slate-50 flex justify-between items-center gap-2">
-                    <div class="min-w-0">
-                        <h3 class="text-[11px] font-black text-slate-800 tracking-wider uppercase">Pareto 80/20 Supplier Risks</h3>
-                        <p class="text-[9px] text-slate-400 font-medium leading-tight mt-1">ซัพพลายเออร์ที่มีจำนวนของเสียสูงสุด เพื่อให้วิศวกรโฟกัสและตรวจสอบ</p>
-                    </div>
-                    <span class="bg-red-50 text-red-500 text-[8px] font-black px-2 py-0.5 rounded-full border border-red-100 uppercase whitespace-nowrap flex-shrink-0">Top NG Areas</span>
-                </div>
-                <div id="pareto-list" class="flex-1 overflow-y-auto p-4 space-y-5 scroll-invisible"></div>
-                <div class="p-4 bg-slate-50 border-t border-slate-100">
-                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                        <div class="flex gap-2 items-start">
-                            <div class="text-amber-400 text-sm">💡</div>
-                            <div class="min-w-0">
-                                <p class="text-[10px] font-black text-slate-700 uppercase leading-none">วิเคราะห์กลยุทธ์:</p>
-                                <p class="text-[9px] text-slate-500 mt-1.5 leading-relaxed" id="pareto-insight-text">ข้อมูลปัจจุบันยังไม่เพียงพอสำหรับการวิเคราะห์เชิงลึก</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="text-right">
+                <p class="text-[8px] font-black text-slate-300 uppercase">Pass Rate</p>
+                <div id="yield-pill" class="yield-badge-v2">0%</div>
             </div>
         </div>
     </div>
 
-    <!-- ============================================================
-         3. EXEC DASHBOARD
-         ============================================================ -->
-    <div id="exec-dashboard-content" class="exec-container hidden-view">
-
-        <!-- KPI Grid 4 การ์ด -->
-        <div class="exec-kpi-grid">
-            <div class="exec-card-premium">
-                <div class="flex justify-between items-start">
-                    <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                    </div>
-                    <span class="text-[10px] font-black text-slate-900 bg-slate-50 px-2 py-1 rounded-lg">▲ 12.4%</span>
-                </div>
-                <p class="text-[10px] font-black text-slate-400 uppercase mt-4">Total Support</p>
-                <h2 class="text-3xl font-black text-slate-900 mt-1" id="exec-kpi-support">3970</h2>
-                <div class="flex gap-4 mt-4 text-[10px] font-bold">
-                    <div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> RP: <span id="exec-sub-rp" class="text-blue-600">3566</span></div>
-                    <div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> VF: <span id="exec-sub-vf" class="text-rose-600">154</span></div>
-                     <!-- เพิ่มส่วนนี้เข้าไป -->
-    <div class="flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> REC: <span id="exec-sub-records" class="text-amber-600">0</span>
-    </div>
-                </div>
-            </div>
-            <div class="exec-card-premium">
-                <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
-                </div>
-    <p class="text-[10px] font-black text-slate-400 uppercase mt-4">5S Score Status</p>
-    <!-- เพิ่ม id="exec-5s-avg" -->
-    <h2 class="text-3xl font-black text-slate-900 mt-1" id="exec-5s-avg">0.0 <span class="text-xs text-slate-300">/ 5.0</span></h2>
-    <div class="mt-4 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <!-- เพิ่ม id="exec-5s-bar" -->
-        <div id="exec-5s-bar" class="h-full bg-gradient-to-r from-amber-400 to-amber-600" style="width: 0%"></div>
-                </div>
-            </div>
-            <div class="exec-card-premium">
-                <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                </div>
-                <p class="text-[10px] font-black text-slate-400 uppercase mt-4">Competency Index</p>
-    <!-- เพิ่ม id="exec-skill-avg" -->
-    <h2 class="text-3xl font-black text-slate-900 mt-1" id="exec-skill-avg">0.0%</h2>
-    <p id="exec-skill-status" class="text-[9px] font-bold text-emerald-600 mt-4 flex items-center gap-1">Optimal Level Reached</p>
-            </div>
-<!-- ค้นหาการ์ด Attendance Rate ใน Exec Dashboard และแก้เป็นแบบนี้ -->
-<div class="exec-card-premium">
-    <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-    </div>
-    <p class="text-[10px] font-black text-slate-400 uppercase mt-4">Attendance Rate</p>
-    <!-- เพิ่ม id="exec-att-rate" -->
-    <h2 class="text-3xl font-black text-slate-900 mt-1" id="exec-att-rate">0%</h2>
-    <!-- เพิ่ม id="exec-leave-total" -->
-    <div class="mt-4 text-[9px] font-bold text-slate-400">
-        LEAVE: <span class="text-rose-500 font-black" id="exec-leave-total">0 DAYS</span> TOTAL
-    </div>
-</div>
+    <!-- 2. SF FAULT -->
+    <div class="kpi-card-v2 border-orange-100">
+        <div class="flex justify-between items-start">
+            <span class="kpi-v2-label text-orange-600">SF FAULT</span>
+            <span class="text-[10px] text-orange-500">◆</span>
         </div>
-
-        <!-- กราฟหลัก -->
-        <div class="exec-chart-grid">
-            <!-- Monthly Trends -->
-            <div class="chart-box col-span-12 lg:col-span-8">
-                
-                <div class="chart-header mb-4">
-                    <h3 class="text-[13px] font-black text-slate-800 uppercase">MONTHLY ACTIVITY TRENDS</h3>
-                    <p class="text-[10px] text-slate-400 font-medium ml-3 mt-1">เปรียบเทียบแนวโน้มการ Support หน้างาน และผลคะแนนตรวจสอบ 5S ประจำสัปดาห์</p>
-                </div>
-<div class="chart-wrapper-fixed" style="height: clamp(200px, 32vh, 320px); min-height: 0;">
-    <div id="exec-trend-chart" style="width:100%;height:100%;"></div>
-</div>
+        <h2 id="kpi-sf-pcs" class="kpi-v2-val">0</h2>
+        <div class="ppm-bar-v2">PPM: <span id="kpi-sf-ppm">0</span> (<span id="kpi-sf-pct">0</span>%)</div>
+        <div class="flex justify-between mt-2">
+            <div>
+                <p class="text-[8px] font-black text-slate-300">TOTAL LOTS</p>
+                <p id="kpi-sf-lots-val" class="text-[14px] font-black text-blue-900">0</p>
             </div>
-            <!-- AI Banner -->
-<div class="col-span-12 lg:col-span-4">
-    <div class="ai-banner-futuristic h-full rounded-[24px]" style="padding: clamp(12px, 2vh, 24px);">
-        <div class="flex justify-between items-center z-10">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
-                <span class="text-[10px] font-black text-blue-400 uppercase tracking-widest">AI Analytic Insight</span>
-            </div>
-            <span class="ai-status-pill">Active</span>
-        </div>
-
-        <div class="z-10" style="margin-top: clamp(8px, 2vh, 24px);">
-            <p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Efficiency Competency Index</p>
-            <div class="flex items-baseline gap-2">
-                <!-- ID: ai-score-val (สำหรับตัวเลข %) -->
-                <span id="ai-score-val" class="font-black text-white tracking-tighter" style="font-size: clamp(28px, 5vw, 60px);">0%</span>
-                <span class="text-sm font-bold text-blue-500 uppercase">Score</span>
-            </div>
-            <div class="ai-progress-bg">
-                <!-- ID: ai-progress-bar (สำหรับปรับความยาวหลอด) -->
-                <div id="ai-progress-bar" class="ai-progress-fill" style="width: 0%"></div>
-            </div>
-            <div class="flex gap-2" style="margin-top: clamp(8px, 1.5vh, 16px);">
-                <span class="text-amber-400 text-xs flex-shrink-0">🌟</span>
-                <!-- ID: ai-insight-text (สำหรับเปลี่ยนข้อความวิเคราะห์) -->
-                <p id="ai-insight-text" class="text-[11px] text-slate-300 leading-relaxed font-medium">กำลังประมวลผลข้อมูลจากฐานข้อมูล...</p>
+            <div class="text-right">
+                <p class="text-[8px] font-black text-slate-300">SHARE</p>
+                <span id="kpi-sf-share" class="share-pill-v2 bg-orange-50 text-orange-600">0%</span>
             </div>
         </div>
-
-        <div class="grid grid-cols-2 gap-2 mt-auto z-10">
-            <div class="ai-summary-box" style="padding: clamp(6px, 1vh, 12px);">
-                <!-- ID: ai-projects-val (สำหรับยอดรวม Activities) -->
-                <p id="ai-projects-val" class="font-black text-white" style="font-size: clamp(16px, 2vw, 24px);">0</p>
-                <p class="text-[7px] text-slate-500 font-black uppercase tracking-wider mt-1">Total Activities</p>
-            </div>
-            <div class="ai-summary-box" style="padding: clamp(6px, 1vh, 12px);">
-                <!-- ID: ai-skills-val (สำหรับยอดรวมรายการทักษะ) -->
-                <p id="ai-skills-val" class="font-black text-white" style="font-size: clamp(16px, 2vw, 24px);">0</p>
-                <p class="text-[7px] text-slate-500 font-black uppercase tracking-wider mt-1">Skills Recorded</p>
-            </div>
+        <div class="kpi-v2-footer bg-orange-500">
+            <div class="pcs-tag-v2"><span class="bg-white/20 px-1 mr-1">PCS</span> <span id="kpi-sf-footer-pcs">0 PCS</span></div>
         </div>
     </div>
-</div>
-            <!-- Top Part Problems -->
-            <div class="chart-box lg:col-span-6 overflow-hidden">
-                <div class="flex justify-between items-start mb-2">
-                    <div>
-                        <h3 class="text-[13px] font-black text-slate-800 uppercase tracking-tight">TOP 5 PROBLEM PART GROUPS</h3>
-                        <p class="text-[10px] text-slate-400 font-medium">ชิ้นส่วนพาร์ทที่มีการเคลมหรือเกิดปัญหาบ่อยที่สุดในสายผลิต</p>
-                    </div>
-                    <div class="bg-blue-50 text-blue-600 text-[9px] font-black px-2 py-1 rounded-lg uppercase">Live Analysis</div>
-                </div>
-<div class="chart-wrapper-fixed" style="height: clamp(180px, 30vh, 280px); min-height: 0;">
-    <div id="exec-part-chart" style="width:100%;height:100%;"></div>
-</div>
+
+    <!-- 3. CTC FAULT -->
+    <div class="kpi-card-v2 border-red-100">
+        <div class="flex justify-between items-start">
+            <span class="kpi-v2-label text-red-600">CTC FAULT</span>
+            <span class="text-[10px] text-red-500">●</span>
+        </div>
+        <h2 id="kpi-ctc-pcs" class="kpi-v2-val">0</h2>
+        <div class="ppm-bar-v2">PPM: <span id="kpi-ctc-ppm">0</span> (<span id="kpi-ctc-pct">0</span>%)</div>
+        <div class="flex justify-between mt-2">
+            <div>
+                <p class="text-[8px] font-black text-slate-300">TOTAL LOTS</p>
+                <p id="kpi-ctc-lots-val" class="text-[14px] font-black text-blue-900">0</p>
             </div>
-            <!-- Report Type Distribution -->
-            <div class="chart-box lg:col-span-6 overflow-hidden">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <h3 class="text-[13px] font-black text-slate-800 uppercase tracking-tight">REPORT TYPE DISTRIBUTION</h3>
-                        <p class="text-[10px] text-slate-400 font-medium">สัดส่วนประเภทรายงานการวิเคราะห์ (RP / VF / Others)</p>
-                    </div>
-                    <div class="bg-indigo-50 text-indigo-600 text-[9px] font-black px-2 py-1 rounded-lg uppercase">Global Share</div>
-                </div>
-                <div class="flex flex-1 flex-col md:flex-row items-center justify-center gap-3 min-h-0 overflow-hidden" style="min-width:0;">
-<div class="relative flex-shrink-0" style="width: clamp(110px, 18vw, 170px); aspect-ratio: 1/1;">
-    <div id="exec-pie-chart" style="width:100%;height:100%;"></div>
-</div>
-                    <div id="exec-pie-legend" class="flex-1 w-full space-y-2 pr-2"></div>
-                </div>
+            <div class="text-right">
+                <p class="text-[8px] font-black text-slate-300">SHARE</p>
+                <span id="kpi-ctc-share" class="share-pill-v2 bg-red-50 text-red-600">0%</span>
             </div>
         </div>
-        <!-- ปิด exec-dashboard-content -->
+        <div class="kpi-v2-footer bg-red-500">
+            <div class="pcs-tag-v2"><span class="bg-white/20 px-1 mr-1">PCS</span> <span id="kpi-ctc-footer-pcs">0 PCS</span></div>
+        </div>
+    </div>
+
+    <!-- 4. CAN USE (OK) -->
+    <div class="kpi-card-v2 border-emerald-100">
+        <div class="flex justify-between items-start">
+            <span class="kpi-v2-label text-emerald-600">CAN USE (OK)</span>
+            <span class="text-[10px] text-emerald-500">▲</span>
+        </div>
+        <h2 id="kpi-ok-pcs" class="kpi-v2-val">0</h2>
+        <div class="ppm-bar-v2">PPM: <span id="kpi-ok-ppm">0</span> (<span id="kpi-ok-pct">0</span>%)</div>
+        <div class="flex justify-between mt-2">
+            <div>
+                <p class="text-[8px] font-black text-slate-300">TOTAL LOTS</p>
+                <p id="kpi-ok-lots-val" class="text-[14px] font-black text-blue-900">0</p>
+            </div>
+            <div class="text-right">
+                <p class="text-[8px] font-black text-slate-300">SHARE</p>
+                <span id="kpi-ok-share" class="share-pill-v2 bg-emerald-50 text-emerald-600">0%</span>
+            </div>
+        </div>
+        <div class="kpi-v2-footer bg-emerald-500">
+            <div class="pcs-tag-v2"><span class="bg-white/20 px-1 mr-1">PCS</span> <span id="kpi-ok-footer-pcs">0 PCS</span></div>
+        </div>
+    </div>
+
+    <!-- 5. VENDOR FAULT -->
+    <div class="kpi-card-v2 border-blue-100">
+        <div class="flex justify-between items-start">
+            <span class="kpi-v2-label text-blue-600">VENDOR FAULT</span>
+            <span class="text-[10px] text-blue-500">■</span>
+        </div>
+        <h2 id="kpi-vendor-pcs" class="kpi-v2-val">0</h2>
+        <div class="ppm-bar-v2">PPM: <span id="kpi-vendor-ppm">0</span> (<span id="kpi-vendor-pct">0</span>%)</div>
+        <div class="flex justify-between mt-2">
+            <div>
+                <p class="text-[8px] font-black text-slate-300">TOTAL LOTS</p>
+                <p id="kpi-vendor-lots-val" class="text-[14px] font-black text-blue-900">0</p>
+            </div>
+            <div class="text-right">
+                <p class="text-[8px] font-black text-slate-300">SHARE</p>
+                <span id="kpi-vendor-share" class="share-pill-v2 bg-blue-50 text-blue-600">0%</span>
+            </div>
+        </div>
+        <div class="kpi-v2-footer bg-blue-500">
+            <div class="pcs-tag-v2"><span class="bg-white/20 px-1 mr-1">PCS</span> <span id="kpi-vendor-footer-pcs">0 PCS</span></div>
+        </div>
+    </div>
+
+</div>
+
+    <!-- แถวที่ 2: Analytics Grid (จุดที่ Error บ่อยที่สุด) -->
+    <div class="compact-main-grid">
+<!-- QUALITY PERFORMANCE DIAL - ADAPTIVE COCKPIT -->
+<!-- QUALITY PERFORMANCE DIAL - MASTER RESPONSIVE -->
+<!-- QUALITY PERFORMANCE DIAL - PERFECT ALIGNMENT -->
+<div class="white-box dial-container-box" style="padding: 15px; border-radius: 20px; background: var(--dial-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; border: 1px solid var(--dial-border); box-shadow: 0 4px 20px rgba(0,0,0,0.05); transition: all 0.3s ease; overflow: hidden;">
+    
+    <div style="width: 100%; text-align: left; margin-bottom: 5px; flex-shrink: 0;">
+        <h3 style="font-size: 12px; font-weight: 900; color: var(--dial-text-main); text-transform: uppercase; margin: 0;">Quality Performance</h3>
+        <p style="font-size: 8px; color: #3b82f6; font-weight: 700; margin: 0;">NEURAL SENSOR / PASS-RATE</p>
+    </div>
+
+    <div class="gauge-ring-wrapper" style="flex: 1; width: 100%; max-width: 280px; aspect-ratio: 1; position: relative; display: flex; align-items: center; justify-content: center; min-height: 0;">
         
-    </div>
+        <svg viewBox="0 0 200 180" style="width: 100%; height: 100%; overflow: visible;">
+            <!-- 1. รางพื้นหลัง (ล็อครัศมี 75 ที่จุด 100, 112) -->
+            <path d="M 35 149.5 A 75 75 0 1 1 165 149.5" fill="none" stroke="var(--dial-track)" stroke-width="14" stroke-linecap="round" />
+            
+            <!-- 2. ขีดสเกล (วาดผ่าน JS ให้ตรงตำแหน่ง 100, 112) -->
+            <g id="gaugeTicksGroup"></g>
 
-    <!-- ============================================================
-         4. ATTENDANCE LOGS (sibling ระดับเดียวกับ views อื่น)
-         ============================================================ -->
-    <div id="attendance-logs" class="hidden-view">
-        <div class="att-container">
+            <!-- 3. แถบสีแสดงผล -->
+            <path id="mainGaugeArc" class="neon-glow" d="M 35 149.5 A 75 75 0 1 1 165 149.5" fill="none" stroke="#ef4444" stroke-width="12" stroke-linecap="round" style="transition: stroke-dasharray 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);" />
 
+            <!-- 4. ตัวเลขสเกล (ปรับตำแหน่งให้สมดุลกับรัศมี 75) -->
+            <g style="font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 800; fill: var(--dial-text-sub);">
+                <text x="30" y="165" text-anchor="middle">0</text>
+                <text x="25" y="90" text-anchor="middle">20</text>
+                <text x="60" y="42" text-anchor="middle">40</text>
+                <text x="140" y="42" text-anchor="middle">60</text>
+                <text x="175" y="90" text-anchor="middle">80</text>
+                <text x="170" y="165" text-anchor="middle">100</text>
+            </g>
 
-            <!-- KPI Cards -->
-            <div class="att-kpi-grid">
-                <div class="att-kpi-card kpi-leave">
-                    <div class="att-kpi-icon icon-leave">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
-                    </div>
-                    <div class="att-kpi-label">Leave Taken</div>
-                    <div><span class="att-kpi-value" id="att-kpi-leave">6</span><span class="att-kpi-unit">Days</span></div>
-                    <div class="att-kpi-sub">วันลาพักร้อนสะสม</div>
-                </div>
-                <div class="att-kpi-card kpi-holiday">
-                    <div class="att-kpi-icon icon-holiday">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/></svg>
-                    </div>
-                    <div class="att-kpi-label">Public Holidays</div>
-                    <div><span class="att-kpi-value" id="att-kpi-holiday">13</span><span class="att-kpi-unit">Days</span></div>
-                    <div class="att-kpi-sub">วันหยุดนักขัตฤกษ์ปีนี้</div>
-                </div>
-                <div class="att-kpi-card kpi-worked">
-                    <div class="att-kpi-icon icon-worked">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z"/></svg>
-                    </div>
-                    <div class="att-kpi-label">Total Worked</div>
-                    <div><span class="att-kpi-value" id="att-kpi-worked">231</span><span class="att-kpi-unit">Days</span></div>
-                    <div class="att-kpi-sub">วันทำงานสะสม</div>
-                </div>
-                <div class="att-kpi-card kpi-rate">
-                    <div class="att-kpi-icon icon-rate">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
-                    </div>
-                    <div class="att-kpi-label">Attendance Rate</div>
-                    <div><span class="att-kpi-value" id="att-kpi-rate">92</span><span class="att-kpi-unit">%</span></div>
-                    <div class="att-kpi-sub">อัตราเข้างานรวม</div>
-                </div>
+            <!-- 5. เข็มไมล์ (ล็อคจุดหมุนที่ 100, 112 ให้ตรงกับเส้นโค้ง) -->
+            <g id="mainGaugeNeedle" style="transform-origin: 100px 112px; transition: transform 1.8s cubic-bezier(0.16, 1, 0.3, 1);">
+                <path d="M 100 112 L 98 112 L 100 37 L 102 112 Z" fill="#3b82f6" />
+                <circle cx="100" cy="112" r="9" fill="var(--dial-bg)" stroke="var(--dial-border)" stroke-width="2" />
+                <circle cx="100" cy="112" r="4" fill="#3b82f6" />
+            </g>
+        </svg>
+
+        <!-- 6. ตัวเลข % และสถานะ -->
+        <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 45px; pointer-events: none;">
+            <div id="mainGaugeValue" style="font-family: 'Inter', sans-serif; font-size: clamp(1.8rem, 4.5vw, 2.3rem); font-weight: 950; color: var(--dial-text-main); line-height: 1; letter-spacing: -1.5px;">0%</div>
+            <div id="mainGaugeStatus" style="margin-top: 6px; padding: 2px 10px; border-radius: 5px; border: 1.5px solid #ef4444; background: var(--dial-bg); font-size: 9px; font-weight: 900; color: #ef4444; text-transform: uppercase; letter-spacing: 1.5px; display: flex; align-items: center; gap: 4px;">
+                <span style="width: 4px; height: 4px; border-radius: 50%; background: #ef4444;"></span>
+                <span id="mainGaugeStatusText">CRITICAL</span>
             </div>
-
-            <!-- Monthly Chart -->
-            <div class="att-chart-card">
-                <div class="att-chart-header">
-                    <div class="att-chart-title">Monthly Overview — <span id="att-chart-year-label">2026</span></div>
-                    <div class="att-chart-legend">
-                        <div class="att-legend-item"><div class="att-legend-dot dot-leave"></div>วันลา</div>
-                        <div class="att-legend-item"><div class="att-legend-dot dot-holiday"></div>วันหยุด</div>
-                        <div class="att-legend-item"><div class="att-legend-dot dot-worked"></div>วันทำงาน</div>
-                    </div>
-                </div>
-                <div class="att-chart-wrap" id="att-monthly-chart"></div>
-            </div>
-
-            <!-- Bottom: Form + Records -->
-            <div class="att-bottom-grid">
-                <!-- Leave Application Form -->
-<div class="att-form-card">
-    <div class="att-form-title">
-        <div class="form-title-dot"></div>
-        แบบฟอร์มขออนุมัติการลา
-    </div>
-    <div class="att-form-body">
-        <div class="att-input-group">
-            <label class="att-input-label">วันที่ลา</label>
-            <input type="date" class="att-input" id="att-leave-date">
-        </div>
-        <div class="att-input-group">
-            <label class="att-input-label">ประเภทการลา</label>
-            <select class="att-select" id="att-leave-type">
-                <option value="">— เลือกประเภท —</option>
-                <option value="sick">ลาป่วย</option>
-                <option value="personal">ลากิจ</option>
-                <option value="annual">ลาพักร้อน</option>
-                <option value="maternity">ลาคลอด</option>
-                <option value="holiday">วันหยุดนักขัตฤกษ์</option>
-                <option value="other">อื่นๆ</option>
-            </select>
-        </div>
-        <div class="att-input-group">
-            <label class="att-input-label">เหตุผล</label>
-            <textarea class="att-textarea" id="att-leave-reason" placeholder="ระบุรายละเอียดเหตุผลการลา..."></textarea>
         </div>
     </div>
-    <button class="att-submit-btn" id="att-submit-btn" onclick="submitLeaveRequest()">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L10.5 16.5 18 8.25"/></svg>
-        ส่งคำขอการลา
-    </button>
+
+    <!-- 7. Footer - ล็อคล่างสุด -->
+    <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-top: auto; border-top: 1px solid var(--dial-border); padding-top: 10px; flex-shrink: 0;">
+        <div style="min-width: 0;">
+            <span style="display:block; font-size: 7px; font-weight: 850; color: var(--dial-text-sub); text-transform: uppercase;">Target</span>
+            <strong style="font-size: clamp(10px, 1.2vw, 13px); color: var(--dial-text-main); font-family: 'DM Mono';">95.0%</strong>
+        </div>
+        <div style="text-align: right; min-width: 0;">
+            <span style="display:block; font-size: 7px; font-weight: 850; color: var(--dial-text-sub); text-transform: uppercase;">Status</span>
+            <strong id="yield-status-text" style="font-size: clamp(10px, 1.2vw, 13px); color: #ef4444; font-weight: 900; text-transform: uppercase;">CRITICAL</strong>
+        </div>
+    </div>
 </div>
-                <!-- Leave Records -->
-                <div class="att-records-card">
-                    <div class="att-records-title">
-                        <span>รายการบันทึกการลา</span>
-                        <span class="att-records-count" id="att-records-count">0 รายการ</span>
+
+        <!-- Monthly Trends -->
+        <div class="white-box">
+            <div class="box-header-flex">
+                <div class="box-title">Monthly Production Trends <small>Analysis</small></div>
+                <div class="trend-stats-compact">
+                    <!-- สำคัญ: ID trend-total-pcs, trend-max, trend-min, trend-avg -->
+                    <span class="badge-blue-tiny" id="trend-total-pcs">PCS 0</span>
+                    <span class="tiny-stat">Max: <span id="trend-max">0</span></span>
+                    <span class="tiny-stat">Min: <span id="trend-min">0</span></span>
+                    <span class="tiny-stat">Avg: <span id="trend-avg">0</span></span>
+                </div>
+            </div>
+            <div class="chart-wrapper flex-grow">
+                <div id="trend-chart"></div>
+            </div>
+        </div>
+
+        <!-- Pareto 80/20 -->
+        <div class="white-box">
+            <div class="box-header-between">
+                <div class="box-title">PARETO 80/20 <small>SUPPLIER RISKS</small></div>
+                <span class="tag-red-mini"></span>
+            </div>
+            <!-- สำคัญ: ID pareto-list -->
+            <div id="pareto-list" class="pareto-mini-scroll"></div>
+            <div class="mini-strategy">
+                💡 <p id="pareto-insight-text">กำลังประมวลผลข้อมูล...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- แถวที่ 3: Feeds -->
+    <div class="compact-feed-grid">
+        <!-- 1. VENDOR FAULT FEED -->
+        <div class="white-box">
+            <div class="box-header-between">
+                <h3>VENDOR FAULT FEED</h3> 
+                <span class="badge-live-tiny"></span>
+            </div>
+            <div id="risk-intel-display-area" class="feed-mini-scroll"></div>
+        </div>
+
+        <!-- 2. TOP CLAIM LINES ANALYSIS -->
+        <div class="white-box">
+            <div class="box-header-between">
+                <h3>TOP CLAIM LINES</h3> 
+                <span class="badge-rank-tiny"></span>
+            </div>
+            <div id="live-incident-feed" class="feed-mini-scroll"></div>
+        </div>
+
+        <!-- 3. VENDOR RISK RADAR -->
+        <div class="white-box">
+            <div class="box-header-between">
+                <h3 style="font-size: 11px; font-weight: 900; color: #1e293b;">VENDOR RISK RANKING</h3>
+                <p class="text-[9px] text-slate-400 font-bold uppercase">Aggregated by PCS</p>
+            </div>
+            <div id="vendor-radar-chart"></div>
+        </div>
+    </div>
+</div><!-- ============================================================
+     3. EXEC DASHBOARD (REFACTORED FOR FIXED SCALING)
+     ============================================================ -->
+    <div id="exec-dashboard-content" class="hidden-view">
+
+    <!-- แถวที่ 1: KPI Grid -->
+    <div class="exec-kpi-fixed-row">
+        <!-- 1. Support -->
+        <div class="exec-card-premium">
+            <div class="flex justify-between items-start">
+                <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                </div>
+                <span class="text-[10px] font-black text-slate-900">▲ 12.4%</span>
+            </div>
+            <div>
+                <p class="exec-label-tiny">Total Support</p>
+                <h2 class="exec-val-large" id="exec-kpi-support">0</h2>
+                <div class="exec-sub-stats">
+                    <span class="flex items-center gap-1"><span class="dot-blue"></span> RP: <span id="exec-sub-rp">0</span></span>
+                    <span class="flex items-center gap-1"><span class="dot-red"></span> VF: <span id="exec-sub-vf">0</span></span>
+                    <span class="flex items-center gap-1"><span class="dot-amber"></span> REC: <span id="exec-sub-records">0</span></span>
+                </div>
+            </div>
+        </div>
+        <!-- 2. 5S -->
+        <div class="exec-card-premium">
+             <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+            </div>
+            <div>
+                <p class="exec-label-tiny">Total 5S Findings (Yearly)</p>
+                <h2 class="exec-val-large" id="exec-5s-avg">0</h2>
+                <div class="exec-progress-bg"><div id="exec-5s-bar" class="exec-progress-fill bg-amber-500" style="width: 30%"></div></div>
+            </div>
+        </div>
+        <!-- 3. Skill -->
+        <div class="exec-card-premium">
+            <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            </div>
+            <div>
+                <p class="exec-label-tiny">Competency Index</p>
+                <h2 class="exec-val-large" id="exec-skill-avg">0%</h2>
+                <p id="exec-skill-status" class="text-[9px] font-bold text-emerald-600 mt-1">🚀 Advanced Support</p>
+            </div>
+        </div>
+        <!-- 4. Att -->
+        <div class="exec-card-premium">
+            <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+                <p class="exec-label-tiny">Attendance Rate</p>
+                <h2 class="exec-val-large" id="exec-att-rate">0%</h2>
+                <p id="exec-leave-total" class="text-[9px] font-bold text-rose-500 mt-1 uppercase">LEAVE: 0 DAYS TOTAL</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- แถวที่ 2: Trends + AI Insight -->
+    <div class="exec-main-analytics-row">
+        <div class="exec-chart-box flex-[2.2]">
+            <div class="mb-4">
+                <h3 class="text-[13px] font-black text-slate-800 uppercase">Monthly Activity Trends</h3>
+                <p class="text-[10px] text-slate-400 font-medium">เปรียบเทียบแนวโน้มการ Support หน้างาน และผลคะแนนตรวจสอบ 5S ประจำสัปดาห์</p>
+            </div>
+            <div class="exec-chart-wrapper"><div id="exec-trend-chart"></div></div>
+        </div>
+
+        <div class="exec-ai-box flex-[1]">
+            <div class="ai-banner-futuristic">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+                        <span class="text-[10px] font-black text-blue-400 uppercase tracking-widest">AI Analytic Insight</span>
                     </div>
-                    <div class="att-records-table-wrap">
-                        <table class="att-records-table">
-<thead>
-    <tr>
-        <th>วันที่</th>
-        <th>ประเภท</th>
-        <th>หมายเหตุ (Note)</th>
-        <th style="text-align:center">จัดการ</th>
-    </tr>
-</thead>
-                            <tbody id="att-records-tbody"></tbody>
-                        </table>
+                    <span class="exec-status-pill">Active</span>
+                </div>
+                <div>
+                    <p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Efficiency Competency Index</p>
+                    <div class="flex items-baseline gap-2">
+                        <span id="ai-score-val" class="exec-val-xl">0%</span>
+                        <span class="text-sm font-bold text-blue-500 uppercase">Score</span>
                     </div>
-                    
+                    <div class="h-1.5 w-full bg-white/5 rounded-full mt-2 overflow-hidden">
+                        <div id="ai-progress-bar" class="h-full bg-gradient-to-r from-blue-500 to-indigo-500" style="width: 0%"></div>
+                    </div>
+                    <p id="ai-insight-text" class="text-[11px] text-slate-300 leading-relaxed font-medium mt-4">กำลังประมวลผลข้อมูล...</p>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-4">
+                    <div class="ai-mini-stat-box">
+                        <p id="ai-projects-val" class="text-white font-black text-lg">0</p>
+                        <p class="text-[7px] text-slate-500 uppercase font-black">Total Activities</p>
+                    </div>
+                    <div class="ai-mini-stat-box">
+                        <p id="ai-skills-val" class="text-white font-black text-lg">0</p>
+                        <p class="text-[7px] text-slate-500 uppercase font-black">Skills Recorded</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- แถวที่ 3: Parts + Distribution -->
+    <div class="exec-bottom-row">
+        <div class="exec-chart-box flex-[1.5]">
+            <div class="flex justify-between items-center mb-2">
+                <div>
+                    <h3 class="text-[13px] font-black text-slate-800 uppercase tracking-tight">Top 5 Problem Part Groups</h3>
+                    <p class="text-[10px] text-slate-400 font-medium">ชิ้นส่วนพาร์ทที่มีปัญหาบ่อยที่สุด</p>
+                </div>
+                <span class="px-2 py-1 bg-blue-50 text-blue-600 text-[9px] font-black rounded-lg">LIVE ANALYSIS</span>
+            </div>
+            <div class="exec-chart-wrapper"><div id="exec-part-chart"></div></div>
+        </div>
+        <div class="exec-chart-box flex-[1]">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-[13px] font-black text-slate-800 uppercase tracking-tight">Report Type Distribution</h3>
+                <span class="px-2 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg">GLOBAL SHARE</span>
+            </div>
+            <div class="flex items-center gap-4 h-full">
+                <div class="w-32 h-32 flex-shrink-0"><div id="exec-pie-chart"></div></div>
+                <div id="exec-pie-legend" class="flex-1 space-y-2"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     4. ATTENDANCE LOGS (100% MATCH DESIGN)
+     ============================================================ -->
+<div id="attendance-logs" class="hidden-view">
+    <div class="att-master-container scroll-custom">
+        
+        <!-- แถวที่ 1: KPI Cards -->
+        <div class="att-kpi-row">
+            <div class="att-card kpi-orange">
+                <div class="kpi-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+                <div class="kpi-content">
+                    <p class="kpi-label">LEAVE TAKEN</p>
+                    <div class="kpi-value-wrap"><span class="kpi-value" id="att-kpi-leave">0</span> <span class="kpi-unit">Days</span></div>
+                    <p class="kpi-sub">วันลาพักร้อนสะสม</p>
+                </div>
+            </div>
+            <div class="att-card kpi-purple">
+                <div class="kpi-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                </div>
+                <div class="kpi-content">
+                    <p class="kpi-label">PUBLIC HOLIDAYS</p>
+                    <div class="kpi-value-wrap"><span class="kpi-value" id="att-kpi-holiday">0</span> <span class="kpi-unit">Days</span></div>
+                    <p class="kpi-sub">วันหยุดนักขัตฤกษ์ปีนี้</p>
+                </div>
+            </div>
+            <div class="att-card kpi-emerald">
+                <div class="kpi-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                </div>
+                <div class="kpi-content">
+                    <p class="kpi-label">TOTAL WORKED</p>
+                    <div class="kpi-value-wrap"><span class="kpi-value" id="att-kpi-worked">0</span> <span class="kpi-unit">Days</span></div>
+                    <p class="kpi-sub">วันทำงานสะสม</p>
+                </div>
+            </div>
+            <div class="att-card kpi-rate-solid">
+                <div class="kpi-icon-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div class="kpi-content">
+                    <p class="kpi-label text-white/70">ATTENDANCE RATE</p>
+                    <div class="kpi-value-wrap"><span class="kpi-value text-white" id="att-kpi-rate">0</span> <span class="kpi-unit text-white/50">%</span></div>
+                    <p class="kpi-sub text-white/60">อัตราเข้างานรวม</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- แถวที่ 2: Chart Section -->
+        <div class="att-chart-section">
+            <div class="chart-header">
+                <h3 class="chart-title">MONTHLY OVERVIEW — <span id="att-chart-year-label">2026</span></h3>
+                <div class="chart-legend">
+                    <span class="l-item"><span class="dot d-orange"></span>วันลา</span>
+                    <span class="l-item"><span class="dot d-purple"></span>วันหยุด</span>
+                    <span class="l-item"><span class="dot d-emerald"></span>วันทำงาน</span>
+                </div>
+            </div>
+            <div class="chart-canvas-wrapper">
+                <div id="att-monthly-chart"></div>
+            </div>
+        </div>
+
+        <!-- แถวที่ 3: Bottom Panels -->
+        <div class="att-bottom-row">
+            <!-- Left: Form Panel (เลื่อนได้เฉพาะข้างใน) -->
+            <div class="att-panel panel-form">
+                <div class="panel-header">
+                    <div class="blue-dot"></div>
+                    <h3>แบบฟอร์มขออนุมัติการลา</h3>
+                </div>
+                <!-- Scroll Body -->
+                <div class="panel-body scroll-custom">
+                    <div class="form-group">
+                        <label>วันที่ลา</label>
+                        <input type="date" id="att-leave-date" class="att-input-v2">
+                    </div>
+                    <div class="form-group">
+                        <label>ประเภทการลา</label>
+                        <select id="att-leave-type" class="att-select-v2">
+                            <option value="">— เลือกประเภท —</option>
+                            <option value="sick">ลาป่วย</option>
+                            <option value="personal">ลากิจ</option>
+                            <option value="annual">ลาพักร้อน</option>
+                            <option value="holiday">วันหยุดนักขัตฤกษ์</option>
+                            <option value="other">อื่นๆ</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>เหตุผล</label>
+                        <textarea id="att-leave-reason" class="att-textarea-v2" placeholder="ระบุรายละเอียดเหตุผลการลา..."></textarea>
+                    </div>
+                </div>
+                <!-- Fixed Button at Bottom -->
+                <div class="panel-footer">
+                    <button onclick="submitLeaveRequest()" id="att-submit-btn" class="btn-submit-v2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                        ส่งคำขอการลา
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Table Panel -->
+            <div class="att-panel panel-table">
+                <div class="panel-header-flex">
+                    <h3>รายการบันทึกการลา</h3>
+                    <span id="att-records-count" class="badge-total">0 รายการ</span>
+                </div>
+                <div class="table-wrapper scroll-custom">
+                    <table class="table-v2">
+                        <thead>
+                            <tr>
+                                <th style="width: 130px;">วันที่</th>
+                                <th style="width: 140px;">ประเภท</th>
+                                <th>หมายเหตุ (NOTE)</th>
+                                <th style="width: 80px; text-align: center;">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="att-records-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
    <!-- ============================================================
          5. LINE SUPPORT LOGS
          ============================================================ -->
@@ -1107,460 +1144,525 @@
         </div>
     </div>
 
-    <!-- ============================================================
-         5. 5S EXCELLENCE FINDS (ID: five-s-content)
-         ============================================================ -->
-    <div id="five-s-content" class="hidden-view s5-container">
-        <!-- Row 1: KPI Stats -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-shrink-0">
-            <div class="glass-card kpi-glow-orange p-3 lg:p-4">
-                <p class="text-cyber-title">สะสมตลอดทั้งปี</p>
-                <div class="flex items-baseline gap-1">
-                    <span id="s5-kpi-total" class="text-cyber-value text-orange-500">0</span>
-                    <span class="text-[10px] font-bold text-slate-300">PTS</span>
-                </div>
-            </div>
-            <div class="glass-card kpi-glow-blue p-3 lg:p-4">
-                <p class="text-cyber-title">เดือนปัจจุบัน</p>
-                <div class="flex items-baseline gap-1">
-                    <span id="s5-kpi-month" class="text-cyber-value text-blue-500">0</span>
-                    <span class="text-[10px] font-bold text-slate-300">PTS</span>
-                </div>
-            </div>
-            <div class="glass-card kpi-glow-purple p-3 lg:p-4">
-                <p class="text-cyber-title">TOP AUDITOR</p>
-                <div id="s5-kpi-auditor" class="text-[13px] lg:text-[16px] font-black text-purple-600 truncate mt-1">-</div>
-            </div>
-            <div class="glass-card kpi-glow-red p-3 lg:p-4">
-                <p class="text-cyber-title">HOT AREA</p>
-                <div id="s5-kpi-hotarea" class="text-[11px] lg:text-[13px] font-black text-red-500 truncate mt-1 uppercase">-</div>
-            </div>
-        </div>
-
-        <!-- Row 2: Analytics Grid -->
-        <div class="grid grid-cols-12 gap-3 flex-[1.2] min-h-0">
-            <div class="col-span-12 lg:col-span-8 glass-card p-4 flex flex-col overflow-hidden">
-                <h3 class="text-slate-800 font-black text-[13px] uppercase">5S Monthly Trends</h3>
-                <div class="flex-1 w-full relative mt-2">
-                    <div id="s5-trend-chart" class="absolute inset-0"></div>
-                </div>
-            </div>
-            <div class="col-span-12 lg:col-span-4 glass-card p-5 flex flex-col overflow-hidden">
-                <h3 class="font-bold text-slate-800 text-[14px] uppercase">S5 Area Ranking</h3>
-                <div id="s5-ranking-list" class="flex-1 overflow-y-auto invisible-scroll py-4 pr-1"></div>
-            </div>
-        </div>
-
-        <!-- Row 3: Input & Table -->
-        <div class="grid grid-cols-12 gap-3 flex-[1.5] min-h-0">
-            <div class="col-span-12 lg:col-span-4 glass-card s5-compact-form border-t-4 border-orange-500 flex flex-col form-container">
-                <h3 class="font-bold text-slate-800 text-[12px] uppercase mb-3">บันทึก 5S Finding</h3>
-                <div class="flex-1 space-y-2">
-                    <div><label class="form-label">📍 พื้นที่</label><input type="text" id="s5-f-area" class="form-input w-full" placeholder="Line A"></div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div><label class="form-label">🔢 จำนวนจุด</label><input type="number" id="s5-f-points" class="form-input w-full"></div>
-                        <div><label class="form-label">🗓️ เดือน</label><input type="month" id="s5-f-month" class="form-input w-full"></div>
-                    </div>
-                    <div><label class="form-label">📝 รายละเอียด</label><input type="text" id="s5-f-detail" class="form-input w-full"></div>
-                    <div><label class="form-label">👤 ผู้ตรวจ</label><input type="text" id="s5-f-auditor" class="form-input w-full"></div>
-                </div>
-                <button onclick="Wap5SExcellence.submit()" class="w-full py-2 bg-[#f59e0b] text-white font-black rounded-xl mt-3 uppercase active:scale-95">บันทึกข้อมูล 5S</button>
-            </div>
-            <div class="col-span-12 lg:col-span-8 glass-card overflow-hidden flex flex-col">
-                <div class="bg-slate-50/50 p-2 border-b flex justify-between items-center">
-                    <span class="text-[11px] font-black uppercase">ทะเบียน FINDING 5S</span>
-                    <span id="s5-table-count" class="text-[9px] font-bold bg-white px-2 rounded-full border">0 Cases</span>
-                </div>
-                <div class="flex-1 overflow-auto modern-scroll">
-                    <table class="data-table"><thead class="sticky top-0 bg-white"><tr><th>พื้นที่</th><th style="text-align:center">คะแนน</th><th>รายละเอียด</th><th>ผู้ตรวจ</th><th>เดือน</th><th></th></tr></thead><tbody id="s5-table-body"></tbody></table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-<!-- ============================================================
-         6. SKILL MATRIX (ID: skill-matrix-content)
-         ============================================================ -->
-    <div id="skill-matrix-content" class="hidden-view s5-container">
-        <!-- KPI Grid -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-shrink-0">
-            <div class="glass-card kpi-glow-blue p-3"><p class="text-cyber-title">คะแนนเฉลี่ย</p><div class="flex items-baseline gap-1"><span id="sm-kpi-avg" class="text-cyber-value text-blue-600">0</span><span class="text-[10px] font-bold text-slate-300">%</span></div></div>
-            <div class="glass-card kpi-glow-orange p-3"><p class="text-cyber-title">ทักษะรวม</p><div class="flex items-baseline gap-1"><span id="sm-kpi-count" class="text-cyber-value text-orange-500">0</span><span class="text-[10px] font-bold text-slate-300">Skills</span></div></div>
-            <div class="glass-card kpi-glow-purple p-3"><p class="text-cyber-title">ทักษะเด่น</p><div id="sm-kpi-top" class="text-[12px] font-black text-purple-600 truncate mt-1">-</div></div>
-            <div class="glass-card kpi-glow-red p-3"><p class="text-cyber-title">จุดอ่อน</p><div id="sm-kpi-weak" class="text-[12px] font-black text-rose-500 truncate mt-1">-</div></div>
-        </div>
-
-        <!-- Input Form -->
-        <div class="glass-card p-4 flex-shrink-0 border-t-4 border-emerald-500 mt-3">
-            <div class="flex flex-col sm:flex-row gap-3">
-                <input type="text" id="sm-f-name" class="form-input flex-[2]" placeholder="ชื่อทักษะ เช่น PLC, Setup, QC">
-                <input type="number" id="sm-f-value" class="form-input flex-1" placeholder="คะแนน (0-100)">
-                <button onclick="WapSkillMatrix.submit()" class="btn-glow-orange px-6 py-2 rounded-xl text-[10px] font-black uppercase flex-shrink-0">Update Skill</button>
-            </div>
-        </div>
-
-       <!-- ส่วนท้ายของ Skill Matrix (Analytics Grid) -->
-        <div class="grid grid-cols-12 gap-3 flex-1 min-h-0 mt-3">
-            <div class="col-span-12 lg:col-span-4 glass-card p-4 flex flex-col overflow-hidden">
-                <h3 class="text-slate-800 font-black text-[11px] uppercase">Radar Map</h3>
-                <div class="flex-1 w-full relative"><div id="sm-radar-chart" class="absolute inset-0"></div></div>
-            </div>
-            <div class="col-span-12 lg:col-span-4 glass-card p-4 flex flex-col overflow-hidden">
-                <h3 class="text-slate-800 font-black text-[11px] uppercase">Proficiency Levels</h3>
-                <div id="sm-bar-list" class="flex-1 overflow-y-auto invisible-scroll space-y-3 mt-3 pr-1"></div>
-            </div>
-            <div class="col-span-12 lg:col-span-4 glass-card p-4 flex flex-col overflow-hidden">
-                <h3 class="text-slate-800 font-black text-[11px] uppercase">Distribution</h3>
-                <div class="flex-1 w-full relative"><div id="sm-donut-chart" class="absolute inset-0"></div></div>
-                <div id="sm-donut-legend" class="grid grid-cols-2 gap-2 mt-2"></div>
-            </div>
-        </div>
-    </div> <!-- *** จุดสำคัญ: ต้องมี DIV ปิดหน้านี้ (skill-matrix-content) ให้ขาด *** -->
-
-<!-- ============================================================
-     SPECIAL JOBS - FUTURISTIC COMMAND CENTER (V5.0)
+  <!-- ============================================================
+     5. 5S EXCELLENCE - AUDIT COMMAND CENTER (ULTRA-FUTURISTIC)
      ============================================================ -->
-<!-- ปรับ p-3 md:p-6 เป็น p-3 เพื่อให้ชิดขอบเท่าหน้าอื่นๆ และปรับ gap-4 เป็น gap-3 เพื่อความกระชับ -->
-<div id="special-jobs-content" class="hidden-view flex flex-col gap-3 p-3 bg-slate-50 overflow-hidden" style="height: calc(100vh - 56px);">
-    
-    <!-- [Top Row] Futuristic KPI Glow Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
-        <!-- Total Tasks -->
-        <div class="relative overflow-hidden bg-white p-4 rounded-2xl border border-slate-100 shadow-sm group hover:border-blue-400 transition-all duration-500">
-            <div class="absolute -right-4 -bottom-4 text-blue-50 group-hover:text-blue-100 transition-colors">
-                <svg width="80" height="80" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            </div>
-            <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">System Load</p>
-            <div class="flex items-baseline gap-2">
-                <h2 id="sj-kpi-total" class="text-3xl font-black text-slate-800 tracking-tighter counter-val">0</h2>
-                <span class="text-[10px] font-bold text-blue-500 uppercase">Projects</span>
-            </div>
-            <div class="mt-3 h-1 w-full bg-slate-50 rounded-full overflow-hidden">
-                <div class="h-full bg-blue-500 w-2/3 shadow-[0_0_8px_#3b82f6]"></div>
-            </div>
-        </div>
-
-        <!-- Monthly Active -->
-        <div class="bg-white p-4 rounded-2xl border-l-4 border-emerald-500 shadow-sm hover:shadow-md transition-all">
-            <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Active Cycle</p>
-            <h2 id="sj-kpi-month" class="text-3xl font-black text-emerald-600 tracking-tighter">0</h2>
-            <p id="sj-current-month-text" class="text-[9px] font-bold text-emerald-400 mt-1 uppercase italic">Loading...</p>
-        </div>
-
-        <!-- Rate -->
-        <div class="bg-white p-4 rounded-2xl border-l-4 border-indigo-500 shadow-sm relative group">
-            <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Success Matrix</p>
-            <div class="flex items-baseline gap-1">
-                <h2 id="sj-kpi-rate" class="text-3xl font-black text-slate-800 tracking-tighter">0%</h2>
-            </div>
-            <div class="absolute top-4 right-4">
-                <div class="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></div>
-            </div>
-        </div>
-
-        <!-- Top Assignor -->
-        <div class="bg-white p-4 rounded-2xl border-l-4 border-amber-500 shadow-sm overflow-hidden">
-            <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Primary Source</p>
-            <h2 id="sj-kpi-top-assignor-jobs" class="text-xl font-black text-slate-800 truncate uppercase tracking-tight">-</h2>
-            <p id="sj-kpi-top-assignor-name" class="text-[9px] font-bold text-amber-500 mt-1 uppercase tracking-wider">Top Assignor</p>
-        </div>
-    </div>
-
-<!-- [Middle Row] Command Center Entry Bar (Compact Thai Version) -->
-    <div class="bg-[#0f172a] p-1 rounded-[20px] shadow-xl shadow-blue-900/10 flex-shrink-0 border border-slate-800">
-        <div class="bg-[#1e293b]/50 backdrop-blur-xl rounded-[18px] p-3 flex flex-wrap lg:flex-nowrap items-end gap-3 text-white">
-            <!-- รายละเอียดงาน -->
-            <div class="flex-[1.8] min-w-[220px]">
-                <label class="block text-[7px] font-black text-blue-400 uppercase tracking-[0.15em] mb-1.5 ml-1">รายละเอียดงาน / โครงการ</label>
-                <input type="text" id="sj-f-project" class="w-full h-9 px-3 bg-slate-900/50 border border-slate-700 rounded-lg text-[11px] font-bold text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all placeholder:text-slate-600" placeholder="พิมพ์ชื่อภารกิจหรือรายละเอียด...">
-            </div>
-            
-            <!-- วันที่ -->
-            <div class="w-full md:w-[135px]">
-                <label class="block text-[7px] font-black text-blue-400 uppercase tracking-[0.15em] mb-1.5 ml-1">วันที่ดำเนินการ</label>
-                <input type="date" id="sj-f-date" class="w-full h-9 px-2 bg-slate-900/50 border border-slate-700 rounded-lg text-[11px] font-bold text-white outline-none focus:border-blue-500 transition-all">
-            </div>
-            
-            <!-- ผู้สั่งงาน -->
-            <div class="w-full md:w-[155px]">
-                <label class="block text-[7px] font-black text-blue-400 uppercase tracking-[0.15em] mb-1.5 ml-1">ผู้สั่งงาน</label>
-                <input type="text" id="sj-f-assignor" class="w-full h-9 px-3 bg-slate-900/50 border border-slate-700 rounded-lg text-[11px] font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600" placeholder="ชื่อผู้สั่ง...">
-            </div>
-            
-            <!-- ผลลัพธ์ -->
-            <div class="flex-1 min-w-[180px]">
-                <label class="block text-[7px] font-black text-blue-400 uppercase tracking-[0.15em] mb-1.5 ml-1">ผลลัพธ์ที่ได้ / Output</label>
-                <input type="text" id="sj-f-result" class="w-full h-9 px-3 bg-slate-900/50 border border-slate-700 rounded-lg text-[11px] font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600" placeholder="ระบุผลลัพธ์ที่เกิดขึ้น...">
-            </div>
-            
-            <!-- ปุ่มบันทึก -->
-            <button onclick="WapSpecialJobs.save()" class="group h-9 px-6 bg-blue-600 hover:bg-blue-500 text-white font-black text-[10px] rounded-lg shadow-lg shadow-blue-600/20 transition-all active:scale-95 uppercase tracking-wider flex items-center gap-2">
-                <span>บันทึกงาน</span>
-                <svg class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
-                    <path d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                </svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- [Bottom Grid] Charts & Table -->
-    <div class="flex-1 grid grid-cols-12 gap-4 min-h-0">
-        <!-- Analytics -->
-        <div class="col-span-12 lg:col-span-5 flex flex-col gap-4 min-h-0">
-            <div class="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm p-5 flex flex-col relative overflow-hidden">
-                <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">Workload Distribution</h3>
-                <div id="sj-assignor-chart" class="flex-1"></div>
-            </div>
-            <div class="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm p-5 flex flex-col">
-                <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">Volume Frequency</h3>
-                <div id="sj-volume-chart" class="flex-1"></div>
-            </div>
-        </div>
-
-        <!-- Project Registry Table -->
-        <div class="col-span-12 lg:col-span-7 bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-hidden">
-            <div class="p-5 px-6 border-b border-slate-50 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
-                <div class="flex items-center gap-3">
-                    <div class="w-2 h-6 bg-blue-600 rounded-full shadow-[0_0_10px_#3b82f6]"></div>
-                    <h3 class="text-sm font-black text-slate-800 uppercase tracking-tighter text-cyber-title">Project History Logs</h3>
-                </div>
-                <div class="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                    <span id="sj-table-count" class="text-[10px] font-black text-slate-500">0 RECORDS</span>
-                </div>
-            </div>
-            
-<!-- ค้นหาส่วนนี้ในหน้าจอ Special Jobs และเพิ่มสไตล์กำกับ -->
-<div class="flex-1 overflow-y-auto scroll-custom px-2">
-    <table class="w-full border-collapse" style="table-layout: fixed;"> 
-        <!-- table-layout: fixed สำคัญมากเพื่อคุมไม่ให้ชื่อโปรเจกต์ดึงตารางจนล้นขอบ -->
-        <thead>
-            <tr class="text-[9px] text-slate-400 font-black uppercase tracking-widest border-b border-slate-100">
-                <th class="py-3 px-4 text-center" style="width: 50px;">#</th>
-                <th class="py-3 px-4 text-left">Mission Brief</th>
-                <th class="py-3 px-4 text-center" style="width: 100px;">Cycle Date</th>
-                <th class="py-3 px-4 text-center" style="width: 120px;">Commander</th>
-                <th class="py-3 px-4 text-center" style="width: 100px;">Output</th>
-                <th class="py-3 px-4 text-right" style="width: 50px;"></th>
-            </tr>
-        </thead>
-        <tbody id="sj-table-body">
-            <!-- Data -->
-        </tbody>
-    </table>
-</div>
-        </div>
-    </div>
-</div>
-   <!-- ============================================================
-     OVERTIME MANAGEMENT SYSTEM (RE-DESIGNED)
-     ============================================================ -->
-<div id="ot-management-content" class="hidden-view flex flex-col gap-3 p-3 bg-slate-50 overflow-hidden" style="height: calc(100vh - 56px);">
-    
-    <!-- [Section 1] KPI Summary Cards (Uniform Height: 115px) -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 flex-shrink-0">
-        <!-- Target Circle: Graph Left, Info Right -->
-        <div class="exec-card-premium flex items-center gap-3 p-4 h-[115px] bg-white shadow-sm border border-slate-100">
-<div class="relative w-16 h-16 flex-shrink-0">
-    <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
-        <circle cx="18" cy="18" r="16" fill="none" stroke="#f1f5f9" stroke-width="3.5"></circle>
-        <circle id="ot-prog-circle" cx="18" cy="18" r="16" fill="none" stroke="#2563eb" stroke-width="3.5" stroke-dasharray="0, 100" stroke-linecap="round" style="transition: stroke-dasharray 1s ease;"></circle>
-    </svg>
-    <!-- ปรับปรุงจุดนี้: ให้เป็น flex column เพื่อแสดงตัวเลขและเดือน -->
-    <div id="ot-prog-val" class="absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
-        <!-- ข้อมูลจะถูกเติมจาก JS -->
-    </div>
-</div>
-
-<!-- เพิ่มข้อมูลกำกับด้านข้างวงกลม (Optional) -->
-<div class="flex flex-col min-w-0">
-    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Monthly Quota</p>
-</div>
-
-        </div>
-
-        <!-- Actual Total -->
-        <div class="exec-card-premium p-4 flex flex-col justify-between border-t-4 border-blue-500 bg-white shadow-sm h-[115px] transition-all hover:shadow-md">
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">ชั่วโมงจริงสะสม</p>
-                <h2 id="ot-kpi-total" class="text-3xl font-black text-blue-600 leading-none mt-1">0.00</h2>
-            </div>
-            <div class="flex items-center justify-between border-t border-slate-50 pt-2">
-                <p class="text-[8px] font-bold text-slate-400 uppercase">Total Actual</p>
-                <span class="text-[10px] font-bold text-blue-500/80 uppercase">Hrs</span>
-            </div>
-        </div>
-
-        <!-- Workday (x1.5) -->
-        <div class="exec-card-premium p-4 flex flex-col justify-between border-t-4 border-emerald-500 bg-white shadow-sm h-[115px] transition-all hover:shadow-md">
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">วันปกติ (x1.5)</p>
-                <h2 id="ot-kpi-wd-count" class="text-3xl font-black text-emerald-600 leading-none mt-1">0 <span class="text-xs font-bold text-slate-400">ครั้ง</span></h2>
-            </div>
-            <div class="flex items-center justify-between border-t border-slate-50 pt-2">
-                <p class="text-[8px] font-bold text-slate-400 uppercase">Accumulated</p>
-                <p id="ot-kpi-wd-hrs" class="text-[10px] font-black text-emerald-500">0.00 ชม.</p>
-            </div>
-        </div>
-
-        <!-- Weekend (x1.0/3.0) -->
-        <div class="exec-card-premium p-4 flex flex-col justify-between border-t-4 border-amber-500 bg-white shadow-sm h-[115px] transition-all hover:shadow-md">
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">เสาร์-อาทิตย์</p>
-                <h2 id="ot-kpi-we-count" class="text-3xl font-black text-amber-600 leading-none mt-1">0 <span class="text-xs font-bold text-slate-400">ครั้ง</span></h2>
-            </div>
-            <div class="flex items-center justify-between border-t border-slate-50 pt-2">
-                <p class="text-[8px] font-bold text-slate-400 uppercase">Weekend Mode</p>
-                <p id="ot-kpi-we-hrs" class="text-[10px] font-black text-amber-500">0.00 ชม.</p>
-            </div>
-        </div>
-
-        <!-- Holiday (x3.0) -->
-        <div class="exec-card-premium p-4 flex flex-col justify-between border-t-4 border-rose-500 bg-white shadow-sm h-[115px] transition-all hover:shadow-md">
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">นักขัตฤกษ์</p>
-                <h2 id="ot-kpi-ho-count" class="text-3xl font-black text-rose-600 leading-none mt-1">0 <span class="text-xs font-bold text-slate-400">ครั้ง</span></h2>
-            </div>
-            <div class="flex items-center justify-between border-t border-slate-50 pt-2">
-                <p class="text-[8px] font-bold text-slate-400 uppercase">Public Holiday</p>
-                <p id="ot-kpi-ho-hrs" class="text-[10px] font-black text-rose-500">0.00 ชม.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- [Section 2] Main Operations Grid (Full Height Content) -->
-    <div class="flex-1 flex flex-col lg:flex-row gap-3 min-h-0">
+<div id="five-s-content" class="hidden-view">
+    <div class="s5-master-layout">
         
-<!-- [Left] Input Form (Matched with Screenshot) -->
-<div class="w-full lg:w-[380px] bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden">
-    <div class="p-4 border-b border-slate-100 flex items-center gap-2">
-        <svg class="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3a1 1 0 011 1v5h4a1 1 0 110 2h-4v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h4V4a1 1 0 011-1z"/></svg>
-        <h3 class="text-[12px] font-black text-slate-600 uppercase">บันทึกข้อมูล OT</h3>
-    </div>
-    
-    <div class="flex-1 overflow-y-auto p-5 space-y-4 scroll-custom bg-white">
-        <!-- Row 1 -->
-        <div class="grid grid-cols-2 gap-4">
-            <div>
-                <label class="block text-[10px] font-bold text-slate-500 mb-1">วันที่ทำงาน</label>
-                <input type="date" id="ot-f-date" class="w-full h-10 px-3 rounded-xl bg-[#ebf2fa] border-none text-[12px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all">
+        <!-- แถวที่ 1: Cyber KPI Dashboard -->
+        <div class="s5-kpi-row">
+            <div class="s5-kpi-card glow-orange">
+                <div class="kpi-scan-line"></div>
+                <p class="kpi-label">Yearly Findings</p>
+                <div class="flex items-baseline gap-2">
+                    <h2 class="kpi-val" id="s5-kpi-total">0</h2>
+                    <span class="kpi-unit"></span>
+                </div>
+                <div class="kpi-status-bar"><div class="fill" style="width: 65%"></div></div>
             </div>
-            <div>
-                <label class="block text-[10px] font-bold text-slate-500 mb-1">ประเภท (MULTIPLIER)</label>
-                <select id="ot-f-type" class="w-full h-10 px-3 rounded-xl bg-[#ebf2fa] border-none text-[12px] font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer">
-                    <option value="">-- เลือกประเภท --</option>
-                    <option value="1.5">วันปกติ (x1.5)</option>
-                    <option value="1.0">วันเสาร์ (x1.0)</option>
-                    <option value="3.0">อาทิตย์/นักขัตฯ (x3.0)</option>
-                </select>
+            <div class="s5-kpi-card glow-blue">
+                <div class="kpi-scan-line"></div>
+                <p class="kpi-label"></p>
+                <div class="flex items-baseline gap-2">
+                    <h2 class="kpi-val" id="s5-kpi-month">0</h2>
+                    <span class="kpi-unit"></span>
+                </div>
+                <div class="kpi-status-bar"><div class="fill" style="width: 40%"></div></div>
             </div>
-        </div>
-
-        <!-- Row 2 -->
-<div class="grid grid-cols-2 gap-3">
-  <div>
-    <label class="form-label">⏰ เวลาเริ่ม OT</label>
-    <input type="text" id="ot-start" class="form-input" list="ot-time-list"
-           placeholder="เลือกหรือพิมพ์ เช่น 17:30" autocomplete="off"
-           oninput="WapOTManagement.calcHours()">
-  </div>
-  <div>
-    <label class="form-label">⏰ เวลาสิ้นสุด OT</label>
-    <input type="text" id="ot-end" class="form-input" list="ot-time-list"
-           placeholder="เลือกหรือพิมพ์ เช่น 20:00" autocomplete="off"
-           oninput="WapOTManagement.calcHours()">
-  </div>
-</div>
-<datalist id="ot-time-list"></datalist>
-
-        <!-- Row 3: Break & Calculated Result (Dashed Box) -->
-        <div class="grid grid-cols-2 gap-4 items-end">
-            <div>
-                <label class="block text-[10px] font-bold text-slate-500 mb-1">เวลาพัก (นาที)</label>
-                <input type="number" id="ot-f-break" value="0" oninput="WapOTManagement.calcHours()" class="w-full h-10 px-3 rounded-xl bg-[#ebf2fa] border-none text-[12px] font-semibold text-slate-700 outline-none">
+            <div class="s5-kpi-card glow-purple">
+                <div class="kpi-scan-line"></div>
+                <p class="kpi-label">Top Auditor</p>
+                <h2 class="kpi-val-text truncate" id="s5-kpi-auditor">-</h2>
+                <p class="kpi-sub-label"></p>
             </div>
-            <div class="h-16 rounded-xl border-2 border-dashed border-blue-400 bg-[#eff6ff] flex flex-col items-center justify-center relative overflow-hidden">
-                <span class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mb-1">ชั่วโมงที่จะบันทึก</span>
-                <span id="ot-f-computed" class="text-2xl font-black text-[#4169e1] leading-none">0.00</span>
+            <div class="s5-kpi-card glow-red">
+                <div class="kpi-scan-line"></div>
+                <p class="kpi-label">Hot Area Risk</p>
+                <h2 class="kpi-val-text text-red-500" id="s5-kpi-hotarea">-</h2>
+                <p class="kpi-sub-label"></p>
             </div>
         </div>
 
-        <!-- Row 4: Job Detail -->
-        <div>
-            <label class="block text-[10px] font-bold text-slate-500 mb-1">รายละเอียดงาน / JOB NAME</label>
-            <input type="text" id="ot-f-job" placeholder="เช่น Support กะดึก, เคลียร์ Part NG" class="w-full h-10 px-4 rounded-xl bg-[#ebf2fa] border-none text-[12px] font-semibold text-slate-600 outline-none placeholder:text-slate-300">
-        </div>
-
-        <!-- Submit Button -->
-        <button onclick="WapOTManagement.save()" id="ot-save-btn" class="w-full h-12 bg-[#4169e1] hover:bg-blue-700 text-white font-black rounded-xl uppercase text-[13px] shadow-lg shadow-blue-200 active:scale-95 transition-all mt-2">
-            บันทึก OT
-        </button>
-    </div>
-</div>
-
-<!-- [Right] Analytical View -->
-<div class="flex-1 flex flex-col gap-3 min-w-0">
-    <!-- Top Chart: Monthly Trend (กราฟแท่ง) -->
-    <div class="flex-[1.2] bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col min-h-0 overflow-hidden">
-        <div class="flex justify-between items-start mb-2">
-            <div class="flex items-center gap-3">
-                <h3 class="text-[10px] font-black text-slate-400 uppercase italic tracking-widest">Monthly OT Trend (Hours)</h3>
-                
-                <!-- ช่องตั้งค่า TARGET -->
-                <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 shadow-inner">
-                    <span class="text-[8px] font-black text-slate-400 uppercase">Target:</span>
-                    <input type="number" id="ot-target-input" value="100" 
-                        class="w-10 bg-transparent border-none text-[11px] font-black text-rose-500 outline-none p-0 text-center"
-                        oninput="WapOTManagement.updateTarget(this.value)">
-                    <span class="text-[8px] font-bold text-slate-400">Hrs</span>
+        <!-- แถวที่ 2: Analytics Grid (Trend & Area Ranking) -->
+        <div class="s5-mid-grid">
+            <!-- กราฟแนวโน้ม (ฝั่งซ้ายใหญ่) -->
+            <div class="s5-glass-panel chart-area">
+                <div class="panel-header">
+                    <div class="flex items-center gap-2">
+                        <span class="pulse-dot orange"></span>
+                        <h3 class="panel-title">5S Finding Trends Analysis</h3>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div id="s5-trend-chart"></div>
                 </div>
             </div>
-            <div class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+            <!-- อันดับพื้นที่ (ฝั่งขวาเล็ก) -->
+            <div class="s5-glass-panel rank-area">
+                <div class="panel-header">
+                    <h3 class="panel-title">Area Risk Ranking</h3>
+                </div>
+                <!-- Invisible Scroll Ranking List -->
+                <div id="s5-ranking-list" class="panel-body scroll-hide">
+                    <!-- Dynamic List -->
+                </div>
+            </div>
         </div>
-        <div class="flex-1 min-h-0 relative">
-            <!-- ID ถูกต้องสำหรับกราฟแท่ง -->
-            <div id="ot-trend-chart" style="height: 250px; width: 100%;"></div> 
+
+        <!-- แถวที่ 3: Operations (Form & Registry) -->
+        <div class="s5-bottom-grid">
+            
+            <!-- แบบฟอร์มบันทึก (ฝั่งซ้าย) -->
+            <div class="s5-glass-panel form-side border-t-orange">
+                <div class="panel-header-sticky">
+                    <h3 class="panel-title">S5 Finding Entry</h3>
+                    <p class="panel-sub">ระบุรายละเอียดการตรวจประเมิน</p>
+                </div>
+                <!-- Invisible Scroll Form Body -->
+                <div class="panel-body-scroll scroll-hide">
+                    <div class="form-stack">
+                        <div class="s5-group">
+                            <label class="s5-label">📍 พื้นที่รับผิดชอบ (Area)</label>
+                            <input type="text" id="s5-f-area" class="s5-input" placeholder="ระบุไลน์หรือแผนก...">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="s5-group">
+                                <label class="s5-label">🔢 จำนวนจุดที่พบ</label>
+                                <input type="number" id="s5-f-points" class="s5-input">
+                            </div>
+                            <div class="s5-group">
+                                <label class="s5-label">🗓️ เดือนที่ตรวจ</label>
+                                <input type="month" id="s5-f-month" class="s5-input">
+                            </div>
+                        </div>
+                        <div class="s5-group">
+                            <label class="s5-label">📝 รายละเอียดสิ่งที่พบ</label>
+                            <textarea id="s5-f-detail" class="s5-textarea" placeholder="เช่น พบสิ่งของวางนอกพื้นที่..."></textarea>
+                        </div>
+                        <div class="s5-group">
+                            <label class="s5-label">👤 ชื่อผู้ตรวจ (Auditor)</label>
+                            <input type="text" id="s5-f-auditor" class="s5-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-footer-action">
+                    <button onclick="Wap5SExcellence.submit()" class="btn-s5-submit">
+                        <div class="btn-glow"></div>
+                        <span>COMMIT 5S FINDING</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ทะเบียนรายการ (ฝั่งขวาขยายใหญ่) -->
+            <div class="s5-glass-panel table-side">
+                <div class="panel-header-flex">
+                    <h3 class="panel-title">Findings Registry</h3>
+                    <span id="s5-table-count" class="cyber-badge">0 RECORDS</span>
+                </div>
+                <!-- Invisible Scroll Table -->
+                <div class="table-container scroll-hide">
+                    <table class="s5-cyber-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 150px;">AREA / LOCATION</th>
+                                <th style="width: 100px; text-align: center;">POINTS</th>
+                                <th>DETAIL DESCRIPTION</th>
+                                <th style="width: 120px;">AUDITOR</th>
+                                <th style="width: 80px; text-align: right;">ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="s5-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </div>
-
-    <!-- Bottom Split Row (ล่างซ้ายกราฟวงกลม / ล่างขวาตาราง) -->
-    <div class="flex-1 flex flex-col md:flex-row gap-3 min-h-0 overflow-hidden">
-        <!-- Donut Distribution (กราฟวงกลม) -->
-        <div class="flex-1 bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col min-h-0 overflow-hidden">
-            <div class="flex justify-between items-center mb-2">
-                <h3 class="text-[11px] font-black text-slate-400 uppercase italic tracking-widest">OT Type Distribution</h3>
+</div>
+<!-- ============================================================
+     6. SKILL MATRIX - NEON ANALYTICS COMMAND CENTER
+     ============================================================ -->
+<div id="skill-matrix-content" class="hidden-view">
+    <div class="sm-ultra-layout">
+        
+        <!-- แถวที่ 1: Glass KPI Cards พร้อมเอฟเฟกต์เรืองแสง -->
+        <div class="sm-top-kpis">
+            <div class="glass-stat-card blue">
+                <div class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+                <div class="stat-info">
+                    <p class="stat-label">Competency Index</p>
+                    <h2 class="stat-val" id="sm-kpi-avg">0%</h2>
+                </div>
+                <div class="stat-progress-mini"><div class="fill" style="width: 62%"></div></div>
             </div>
             
-            <div class="flex-1 flex flex-col items-center justify-center min-h-0 relative">
-                <!-- ID ถูกต้องสำหรับกราฟวงกลม -->
-                <div id="ot-dist-chart" class="w-full h-full" style="max-height: 180px;"></div>
+            <div class="glass-stat-card orange">
+                <div class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-1.006 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946 1.006 3.42 3.42 0 013.138 3.138 3.42 3.42 0 001.006 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-1.006 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946 1.006 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-1.006 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-1.006-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 001.006-1.946 3.42 3.42 0 013.138-3.138z"/></svg></div>
+                <div class="stat-info">
+                    <p class="stat-label">Total Skills Asset</p>
+                    <h2 class="stat-val" id="sm-kpi-count">0</h2>
+                </div>
             </div>
 
-            <!-- Legend แคปซูล -->
-            <div id="ot-custom-legend" class="flex flex-wrap justify-center gap-1.5 mt-2"></div>
+            <div class="glass-stat-card purple">
+                <div class="stat-info">
+                    <p class="stat-label">Primary Strength</p>
+                    <h2 class="stat-val-text truncate" id="sm-kpi-top">RUBBER PARTS</h2>
+                </div>
+                <div class="strength-tag"></div>
+            </div>
+
+            <div class="glass-stat-card red">
+                <div class="stat-info">
+                    <p class="stat-label">Critical Gap</p>
+                    <h2 class="stat-val-text text-red-500 truncate" id="sm-kpi-weak">COPPER PART</h2>
+                </div>
+                <div class="gap-alert"></div>
+            </div>
         </div>
-        <!-- Mini History Table (ตารางส่วนท้ายของ OT) -->
-        <div class="flex-[1.5] bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-0 overflow-hidden">
-            <div class="p-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                <h3 class="text-[10px] font-black text-slate-800 uppercase italic">Recent Activities</h3>
-                <span id="ot-hist-count" class="text-[9px] font-bold bg-white px-2 py-0.5 rounded-full border border-slate-200">0 Items</span>
+
+        <!-- แถวที่ 2: Futuristic Console Bar (Input) -->
+        <div class="sm-console-bar">
+            <div class="console-inner">
+                <div class="flex-1 relative">
+                    <span class="input-tag">Skill Identity</span>
+                    <input type="text" id="sm-f-name" class="console-input" placeholder="e.g. Mold Design, Quality Control...">
+                </div>
+                <div class="w-40 relative">
+                    <span class="input-tag">Proficiency</span>
+                    <input type="number" id="sm-f-value" class="console-input" placeholder="0-100%">
+                </div>
+                <button onclick="WapSkillMatrix.submit()" class="btn-sm-trigger">
+                    <span>UPDATE CORE SKILL</span>
+                    <div class="btn-reflection"></div>
+                </button>
             </div>
-            <div class="flex-1 overflow-y-auto scroll-custom">
-                <table class="w-full border-collapse">
-                    <thead class="sticky top-0 bg-white z-10">
-                        <tr class="border-b border-slate-100">
-                            <th class="py-2 px-3 text-left text-[9px] font-black text-slate-400 uppercase">วันที่</th>
-                            <th class="py-2 px-2 text-left text-[9px] font-black text-slate-400 uppercase">ภารกิจ/งาน</th>
-                            <th class="py-2 px-2 text-center text-[9px] font-black text-slate-400 uppercase">ชม.</th>
-                            <th class="py-2 px-3 text-right"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="ot-table-body" class="divide-y divide-slate-50 text-[10px]"></tbody>
-                </table>
+        </div>
+
+        <!-- แถวที่ 3: Deep Analytics (3 Columns) -->
+        <div class="sm-analytics-grid">
+            <!-- Radar Chart -->
+            <div class="analytics-card flex-[1]">
+                <div class="card-head"><h3>Radar Performance</h3></div>
+                <div class="card-body"><div id="sm-radar-chart"></div></div>
             </div>
-        </div><!-- ปิด Mini History Table -->
-    </div><!-- ปิด Section 2 ของ OT -->
-</div><!-- ปิด ot-management-content ครบถ้วน -->
+
+            <!-- Detailed Proficiency Bars -->
+            <div class="analytics-card flex-[1.4]">
+                <div class="card-head flex justify-between items-center">
+                    <h3>Proficiency Levels</h3>
+                    <div class="flex gap-2">
+                        <span class="status-indicator"><span class="dot expert"></span> Expert</span>
+                        <span class="status-indicator"><span class="dot basic"></span> Basic</span>
+                    </div>
+                </div>
+                <div id="sm-bar-list" class="card-body scroll-hide">
+                    <!-- Bars with Neon Glow -->
+                </div>
+            </div>
+
+            <!-- Distribution Donut -->
+            <div class="analytics-card flex-[0.8]">
+                <div class="card-head"><h3>Skill Weight</h3></div>
+                <div class="card-body flex flex-col items-center">
+                    <div id="sm-donut-chart"></div>
+                    <div id="sm-donut-legend" class="w-full mt-4"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+<!-- ============================================================
+     7. SPECIAL JOBS - FUTURISTIC COMMAND CENTER (V5.0)
+     ============================================================ -->
+<div id="special-jobs-content" class="hidden-view">
+    <div class="sj-master-container">
+        
+        <!-- [Top Row] Futuristic KPI Glow Cards -->
+        <div class="sj-kpi-row">
+            <!-- System Load -->
+            <div class="sj-kpi-card">
+                <div class="card-glow-line blue"></div>
+                <div class="flex justify-between items-start">
+                    <p class="sj-kpi-label">System Load</p>
+                    <div class="sj-kpi-icon blue"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+                </div>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <h2 class="sj-kpi-val" id="sj-kpi-total">0</h2>
+                    <span class="sj-kpi-unit">PROJECTS</span>
+                </div>
+                <div class="sj-progress-mini"><div class="fill blue" style="width: 70%"></div></div>
+            </div>
+
+            <!-- Active Cycle -->
+            <div class="sj-kpi-card">
+                <div class="card-glow-line emerald"></div>
+                <p class="sj-kpi-label">Active Cycle</p>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <h2 class="sj-kpi-val" id="sj-kpi-month">0</h2>
+                </div>
+                <p id="sj-current-month-text" class="sj-kpi-subtext emerald">SHOWING ALL 2026 MISSIONS</p>
+            </div>
+
+            <!-- Success Matrix -->
+            <div class="sj-kpi-card">
+                <div class="card-glow-line purple"></div>
+                <p class="sj-kpi-label">Success Matrix</p>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <h2 class="sj-kpi-val" id="sj-kpi-rate">0%</h2>
+                </div>
+                <div class="sj-live-tag"><span class="dot-pulse"></span> ANALYZING</div>
+            </div>
+
+            <!-- Primary Source -->
+            <div class="sj-kpi-card">
+                <div class="card-glow-line amber"></div>
+                <p class="sj-kpi-label">Primary Source</p>
+                <h2 class="sj-kpi-text-val truncate mt-2" id="sj-kpi-top-assignor-jobs">-</h2>
+                <p id="sj-kpi-top-assignor-name" class="sj-kpi-subtext amber">TOP ASSIGNOR</p>
+            </div>
+        </div>
+
+        <!-- [Middle Row] Command Center Entry Bar -->
+        <div class="sj-command-console">
+            <div class="console-inner">
+                <div class="flex-[1.8]">
+                    <label class="console-tag">Mission Brief / รายละเอียดงาน</label>
+                    <input type="text" id="sj-f-project" class="console-input" placeholder="พิมพ์ชื่อภารกิจหรือรายละเอียด...">
+                </div>
+                <div class="w-44">
+                    <label class="console-tag">Deployment Date</label>
+                    <input type="date" id="sj-f-date" class="console-input">
+                </div>
+                <div class="w-44">
+                    <label class="console-tag">Commander</label>
+                    <input type="text" id="sj-f-assignor" class="console-input" placeholder="ผู้สั่งงาน...">
+                </div>
+                <div class="flex-1">
+                    <label class="console-tag">Mission Output</label>
+                    <input type="text" id="sj-f-result" class="console-input" placeholder="ผลลัพธ์ที่ได้...">
+                </div>
+                <button onclick="WapSpecialJobs.save()" class="btn-mission-deploy">
+                    <span>บันทึกงาน</span>
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- [Bottom Row] Deep Analytics Grid -->
+        <div class="sj-main-grid">
+            <!-- Analytics Side -->
+            <div class="sj-analytics-col flex-[0.9]">
+                <div class="sj-glass-card h-[49%]">
+                    <div class="card-head"><h3>Workload Distribution</h3></div>
+                    <div class="card-body"><div id="sj-assignor-chart"></div></div>
+                </div>
+                <div class="sj-glass-card h-[49%]">
+                    <div class="card-head"><h3>Volume Frequency</h3></div>
+                    <div class="card-body"><div id="sj-volume-chart"></div></div>
+                </div>
+            </div>
+
+            <!-- Project History Table -->
+            <div class="sj-glass-card flex-[1.4]">
+                <div class="card-head-flex">
+                    <div class="flex items-center gap-3">
+                        <div class="header-indicator"></div>
+                        <h3>Project History Logs</h3>
+                    </div>
+                    <span id="sj-table-count" class="sj-record-badge">0 RECORDS</span>
+                </div>
+                <div class="sj-table-container scroll-hide">
+                    <table class="sj-premium-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px; text-align: center;">#</th>
+                                <th>MISSION BRIEF</th>
+                                <th style="width: 100px; text-align: center;">CYCLE DATE</th>
+                                <th style="width: 120px; text-align: center;">COMMANDER</th>
+                                <th style="width: 100px; text-align: center;">OUTPUT</th>
+                                <th style="width: 60px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="sj-table-body">
+                            <!-- Dynamic Data -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+<!-- ============================================================
+     8. OVERTIME MANAGEMENT - PRO COMMAND CENTER (V6.0)
+     ============================================================ -->
+<div id="ot-management-content" class="hidden-view">
+    <div class="ot-master-layout">
+        
+        <!-- [Section 1] KPI Summary Cards (Uniform Height: 115px) -->
+        <div class="ot-kpi-row">
+            <!-- Target Circle: Graph Left, Info Right -->
+            <div class="ot-card-v2 flex items-center gap-4">
+                <div class="ot-progress-circle-big">
+                    <svg viewBox="0 0 36 36">
+                        <circle class="bg" cx="18" cy="18" r="16"></circle>
+                        <circle id="ot-prog-circle" class="fill blue-glow" cx="18" cy="18" r="16" stroke-dasharray="72, 100"></circle>
+                    </svg>
+                    <div class="center-label"><span id="ot-prog-val">72.0</span><small>HRS</small></div>
+                </div>
+                <div class="min-w-0">
+                    <p class="ot-label">MONTHLY QUOTA</p>
+                    <h3 class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-tighter">Budget Control</h3>
+                </div>
+            </div>
+
+            <!-- Actual Total -->
+            <div class="ot-card-v2 border-t-blue">
+                <p class="ot-label">ชั่วโมงจริงสะสม</p>
+                <h2 class="val-mega blue" id="ot-kpi-total">0.00</h2>
+                <div class="flex justify-between items-end mt-auto">
+                    <span class="tiny-caption">TOTAL ACTUAL</span>
+                    <span class="unit-tag">HRS</span>
+                </div>
+            </div>
+
+            <!-- Workday (x1.5) -->
+            <div class="ot-card-v2 border-t-emerald">
+                <p class="ot-label">วันปกติ (x1.5)</p>
+                <h2 class="val-mega emerald" id="ot-kpi-wd-count">0 <small>ครั้ง</small></h2>
+                <div class="flex justify-between items-end mt-auto">
+                    <span class="tiny-caption">ACCUMULATED</span>
+                    <span class="status-tag emerald" id="ot-kpi-wd-hrs">0.00 ชม.</span>
+                </div>
+            </div>
+
+            <!-- Weekend (x1.0) -->
+            <div class="ot-card-v2 border-t-amber">
+                <p class="ot-label">เสาร์-อาทิตย์</p>
+                <h2 class="val-mega amber" id="ot-kpi-we-count">0 <small>ครั้ง</small></h2>
+                <div class="flex justify-between items-end mt-auto">
+                    <span class="tiny-caption">WEEKEND MODE</span>
+                    <span class="status-tag amber" id="ot-kpi-we-hrs">0.00 ชม.</span>
+                </div>
+            </div>
+
+            <!-- Holiday (x3.0) -->
+            <div class="ot-card-v2 border-t-rose">
+                <p class="ot-label">นักขัตฤกษ์</p>
+                <h2 class="val-mega rose" id="ot-kpi-ho-count">0 <small>ครั้ง</small></h2>
+                <div class="flex justify-between items-end mt-auto">
+                    <span class="tiny-caption">PUBLIC HOLIDAY</span>
+                    <span class="status-tag rose" id="ot-kpi-ho-hrs">0.00 ชม.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- [Section 2] Main Operations Grid -->
+        <div class="ot-ops-grid">
+            
+            <!-- [Left] Premium Entry Console -->
+            <div class="ot-console-box">
+                <div class="console-head">
+                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M12 4v16m8-8H4"/></svg>
+                    <h3>บันทึกข้อมูล OT</h3>
+                </div>
+                <div class="console-body scroll-hide">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label>วันที่ทำงาน</label>
+                            <input type="date" id="ot-f-date" class="ot-input-modern">
+                        </div>
+                        <div class="form-group">
+                            <label>ประเภท (MULTIPLIER)</label>
+                            <select id="ot-f-type" class="ot-input-modern">
+                                <option value="">-- เลือกประเภท --</option>
+                                <option value="1.5">วันปกติ (x1.5)</option>
+                                <option value="1.0">วันเสาร์ (x1.0)</option>
+                                <option value="3.0">อาทิตย์/นักขัตฯ (x3.0)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <div class="form-group">
+                            <label>⏰ เวลาเริ่ม OT</label>
+                            <input type="text" id="ot-start" class="ot-input-modern" list="ot-time-list" placeholder="เช่น 17:30" oninput="WapOTManagement.calcHours()">
+                        </div>
+                        <div class="form-group">
+                            <label>⏰ เวลาสิ้นสุด OT</label>
+                            <input type="text" id="ot-end" class="ot-input-modern" list="ot-time-list" placeholder="เช่น 20:00" oninput="WapOTManagement.calcHours()">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-4 items-end">
+                        <div class="form-group">
+                            <label>เวลาพัก (นาที)</label>
+                            <input type="number" id="ot-f-break" value="0" class="ot-input-modern" oninput="WapOTManagement.calcHours()">
+                        </div>
+                        <div class="digital-result-box">
+                            <p>ชั่วโมงที่จะบันทึก</p>
+                            <h2 id="ot-f-computed">0.00</h2>
+                        </div>
+                    </div>
+                    <div class="form-group mt-4">
+                        <label>รายละเอียดงาน / JOB NAME</label>
+                        <input type="text" id="ot-f-job" class="ot-input-modern" placeholder="เช่น Support กะดึก, เคลียร์ Part NG">
+                    </div>
+                </div>
+                <div class="console-footer">
+                    <button onclick="WapOTManagement.save()" id="ot-save-btn" class="btn-ot-submit-ultra">
+                        <span>บันทึก OT</span>
+                        <div class="btn-light"></div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- [Right] Big Analytics Column -->
+            <div class="ot-analytics-column">
+                <!-- Bar Chart Trend -->
+                <div class="analytics-card-white h-[58%]">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="chart-title-v2">MONTHLY OT TREND (HOURS)</h3>
+                        <div class="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full border">
+                            <span class="text-[8px] font-black text-slate-400">TARGET:</span>
+                            <input type="number" id="ot-target-input" value="100" class="w-8 bg-transparent border-none text-[10px] font-black text-rose-500 outline-none text-center p-0">
+                        </div>
+                    </div>
+                    <div class="chart-wrap-v2"><div id="ot-trend-chart"></div></div>
+                </div>
+
+                <!-- Bottom Split -->
+                <div class="analytics-bottom-split h-[40%]">
+                    <div class="analytics-card-white flex-[1]">
+                        <h3 class="chart-title-v2">OT TYPE DISTRIBUTION</h3>
+                        <div class="chart-wrap-v2"><div id="ot-dist-chart"></div></div>
+                    </div>
+                    <div class="analytics-card-white flex-[1.4]">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="chart-title-v2 italic">RECENT ACTIVITIES</h3>
+                            <span id="ot-hist-count" class="text-[9px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100">0 ITEMS</span>
+                        </div>
+                        <div class="recent-table-wrap scroll-hide">
+                            <table class="recent-table">
+                                <thead>
+                                    <tr>
+                                        <th>วันที่</th>
+                                        <th>ภารกิจ/งาน</th>
+                                        <th class="text-center">ชม.</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ot-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
 
     <script src="script.js"></script>
 </body>
