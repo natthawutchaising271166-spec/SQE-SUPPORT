@@ -12992,3 +12992,60 @@ header {
 .support-table thead th {
     z-index: 10 !important;
 }
+/* ค้นหาคลาสเหล่านี้ใน styles.css และปรับปรุง */
+
+/* ตัวกล่องหุ้มกราฟหลัก */
+#five-s-content .panel-content {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    position: relative;
+    padding: 0 !important; /* ลบ padding ออกเพื่อให้กราฟวิ่งไปชนขอบได้ */
+    overflow: hidden;      /* กันกราฟแลบ */
+}
+
+/* ปรับระยะห่างของ Header ด้านบนกราฟไม่ให้เบียดเกินไป */
+#five-s-content .panel-header {
+    padding: 18px 20px 10px; /* รักษาช่องไฟด้านบนไว้ */
+}
+
+/* บังคับให้ตัว chart div ขยายเต็มพื้นที่ */
+#s5-trend-chart {
+    height: 100%;
+    width: 100%;
+    margin-bottom: -10px; /* ดึงตัวกราฟลงด้านล่างชดเชยกับระยะที่ ApexCharts จองไว้ */
+}
+/* บังคับคอลัมน์ Area ในหน้า 5S ให้เป็นบรรทัดเดียว */
+.s5-cyber-table td:first-child {
+    white-space: nowrap !important;    /* ห้ามขึ้นบรรทัดใหม่ */
+    overflow: hidden !important;        /* ซ่อนส่วนที่เกิน */
+    text-overflow: ellipsis !important; /* ใส่ ... ถ้าข้อความยาวเกิน */
+    max-width: 350px;                  /* กำหนดความยาวสูงสุด (ปรับเปลี่ยนได้ตามชอบ) */
+}
+
+/* ปรับให้ตารางยืดหยุ่นขึ้น */
+.s5-cyber-table {
+    table-layout: auto !important;     /* ให้ตารางคำนวณความกว้างตามเนื้อหา */
+    width: 100% !important;
+}
+/* บังคับให้ตารางยืดตามพื้นที่ และควบคุมความกว้างแต่ละคอลัมน์ */
+.sj-premium-table {
+    table-layout: fixed !important; /* สำคัญมากเพื่อให้ Ellipsis ทำงานได้ในตาราง */
+    width: 100% !important;
+}
+
+/* ตั้งความกว้างมาตรฐานให้แต่ละหัวข้อ */
+.sj-premium-table th:nth-child(1) { width: 45px; }  /* # */
+.sj-premium-table th:nth-child(2) { width: auto; }  /* Mission Brief */
+.sj-premium-table th:nth-child(3) { width: 90px; }  /* Date */
+.sj-premium-table th:nth-child(4) { width: 110px; } /* Assignor */
+.sj-premium-table th:nth-child(5) { width: 120px; } /* Status */
+.sj-premium-table th:nth-child(6) { width: 50px; }  /* Action */
+
+/* ทำให้ตัวหนังสือในคอลัมน์ Mission ตัดเป็นบรรทัดเดียว */
+.truncate {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block;
+}

@@ -1,5 +1,5 @@
 // 1. อัปเดตเวอร์ชันแคช เพื่อให้เบราว์เซอร์ล้างอันเก่าแล้วดึงอันใหม่ที่ไม่มีโฟลเดอร์ icons
-const CACHE_NAME = 'sqe-portal-v1.0.1'; 
+const CACHE_NAME = 'sqe-portal-v1.0.2'; 
 
 const urlsToCache = [
   './',

@@ -4959,59 +4959,65 @@ function renderChart() {
         });
 
         if (_chart) _chart.destroy();
-        _chart = new ApexCharts($id('s5-trend-chart'), {
-            series: [{ name: 'จุดที่พบ', data: chartData }],
-            chart: { 
-                type: 'area', 
-                height: '100%', 
-                toolbar: { show: false },
-                // --- [1. อนิเมชั่นแบบพริ้วไหว] ---
-                animations: {
-                    enabled: true,
-                    easing: 'easeinout',
-                    speed: 1300, // ช้าลงเล็กน้อยเพื่อให้เห็นการวาดเส้นที่นุ่มนวล
-                    animateGradually: { enabled: true, delay: 150 },
-                    dynamicAnimation: { enabled: true, speed: 450 }
-                },
-                sparkline: { enabled: false }
-            },
-            colors: ['#f59e0b'],
-            // ปรับเส้นให้หนาและมน (Round) ขึ้น
-            stroke: { curve: 'smooth', width: 4, lineCap: 'round' },
-            fill: {
-                type: 'gradient',
-                gradient: {
-                    shadeIntensity: 1,
-                    opacityFrom: 0.4, // ไล่เฉดสีจากส้มจาง
-                    opacityTo: 0.02,  // ไปจนถึงเกือบใส
-                    stops: [0, 90, 100]
-                }
-            },
-            // --- [2. ลบเส้นตารางพื้นหลังออก] ---
-            grid: {
-                show: false, // ปิดเส้นตารางทั้งหมด
-                padding: { left: 10, right: 10, top: 0, bottom: 0 }
-            },
-            dataLabels: { enabled: false },
-            markers: { size: 0, hover: { size: 5, strokeWidth: 3 } },
-            xaxis: { 
-                categories: months,
-                axisBorder: { show: false }, // ลบเส้นขอบแกน X
-                axisTicks: { show: false },  // ลบขีดติ๊กแกน X
-                labels: { 
-                    style: { colors: '#94a3b8', fontSize: '10px', fontWeight: 600 } 
-                }
-            },
-            yaxis: { 
-                show: false // ซ่อนแกน Y เพื่อความคลีน (เพราะมีเลขกำกับบนกราฟหรือ Tooltip อยู่แล้ว)
-            },
-            tooltip: { 
-                theme: 'dark',
-                y: { formatter: (val) => val + " Points" }
+    _chart = new ApexCharts($id('s5-trend-chart'), {
+        series: [{ name: 'จุดที่พบ', data: chartData }],
+        chart: { 
+            type: 'area', 
+            height: '100%', 
+            width: '100%', // มั่นใจว่าเต็มความกว้าง
+            toolbar: { show: false },
+            sparkline: { enabled: false }, // ต้องเป็น false เพื่อให้โชว์แกน X (เดือน)
+            animations: { enabled: true, easing: 'easeinout', speed: 1000 }
+        },
+        // --- ส่วนที่แก้ไข: ปรับจูนระยะขอบ (Margin/Padding) ---
+        grid: {
+            show: false,
+            padding: {
+                left: -15,   // ดันกราฟไปทางซ้ายจนชิดขอบ (ค่าติดลบช่วยให้ชิดขึ้น)
+                right: 0,
+                top: 0,
+                bottom: -10  // ดันกราฟลงมาข้างล่างให้ชิดขอบขึ้น
             }
-        });
-        _chart.render();
-    }
+        },
+        // ------------------------------------------
+        colors: ['#f59e0b'],
+        stroke: { curve: 'smooth', width: 4, lineCap: 'round' },
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shadeIntensity: 1,
+                opacityFrom: 0.4,
+                opacityTo: 0.02,
+                stops: [0, 90, 100]
+            }
+        },
+        dataLabels: { enabled: false },
+        xaxis: { 
+            categories: months,
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+            labels: { 
+                show: true,
+                offsetY: -5, // ขยับตัวหนังสือเดือนขึ้นมาหน่อยเพื่อให้พ้นขอบล่าง
+                style: { 
+                    colors: '#94a3b8', 
+                    fontSize: '10px', 
+                    fontWeight: 700 
+                } 
+            },
+            tooltip: { enabled: false } // ปิด tooltip เล็กบนแกน X
+        },
+        yaxis: { 
+            show: false,
+            padding: { left: 0, right: 0 }
+        },
+        tooltip: { 
+            theme: 'dark',
+            y: { formatter: (val) => val + " Points" }
+        }
+    });
+    _chart.render();
+}
 
 
 function renderRanking() {
@@ -6428,19 +6434,27 @@ function renderTable() {
     tbody.innerHTML = _filteredRecords.map((r, i) => {
         const hasResult = r.result && r.result !== '-' && r.result !== '';
         return `
-        <tr>
+        <tr class="sj-table-row border-b border-slate-50 opacity-0"> <!-- เพิ่มคลาส sj-table-row และ opacity-0 -->
             <td class="text-center font-bold text-slate-300">${i+1}</td>
-            <td>
+            <td style="max-width: 0; width: 40%;"> <!-- บังคับให้ cell คำนวณความกว้างใหม่เพื่อทำ Ellipsis -->
                 <div class="flex flex-col">
-                    <span class="text-[11.5px] font-black text-slate-700 leading-tight uppercase">${r.project}</span>
-                    <span class="text-[9.5px] text-slate-400 font-bold italic mt-1">${r.result || 'Outcome Pending...'}</span>
+                    <!-- แสดงโปรเจกต์เป็นบรรทัดเดียว -->
+                    <span class="text-[11.5px] font-black text-slate-700 leading-tight uppercase truncate" title="${r.project}">
+                        ${r.project}
+                    </span>
+                    <!-- แสดงผลลัพธ์เป็นบรรทัดเดียว -->
+                    <span class="text-[9.5px] text-slate-400 font-bold italic mt-1 truncate" title="${r.result || ''}">
+                        ${r.result || 'Outcome Pending...'}
+                    </span>
                 </div>
             </td>
             <td class="text-center font-mono text-[10px] text-slate-400 font-bold">${r.date}</td>
-            <td class="text-center text-[10px] font-black text-blue-600 uppercase">${r.assigned_by}</td>
+            <td class="text-center text-[10px] font-black text-blue-600 uppercase truncate" style="max-width: 100px;">
+                ${r.assigned_by}
+            </td>
             <td class="text-center">
-                <span class="px-3 py-1 rounded-full text-[8.5px] font-black ${hasResult ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}">
-                    ${hasResult ? 'MISSION COMPLETED' : 'IN PROGRESS'}
+                <span class="px-3 py-1 rounded-full text-[8.5px] font-black whitespace-nowrap ${hasResult ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}">
+                    ${hasResult ? 'COMPLETED' : 'IN PROGRESS'}
                 </span>
             </td>
             <td class="text-right">
@@ -6451,14 +6465,12 @@ function renderTable() {
         </tr>
     `}).join('');
 
-
-    // สั่งรันอนิเมชั่นให้แถวทยอยเลื่อนเข้ามา (Stagger)
     requestAnimationFrame(() => {
         gsap.to(".sj-table-row", {
             opacity: 1,
             x: 0,
             duration: 0.4,
-            stagger: 0.03, // ความเร็วในการทยอยเลื่อน
+            stagger: 0.03,
             ease: "power2.out",
             clearProps: "transform"
         });
