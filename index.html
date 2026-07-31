@@ -1044,8 +1044,7 @@
         </div>
     </div>
 
-    <!-- แถวที่ 3: Parts + Distribution -->
-    <!-- ค้นหาแถว exec-bottom-row ใน index.html แล้วเพิ่ม/แก้ไขส่วนนี้ -->
+<!-- ค้นหาแถว exec-bottom-row ใน index.html แล้วเพิ่ม/แก้ไขส่วนนี้ -->
 <div class="exec-bottom-row">
     <!-- ส่วนเดิม: Top 5 Problem Part -->
     <div class="exec-chart-box flex-[1.2]">
@@ -1058,6 +1057,7 @@
         <div class="exec-chart-wrapper"><div id="exec-part-chart"></div></div>
     </div>
 
+    <!-- ส่วนที่เพิ่มใหม่: SPECIAL MISSIONS SUMMARY -->
 <!-- ค้นหาจุดเดิมของ Special Missions ในหน้า Exec Dashboard และแทนที่ด้วยโค้ดนี้ -->
 <div class="exec-chart-box flex-[1] relative overflow-hidden group">
     <!-- Gimmick: แถบแสงสแกนวิ่งผ่าน (Automation Effect) -->
@@ -1522,23 +1522,15 @@
                 </div>
             </div>
 
-<!-- ค้นหาจุด Distribution Donut และแก้ให้เป็นแบบนี้ -->
-<div class="analytics-card flex-[0.8] flex flex-col">
-    <div class="card-head"><h3>Skill Weight</h3></div>
-    <div class="card-body flex flex-col" style="padding: 15px; min-height: 0; flex: 1;">
-        
-        <!-- ล็อคความสูงเฉพาะจุดวาดกราฟ -->
-        <div style="height: 220px; width: 100%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-            <div id="sm-donut-chart"></div>
+            <!-- Distribution Donut -->
+            <div class="analytics-card flex-[0.8]">
+                <div class="card-head"><h3>Skill Weight</h3></div>
+                <div class="card-body flex flex-col items-center">
+                    <div id="sm-donut-chart"></div>
+                    <div id="sm-donut-legend" class="w-full mt-4"></div>
+                </div>
+            </div>
         </div>
-
-        <!-- พื้นที่ Legend ให้เลื่อนได้เองถ้าล้น -->
-        <div id="sm-donut-legend" class="w-full mt-4 overflow-y-auto scroll-hide" style="flex: 1;">
-            <!-- แถบ Expert, Advanced จะถูกฉีดเข้าที่นี่ -->
-        </div>
-        
-    </div>
-</div>
 
     </div>
 </div>

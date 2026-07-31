@@ -13928,62 +13928,25 @@ body:has(.system-banner:not(.hidden)) #dashboard-view {
 @media (max-width: 768px) {
     .hud-ring-outer, .hud-ring-inner, .side-info { display: none; }
 }
-/* Futuristic Mission Toggle Switch */
-.mission-sync-toggle {
-  position: relative;
-  display: inline-block;
-  width: 46px;
-  height: 24px;
+/* เพิ่มไว้ล่างสุดของ styles.css */
+@keyframes scan {
+    0% { transform: translateY(-10px); opacity: 0; }
+    50% { opacity: 0.5; }
+    100% { transform: translateY(150px); opacity: 0; }
 }
 
-.mission-sync-toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+.animate-scan {
+    animation: scan 3s linear infinite;
 }
 
-.mission-slider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  background-color: #cbd5e1;
-  transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 34px;
+#exec-mission-mini-feed > div {
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.mission-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-input:checked + .mission-slider {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
-}
-
-input:checked + .mission-slider:before {
-  transform: translateX(22px);
-}
-
-/* Disabled State for Edits */
-input:disabled + .mission-slider {
-  background-color: #e2e8f0;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-/* Hover Effect */
-.mission-sync-box:hover {
-    background: rgba(37, 99, 235, 0.08) !important;
-    border-color: #3b82f6 !important;
+#exec-mission-mini-feed > div:hover {
+    transform: translateX(5px);
+    background-color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 /* ค้นหาหรือเพิ่มส่วนนี้ใน styles.css */
 
