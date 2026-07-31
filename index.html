@@ -1045,30 +1045,77 @@
     </div>
 
     <!-- แถวที่ 3: Parts + Distribution -->
-    <div class="exec-bottom-row">
-        <div class="exec-chart-box flex-[1.5]">
-            <div class="flex justify-between items-center mb-2">
-                <div>
-                    <h3 class="text-[13px] font-black text-slate-800 uppercase tracking-tight">Top 5 Problem Part Groups</h3>
-                    <p class="text-[10px] text-slate-400 font-medium">ชิ้นส่วนพาร์ทที่มีปัญหาบ่อยที่สุด</p>
-                </div>
-                <span class="px-2 py-1 bg-blue-50 text-blue-600 text-[9px] font-black rounded-lg">LIVE ANALYSIS</span>
+    <!-- ค้นหาแถว exec-bottom-row ใน index.html แล้วเพิ่ม/แก้ไขส่วนนี้ -->
+<div class="exec-bottom-row">
+    <!-- ส่วนเดิม: Top 5 Problem Part -->
+    <div class="exec-chart-box flex-[1.2]">
+        <div class="flex justify-between items-center mb-2">
+            <div>
+                <h3 class="text-[13px] font-black text-slate-800 uppercase tracking-tight">Top Problem Parts</h3>
             </div>
-            <div class="exec-chart-wrapper"><div id="exec-part-chart"></div></div>
+            <span class="px-2 py-1 bg-blue-50 text-blue-600 text-[9px] font-black rounded-lg">LIVE</span>
         </div>
-        <div class="exec-chart-box flex-[1]">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-[13px] font-black text-slate-800 uppercase tracking-tight">Report Type Distribution</h3>
-                <span class="px-2 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg">GLOBAL SHARE</span>
+        <div class="exec-chart-wrapper"><div id="exec-part-chart"></div></div>
+    </div>
+
+<!-- ค้นหาจุดเดิมของ Special Missions ในหน้า Exec Dashboard และแทนที่ด้วยโค้ดนี้ -->
+<div class="exec-chart-box flex-[1] relative overflow-hidden group">
+    <!-- Gimmick: แถบแสงสแกนวิ่งผ่าน (Automation Effect) -->
+    <div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-0 group-hover:opacity-100 animate-scan z-0"></div>
+
+    <div class="flex justify-between items-center mb-3 relative z-10">
+        <h3 class="text-[13px] font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+            Special Missions
+        </h3>
+        <div id="exec-mission-badge" class="px-2 py-0.5 bg-slate-100 text-slate-400 text-[9px] font-black rounded-full border border-slate-200 transition-all duration-500">0 DONE</div>
+    </div>
+    
+    <div class="flex flex-col h-full relative z-10">
+        <div class="flex items-center gap-4 mb-4">
+            <!-- Animated Circle Gauge -->
+            <div class="relative w-16 h-16 flex-shrink-0">
+                <svg viewBox="0 0 36 36" class="w-full h-full transform -rotate-90">
+                    <circle cx="18" cy="18" r="16" fill="none" stroke="#f1f5f9" stroke-width="3.5"></circle>
+                    <circle id="exec-mission-circle" cx="18" cy="18" r="16" fill="none" stroke="url(#missionGradient)" stroke-width="3.5" stroke-dasharray="0, 100" stroke-linecap="round" style="transition: stroke-dasharray 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);"></circle>
+                    <defs>
+                        <linearGradient id="missionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3b82f6" />
+                            <stop offset="100%" stop-color="#10b981" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center font-black text-[13px] text-slate-800" id="exec-mission-pct">0%</div>
             </div>
-            <div class="flex items-center gap-4 h-full">
-                <div class="w-32 h-32 flex-shrink-0"><div id="exec-pie-chart"></div></div>
-                <div id="exec-pie-legend" class="flex-1 space-y-2"></div>
+            <div>
+                <div class="flex items-center gap-1.5 mb-1">
+                    <div class="w-1 h-1 rounded-full bg-emerald-500"></div>
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Neural Sync Active</p>
+                </div>
+                <p class="text-[12px] font-black text-slate-700 leading-none" id="exec-mission-stats">0 / 0</p>
+                <p class="text-[8px] font-bold text-blue-500 uppercase mt-1">Automated Reporting</p>
             </div>
+        </div>
+        
+        <!-- Mission Mini Feed with Automated Stagger -->
+        <div class="space-y-2 flex-1" id="exec-mission-mini-feed">
+            <!-- Items will be auto-injected -->
         </div>
     </div>
 </div>
 
+    <!-- ส่วนเดิม: Distribution Pie -->
+    <div class="exec-chart-box flex-[0.8]">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-[13px] font-black text-slate-800 uppercase tracking-tight">Distribution</h3>
+        </div>
+        <div class="flex items-center gap-4 h-full">
+            <div class="w-24 h-24 flex-shrink-0"><div id="exec-pie-chart"></div></div>
+            <div id="exec-pie-legend" class="flex-1 space-y-1"></div>
+        </div>
+    </div>
+</div>
+</div>
 <!-- ============================================================
      4. ATTENDANCE LOGS (100% MATCH DESIGN)
      ============================================================ -->
@@ -1475,15 +1522,23 @@
                 </div>
             </div>
 
-            <!-- Distribution Donut -->
-            <div class="analytics-card flex-[0.8]">
-                <div class="card-head"><h3>Skill Weight</h3></div>
-                <div class="card-body flex flex-col items-center">
-                    <div id="sm-donut-chart"></div>
-                    <div id="sm-donut-legend" class="w-full mt-4"></div>
-                </div>
-            </div>
+<!-- ค้นหาจุด Distribution Donut และแก้ให้เป็นแบบนี้ -->
+<div class="analytics-card flex-[0.8] flex flex-col">
+    <div class="card-head"><h3>Skill Weight</h3></div>
+    <div class="card-body flex flex-col" style="padding: 15px; min-height: 0; flex: 1;">
+        
+        <!-- ล็อคความสูงเฉพาะจุดวาดกราฟ -->
+        <div style="height: 220px; width: 100%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div id="sm-donut-chart"></div>
         </div>
+
+        <!-- พื้นที่ Legend ให้เลื่อนได้เองถ้าล้น -->
+        <div id="sm-donut-legend" class="w-full mt-4 overflow-y-auto scroll-hide" style="flex: 1;">
+            <!-- แถบ Expert, Advanced จะถูกฉีดเข้าที่นี่ -->
+        </div>
+        
+    </div>
+</div>
 
     </div>
 </div>

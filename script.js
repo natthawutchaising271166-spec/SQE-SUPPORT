@@ -5255,6 +5255,36 @@ function renderTable() {
     handleTableScroll();
 }
 
+// ฟังก์ชันคำนวณสถิติการเข้างานมาตรฐาน (จันทร์-ศุกร์)
+function getUnifiedAttendanceStats(records, startStr, endFilterStr) {
+    const start = new Date(startStr);
+    const end = endFilterStr ? new Date(endFilterStr) : new Date();
+    
+    // 1. หาจำนวนวัน จันทร์-ศุกร์ ทั้งหมดในช่วงวันที่เลือก
+    let totalWorkingDays = 0;
+    let curr = new Date(start);
+    while (curr <= end) {
+        if (curr.getDay() !== 0 && curr.getDay() !== 6) totalWorkingDays++;
+        curr.setDate(curr.getDate() + 1);
+    }
+
+    // 2. กรองข้อมูลการลาและวันหยุด
+    const yearRecords = records.filter(r => r.date >= startStr && r.date <= (endFilterStr || "9999-12-31"));
+    const leaveCount = yearRecords.filter(r => r.type !== 'holiday').length;
+    const holidayCount = yearRecords.filter(r => r.type === 'holiday').length;
+
+    // 3. คำนวณวันทำงานจริง และ % (ตามเกณฑ์ จันทร์-ศุกร์)
+    const scheduledDays = totalWorkingDays - holidayCount;
+    const actualWorked = Math.max(0, scheduledDays - leaveCount);
+    const rate = scheduledDays > 0 ? (actualWorked / scheduledDays) * 100 : 100;
+
+    return {
+        rate: rate.toFixed(1),
+        leave: leaveCount,
+        worked: actualWorked,
+        holiday: holidayCount
+    };
+}
 
 /**
  * ฟังก์ชันจัดการ Virtual Scroll (High Performance)
@@ -5645,25 +5675,20 @@ async function fetchWAPData() {
     if (!targetUser) return false;
 
     try {
-        // ดึงข้อมูลจาก 5 ตารางหลักของ WAP พร้อมกัน (Parallel Fetch)
-        const [resAct, resS5, resAtt, resOT, resSkill] = await Promise.all([
+        const [resAct, resS5, resAtt, resOT, resSkill, resSJ] = await Promise.all([
             wapClient.from('support_records').select('*').eq('user_id', targetUser).order('event_date', { ascending: false }),
             wapClient.from('s5_records').select('*').eq('user_id', targetUser).order('month', { ascending: false }),
             wapClient.from('daily_reports').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
             wapClient.from('ot_records').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
-            wapClient.from('skill_matrix').select('*').eq('user_id', targetUser)
+            wapClient.from('skill_matrix').select('*').eq('user_id', targetUser),
+            wapClient.from('special_jobs').select('*').eq('user_id', targetUser).order('date', { ascending: false }) // เพิ่มบรรทัดนี้
         ]);
 
-        // ตรวจสอบ Error
-        if (resAct.error) throw resAct.error;
-        if (resS5.error) throw resS5.error;
-
-        // บันทึกลง Global State
+        // เก็บข้อมูลลง State
         S.wapData.achievements = resAct.data || []; 
         S.wapData.score5s = resS5.data || [];
-        S.attLeaveRecords = resAtt.data || []; // สำหรับหน้า Attendance
-        S.otRecords = resOT.data || [];        // สำหรับหน้า OT (ถ้ามี State แยก)
-        S.skillRecords = resSkill.data || [];  // สำหรับหน้า Skill Matrix
+        S.wapData.specialJobs = resSJ.data || []; // เพิ่มบรรทัดนี้
+        S.attLeaveRecords = resAtt.data || [];
         
         return true;
     } catch (e) {
@@ -6735,6 +6760,91 @@ function getGlobalAttendanceStats(year) {
     };
 }
 
+// เพิ่มฟังก์ชันใหม่นี้เข้าไปใน script.js
+function renderExecSpecialJobs() {
+    const missions = S.wapData.specialJobs || [];
+    const start = $id('cd-start-date')?.value;
+    const end = $id('cd-end-date')?.value;
+
+    // 1. ประมวลผลข้อมูล
+    const filteredMissions = missions.filter(r => !start || !end || (r.date >= start && r.date <= end));
+    const total = filteredMissions.length;
+    const completed = filteredMissions.filter(r => r.result && r.result !== '-' && r.result !== '').length;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    // 2. Automation: Circular Progress Animation
+    const circle = $id('exec-mission-circle');
+    if (circle) {
+        gsap.to(circle, {
+            attr: { "stroke-dasharray": `${pct}, 100` },
+            duration: 1.5,
+            ease: "power2.out"
+        });
+    }
+
+    // 3. Automation: Number Counter (เลขวิ่ง)
+    animateValue('exec-mission-pct', 0, pct, 1500, 0, "%");
+    
+    // อัปเดต Stats Text แบบเนียนๆ
+    const statsEl = $id('exec-mission-stats');
+    if (statsEl) {
+        gsap.to(statsEl, {
+            opacity: 0, scale: 0.9, duration: 0.2,
+            onComplete: () => {
+                statsEl.textContent = `${completed} / ${total} COMPLETED`;
+                gsap.to(statsEl, { opacity: 1, scale: 1, duration: 0.3 });
+            }
+        });
+    }
+
+    // 4. Automation: Badge Color Sync
+    const badge = $id('exec-mission-badge');
+    if (badge) {
+        badge.textContent = `${completed} DONE`;
+        if (pct >= 80) {
+            badge.className = "px-2 py-0.5 bg-emerald-500 text-white text-[9px] font-black rounded-full border border-emerald-400 shadow-sm";
+        } else if (pct >= 50) {
+            badge.className = "px-2 py-0.5 bg-blue-500 text-white text-[9px] font-black rounded-full border border-blue-400 shadow-sm";
+        } else {
+            badge.className = "px-2 py-0.5 bg-slate-100 text-slate-400 text-[9px] font-black rounded-full border border-slate-200";
+        }
+    }
+
+    // 5. Automation: Mini Feed Staggered Injection
+    const feedEl = $id('exec-mission-mini-feed');
+    if (feedEl) {
+        if (filteredMissions.length === 0) {
+            feedEl.innerHTML = '<div class="h-full flex items-center justify-center"><p class="text-[10px] text-slate-300 italic">No Missions Synchronized</p></div>';
+            return;
+        }
+
+        feedEl.innerHTML = filteredMissions.slice(0, 3).map((m, i) => `
+            <div class="p-2.5 rounded-xl bg-slate-50/50 border border-slate-100 relative overflow-hidden opacity-0 translate-x-[-10px]" id="m-item-${i}">
+                <div class="absolute left-0 top-0 bottom-0 w-1 ${m.result && m.result !== '-' ? 'bg-emerald-500' : 'bg-blue-400'}"></div>
+                <div class="flex justify-between items-start">
+                    <p class="text-[10px] font-black text-slate-700 truncate uppercase w-3/4">${m.project}</p>
+                    <span class="text-[8px] font-black ${m.result && m.result !== '-' ? 'text-emerald-500' : 'text-blue-500'}">${m.result && m.result !== '-' ? 'DONE' : 'ACTIVE'}</span>
+                </div>
+                <p class="text-[8px] font-bold text-slate-400 mt-1 flex items-center gap-1">
+                    <svg class="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    ${m.date} | CMD: ${m.assigned_by}
+                </p>
+            </div>
+        `).join('');
+
+        // รัน Stagger Animation ให้รายการไหลเข้ามาทีละอัน
+        filteredMissions.slice(0, 3).forEach((_, i) => {
+            gsap.to(`#m-item-${i}`, {
+                opacity: 1,
+                x: 0,
+                duration: 0.5,
+                delay: 0.2 + (i * 0.1),
+                ease: "back.out(1.7)"
+            });
+        });
+    }
+}
+
 function initExecDashboard() {
     // [CLEANUP] ล้างอนิเมชั่นที่อาจค้างอยู่ก่อนเริ่มใหม่
     gsap.killTweensOf(".exec-card-premium, #exec-5s-bar");
@@ -6785,13 +6895,18 @@ function initExecDashboard() {
         gsap.to('#exec-5s-bar', { width: barPct + '%', duration: 1.5, ease: "expo.out" });
     }
 
+// ============================================================
+    // 4. ส่วน Attendance (ใช้ Unified Logic เพื่อให้ค่าตรงกันทุกหน้า)
     // ============================================================
-    // 4. ส่วน Attendance (รันเลขวิ่ง % และจำนวนวัน)
-    // ============================================================
-    const attStats = getGlobalAttendanceStats(parseInt(targetYear));
+    // ดึงค่าวันที่จาก Header หรือใช้ต้นปีเป็นค่าเริ่มต้น
+    const startFilter = $id('cd-start-date')?.value || `${targetYear}-01-01`;
+    const endFilter = $id('cd-end-date')?.value || new Date().toISOString().split('T')[0];
+    
+    // เรียกใช้ฟังก์ชันกลางที่นับเฉพาะ จันทร์-ศุกร์
+    const attStats = getUnifiedAttendanceStats(S.attLeaveRecords, startFilter, endFilter);
     
     // --- [ANIMATION: กล่องที่ 4 - ATTENDANCE RATE] ---
-    // หมายเหตุ: กล่องที่ 3 (Index) จะถูกสั่งรันใน updateAIBannerInsight
+    // ใช้ค่า rate และ leave จากตัวแปร attStats ใหม่
     animateValue('exec-att-rate', 0, parseFloat(attStats.rate), 1200, 1, "%");
     animateValue('exec-leave-total', 0, attStats.leave, 1000, 0, " DAYS TOTAL", "LEAVE: ");
 
@@ -6802,7 +6917,7 @@ function initExecDashboard() {
     renderExecParts(filteredActs);
     renderExecPie(rp, vf, recordsCount); 
     updateAIBannerInsight(filteredActs);
-
+    renderExecSpecialJobs();
     // --- [ENTRANCE STAGGER: สั่งให้การ์ดค่อยๆ เด้งขึ้นมาทีละใบ] ---
     if (!$id('exec-dashboard-content').classList.contains('hidden-view')) {
         gsap.fromTo("#exec-dashboard-content .exec-card-premium", 
@@ -7456,57 +7571,40 @@ async function submitLeaveRequest() {
 }
 
 /* อัปเดต KPI สถิติการเข้างาน (เวอร์ชั่นรวมฟิลเตอร์ Header และรายปี) */
+/* อัปเดต KPI สถิติการเข้างาน (ดึงค่าจากฟังก์ชันกลางเพื่อให้เลขตรงกันทุกหน้า) */
 function updateAttKPI() {
+    // ดึงค่าวันที่จาก Global Filter (Header)
     const startFilter = $id('cd-start-date')?.value;
     const endFilter = $id('cd-end-date')?.value;
     const allRecords = S.attLeaveRecords || [];
 
-    let rangeStart, rangeEnd;
+    let rangeStartStr, rangeEndStr;
+
+    // ตรวจสอบช่วงวันที่
     if (startFilter && endFilter) {
-        rangeStart = new Date(startFilter);
-        rangeEnd = new Date(endFilter);
+        rangeStartStr = startFilter;
+        rangeEndStr = endFilter;
     } else {
+        // ถ้าไม่มี Filter ใน Header ให้คำนวณตามปีที่เลือกในหน้า Attendance
         const year = attSelectedYear;
         const now = new Date();
-        rangeStart = new Date(year, 0, 1);
-        rangeEnd = (year === now.getFullYear()) ? now : new Date(year, 11, 31);
+        const nowStr = now.toISOString().split('T')[0];
+        
+        rangeStartStr = `${year}-01-01`;
+        // ถ้าเป็นปีปัจจุบัน ให้จบที่วันนี้ ถ้าปีเก่า ให้จบที่สิ้นปีนั้น
+        rangeEndStr = (year === now.getFullYear()) ? nowStr : `${year}-12-31`;
     }
 
-    // 1. คำนวณจำนวนวันทั้งหมดในปฏิทินตั้งแต่วันเริ่มจนถึงวันสิ้นสุด (Total Calendar Days)
-    const diffTime = Math.abs(rangeEnd - rangeStart);
-    const totalCalendarDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    // >>> จุดสำคัญ: ประกาศเรียกใช้ฟังก์ชันกลางดึงค่า stats มาก่อน <<<
+    const stats = getUnifiedAttendanceStats(allRecords, rangeStartStr, rangeEndStr);
 
-    // 2. กรองข้อมูลเฉพาะในช่วงวันที่เลือก และนับวันที่บันทึกไว้ในระบบ (ลา + วันหยุด)
-    // ใช้ Set เพื่อป้องกันกรณีบันทึกซ้ำซ้อนในวันเดียวกัน
-    const leaveDates = new Set();
-    const holidayDates = new Set();
-
-    allRecords.forEach(r => {
-        const rDate = new Date(r.date);
-        if (rDate >= rangeStart && rDate <= rangeEnd) {
-            if (r.type === 'holiday') {
-                holidayDates.add(r.date);
-            } else {
-                leaveDates.add(r.date);
-            }
-        }
-    });
-
-    const totalLeaveCount = leaveDates.size;
-    const totalHolidayCount = holidayDates.size;
-
-    // 3. วันทำงานสะสม = วันทั้งหมดในปฏิทิน - (วันลา + วันหยุดนักขัตฤกษ์ที่ลงบันทึกไว้)
-    const actualWorkedDays = totalCalendarDays - (totalLeaveCount + totalHolidayCount);
-
-    // 4. คำนวณอัตราเข้างาน (%)
-    const scheduledDays = actualWorkedDays + totalLeaveCount;
-    const rate = scheduledDays > 0 ? Math.round((actualWorkedDays / scheduledDays) * 100) : 100;
-
-    // 5. อัปเดตตัวเลขบนหน้าจอด้วย Animation
-    animateValue('att-kpi-leave', 0, totalLeaveCount, 800);
-    animateValue('att-kpi-holiday', 0, totalHolidayCount, 800);
-    animateValue('att-kpi-worked', 0, actualWorkedDays, 1000); 
-    animateValue('att-kpi-rate', 0, rate, 1200, 0, "");
+    // อัปเดตตัวเลขบนหน้าจอด้วย Animation (ใช้ค่าจากตัวแปร stats)
+    animateValue('att-kpi-leave', 0, stats.leave, 800);
+    animateValue('att-kpi-holiday', 0, stats.holiday, 800);
+    animateValue('att-kpi-worked', 0, stats.worked, 1000); 
+    
+    // แสดงผลทศนิยม 1 ตำแหน่งให้ตรงกับหน้า Exec Dashboard
+    animateValue('att-kpi-rate', 0, parseFloat(stats.rate), 1200, 1, "%");
 }
 
 /**
@@ -7933,141 +8031,232 @@ const WapSupportLogs = (function () {
         $.tbody.innerHTML = htmlRows;
     }
 
-    /* ──────────────────────────────────────────
-       FORM MODAL (เหลือชุดเดียว — ลบ _renderFormModal /
-       _handleImgChange / _handleSubmit เดิมที่เป็น dead code ซ้ำซ้อนออก)
+/* ──────────────────────────────────────────
+       FORM MODAL (อัปเกรดเวอร์ชัน V6.0: ระบบเชื่อมโยง SPECIAL JOBS)
        ────────────────────────────────────────── */
     function _openFormModal(id) {
         _editingId = id || null;
-
-        // แก้: ถ้าหา record ไม่เจอ (เผื่อกรณี id ผิด) ให้ fallback เป็นฟอร์มว่างแทนการพัง
         const r = id ? (_records.find(x => x.id === id) || _blankRecord()) : _blankRecord();
 
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
         modal.id = 'support-form-modal';
-        modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.7);backdrop-filter:blur(6px);';
 
         modal.innerHTML = `
-            <div style="background:#fff; border-radius:24px; width:90%; max-width:650px; overflow:hidden; display:flex; flex-direction:column; max-height:92vh; box-shadow:0 25px 50px rgba(0,0,0,0.2); animation:modalPop .25s ease;">
-                <div style="background:#161d2f; color:#fff; padding:18px 22px; display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em;">
-                        ${id ? '📝 แก้ไขรายงานเคลมผลิต' : '✨ บันทึกรายงานเคลมใหม่'}
-                    </h3>
-                    <button type="button" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:#64748b; cursor:pointer; font-size:20px;">✕</button>
+            <div style="background:#fff; border-radius:28px; width:95%; max-width:700px; overflow:hidden; display:flex; flex-direction:column; max-height:95vh; box-shadow:0 30px 60px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.2); animation:modalPop .3s cubic-bezier(0.34, 1.56, 0.64, 1);">
+                <!-- Header: Dark Premium -->
+                <div style="background:linear-gradient(135deg, #161d2f 0%, #0f172a 100%); color:#fff; padding:20px 25px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1);">
+                    <div>
+                        <h3 style="font-size:14px; font-weight:900; text-transform:uppercase; letter-spacing:0.1em; margin:0;">
+                            ${id ? '📝 Edit Support Case' : '✨ New Support Record'}
+                        </h3>
+                        <p style="font-size:10px; color:#94a3b8; margin:4px 0 0 0; font-weight:600;">ระบุรายละเอียดปัญหาเพื่อเริ่มกระบวนการช่วยเหลือ</p>
+                    </div>
+                    <button type="button" onclick="this.closest('.modal-overlay').remove()" style="background:rgba(255,255,255,0.05); border:none; color:#fff; cursor:pointer; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:0.2s;">✕</button>
                 </div>
-                <form id="sup-form" style="padding:22px; display:flex; flex-direction:column; gap:15px; overflow-y:auto;">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+
+                <form id="sup-form" style="padding:25px; display:flex; flex-direction:column; gap:18px; overflow-y:auto; scrollbar-width:none;">
+                    <!-- Row 1: Date & Action -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
                         <div>
-                            <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📅 วันที่รายงาน</label>
-                            <input type="date" name="date" value="${r.eventDate}" class="form-input" style="width:100%;" required>
+                            <label style="font-size:9px; font-weight:900; color:#64748b; text-transform:uppercase; display:block; margin-bottom:6px; letter-spacing:0.05em;">📅 Report Date</label>
+                            <input type="date" name="date" value="${r.eventDate}" class="form-input" style="width:100%; height:42px; border-radius:12px;" required>
                         </div>
                         <div>
-                            <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">🔧 การแก้ไข (ACTION)</label>
-                            <select name="action" class="form-input" style="width:100%;">
+                            <label style="font-size:9px; font-weight:900; color:#64748b; text-transform:uppercase; display:block; margin-bottom:6px; letter-spacing:0.05em;">🔧 Resolution Action</label>
+                            <select name="action" class="form-input" style="width:100%; height:42px; border-radius:12px;">
                                 <option value="Rework" ${r.action==='Rework'?'selected':''}>Rework (ซ่อมแซม/คัดชิ้นดี)</option>
                                 <option value="Replace" ${r.action==='Replace'?'selected':''}>Replace (ส่งคืนซัพพลายเออร์)</option>
-                                <option value="Sorting" ${r.action==='Sorting'?'selected':''}>Sorting 100%</option>
+                                <option value="Sorting" ${r.action==='Sorting'?'selected':''}>Sorting 100% (คัดงานยกกะ)</option>
                                 <option value="Use as is" ${r.action==='Use as is'?'selected':''}>Use as is (อนุโลมใช้งาน)</option>
                             </select>
                         </div>
                     </div>
+
+                    <!-- Row 2: Problem Details -->
                     <div>
-                        <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📝 รายละเอียดปัญหา</label>
-                        <textarea name="problem" class="form-textarea" style="height:80px; width:100%;" required placeholder="ระบุปัญหาที่พบ...">${_esc(r.problem)}</textarea>
+                        <label style="font-size:9px; font-weight:900; color:#64748b; text-transform:uppercase; display:block; margin-bottom:6px; letter-spacing:0.05em;">📝 Problem Description</label>
+                        <textarea name="problem" class="form-textarea" style="height:90px; width:100%; border-radius:14px; padding:12px;" required placeholder="พิมพ์รายละเอียดปัญหาที่ตรวจพบ...">${_esc(r.problem)}</textarea>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-                        <div><label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน</label>
-                             <input type="text" name="part" value="${_esc(r.part)}" class="form-input" style="width:100%;" placeholder="เช่น Steel part"></div>
-                        <div><label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">LOT NO.</label>
-                             <input type="text" name="lot" value="${_esc(r.lot)}" class="form-input" style="width:100%;" placeholder="เช่น 52"></div>
+
+                    <!-- Row 3: Part & Lot -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+                        <div><label style="font-size:9px; font-weight:900; color:#64748b; text-transform:uppercase; display:block; margin-bottom:6px;">📦 Part Identity</label>
+                             <input type="text" name="part" value="${_esc(r.part)}" class="form-input" style="width:100%; height:42px; border-radius:12px;" placeholder="เช่น Steel Frame, Housing..."></div>
+                        <div><label style="font-size:9px; font-weight:900; color:#64748b; text-transform:uppercase; display:block; margin-bottom:6px;">Lot Number</label>
+                             <input type="text" name="lot" value="${_esc(r.lot)}" class="form-input" style="width:100%; height:42px; border-radius:12px; font-family:monospace;" placeholder="เช่น 2407A"></div>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px;">
-                        <div><label style="font-size:10px; font-weight:800; color:#059669; display:block; margin-bottom:5px;">✅ OK</label>
-                             <input type="number" name="ok" value="${r.ok}" class="form-input" style="width:100%;"></div>
-                        <div><label style="font-size:10px; font-weight:800; color:#ef4444; display:block; margin-bottom:5px;">❌ NG</label>
-                             <input type="number" name="ng" value="${r.ng}" class="form-input" style="width:100%;"></div>
-                        <div><label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📋 ประเภท</label>
-                            <select name="report" class="form-input" style="width:100%;">
+
+                    <!-- Row 4: Stats & Type -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1.2fr; gap:18px;">
+                        <div><label style="font-size:9px; font-weight:900; color:#059669; text-transform:uppercase; display:block; margin-bottom:6px;">✅ OK Qty</label>
+                             <input type="number" name="ok" value="${r.ok}" class="form-input" style="width:100%; height:42px; border-radius:12px; font-weight:800;"></div>
+                        <div><label style="font-size:9px; font-weight:900; color:#ef4444; text-transform:uppercase; display:block; margin-bottom:6px;">❌ NG Qty</label>
+                             <input type="number" name="ng" value="${r.ng}" class="form-input" style="width:100%; height:42px; border-radius:12px; font-weight:800; color:#ef4444;"></div>
+                        <div><label style="font-size:9px; font-weight:900; color:#64748b; text-transform:uppercase; display:block; margin-bottom:6px;">📋 Report Category</label>
+                            <select name="report" class="form-input" style="width:100%; height:42px; border-radius:12px; font-weight:700;">
                                 <option value="VF" ${r.report==='VF'?'selected':''}>VF Report</option>
                                 <option value="RP" ${r.report==='RP'?'selected':''}>RP Report</option>
                             </select>
                         </div>
                     </div>
+
+                    <!-- Row 5: Remark -->
                     <div>
-                        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">💬 Remark</label>
-                        <input type="text" name="remark" value="${_esc(r.remark)}" class="form-input" style="width:100%;" placeholder="หมายเหตุเพิ่มเติม...">
+                        <label style="font-size:9px; font-weight:900; color:#64748b; text-transform:uppercase; display:block; margin-bottom:6px;">💬 Additional Remark</label>
+                        <input type="text" name="remark" value="${_esc(r.remark)}" class="form-input" style="width:100%; height:42px; border-radius:12px;" placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)...">
                     </div>
-                    <div>
-                        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:8px;">📸 Evidence Photo</label>
-                        <div style="border:2px dashed #cbd5e1; border-radius:16px; background:#f8fafc; position:relative; min-height:120px; display:flex; align-items:center; justify-content:center;">
-                            <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;">
-                            <div id="img-preview-area" style="text-align:center;" data-image="${r.imageUrl || ''}">
-                                ${r.imageUrl ? `<img src="${r.imageUrl}" style="max-height:100px; border-radius:8px;">` : `<p style="font-size:11px; color:#94a3b8;">คลิกเพื่ออัปโหลดรูปภาพ</p>`}
-                            </div>
+
+                    <!-- Row 6: Image Upload -->
+                    <div style="background:#f8fafc; border:2px dashed #cbd5e1; border-radius:18px; padding:15px; position:relative; min-height:130px; display:flex; align-items:center; justify-content:center; transition:0.3s;">
+                        <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;">
+                        <div id="img-preview-area" style="text-align:center;">
+                            ${r.imageUrl ? `<img src="${r.imageUrl}" style="max-height:110px; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.1);">` : 
+                            `<div style="color:#94a3b8;"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-bottom:8px;"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><p style="font-size:11px; font-weight:700;">Drop or click to upload evidence</p></div>`}
                         </div>
                     </div>
-                    <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:10px;">
-                        <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding:10px 25px; border-radius:12px; border:1.5px solid #e2e8f0; background:#fff; font-weight:700; color:#64748b;">ยกเลิก</button>
-                        <button type="submit" id="sup-form-submit-btn" style="padding:10px 30px; border-radius:12px; border:none; background:linear-gradient(135deg,#4f46e5,#3b82f6); color:#fff; font-weight:800;">บันทึกข้อมูล</button>
+
+                    <!-- 🚀 NEW FEATURE: SPECIAL JOBS BRIDGE -->
+                    <div style="background:rgba(37, 99, 235, 0.04); border:1.5px solid #dbeafe; border-radius:20px; padding:18px; display:flex; align-items:center; justify-content:space-between; margin-top:5px;">
+                        <div style="display:flex; gap:14px; align-items:center;">
+                            <div style="width:40px; height:40px; background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius:12px; display:flex; align-items:center; justify-content:center; color:#fff; box-shadow:0 8px 16px rgba(37, 99, 235, 0.25);">
+                                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                            <div>
+                                <h4 style="font-size:12px; font-weight:900; color:#1e3a8a; margin:0; text-transform:uppercase;">Sync to Special Jobs</h4>
+                                <p style="font-size:10px; color:#64748b; margin:2px 0 0 0; font-weight:600;">บันทึกเคสนี้เป็น "ภารกิจพิเศษ" ในหน้าแดชบอร์ดทีม SQE</p>
+                            </div>
+                        </div>
+                        <label class="mission-sync-toggle">
+                            <input type="checkbox" id="sync-to-special" ${id ? 'disabled' : ''}>
+                            <span class="mission-slider"></span>
+                        </label>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div style="display:flex; gap:15px; justify-content:flex-end; padding-top:10px; margin-top:5px;">
+                        <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding:12px 30px; border-radius:14px; border:1.5px solid #e2e8f0; background:#fff; font-weight:800; color:#64748b; font-size:12px; cursor:pointer; transition:0.2s;">DISCARD</button>
+                        <button type="submit" id="sup-form-submit-btn" style="padding:12px 45px; border-radius:14px; border:none; background:linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color:#fff; font-weight:900; font-size:12px; cursor:pointer; box-shadow:0 10px 25px rgba(37,99,235,0.3); transition:0.2s; letter-spacing:0.05em;">SAVE RECORD</button>
                     </div>
                 </form>
             </div>`;
 
         document.body.appendChild(modal);
 
-        // ตัวแปรเก็บรูปภาพของฟอร์มนี้โดยเฉพาะ (local ต่อ modal ไม่ปนกับ modal อื่น)
         let currentImage = r.imageUrl || null;
 
+        // Image Preview Logic
         const imgInput = document.getElementById('img-input');
         imgInput.onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
+            if (file.size > 2 * 1024 * 1024) { toast('ไฟล์รูปใหญ่เกิน 2MB','error'); return; }
             const reader = new FileReader();
             reader.onload = (ev) => {
                 currentImage = ev.target.result;
-                document.getElementById('img-preview-area').innerHTML = `<img src="${ev.target.result}" style="max-height:100px; border-radius:8px;">`;
+                document.getElementById('img-preview-area').innerHTML = `<img src="${ev.target.result}" style="max-height:110px; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.1);">`;
             };
             reader.readAsDataURL(file);
         };
 
+        // Form Submit Logic (Dual Database Sync)
         const formEl = document.getElementById('sup-form');
         const submitBtn = document.getElementById('sup-form-submit-btn');
 
         formEl.onsubmit = async (e) => {
             e.preventDefault();
-            if (submitBtn.disabled) return; // กันกดซ้ำซ้อน
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'กำลังบันทึก...';
+            if (submitBtn.disabled) return;
 
             const fd = new FormData(e.target);
+            const isSyncEnabled = document.getElementById('sync-to-special')?.checked;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'SYNCING ASSETS...';
+
+            const problemText = fd.get('problem');
+            const actionText = fd.get('action');
+            const remarkText = fd.get('remark') || 'No remark';
+            const partText = fd.get('part');
+            const eventDate = fd.get('date');
+
+            // 1. [V7.0 Logic] หาชื่อ Commander ที่ใช้งานบ่อยที่สุดอัตโนมัติ
+            const getSmartCommander = () => {
+                // ดึงข้อมูลจาก Cache ของ Special Jobs (ถ้ามี)
+                const sjHistory = S.wapData?.specialJobs || []; 
+                if (sjHistory.length === 0) return 'SQE Supervisor'; // Default กรณีไม่มีประวัติ
+
+                const counts = {};
+                sjHistory.forEach(r => {
+                    const name = r.assigned_by || 'Unknown';
+                    counts[name] = (counts[name] || 0) + 1;
+                });
+
+                // คืนค่าชื่อที่มีจำนวนการสั่งงานสูงสุด (Mode)
+                return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+            };
+
+            // เตรียม Payload สำหรับ Support Record
             const payload = {
                 id: _editingId || 'SUP-' + Date.now(),
                 user_id: S.currentUser,
-                problem: fd.get('problem'),
-                action: fd.get('action'),
-                part: fd.get('part'),
+                problem: problemText,
+                action: actionText,
+                part: partText,
                 lot: fd.get('lot'),
                 ok_qty: Number(fd.get('ok')),
                 ng_qty: Number(fd.get('ng')),
                 report_type: fd.get('report'),
-                remark: fd.get('remark'),
-                event_date: fd.get('date'),
+                remark: remarkText,
+                event_date: eventDate,
                 image_url: currentImage,
                 created_at: new Date().toISOString()
             };
 
             try {
-                const { error } = await wapClient.from(TABLE).upsert([payload]);
-                if (error) throw error;
-                toast('บันทึกข้อมูลสำเร็จ', 'success');
+                // --- STEP 1: บันทึกลง Support Logs (ฐานข้อมูลหลัก) ---
+                const { error: supErr } = await wapClient.from(TABLE).upsert([payload]);
+                if (supErr) throw supErr;
+
+                // --- STEP 2: [Smart Sync V7.0] เชื่อมโยงภารกิจพิเศษ ---
+                if (isSyncEnabled && !_editingId) {
+                    const frequentCommander = getSmartCommander();
+
+                    const sjPayload = {
+                        id: 'SJ-' + Date.now(),
+                        user_id: S.currentUser,
+                        // รูปแบบโปรเจกต์: [SUPPORT] รายละเอียดปัญหา (ชื่อพาร์ท)
+                        project: `[SUPPORT] ${problemText} (${partText})`,
+                        assigned_by: frequentCommander, // ดึงชื่อที่ใช้บ่อยมาใส่ให้อัตโนมัติ
+                        // V7.0 บังคับสถานะเป็น "Done" โดยการระบุผลลัพธ์ทันที
+                        result: `DONE | Action: ${actionText} | Note: ${remarkText}`,
+                        date: eventDate,
+                        full_timestamp: new Date().toISOString()
+                    };
+
+                    const { error: sjErr } = await wapClient.from('special_jobs').insert([sjPayload]);
+                    if (sjErr) console.error('[V7.0 Sync Error]:', sjErr);
+                }
+
+                // การแจ้งเตือนความสำเร็จ
+                const toastMsg = isSyncEnabled 
+                    ? `✅ บันทึกและปิดภารกิจโดย ${getSmartCommander()} สำเร็จ` 
+                    : 'บันทึกข้อมูลเรียบร้อย';
+                
+                toast(toastMsg, 'success');
                 modal.remove();
+                
+                // รีเฟรชข้อมูลทุกส่วนที่เกี่ยวข้อง
+                if (typeof WapSpecialJobs !== 'undefined' && isSyncEnabled) {
+                    await WapSpecialJobs.fetchRecords();
+                }
                 await _fetch();
+                
             } catch (err) {
-                console.error('[WapSupport] Save error:', err);
-                toast('บันทึกล้มเหลว', 'error');
+                console.error('[Smart Sync V7.0 Error]:', err);
+                toast('ระบบซิงค์ขัดข้อง: ' + err.message, 'error');
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'บันทึกข้อมูล';
+                submitBtn.textContent = 'SAVE RECORD';
             }
         };
     }
@@ -8665,21 +8854,35 @@ const WapSkillMatrix = (function() {
     let _records = [];
 
     async function init() {
+        // --- ส่วนที่แก้ไข ---
+        // 1. ถ้ามีข้อมูลเดิมเก็บไว้อยู่แล้ว ให้วาดทันทีไม่ต้องรอโหลด
+        if (_records.length > 0) {
+            renderAll(); 
+        }
+        
+        // 2. ดึงข้อมูลใหม่จากฐานข้อมูลมาอัปเดต (เบื้องหลัง)
         await fetchRecords();
     }
 
     async function fetchRecords() {
         const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-        if (!navigator.onLine) return;
+        if (!navigator.onLine) {
+            // ถ้าออฟไลน์ ให้วาดจากข้อมูลที่มีอยู่เดิม
+            renderAll();
+            return;
+        }
+
         try {
             const { data, error } = await wapClient
                 .from(TABLE)
                 .select('*')
                 .eq('user_id', targetUser)
-                .order('skill_value', { ascending: false }); // แก้จาก value เป็น skill_value
+                .order('skill_value', { ascending: false });
 
             if (error) throw error;
             _records = data || [];
+            
+            // วาดข้อมูลใหม่ลงหน้าจอ
             renderAll();
         } catch (e) {
             console.error('[SkillMatrix] Fetch error:', e);
@@ -8860,92 +9063,99 @@ function updateKPIs() {
         }).join('');
     }
 
-    // --- 3. Donut Chart: วงแหวนวิเคราะห์สัดส่วนทักษะรายบุคคล ---
     function renderDonut() {
-        const chartEl = document.getElementById('sm-donut-chart');
-        const legendEl = document.getElementById('sm-donut-legend');
-        const count = _records.length;
-        
-        // คำนวณค่าเฉลี่ยทักษะทั้งหมด
-        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
-        
-        if (!chartEl) return;
-        if (_charts.donut) _charts.donut.destroy();
+    const chartEl = document.getElementById('sm-donut-chart');
+    const legendEl = document.getElementById('sm-donut-legend');
+    
+    // 1. ตรวจสอบ Legend ก่อน (เพื่อให้วาดแถบด้านล่างได้เสมอแม้กราฟจะยังไม่มา)
+    if (!legendEl) return; 
 
-        // 1. แยกกลุ่มข้อมูลตามระดับความเชี่ยวชาญ
-        const dist = { expert: 0, adv: 0, dev: 0, basic: 0 };
-        _records.forEach(r => {
-            const v = r.skill_value || 0;
-            if (v >= 80) dist.expert++;
-            else if (v >= 60) dist.adv++;
-            else if (v >= 40) dist.dev++;
-            else dist.basic++;
-        });
+    const count = _records.length;
+    const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
 
-        const series = [dist.expert, dist.adv, dist.dev, dist.basic];
-        const labels = ['Expert', 'Advanced', 'Developing', 'Basic'];
-        const colors = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8'];
+    // แยกกลุ่มข้อมูล
+    const dist = { expert: 0, adv: 0, dev: 0, basic: 0 };
+    _records.forEach(r => {
+        const v = r.skill_value || 0;
+        if (v >= 80) dist.expert++;
+        else if (v >= 60) dist.adv++;
+        else if (v >= 40) dist.dev++;
+        else dist.basic++;
+    });
 
-        // 2. ตั้งค่ากราฟ ApexCharts (สไตล์ Modern Donut)
-        _charts.donut = new ApexCharts(chartEl, {
-            series: series,
-            labels: labels,
-            chart: { 
-                type: 'donut', 
-                height: '100%', 
-                animations: { enabled: true, speed: 1000, animateGradually: { enabled: true, delay: 150 } } 
-            },
-            colors: colors,
-            stroke: { width: 3, colors: ['#ffffff'] }, // เส้นขอบสีขาวช่วยให้ดูหรูขึ้น
-            plotOptions: {
-                pie: {
-                    donut: {
-                        size: '82%', // วงแหวนบางลงเพื่อให้ดูโปร่งและล้ำสมัย
-                        labels: {
-                            show: true,
-                            name: { show: true, fontSize: '11px', fontWeight: 700, color: '#94a3b8', offsetY: -10 },
-                            value: { 
-                                show: true, fontSize: '24px', fontWeight: 900, color: '#1e293b', offsetY: 10,
-                                formatter: (val) => val
-                            },
-                            total: { 
-                                show: true, label: 'AVERAGE', color: '#64748b', fontSize: '9px', fontWeight: 800,
-                                formatter: () => avg + '%' // แสดงค่าเฉลี่ยรวมตรงกลาง
-                            }
+    const series = [dist.expert, dist.adv, dist.dev, dist.basic];
+    const labels = ['Expert', 'Advanced', 'Developing', 'Basic'];
+    const colors = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8'];
+
+    // 2. วาด Legend (แถบด้านล่าง) ทันที
+    legendEl.innerHTML = labels.map((l, i) => {
+        const total = series.reduce((a, b) => a + b, 0);
+        const pct = total > 0 ? ((series[i] / total) * 100).toFixed(0) : 0;
+        return `
+            <div class="legend-pill-cyber flex items-center justify-between p-2 rounded-xl border border-slate-50 mb-2 shadow-sm bg-white">
+                <div class="flex items-center gap-2">
+                    <div class="w-2.5 h-2.5 rounded-full" style="background:${colors[i]}; box-shadow: 0 0 8px ${colors[i]}44"></div>
+                    <div class="flex flex-col leading-none">
+                        <span class="text-[10px] font-black text-slate-600 uppercase tracking-wide">${l}</span>
+                        <span class="text-[8px] font-bold text-slate-400">${pct}% Share</span>
+                    </div>
+                </div>
+                <span class="text-[13px] font-black text-slate-700">${series[i]}</span>
+            </div>
+        `;
+    }).join('');
+
+    // 3. วาดกราฟ Donut (ล็อคขนาดไม่ให้ขยายจนเบี้ยว)
+    if (!chartEl) return;
+    
+    // ทำลายกราฟเก่าทิ้งให้สะอาด 100%
+    if (_charts.donut) {
+        _charts.donut.destroy();
+        _charts.donut = null;
+    }
+    chartEl.innerHTML = ''; // ล้างขยะข้างในออก
+
+    const options = {
+        series: series,
+        labels: labels,
+        chart: { 
+            type: 'donut', 
+            height: 220, // ล็อคความสูงตายตัวป้องกันวงกลมใหญ่เกินไป
+            width: '100%',
+            animations: { enabled: true, speed: 600 } 
+        },
+        colors: colors,
+        stroke: { width: 2, colors: ['#ffffff'] },
+        plotOptions: {
+            pie: {
+                donut: {
+                    size: '78%',
+                    labels: {
+                        show: true,
+                        name: { show: true, fontSize: '10px', fontWeight: 700, color: '#94a3b8', offsetY: -6 },
+                        value: { 
+                            show: true, fontSize: '20px', fontWeight: 900, color: '#1e293b', offsetY: 6,
+                            formatter: (val) => val
+                        },
+                        total: { 
+                            show: true, label: 'AVG', color: '#64748b', fontSize: '9px', fontWeight: 800,
+                            formatter: () => avg + '%'
                         }
                     }
                 }
-            },
-            dataLabels: { enabled: false }, // ปิดตัวเลข % บนตัวกราฟเพื่อให้ดูคลีน
-            legend: { show: false }, // ปิด Legend มาตรฐาน เราจะใช้ Custom Pills ด้านล่างแทน
-            tooltip: { 
-                theme: 'dark',
-                y: { formatter: (val) => val + " ทักษะ" }
             }
-        });
-        _charts.donut.render();
+        },
+        dataLabels: { enabled: false },
+        legend: { show: false },
+        tooltip: { theme: 'dark', y: { formatter: (val) => val + " ทักษะ" } }
+    };
 
-        // 3. สร้าง Custom Legend Pills (แคปซูลข้อมูล)
-        if (legendEl) {
-            legendEl.innerHTML = labels.map((l, i) => {
-                const total = series.reduce((a, b) => a + b, 0);
-                const pct = total > 0 ? ((series[i] / total) * 100).toFixed(0) : 0;
-                return `
-                    <div class="legend-pill-cyber flex items-center justify-between p-2 rounded-xl transition-all duration-300 hover:shadow-md border border-slate-50">
-                        <div class="flex items-center gap-2">
-                            <!-- จุดสีเรืองแสง (Glow Dot) -->
-                            <div class="w-2 h-2 rounded-full shadow-[0_0_8px_currentColor]" style="background:${colors[i]}; color:${colors[i]}"></div>
-                            <div class="flex flex-col leading-none">
-                                <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider">${l}</span>
-                                <span class="text-[8px] font-bold text-slate-300">${pct}% Share</span>
-                            </div>
-                        </div>
-                        <span class="text-[12px] font-black text-slate-700">${series[i]}</span>
-                    </div>
-                `;
-            }).join('');
-        }
-    }
+    _charts.donut = new ApexCharts(chartEl, options);
+    // ใช้ setTimeout เล็กน้อยเพื่อให้หน้าจอแสดงผลเสร็จก่อนวาดกราฟ (แก้ปัญหาวงกลมใหญ่เกิน)
+    setTimeout(() => {
+        if (_charts.donut) _charts.donut.render();
+    }, 50);
+}
 
     async function remove(skillName) {
         if (!confirm('ลบทักษะนี้?')) return;
