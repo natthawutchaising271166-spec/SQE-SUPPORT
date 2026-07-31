@@ -33,15 +33,53 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div id="login-view">
-        <!-- 1. System Announcement Banner (เพิ่มตรงนี้) -->
-    <div id="system-announcement" class="system-banner">
-        <div class="banner-content">
-            <span class="banner-icon">📢</span>
-            <span id="banner-text" class="banner-text">SYSTEM UPDATE: เวอร์ชั่น 1.0 รองรับการทำงานแบบ Offline เต็มรูปแบบแล้ว</span>
-        </div>
-        <button onclick="this.parentElement.style.display='none'" class="banner-close">✕</button>
+    <div id="system-announcement" class="system-banner hidden">
+    <div class="banner-content">
+        <span class="banner-icon">📢</span>
+        <span id="banner-text" class="banner-text">กำลังโหลดประกาศ...</span>
     </div>
+    <button onclick="this.parentElement.style.display='none'" class="banner-close">✕</button>
+</div>
+<div id="maintenance-view" class="jarvis-maintenance">
+    <!-- พื้นหลังดวงดาวพุ่ง -->
+    <canvas id="starfield"></canvas>
+    
+    <!-- วงแหวน HUD รอบนอก -->
+    <div class="hud-ring-outer"></div>
+    <div class="hud-ring-inner"></div>
+    <div class="scanning-line"></div>
+
+    <div class="maintenance-container">
+        <!-- ไอคอนแบบมีแสง Glow -->
+        <div class="core-icon">
+            <div class="icon-glow"></div>
+            <div style="font-size: 80px; position: relative; z-index: 2;">🚧</div>
+        </div>
+
+        <h1 class="glitch-text" data-text="SYSTEM MAINTENANCE">SYSTEM MAINTENANCE</h1>
+        <p class="data-typing">ระบบกำลังปรับปรุงฐานข้อมูลชั่วคราว...</p>
+        
+        <div class="admin-access-wrap">
+            <button onclick="unlockMaintenanceForAdmin()" class="jarvis-btn">
+                <span class="btn-scanner"></span>
+                ADMIN ACCESS
+            </button>
+        </div>
+        
+        <!-- ข้อมูลหลอกๆ แบบ JARVIS -->
+        <div class="side-info left">
+            <p>SYNCING: 84%</p>
+            <p>CORE_TEMP: NOMINAL</p>
+        </div>
+        <div class="side-info right">
+            <p>DB_RESTRUCTURING</p>
+            <p>ENCRYPTION: AES-256</p>
+        </div>
+    </div>
+</div>
+
+<div id="login-view">
+
     <!-- Background System (วิดีโอธรรมชาติและผีเสื้อ) -->
     <div class="background-scene">
         <div class="vignette-overlay"></div>
@@ -180,7 +218,6 @@
 
   <!-- โครงสร้างเมนูระบบพรีเมียม (แก้ไขให้กดได้ครบทุกหน้า สลับกลับไปมาได้ปกติ) -->
 <div id="sidebar-nav" class="flex-1 overflow-y-auto scroll-custom scroll-hide">
-
 <!-- แก้ไขจุดที่ 1: หัวข้อกลุ่ม Sales Suite -->
 <p class="sidebar-section-label text-[10px] font-extrabold text-slate-400 px-3 pt-4 pb-2 uppercase tracking-[0.1em]" 
    data-i18n="nav_sales_suite">
@@ -302,26 +339,38 @@
     </div>
 
 </div>
+
 <!-- Footer ส่วนล่างสุดของ Sidebar -->
 <div class="sidebar-footer">
     <div class="user-panel-integrated">
-        <!-- ส่วนข้อมูลผู้ใช้ -->
+        <!-- ส่วนที่ 1: ข้อมูลผู้ใช้ (Avatar + Name) -->
         <div class="user-profile-core">
             <div id="user-avatar" class="avatar-gradient">N</div>
             <div class="user-meta sidebar-text">
                 <p id="user-display-name" class="user-name">NATTHAWUT CHAI...</p>
                 <p id="user-display-email" class="user-email">natthawut.c@carrier...</p>
+                
+                <!-- ส่วนที่ 2: Master Admin Access (จะปรากฏเฉพาะ Natthawut) -->
+<!-- ปรับปรุงให้ไม่มีพื้นหลังและไม่มีเส้นขอบ -->
+<div id="admin-footer-access" class="hidden mt-0.5 leading-none">
+    <button onclick="switchPage('Admin Console', this)" 
+            class="flex items-center gap-1.5 text-[8.5px] font-black text-rose-500 hover:text-rose-600 transition-all uppercase tracking-tighter"
+            style="background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;">
+        <div class="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></div>
+        Master User Control
+    </button>
+</div>
             </div>
         </div>
 
-        <!-- ส่วนปุ่มคำสั่ง (Action Grid) -->
-        <div class="user-actions-grid">
+        <!-- ส่วนที่ 3: ปุ่มคำสั่ง Sync และ Logout (วางคู่กัน) -->
+        <div class="user-actions-grid mt-3">
             <button onclick="cloudSyncAll()" class="action-btn-hub sync" title="ซิงค์ข้อมูล">
-                <svg id="sync-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <svg id="sync-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 <span class="sidebar-text">Sync</span>
             </button>
             <button onclick="handleLogout()" class="action-btn-hub logout" title="ออกจากระบบ">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                 <span class="sidebar-text">Logout</span>
             </button>
         </div>
@@ -342,35 +391,49 @@
         </div>
     </div>
 
-    <!-- [กลุ่มตรงกลาง]: ปุ่มสลับ PART CLAIM / DASHBOARD + Theme + Lang -->
-    <div id="terminal-sub-nav" class="flex bg-slate-50 dark:bg-slate-800/50 p-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-inner items-center shrink-0">
-        <button id="sub-btn-entry" onclick="switchSubTerminal('entry')" class="px-3 py-1 rounded-full text-[9px] font-black transition-all bg-blue-600 text-white shadow-sm">PART CLAIM</button>
-        <button id="sub-btn-cockpit" onclick="switchSubTerminal('cockpit')" class="px-3 py-1 rounded-full text-[9px] font-black text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-all">DASHBOARD</button>
-        
-        <div class="w-[1px] h-3 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-        <div class="flex items-center gap-0.5">
-            <button id="theme-toggle-btn" onclick="toggleTheme()" class="w-7 h-7 flex items-center justify-center rounded-full text-amber-500 hover:bg-white dark:hover:bg-slate-700 transition-all">
-                <div id="theme-icon-container"></div>
+<!-- [กลุ่มตรงกลาง]: ปุ่มสลับ PART CLAIM / DASHBOARD + Theme + Lang + Settings -->
+<div id="terminal-sub-nav" class="flex bg-slate-50 dark:bg-slate-800/50 p-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-inner items-center shrink-0">
+    <!-- ปุ่มสลับหน้าหลัก -->
+    <button id="sub-btn-entry" onclick="switchSubTerminal('entry')" class="px-3 py-1 rounded-full text-[9px] font-black transition-all bg-blue-600 text-white shadow-sm">PART CLAIM</button>
+    <button id="sub-btn-cockpit" onclick="switchSubTerminal('cockpit')" class="px-3 py-1 rounded-full text-[9px] font-black text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-all">DASHBOARD</button>
+    
+    <!-- เส้นแบ่ง -->
+    <div class="w-[1px] h-3 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+    <div class="flex items-center gap-0.5">
+        <!-- ปุ่มเปลี่ยนธีม -->
+        <button id="theme-toggle-btn" onclick="toggleTheme()" class="w-7 h-7 flex items-center justify-center rounded-full text-amber-500 hover:bg-white dark:hover:bg-slate-700 transition-all">
+            <div id="theme-icon-container"></div>
+        </button>
+
+        <!-- ปุ่มเลือกภาษา -->
+        <div class="relative" id="lang-selector">
+            <button onclick="toggleLangMenu()" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white dark:hover:bg-slate-700 transition-all overflow-hidden">
+                <img id="current-lang-flag" src="https://flagcdn.com/w20/us.png" class="w-3.5 h-3.5 object-cover rounded-full border border-slate-200" alt="flag">
             </button>
-
-            <div class="relative" id="lang-selector">
-                <button onclick="toggleLangMenu()" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white dark:hover:bg-slate-700 transition-all overflow-hidden">
-                    <img id="current-lang-flag" src="https://flagcdn.com/w20/us.png" class="w-3.5 h-3.5 object-cover rounded-full border border-slate-200" alt="flag">
-                </button>
-                <div id="lang-menu" class="hidden absolute right-0 mt-2 w-28 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[999] overflow-hidden">
-                    <div onclick="changeLanguage('th')" class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700">
-                        <img src="https://flagcdn.com/w20/th.png" class="w-4 rounded-sm">
-                        <span class="text-[10px] font-bold dark:text-white">ไทย</span>
-                    </div>
-                    <div onclick="changeLanguage('en')" class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
-                        <img src="https://flagcdn.com/w20/us.png" class="w-4 rounded-sm">
-                        <span class="text-[10px] font-bold dark:text-white">English</span>
-                    </div>
+            <div id="lang-menu" class="hidden absolute right-0 mt-2 w-28 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[999] overflow-hidden">
+                <div onclick="changeLanguage('th')" class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700">
+                    <img src="https://flagcdn.com/w20/th.png" class="w-4 rounded-sm">
+                    <span class="text-[10px] font-bold dark:text-white">ไทย</span>
+                </div>
+                <div onclick="changeLanguage('en')" class="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                    <img src="https://flagcdn.com/w20/us.png" class="w-4 rounded-sm">
+                    <span class="text-[10px] font-bold dark:text-white">English</span>
                 </div>
             </div>
         </div>
+
+        <!-- [เพิ่มใหม่]: ปุ่มตั้งค่าโปรไฟล์ -->
+        <button onclick="openPersonalSettings()" class="w-7 h-7 flex items-center justify-center rounded-full text-slate-400 hover:text-blue-600 hover:bg-white dark:hover:bg-slate-700 transition-all" title="User Settings">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                <circle cx="12" cy="12" r="3"/>
+            </svg>
+        </button>
     </div>
+</div>
+
 
     <!-- [กลุ่มฝั่งขวาสุด]: Online Badge + Staff Selector + Filter Bar -->
     <div class="flex items-center gap-2 ml-auto shrink-0 flex-nowrap">
@@ -412,6 +475,39 @@
             </button>
         </div>
     </div>
+
+    <!-- เพิ่มต่อจากส่วนชื่อหน้าใน <header> -->
+<div id="admin-header-tools" class="hidden items-center gap-2 ml-4 flex-nowrap">
+    <!-- กลุ่ม Tabs ย่อจิ๋ว -->
+    <div class="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+        <button onclick="WapAdminSystem.switchTab('users')" id="tab-adm-users" class="admin-tab-mini active">Users</button>
+        <button onclick="WapAdminSystem.switchTab('suppliers')" id="tab-adm-suppliers" class="admin-tab-mini">Suppliers</button>
+        <button onclick="WapAdminSystem.switchTab('parts')" id="tab-adm-parts" class="admin-tab-mini">Parts</button>
+        <button onclick="WapAdminSystem.switchTab('defects')" id="tab-adm-defects" class="admin-tab-mini">Defects</button>
+        <button onclick="WapAdminSystem.switchTab('logs')" id="tab-adm-logs" class="admin-tab-mini">Audit Logs</button>
+        <button onclick="WapAdminSystem.switchTab('system')" id="tab-adm-system" class="admin-tab-mini">System</button>
+    </div>
+
+    <!-- ช่องค้นหาย่อส่วน -->
+    <div class="relative w-32 lg:w-48">
+        <svg class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input type="text" id="admin-search-input" placeholder="Search..." 
+               class="w-full h-7 pl-7 pr-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-[9px] font-bold focus:ring-2 focus:ring-blue-500/20 outline-none">
+    </div>
+
+<!-- ปุ่ม Sync Data (Harvest) -->
+<button onclick="WapAdminSystem.harvestFromHistory()" class="btn-admin-mini text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white" title="Sync Data">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+</button>
+
+<!-- ปุ่ม Add New -->
+<!-- เปลี่ยนให้เรียก handleGlobalAdd() เพื่อให้ใช้ได้ทุกหน้า -->
+<button onclick="handleGlobalAdd()" class="btn-admin-mini bg-blue-600 text-white border-transparent hover:bg-blue-700" title="Add New">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+</button>
+</div>
 </header>
                         
             
@@ -819,15 +915,32 @@
         </div>
 
         <!-- 3. VENDOR RISK RADAR -->
-        <div class="white-box">
-            <div class="box-header-between">
-                <h3 style="font-size: 11px; font-weight: 900; color: #1e293b;">VENDOR RISK RANKING</h3>
-                <p class="text-[9px] text-slate-400 font-bold uppercase">Aggregated by PCS</p>
-            </div>
-            <div id="vendor-radar-chart"></div>
+<div class="white-box">
+    <div class="box-header-between">
+        <div>
+            <h3 style="font-size: 13px; font-weight: 900; color: #1e293b;">VENDOR RISK INTELLIGENCE</h3>
+            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Weighted by Qty, Frequency & Judgment</p>
+        </div>
+        <div class="flex gap-2">
+            <span class="text-[9px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">LIVE MONITORING</span>
         </div>
     </div>
-</div><!-- ============================================================
+    
+    <!-- พื้นที่แสดงรายการ -->
+    <div id="vendor-risk-list" class="feed-mini-scroll" style="height: 380px;">
+        <!-- JS จะมาวาดตรงนี้ -->
+    </div>
+    
+    <!-- Legend คำอธิบายสี -->
+    <div class="flex justify-center gap-4 mt-4 pt-3 border-t border-slate-50">
+        <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#ef4444]"></span><span class="text-[8px] font-bold text-slate-500 uppercase">Vendor Fault</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#f97316]"></span><span class="text-[8px] font-bold text-slate-500 uppercase">SF Fault</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#2563eb]"></span><span class="text-[8px] font-bold text-slate-500 uppercase">CTC Fault</span></div>
+    </div>
+</div>
+</div>
+</div>
+<!-- ============================================================
      3. EXEC DASHBOARD (REFACTORED FOR FIXED SCALING)
      ============================================================ -->
     <div id="exec-dashboard-content" class="hidden-view">
@@ -1668,6 +1781,152 @@
     </div>
 </div>
 
+<div id="admin-console-content" class="hidden-view h-full flex flex-col p-4 gap-4 overflow-hidden bg-slate-50/50">
+    
+    <!-- [Section 1] Broadcast & System Announcement -->
+    <div id="admin-announcement-control" class="flex-shrink-0">
+        <div class="bg-white dark:bg-slate-900 rounded-[24px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Broadcast Management</h3>
+                    <p class="text-[9px] text-slate-400 font-bold uppercase">ควบคุมข้อความประกาศถึงพนักงานทุกคน</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="admin-banner-toggle" class="sr-only peer" onchange="WapAdminSystem.toggleBanner(this.checked)">
+                    <div class="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500"></div>
+                    <span id="banner-status-label" class="ml-2 text-[9px] font-black text-slate-400 uppercase">Offline</span>
+                </label>
+            </div>
+            <div class="flex gap-3">
+                <input type="text" id="admin-banner-input" 
+                       class="flex-1 h-10 px-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
+                       placeholder="ระบุข้อความประกาศระบบที่นี่...">
+                <button onclick="WapAdminSystem.updateAnnouncement()" 
+                        class="px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 shadow-lg shadow-blue-500/20">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+                    Publish
+                </button>
+            </div>
+        </div>
+    </div>
+
+<!-- แถวรวมศูนย์คำสั่งวิกฤต (Maintenance + Backup + Archive) -->
+<div class="mt-4 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-[24px] flex flex-wrap items-center justify-between gap-4">
+    
+    <!-- ฝั่งซ้าย: ข้อมูล Maintenance -->
+    <div class="flex items-center gap-3 min-w-[250px]">
+        <div class="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center flex-shrink-0 shadow-lg shadow-rose-500/20">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h7.528a2 2 0 011.789 1.106l3.5 7A2 2 0 0119.764 14H15m-5 0v1a3 3 0 003 3h0a3 3 0 003-3v-1m-5 0h4m-9 4h14"/></svg>
+        </div>
+        <div>
+            <h4 class="text-[11px] font-black text-rose-900 dark:text-rose-400 uppercase tracking-widest leading-tight">System Control</h4>
+            <p class="text-[9px] text-rose-600/70 font-bold uppercase">จัดการฐานข้อมูลและสถานะระบบ</p>
+        </div>
+    </div>
+
+    <!-- ส่วนกลาง: ปุ่ม Backup และ Archive (เพิ่มเข้ามาใหม่) -->
+    <div class="flex flex-1 items-center justify-end gap-3 min-w-[300px]">
+        
+        <!-- One-Click Backup -->
+        <button onclick="WapAdminSystem.performFullBackup()" 
+                class="flex items-center gap-2 h-9 px-4 bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 rounded-xl text-[10px] font-black uppercase hover:bg-rose-500 hover:text-white transition-all active:scale-95 shadow-sm">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Full Backup
+        </button>
+
+        <div class="h-6 w-[1px] bg-rose-200 dark:bg-rose-900"></div>
+
+        <!-- Archive Section -->
+        <div class="flex items-center gap-1.5">
+            <input type="number" id="archive-year" placeholder="2025" 
+                   class="w-20 h-9 px-3 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900 rounded-xl text-[10px] font-black text-center outline-none focus:ring-2 focus:ring-rose-500/20 dark:text-white">
+            <button onclick="WapAdminSystem.performArchive()" 
+                    class="h-9 px-4 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 rounded-xl text-[10px] font-black uppercase hover:bg-rose-200 transition-all active:scale-95 border border-rose-200 dark:border-rose-800">
+                Archive
+            </button>
+        </div>
+    </div>
+
+    <!-- ฝั่งขวาสุด: สวิตช์ Maintenance -->
+    <div class="flex items-center gap-3 pl-2 border-l border-rose-200 dark:border-rose-900">
+        <span class="text-[9px] font-black text-rose-500 uppercase tracking-tighter text-right leading-none">Force<br>Maint.</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="admin-mtx-toggle" class="sr-only peer" onchange="WapAdminSystem.toggleMaintenance(this.checked)">
+            <div class="w-12 h-6 bg-rose-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600 shadow-inner"></div>
+        </label>
+    </div>
+
+</div>
+    <!-- [Section 2] KPI Stats Row -->
+    <div id="admin-stats-row" class="grid grid-cols-1 md:grid-cols-4 gap-4 flex-shrink-0">
+        <!-- JS จะฉีด KPI เข้าที่นี่ -->
+    </div>
+
+    <!-- [Section 3] Database Control Center -->
+    <div class="flex-1 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col overflow-hidden relative">
+        <!-- Table Toolbar -->
+        <div class="px-6 py-4 border-b border-slate-50 dark:border-slate-800 flex flex-wrap justify-between items-center gap-4 bg-slate-50/30">
+            <div class="flex items-center gap-4">
+                <span id="admin-table-title" class="text-[10px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest">Database Registry</span>
+                <div class="h-4 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
+                <span id="admin-record-count" class="text-[9px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full">0 RECORDS</span>
+            </div>
+            <div id="admin-table-loader" class="hidden"><div class="spinner-blue"></div></div>
+        </div>
+
+        <!-- Scrollable Area -->
+        <div class="flex-1 overflow-auto p-4 admin-scroll-area">
+            <table class="w-full border-separate border-spacing-y-2">
+                <thead id="admin-table-head" class="sticky top-0 bg-white dark:bg-slate-900 z-10">
+                    <!-- JS ฉีดหัวตารางตาม Tab -->
+                </thead>
+                <tbody id="admin-table-body">
+                    <!-- ข้อมูล Registry -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Maintenance View Overlay -->
+<div id="maintenance-view" class="hidden-view fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900">
+    <div class="background-scene absolute inset-0 opacity-40">
+        <video autoplay muted loop playsinline class="w-full h-full object-cover grayscale">
+            <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260619_191346_9d19d66e-86a4-47f7-8dc6-712c1788c3b2.mp4" type="video/mp4">
+        </video>
+    </div>
+    
+    <div class="relative z-10 text-center p-8 max-w-lg">
+        <div class="mb-6 inline-flex w-20 h-20 items-center justify-center rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.2)]">
+            <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <h1 class="text-3xl font-black text-white mb-2 uppercase tracking-tight">System Maintenance</h1>
+        <p class="text-slate-400 text-sm leading-relaxed mb-8">
+            ขณะนี้ระบบกำลังอยู่ระหว่างการปรับปรุงฐานข้อมูลชั่วคราว <br>
+            ขออภัยในความไม่สะดวก พนักงานจะสามารถใช้งานได้อีกครั้งในเร็วๆ นี้
+        </p>
+        <div class="py-3 px-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md inline-block">
+            <span class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Estimated time: 30-60 mins</span>
+        </div>
+    </div>
+</div>
+
+
+<!-- ADMIN MASTER MODAL (หน้าต่างสำหรับเพิ่มข้อมูลในหน้า Admin) -->
+<div id="admin-master-modal" class="hidden-view fixed inset-0 z-[10000] flex items-center justify-center p-4">
+    <!-- ฉากหลังมืด -->
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="WapAdminSystem.closeMasterModal()"></div>
+    
+    <!-- ตัวกล่อง Modal -->
+    <div class="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 transform transition-all">
+        <div id="master-modal-content" class="p-8 text-center">
+            <!-- JavaScript จะฉีดเนื้อหาฟอร์ม (User/Supplier/Part/Defect) เข้าที่นี่ -->
+        </div>
+    </div>
+</div>
+
+
     <script src="script.js"></script>
 </body>
+
 </html>

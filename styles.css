@@ -13049,3 +13049,882 @@ header {
     text-overflow: ellipsis !important;
     display: block;
 }
+.risk-row {
+    position: relative;
+    padding: 2px;
+}
+
+/* เอฟเฟกต์ Glass บนแถบพลัง */
+.h-2.5.w-full > div {
+    height: 100%;
+    transition: width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+}
+
+/* เพิ่มแสงเงาให้แถบดูเป็น 3D */
+.h-2.5.w-full > div::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    pointer-events: none;
+}
+
+/* ปรับแต่ง Scrollbar ในกล่องนี้ให้สวย */
+.feed-mini-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+.feed-mini-scroll::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+/* บังคับให้หน้า Admin แสดงผลแบบ Flex เต็มพื้นที่เมื่อเปิดใช้งาน */
+#admin-console-content:not(.hidden-view) {
+    display: flex !important;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+/* ป้องกันหน้า Part Claim แสดงซ้อน */
+#entry-terminal-content.hidden-view {
+    display: none !important;
+}
+/* คอนเทนเนอร์ใหญ่ของ Action Buttons */
+.user-actions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* แบ่งครึ่ง 50/50 */
+    gap: 8px;
+    width: 100%;
+}
+
+/* ปรับให้ Profile Core ไม่ไปบีบปุ่ม */
+.user-profile-core {
+    display: flex;
+    align-items: flex-start; /* จัด Avatar ให้อยู่บนสุดของบรรทัดชื่อ */
+    gap: 12px;
+    width: 100%;
+}
+
+/* ปรับ User Meta ให้ขยายเต็มพื้นที่ที่เหลือ */
+.user-meta {
+    flex: 1;
+    min-width: 0; /* ป้องกันชื่อยาวเกินจนดันปุ่มหลุด */
+    display: flex;
+    flex-direction: column;
+}
+
+/* ปุ่ม Sync / Logout */
+.action-btn-hub {
+    width: 100% !important; /* บังคับให้ปุ่มขยายเต็มช่อง Grid */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 0;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 800;
+}
+/* ปรับชื่อให้เล็กลงเล็กน้อยและชิดอีเมล */
+.user-name {
+    font-size: 11px !important;
+    font-weight: 800;
+    line-height: 1.2;
+    margin: 0 !important;
+}
+
+/* ปรับอีเมลให้ชิดปุ่ม Admin */
+.user-email {
+    font-size: 9px !important;
+    line-height: 1.1;
+    margin-bottom: 2px !important;
+}
+
+/* จัดการ Container ของข้อมูลผู้ใช้ให้ดันลงล่าง */
+.user-profile-core {
+    display: flex;
+    align-items: center; /* เปลี่ยนเป็นกึ่งกลางเพื่อความสมดุล */
+    gap: 10px;
+    padding-bottom: 4px; /* ลดระยะห่างด้านล่าง */
+}
+
+/* ปรับระยะห่างระหว่างกลุ่มชื่อพนักงานกับปุ่ม Sync/Logout ให้แคบลง */
+.user-actions-grid.mt-3 {
+    margin-top: 8px !important; /* ลดจาก mt-3 (12px) เหลือ 8px */
+}
+#admin-footer-access button {
+    background: none !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    padding: 2px 0 !important; /* เว้นระยะบนล่างนิดเดียวเพื่อให้กดง่าย */
+    cursor: pointer;
+}
+
+#admin-footer-access button:hover {
+    background: none !important;
+    color: #e11d48; /* สี Rose-600 เมื่อเอาเมาส์วาง */
+}
+.admin-kpi-card {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 20px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+    border-left-width: 6px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.admin-kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+}
+
+.user-row-premium {
+    background: #fafafa;
+    transition: all 0.2s ease;
+}
+.user-row-premium:hover {
+    background: #fff;
+    transform: scale(1.005);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    z-index: 10;
+}
+
+.role-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 99px;
+    font-[900] text-[10px] uppercase tracking-tighter;
+}
+
+.key-code {
+    font-family: 'DM Mono', 'SF Mono', monospace;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    border: 1px solid #e2e8f0;
+}
+
+/* Dark Mode Overrides */
+body.dark-mode .admin-kpi-card {
+    background: #0f172a;
+    border-color: #1e293b;
+}
+body.dark-mode .user-row-premium {
+    background: #020617;
+}
+.admin-sub-tab {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #94a3b8;
+    padding: 6px 16px;
+    border-radius: 12px;
+    transition: all 0.3s;
+    border: 1px solid transparent;
+}
+.admin-sub-tab:hover {
+    color: #64748b;
+    background: rgba(0,0,0,0.03);
+}
+.admin-sub-tab.active {
+    color: #2563eb;
+    background: #eff6ff;
+    border-color: #dbeafe;
+}
+
+.admin-search-bar {
+    width: 240px;
+    height: 42px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 0 16px;
+    font-size: 12px;
+    font-weight: 600;
+    outline: none;
+    transition: 0.3s;
+}
+.admin-search-bar:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.1);
+}
+
+.btn-nexus-primary {
+    height: 42px;
+    padding: 0 20px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+/* Admin Navigation Buttons */
+.admin-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #64748b;
+    border-radius: 14px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.admin-nav-btn:hover {
+    color: #1e293b;
+    background: #f8fafc;
+}
+
+.admin-nav-btn.active {
+    background: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 8px 15px rgba(37, 99, 235, 0.2);
+}
+
+body.dark-mode .admin-nav-btn:hover {
+    color: #f1f5f9;
+    background: #1e293b;
+}
+
+body.dark-mode .admin-nav-btn.active {
+    background: #3b82f6;
+    color: #ffffff;
+}
+
+/* Floating Table Rows */
+.user-row-premium {
+    background: #fafbfc;
+    transition: all 0.2s ease;
+}
+
+body.dark-mode .user-row-premium {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.user-row-premium:hover {
+    background: #ffffff;
+    transform: scale(1.005) translateY(-1px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .user-row-premium:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+/* Container สำหรับกลุ่มปุ่มสลับ */
+.admin-tab-group {
+    display: flex;
+    background: #f1f5f9; /* สีเทาอ่อนพื้นหลัง */
+    padding: 4px;
+    border-radius: 16px;
+    gap: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+/* ปุ่มสถานะปกติ */
+.admin-nav-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #64748b; /* สีเทาจาง */
+    border-radius: 12px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* เอฟเฟกต์เมื่อ Hover */
+.admin-nav-btn:hover {
+    color: #1e293b;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* ปุ่มสถานะ Active (ปุ่มที่ถูกกด) */
+.admin-nav-btn.active {
+    background: #ffffff; /* พื้นหลังขาวสะอาด */
+    color: #2563eb;    /* ตัวหนังสือสีน้ำเงิน */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+    transform: translateY(0);
+}
+
+/* สไตล์การ์ดสถิติให้กระชับขึ้น */
+.admin-kpi-card {
+    padding: 14px 18px !important;
+    min-height: 90px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* ตารางให้กระชับขึ้น */
+.user-row-premium td {
+    padding: 10px 20px !important; /* ลดความอ้วนของแถว */
+}
+
+/* --- Admin Console Premium Styling --- */
+
+/* ปรับระยะห่างรวมของหน้าให้กระชับ */
+#admin-console-content {
+    padding: 1.5rem !important;
+    background-color: #f8fafc;
+}
+
+/* ส่วนของตาราง: ทำให้แถวเล็กลง (Compact Row) */
+.admin-table-row {
+    transition: all 0.2s ease;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.admin-table-row:hover {
+    background-color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    transform: scale(1.002);
+    z-index: 10;
+}
+
+/* ปรับขนาดตัวอักษรและ Padding ใน Cell */
+.admin-table-row td {
+    padding: 10px 16px !important; /* เล็กลง */
+    font-size: 12px;
+    color: #475569;
+    vertical-align: middle;
+}
+
+/* หัวตารางให้ดู Professional */
+#admin-table-head th {
+    background: #f8fafc;
+    padding: 12px 16px !important;
+    font-size: 10px;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+/* --- การจัดการปุ่ม (Action Buttons) --- */
+
+.admin-actions-wrap {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+/* ปุ่มทั่วไป (Edit / View) */
+.btn-admin-action {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #64748b;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.btn-admin-action:hover {
+    background: #f1f5f9;
+    color: #2563eb;
+    border-color: #bfdbfe;
+}
+
+/* !!! ปุ่มลบ (Delete) - ต้องชัดเจนและเด่น !!! */
+.btn-admin-delete {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #fff1f2; /* แดงจางๆ */
+    color: #e11d48; /* แดงเข้ม */
+    border: 1px solid #fecdd3;
+    transition: all 0.2s;
+}
+
+.btn-admin-delete:hover {
+    background: #e11d48;
+    color: white;
+    box-shadow: 0 4px 10px rgba(225, 29, 72, 0.3);
+}
+
+/* ป้าย Role (Badge) */
+.admin-badge-pill {
+    padding: 2px 10px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.badge-staff { background: #eff6ff; color: #2563eb; border: 1px solid #dbeafe; }
+.badge-supervisor { background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+
+/* ปรับแต่ง Scrollbar ในตาราง */
+.admin-scroll-area::-webkit-scrollbar { width: 4px; height: 4px; }
+.admin-scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+/* --- Admin Header Mini Tools --- */
+.admin-tab-mini {
+    padding: 3px 10px;
+    font-size: 9px;
+    font-weight: 850;
+    color: #64748b;
+    text-transform: uppercase;
+    border-radius: 6px;
+    transition: all 0.2s;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.admin-tab-mini.active {
+    background: #ffffff;
+    color: #2563eb;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.btn-admin-mini {
+    height: 28px;
+    width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    transition: all 0.2s;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+body.dark-mode .admin-tab-mini.active {
+    background: #1e293b;
+    color: #60a5fa;
+}
+
+/* ปรับความสูงช่องค้นหาใน Header ให้สมดุล */
+#admin-search-input {
+    line-height: 1;
+}
+.system-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 3000; /* สูงกว่าทุกอย่าง */
+    padding: 10px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    background: linear-gradient(90deg, #1e40af, #3b82f6);
+    color: white;
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.banner-text {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.banner-close {
+    background: rgba(0,0,0,0.2);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 10px;
+}
+
+body.dark-mode .system-banner {
+    background: linear-gradient(90deg, #020617, #1e3a8a);
+}
+
+/* ปรับระยะขอบหน้า Dashboard เมื่อมีประกาศ */
+body:has(.system-banner:not(.hidden)) #dashboard-view {
+    margin-top: 45px;
+}
+/* คอนเทนเนอร์ Admin ให้เลื่อนได้เฉพาะตัวตาราง */
+#admin-console-content {
+    background-color: #f8fafc;
+    height: 100%;
+}
+
+/* แถวตารางสไตล์ Floating */
+.admin-table-row {
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.admin-table-row:hover {
+    transform: scale(1.002) translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    z-index: 10;
+}
+
+.admin-table-row td {
+    padding: 12px 16px !important;
+    font-size: 11.5px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* ป้ายสถานะ */
+.admin-badge-pill {
+    padding: 2px 10px;
+    border-radius: 99px;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.badge-staff { background: #eff6ff; color: #2563eb; }
+.badge-supervisor { background: #f5f3ff; color: #7c3aed; }
+
+/* ระบบ Loader */
+.spinner-blue {
+    width: 18px; height: 18px;
+    border: 3px solid rgba(37,99,235,0.1);
+    border-top: 3px solid #2563eb;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* จัดการ Scrollbar ของหน้า Admin */
+.admin-scroll-area::-webkit-scrollbar {
+    width: 5px;
+}
+.admin-scroll-area::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+/* 1. ปรับให้ประกาศลอยทับหน้าจอ (ไม่ดันเนื้อหา) */
+.system-banner {
+    position: fixed !important; /* เปลี่ยนเป็น fixed เพื่อให้ลอย */
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999; /* ดันให้อยู่หน้าสุดของทุกอย่าง */
+    padding: 10px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    background: linear-gradient(90deg, #1e40af, #3b82f6);
+    color: white;
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+/* 2. !!! ลบก้อนนี้ออก หรือแก้ให้เป็น 0 !!! */
+/* เดิมมันจะสั่งให้เลื่อนลง 45px เมื่อมีประกาศ ให้แก้เป็น 0 หรือลบทิ้งไปเลย */
+body:has(.system-banner:not(.hidden)) #dashboard-view {
+    margin-top: 0 !important; 
+}
+
+/* เพิ่มเติม: เพื่อไม่ให้ประกาศบังเมนูใน Header มากเกินไป 
+   อาจปรับให้แผงประกาศแคบลงหรือกึ่งกลาง */
+.banner-content {
+    max-width: 80%;
+    text-align: center;
+}
+/* สไตล์สำหรับ Admin Modal */
+#admin-master-modal:not(.hidden-view) {
+    display: flex !important;
+}
+
+#admin-master-modal .relative {
+    animation: modalPopUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalPopUp {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ปรับสีปุ่มใน Modal Admin */
+.btn-nexus-primary {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    transition: all 0.2s ease;
+}
+.btn-nexus-primary:hover {
+    filter: brightness(1.1);
+    transform: translateY(-2px);
+}
+/* แถบประกาศสไตล์ Enterprise */
+.system-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    height: 40px; /* ความหนาให้พอดีตามรูป */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(90deg, #1e40af 0%, #3b82f6 50%, #1e40af 100%); /* ไล่เฉดน้ำเงินกลางสว่าง */
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 90%;
+}
+
+.banner-text {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.banner-close {
+    position: absolute;
+    right: 15px;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    transition: 0.3s;
+}
+
+.banner-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+/* คอนเทนเนอร์ของรูปโปรไฟล์ (ทั้งใน Sidebar และในหน้า Settings) */
+#user-avatar, #settings-avatar-preview {
+    width: 42px;              /* ขนาดคงที่ตามที่คุณใช้ */
+    height: 42px;
+    border-radius: 12px;      /* ความมนแบบทันสมัย */
+    overflow: hidden;         /* สำคัญ: ตัดส่วนรูปที่ล้นขอบออก */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background-color: #f1f5f9; /* สีพื้นหลังกรณีรูปยังไม่โหลด */
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+/* บังคับให้รูปภาพข้างในเต็มกล่องเสมอ */
+#user-avatar img, #settings-avatar-preview img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important; /* ดึงรูปให้เต็มพื้นที่โดยไม่เบี้ยว */
+    object-position: center;      /* จัดให้อยู่กึ่งกลางรูป */
+    display: block;
+}
+
+/* กรณีหน้า Settings รูปจะใหญ่กว่า ให้ปรับขนาดเฉพาะจุด */
+#settings-avatar-preview {
+    width: 96px; 
+    height: 96px;
+    border-radius: 28px;
+}
+/* คอนเทนเนอร์หลัก */
+.jarvis-maintenance {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: radial-gradient(circle at center, #0a192f 0%, #020617 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #00f2ff;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+}
+
+#starfield {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+/* วงแหวนหมุน JARVIS */
+.hud-ring-outer {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    border: 2px dashed rgba(0, 242, 255, 0.2);
+    border-radius: 50%;
+    animation: rotateJarvis 20s linear infinite;
+    z-index: 2;
+}
+
+.hud-ring-inner {
+    position: absolute;
+    width: 420px;
+    height: 420px;
+    border: 1px solid rgba(0, 242, 255, 0.1);
+    border-top: 4px solid #00f2ff;
+    border-radius: 50%;
+    animation: rotateJarvis 10s linear infinite reverse;
+    z-index: 2;
+}
+
+@keyframes rotateJarvis {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* เอฟเฟกต์แสกนหน้าจอ */
+.scanning-line {
+    position: absolute;
+    width: 100%;
+    height: 10px;
+    background: linear-gradient(to bottom, transparent, rgba(0, 242, 255, 0.2), transparent);
+    top: -10%;
+    left: 0;
+    animation: scan 4s linear infinite;
+    z-index: 3;
+}
+
+@keyframes scan {
+    0% { top: -10%; }
+    100% { top: 110%; }
+}
+
+/* เนื้อหาตรงกลาง */
+.maintenance-container {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+}
+
+.core-icon {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.icon-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 120px;
+    height: 120px;
+    background: #00f2ff;
+    filter: blur(50px);
+    opacity: 0.3;
+    border-radius: 50%;
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.2; transform: translate(-50%, -50%) scale(1); }
+    50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+.jarvis-maintenance h1 {
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: 5px;
+    margin: 0;
+    text-shadow: 0 0 20px rgba(0, 242, 255, 0.8);
+}
+
+/* ปุ่มแบบ Hi-Tech */
+.jarvis-btn {
+    background: transparent;
+    border: 1px solid #00f2ff;
+    color: #00f2ff;
+    padding: 12px 30px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: 0.3s;
+    margin-top: 30px;
+    box-shadow: 0 0 10px rgba(0, 242, 255, 0.2);
+}
+
+.jarvis-btn:hover {
+    background: rgba(0, 242, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 242, 255, 0.5);
+}
+
+.btn-scanner {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: 0.5s;
+}
+
+.jarvis-btn:hover .btn-scanner {
+    left: 100%;
+}
+
+/* ข้อมูลด้านข้าง */
+.side-info {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    font-family: monospace;
+    opacity: 0.6;
+    text-align: left;
+}
+.side-info.left { left: -220px; border-left: 2px solid #00f2ff; padding-left: 10px; }
+.side-info.right { right: -220px; border-right: 2px solid #00f2ff; padding-right: 10px; text-align: right; }
+
+@media (max-width: 768px) {
+    .hud-ring-outer, .hud-ring-inner, .side-info { display: none; }
+}
