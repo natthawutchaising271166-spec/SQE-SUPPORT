@@ -1213,10 +1213,9 @@
                 </div>
                 <!-- Fixed Button at Bottom -->
                 <div class="panel-footer">
-                    <button onclick="submitLeaveRequest()" id="att-submit-btn" class="btn-submit-v2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
-                        ส่งคำขอการลา
-                    </button>
+<button onclick="submitLeaveRequest()" id="att-submit-btn" class="btn-submit-v2">
+    ส่งคำขอการลา
+</button>
                 </div>
             </div>
 
@@ -1238,12 +1237,53 @@
                         </thead>
                         <tbody id="att-records-tbody"></tbody>
                     </table>
+                    
                 </div>
+                
             </div>
+
+<!-- คอนเทนเนอร์ Matrix แบบปรับปรุงสัดส่วน -->
+<div class="att-panel h-full p-5 flex flex-col overflow-hidden" style="width: 330px; flex-shrink: 0;">
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <h4 class="text-[11px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Submission Tracker
+            </h4>
+        </div>
+        
+        <!-- Legend แบบจุดจิ๋วประหยัดพื้นที่ -->
+<!-- ค้นหาส่วน Legend ของ Submission Tracker ในหน้า Attendance Logs -->
+<div class="flex gap-2.5 items-center">
+    <div class="flex items-center gap-1">
+        <span class="w-2.5 h-2.5 rounded-[3px] bg-emerald-500"></span>
+        <span class="text-[8px] font-bold text-slate-400 uppercase">Worked</span>
+    </div>
+    <div class="flex items-center gap-1">
+        <span class="w-2.5 h-2.5 rounded-[3px] bg-yellow-400"></span>
+        <span class="text-[8px] font-bold text-slate-400 uppercase">Leave</span>
+    </div>
+    <div class="flex items-center gap-1">
+        <span class="w-2.5 h-2.5 rounded-[3px] bg-red-600"></span>
+        <span class="text-[8px] font-bold text-slate-400 uppercase">Holiday</span>
+    </div>
+    <div class="flex items-center gap-1">
+        <span class="w-2.5 h-2.5 rounded-[3px] bg-slate-200"></span>
+        <span class="text-[8px] font-bold text-slate-400 uppercase">No Data</span>
+    </div>
+</div>
+    </div>
+
+    <!-- Grid 7 คอลัมน์ที่กระชับขึ้น -->
+    <div class="grid grid-cols-7 gap-2 w-full" id="daily-submit-matrix">
+         <!-- JS Render -->
+    </div>
+</div>
         </div>
 
     </div>
 </div>
+
    <!-- ============================================================
          5. LINE SUPPORT LOGS
          ============================================================ -->

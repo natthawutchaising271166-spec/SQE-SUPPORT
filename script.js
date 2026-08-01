@@ -4942,6 +4942,8 @@ function filterTable(filter, btnEl) {
     S.activeFilter = filter;
     document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
     if (btnEl) btnEl.classList.add('active');
+
+    
     renderTable();
 }
 
@@ -5926,57 +5928,145 @@ function initKeyboardAwareness() {
 // 1. ประกาศฟังก์ชันไว้ด้านนอกสุด (Global Scope) 
 // เพื่อให้ปุ่ม Reset และ Event Listener เรียกใช้ได้พร้อมกัน
 // ============================================================
+// ใช้เพียงชุดเดียวในไฟล์ script.js
 const updateAllModuleFilters = () => {
     const titleEl = document.getElementById('header-title');
     if (!titleEl) return;
     
     const currentTitle = titleEl.textContent.trim().toUpperCase();
     
-    // 1. หน้า Dashboard หลัก (ตรวจสอบทั้ง LINE CLAIM / บันทึกเคลม และ DASHBOARD / แดชบอร์ด)
+    // 1. หน้า Dashboard หลัก
     if ((currentTitle.includes('LINE CLAIM') || currentTitle.includes('บันทึกเคลม')) && 
         (currentTitle.includes('DASHBOARD') || currentTitle.includes('แดชบอร์ด'))) {
         refreshClaimDashboard();
     }
     
-    // 2. หน้า Exec Dashboard (ตรวจสอบ EXEC / สรุปงาน)
+    // 2. หน้า Exec Dashboard
     if (currentTitle.includes('EXEC') || currentTitle.includes('สรุปงาน')) {
         initExecDashboard();
     }
 
-    // 3. หน้า 5S Excellence (5S มักใช้ทับศัพท์ แต่ดัก 'ตรวจสอบ' เผื่อไว้)
+    // 3. หน้า 5S Excellence
     if (typeof Wap5SExcellence !== 'undefined' && Wap5SExcellence.applyDateFilter) {
         if (currentTitle.includes('5S') || currentTitle.includes('ตรวจสอบ')) {
             Wap5SExcellence.applyDateFilter();
         }
     }
     
-    // 4. หน้า Special Jobs (ตรวจสอบ SPECIAL / ภารกิจ)
+    // 4. หน้า Special Jobs
     if (typeof WapSpecialJobs !== 'undefined' && WapSpecialJobs.applyDateFilter) {
         if (currentTitle.includes('SPECIAL') || currentTitle.includes('ภารกิจ')) {
             WapSpecialJobs.applyDateFilter();
         }
     }
 
-    // 5. หน้า OT Management (ตรวจสอบ OT / ล่วงเวลา)
+    // 5. หน้า OT Management
     if (typeof WapOTManagement !== 'undefined' && WapOTManagement.applyDateFilter) {
         if (currentTitle.includes('OT') || currentTitle.includes('ล่วงเวลา')) {
             WapOTManagement.applyDateFilter();
         }
     }
 
-    // 6. หน้า Line Support Logs (ตรวจสอบ SUPPORT / สนับสนุน)
+    // 6. หน้า Line Support Logs
     if (typeof WapSupportLogs !== 'undefined' && WapSupportLogs.applyDateFilter) {
         if (currentTitle.includes('SUPPORT') || currentTitle.includes('สนับสนุน')) {
             WapSupportLogs.applyDateFilter();
         }
     }
 
-    // 7. หน้า Attendance / Daily Report (ตรวจสอบ ATTENDANCE / DAILY / เข้างาน / รายงานประจำวัน)
+    // 7. หน้า Attendance / Daily Report
     if (currentTitle.includes('ATTENDANCE') || currentTitle.includes('DAILY') || 
         currentTitle.includes('เข้างาน') || currentTitle.includes('รายงาน')) {
-        initAttDashboard();
+        
+        // เช็คว่าฟังก์ชันมีตัวตนอยู่จริงก่อนเรียกใช้เพื่อป้องกัน Error
+        if (typeof initAttDashboard === 'function') {
+            initAttDashboard();
+        }
+        
+        if (typeof renderDailySubmissionMatrix === 'function') {
+            renderDailySubmissionMatrix(); 
+        }
     }
 };
+
+function renderDailySubmissionMatrix() {
+    const container = document.getElementById('daily-submit-matrix');
+    if (!container || !S || !S.attLeaveRecords) return;
+
+    const now = new Date();
+    // 1. ดึงปี/เดือน จาก Filter Header
+    const startFilter = document.getElementById('cd-start-date')?.value;
+    
+    let displayYear, displayMonth;
+    if (startFilter) {
+        const d = new Date(startFilter);
+        displayYear = d.getFullYear();
+        displayMonth = d.getMonth();
+    } else {
+        displayYear = now.getFullYear();
+        displayMonth = now.getMonth();
+    }
+
+    const daysInMonth = new Date(displayYear, displayMonth + 1, 0).getDate();
+    const records = S.attLeaveRecords;
+    let html = '';
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        // รูปแบบวันที่สำหรับเช็คใน DB (YYYY-MM-DD)
+        const dStr = `${displayYear}-${String(displayMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        const checkDate = new Date(displayYear, displayMonth, day);
+        
+        // ตัดเวลาออกเพื่อเปรียบเทียบแค่ วัน/เดือน/ปี ปัจจุบัน
+        const todayNoTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const isFuture = checkDate > todayNoTime;
+
+        // ค้นหาประวัติการลา/หยุดใน Database
+        const record = records.find(r => (r.date && r.date.startsWith(dStr)));
+        
+        // --- ส่วนตัดสินสี (Logic: เขียวคือพื้นฐาน) ---
+        let statusClass = 'bg-slate-50 text-slate-300'; // สำหรับวันที่ยังมาไม่ถึง (Future)
+        let statusTitle = `วันที่ ${day}: ยังไม่ถึงเวลา`;
+
+        if (!isFuture) {
+            // 🟢 1. ตั้งค่าเริ่มต้นเป็น "สีเขียว (Worked)" สำหรับวันในอดีตและวันนี้
+            statusClass = 'bg-emerald-500 text-white border-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.4)]';
+            statusTitle = `วันที่ ${day}: วันทำงานปกติ ✅`;
+
+            if (record) {
+                // 🔴 2. ถ้าในบันทึกระบุว่าเป็นวันหยุด (Holiday) -> เปลี่ยนเป็นสีแดง
+                if (record.type === 'holiday') {
+                    statusClass = 'bg-red-600 text-white border-red-700 shadow-sm';
+                    statusTitle = `วันที่ ${day}: วันหยุดนักขัตฤกษ์ 🚩`;
+                } 
+                // 🟡 3. ถ้าในบันทึกระบุว่าเป็นการลา (Sick/Personal/Annual) -> เปลี่ยนเป็นสีเหลือง
+                else if (['sick', 'personal', 'annual'].includes(record.type)) {
+                    statusClass = 'bg-yellow-400 text-slate-800 border-yellow-500 shadow-sm';
+                    statusTitle = `วันที่ ${day}: ลาหยุด (${record.type}) ⚠️`;
+                }
+            }
+            // 🟢 หากไม่มี Record หรือ Record เป็นประเภทอื่นที่ไม่ใช่ลา/หยุด จะเป็นสีเขียวค้างไว้ตามค่าเริ่มต้นด้านบน
+        }
+
+        html += `
+            <div class="${statusClass} rounded-lg border flex items-center justify-center transition-all duration-300 hover:scale-110"
+                 style="aspect-ratio: 1 / 1; width: 100%; cursor: help;" title="${statusTitle}">
+                 <span style="font-size: 11px; font-weight: 900;">${day}</span>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+}
+
+// ผูกเข้ากับระบบ Refresh ของคุณ
+if (typeof initAttDashboard !== 'undefined') {
+    const oldInit = initAttDashboard;
+    initAttDashboard = async function() {
+        await oldInit();
+        renderDailySubmissionMatrix();
+    };
+}
 // ============================================================
 // 2. ส่วนตั้งค่าเริ่มต้นเมื่อโหลดหน้าจอ
 // ============================================================
@@ -7371,6 +7461,7 @@ function openAttendanceView() {
     setTimeout(initAttDashboard, 120);
 }
 
+
 async function initAttDashboard() {
     // 0. Sync ตัวเลือกปีและป้ายกำกับให้ตรงกับ attSelectedYear
     var yearSelect = document.getElementById('att-year-select');
@@ -7389,7 +7480,7 @@ async function initAttDashboard() {
     if (attMonthlyChart) {
         attMonthlyChart.destroy();
     }
-
+    renderDailySubmissionMatrix(); 
     initAttMonthlyChart();
 }
 
@@ -7439,6 +7530,7 @@ async function renderAttRecords() {
 
     tbody.innerHTML = html;
     if (countEl) countEl.textContent = `${records.length} รายการ`;
+    renderDailySubmissionMatrix(); 
 }
 
 function cancelEditAttRecord() {
@@ -7543,6 +7635,8 @@ async function submitLeaveRequest() {
     } finally {
         if (submitBtn) submitBtn.disabled = false;
     }
+    await fetchAttendanceRecords(); // โหลดข้อมูลใหม่จากฐานข้อมูล
+renderDailySubmissionMatrix();  // สั่งวาดปฏิทินใหม่ทันที
 }
 // ฟังก์ชันคำนวณสถิติเข้างานแบบมาตรฐาน (นับเฉพาะ จันทร์-ศุกร์)
 function getGlobalAttendanceStats(startDate, endDate) {
@@ -8154,9 +8248,16 @@ const WapSupportLogs = (function () {
     /* ──────────────────────────────────────────
        FORM MODAL (เพิ่มระบบ Sync To Special Jobs)
        ────────────────────────────────────────── */
+    /* ──────────────────────────────────────────
+       FORM MODAL (เพิ่มระบบ Sync To Special Jobs + Commander Suggestion)
+       ────────────────────────────────────────── */
     function _openFormModal(id) {
         _editingId = id || null;
         const r = id ? (_records.find(x => x.id === id) || _blankRecord()) : _blankRecord();
+
+        // [NEW]: ดึงรายชื่อ Commander เดิมจากประวัติเพื่อทำเป็นตัวเลือก (Auto-suggest)
+        const existingCommanders = [...new Set((S.wapData.specialJobs || []).map(j => j.assigned_by).filter(Boolean))];
+        const commanderOptions = existingCommanders.map(name => `<option value="${name}">`).join('');
 
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
@@ -8180,76 +8281,50 @@ const WapSupportLogs = (function () {
                         </div>
                         <div>
                             <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">🔧 การแก้ไข (ACTION)</label>
-<select id="f-sup-action" name="action" class="form-input" style="width:100%;">
-    <!-- กลุ่มมาตรฐานเดิม -->
-    <option value="Rework" ${r.action==='Rework'?'selected':''}>Rework (ซ่อมแซมให้ได้ตาม Spec)</option>
-    <option value="Replace" ${r.action==='Replace'?'selected':''}>Replace (เปลี่ยนชิ้นส่วนใหม่)</option>
-    <option value="Sorting 100%" ${r.action==='Sorting 100%'?'selected':''}>Sorting 100% (คัดแยก 100%)</option>
-    <option value="Use as is" ${r.action==='Use as is'?'selected':''}>Use as is (อนุโลมใช้งาน / Deviation)</option>
-    
-    <!-- เพิ่มหัวข้อระดับสากลใหม่ -->
-    <option value="Scrap" ${r.action==='Scrap'?'selected':''}>Scrap (ตัดทิ้ง / ทำลายเป็นของเสีย)</option>
-    <option value="Return to Vendor" ${r.action==='Return to Vendor'?'selected':''}>RTV (ส่งคืนซัพพลายเออร์เพื่อเคลม)</option>
-    <option value="Containment" ${r.action==='Containment'?'selected':''}>Containment (กักกันสินค้าเสี่ยงใน Line/WIP)</option>
-    <option value="Purge Stock" ${r.action==='Purge Stock'?'selected':''}>Purge Stock (เรียกคืนและตรวจสอบสต็อกทั้งหมด)</option>
-    <option value="Investigation" ${r.action==='On-hold for Investigation'?'selected':''}>On-hold (ระงับเพื่อรอผลวิเคราะห์เชิงลึก)</option>
-    <option value="Retrofit" ${r.action==='Retrofit'?'selected':''}>Retrofit (ปรับเปลี่ยนแก้ไขหน้างาน)</option>
-</select>
+                            <select id="f-sup-action" name="action" class="form-input" style="width:100%;">
+                                <option value="Rework" ${r.action==='Rework'?'selected':''}>Rework</option>
+                                <option value="Replace" ${r.action==='Replace'?'selected':''}>Replace</option>
+                                <option value="Sorting 100%" ${r.action==='Sorting 100%'?'selected':''}>Sorting 100%</option>
+                                <option value="Use as is" ${r.action==='Use as is'?'selected':''}>Use as is</option>
+                                <option value="Scrap" ${r.action==='Scrap'?'selected':''}>Scrap</option>
+                                <option value="Return to Vendor" ${r.action==='Return to Vendor'?'selected':''}>RTV</option>
+                            </select>
                         </div>
                     </div>
                     <div>
                         <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📝 รายละเอียดปัญหา</label>
                         <textarea id="f-sup-problem" name="problem" class="form-textarea" style="height:80px; width:100%;" required placeholder="ระบุปัญหาที่พบ...">${_esc(r.problem)}</textarea>
                     </div>
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-    <!-- ฝั่งซ้าย: พาร์ทชิ้นส่วนพร้อมระบบ Dropdown -->
-    <div>
-        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน</label>
-        <div class="form-input-wrap" style="position:relative;">
-            <input type="text" id="f-sup-part" name="part" value="${_esc(r.part)}" 
-                   class="form-input" style="width:100%;" placeholder="ค้นหาหมวดหมู่พาร์ท..." 
-                   onfocus="WapSupportLogs.showPartAC(this)" 
-                   oninput="WapSupportLogs.showPartAC(this)"
-                   autocomplete="off">
-            <!-- Dropdown Container -->
-            <div id="sup-part-ac" class="ac-dropdown shadow-2xl" 
-                 style="display:none; position:absolute; top:105%; left:0; right:0; background:white; z-index:1000; border-radius:14px; border:1px solid #e2e8f0; max-height:200px; overflow-y:auto; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-            </div>
-        </div>
-    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                        <div>
+                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน</label>
+                            <input type="text" id="f-sup-part" name="part" value="${_esc(r.part)}" class="form-input" style="width:100%;" placeholder="ค้นหาหมวดหมู่พาร์ท..." onfocus="WapSupportLogs.showPartAC(this)" oninput="WapSupportLogs.showPartAC(this)" autocomplete="off">
+                            <div id="sup-part-ac" class="ac-dropdown shadow-2xl" style="display:none; position:absolute; z-index:1000; background:white; border-radius:14px; border:1px solid #e2e8f0; max-height:200px; overflow-y:auto;"></div>
+                        </div>
+                        <div>
+                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">LOT NO. (QTY)</label>
+                            <input type="number" id="f-sup-lot" name="lot" value="${r.lot}" class="form-input" style="width:100%;" placeholder="จำนวนทั้งหมด" oninput="WapSupportLogs.calcNG()">
+                        </div>
+                    </div>
 
-    <div>
-        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">LOT NO. (QTY)</label>
-        <!-- เพิ่ม id="f-sup-lot" และ oninput -->
-        <input type="number" id="f-sup-lot" name="lot" value="${r.lot}" 
-               class="form-input" style="width:100%;" placeholder="จำนวนทั้งหมด" 
-               oninput="WapSupportLogs.calcNG()">
-    </div>
-</div>
-
-<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px;">
-    <div>
-        <label style="font-size:10px; font-weight:800; color:#059669; display:block; margin-bottom:5px;">✅ OK</label>
-        <!-- เพิ่ม id="f-sup-ok" และ oninput -->
-        <input type="number" id="f-sup-ok" name="ok" value="${r.ok}" 
-               class="form-input" style="width:100%;" 
-               oninput="WapSupportLogs.calcNG()">
-    </div>
-    <div>
-        <label style="font-size:10px; font-weight:800; color:#ef4444; display:block; margin-bottom:5px;">❌ NG</label>
-        <!-- เพิ่ม id="f-sup-ng" -->
-        <input type="number" id="f-sup-ng" name="ng" value="${r.ng}" 
-               class="form-input" style="width:100%; background:#f8fafc;" readonly>
-    </div>
-    <div>
-        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📋 ประเภท</label>
-        <select name="report" class="form-input" style="width:100%;">
-            <option value="VF" ${r.report==='VF'?'selected':''}>VF Report</option>
-            <option value="RP" ${r.report==='RP'?'selected':''}>RP Report</option>
-            <option value="RECORDS" ${r.report==='RECORDS'?'selected':''}>Records</option> 
-        </select>
-    </div>
-</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px;">
+                        <div>
+                            <label style="font-size:10px; font-weight:800; color:#059669; display:block; margin-bottom:5px;">✅ OK</label>
+                            <input type="number" id="f-sup-ok" name="ok" value="${r.ok}" class="form-input" style="width:100%;" oninput="WapSupportLogs.calcNG()">
+                        </div>
+                        <div>
+                            <label style="font-size:10px; font-weight:800; color:#ef4444; display:block; margin-bottom:5px;">❌ NG</label>
+                            <input type="number" id="f-sup-ng" name="ng" value="${r.ng}" class="form-input" style="width:100%; background:#f8fafc;" readonly>
+                        </div>
+                        <div>
+                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📋 ประเภท</label>
+                            <select name="report" class="form-input" style="width:100%;">
+                                <option value="VF" ${r.report==='VF'?'selected':''}>VF Report</option>
+                                <option value="RP" ${r.report==='RP'?'selected':''}>RP Report</option>
+                                <option value="RECORDS" ${r.report==='RECORDS'?'selected':''}>Records</option> 
+                            </select>
+                        </div>
+                    </div>
                     <div>
                         <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">💬 Remark</label>
                         <input type="text" name="remark" value="${_esc(r.remark)}" class="form-input" style="width:100%;" placeholder="หมายเหตุเพิ่มเติม...">
@@ -8266,18 +8341,27 @@ const WapSupportLogs = (function () {
                         </div>
                     </div>
 
-                    <!-- [NEW]: NEURAL SYNC TO SPECIAL JOBS SECTION -->
-                    <div style="margin-top: 5px; padding: 12px 16px; background: rgba(59, 130, 246, 0.04); border: 1.5px dashed rgba(59, 130, 246, 0.25); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; transition: 0.3s;" id="sync-container">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 34px; height: 34px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #3b82f6;">
+                    <!-- [NEW]: NEURAL SYNC TO SPECIAL JOBS SECTION (WITH COMMANDER INPUT) -->
+                    <div style="margin-top: 5px; padding: 16px; background: rgba(59, 130, 246, 0.04); border: 1.5px dashed rgba(59, 130, 246, 0.25); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; gap: 15px;" id="sync-container">
+                        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                            <div style="width: 34px; height: 34px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #3b82f6; flex-shrink: 0;">
                                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                             </div>
-                            <div>
-                                <p style="font-size: 11px; font-weight: 900; color: #1e293b; margin: 0; text-transform: uppercase; letter-spacing: 0.02em;">บันทึกเป็นภารกิจพิเศษ</p>
-                                <p style="font-size: 9px; font-weight: 600; color: #64748b; margin: 1px 0 0 0;">คัดลอกลงใน Special Jobs History</p>
+                            <div style="flex: 1;">
+                                <p style="font-size: 11px; font-weight: 900; color: #1e293b; margin: 0; text-transform: uppercase;">บันทึกเป็นภารกิจพิเศษ</p>
+                                
+                                <!-- ช่องใส่ชื่อ Commander -->
+                                <div style="margin-top: 6px;">
+                                    <input type="text" id="sync-commander-name" list="commander-list" 
+                                           placeholder="ระบุชื่อผู้สั่งงาน (Commander)..."
+                                           style="width: 100%; height: 30px; font-size: 11px; border: 1px solid #dbeafe; border-radius: 8px; padding: 0 10px; outline: none; background: rgba(255,255,255,0.7); font-weight: 600; color: #2563eb;">
+                                    <datalist id="commander-list">
+                                        ${commanderOptions}
+                                    </datalist>
+                                </div>
                             </div>
                         </div>
-                        <label class="premium-toggle" style="position:relative; display:inline-block; width:40px; height:22px;">
+                        <label class="premium-toggle" style="position:relative; display:inline-block; width:40px; height:22px; flex-shrink: 0;">
                             <input type="checkbox" id="sync-to-special" style="opacity:0; width:0; height:0;">
                             <span class="toggle-slider" style="position:absolute; cursor:pointer; inset:0; background-color:#e2e8f0; transition:.4s; border-radius:34px;"></span>
                         </label>
@@ -8292,14 +8376,21 @@ const WapSupportLogs = (function () {
 
         document.body.appendChild(modal);
 
-        // --- Logic สำหรับ Toggle Switch (Visual Only) ---
+        // --- Logic สำหรับ Toggle Switch UI ---
         const syncCheck = document.getElementById('sync-to-special');
         const syncCont = document.getElementById('sync-container');
-        syncCheck.onchange = (e) => {
-            syncCont.style.borderColor = e.target.checked ? '#3b82f6' : 'rgba(59, 130, 246, 0.25)';
-            syncCont.style.background = e.target.checked ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.04)';
-        };
+        const commanderInput = document.getElementById('sync-commander-name');
 
+        syncCheck.onchange = (e) => {
+            const isActive = e.target.checked;
+            syncCont.style.borderColor = isActive ? '#3b82f6' : 'rgba(59, 130, 246, 0.25)';
+            syncCont.style.background = isActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.04)';
+            commanderInput.style.display = isActive ? 'block' : 'none';
+        };
+        // เริ่มต้นให้ซ่อนช่อง Commander ถ้าไม่ได้ติ๊ก Sync
+        commanderInput.style.display = 'none';
+
+        // --- Logic สำหรับอัปโหลดรูปภาพ ---
         let currentImage = r.imageUrl || null;
         const imgInput = document.getElementById('img-input');
         imgInput.onchange = (e) => {
@@ -8313,17 +8404,22 @@ const WapSupportLogs = (function () {
             reader.readAsDataURL(file);
         };
 
+        // ──────────────────────────────────────────
+        //  SUBMIT LOGIC
+        // ──────────────────────────────────────────
         const formEl = document.getElementById('sup-form');
         const submitBtn = document.getElementById('sup-form-submit-btn');
 
         formEl.onsubmit = async (e) => {
             e.preventDefault();
             if (submitBtn.disabled) return;
+            
+            const fd = new FormData(e.target);
+            const isSyncActive = syncCheck.checked;
+            const commanderName = commanderInput.value.trim() || 'SQE EN'; // ดึงค่าจากช่องที่พิมพ์ใหม่
+
             submitBtn.disabled = true;
             submitBtn.textContent = 'กำลังบันทึก...';
-
-            const fd = new FormData(e.target);
-            const isSyncActive = document.getElementById('sync-to-special').checked;
 
             const payload = {
                 id: _editingId || 'SUP-' + Date.now(),
@@ -8342,36 +8438,37 @@ const WapSupportLogs = (function () {
             };
 
             try {
-                // 1. บันทึกลงตาราง Support Line (หลัก)
+                // 1. บันทึกลงตารางหลัก (Support Line)
                 const { error } = await wapClient.from(TABLE).upsert([payload]);
                 if (error) throw error;
 
-                // 2. ถ้าติ๊ก Sync ให้บันทึกลงตาราง Special Jobs
-                // ค้นหาบรรทัด specialPayload ภายใน formEl.onsubmit ของโมดูล WapSupportLogs
-if (isSyncActive) {
+                if (isSyncActive) {
+    // ดึงค่าจากช่องใส่ชื่อ Commander ที่เพิ่งเพิ่มเข้าไป
+    const commanderName = document.getElementById('sync-commander-name').value.trim() || 'SQE EN';
+
     const specialPayload = {
         id: 'SJ-SYNC-' + Date.now(),
         user_id: S.currentUser,
         project: `[SUPPORT] ${payload.problem}`, 
         date: payload.event_date,
-        assigned_by: 'SQE EN',
-        result: 'Done', // <--- เปลี่ยนจากข้อความยาวๆ เป็น "Done" ตามที่คุณต้องการ
+        assigned_by: commanderName, // <--- ใช้ชื่อที่พิมพ์หรือเลือกมาจากช่อง Commander
+        result: 'Done', 
         full_timestamp: new Date().toISOString()
     };
     
     try {
         await wapClient.from('special_jobs').insert([specialPayload]);
-        console.log("Sync to Special Jobs successful");
+        console.log("Sync to Special Jobs successful with Commander:", commanderName);
     } catch (syncErr) {
         console.error("Sync to Special Jobs failed", syncErr);
     }
 }
 
-                toast(isSyncActive ? '✅ บันทึกและ Sync ไปที่ SQE EN สำเร็จ' : 'บันทึกข้อมูลสำเร็จ', 'success');
+                toast(isSyncActive ? '✅ บันทึกและส่งภารกิจให้ ' + commanderName + ' สำเร็จ' : 'บันทึกข้อมูลสำเร็จ', 'success');
                 modal.remove();
-                await _fetch();
+                await _fetch(); // รีเฟรชตาราง
                 
-                // สั่งรีเฟรชข้อมูล Special Jobs หากหน้าจอเปิดค้างอยู่
+                // รีเฟรชหน้าจอ Special Jobs (ถ้าเปิดอยู่)
                 if (typeof WapSpecialJobs !== 'undefined') WapSpecialJobs.fetchRecords();
 
             } catch (err) {
@@ -8393,16 +8490,10 @@ function _openViewModal(id) {
     _viewing = item;
 
     const isDark = document.body.classList.contains('dark-mode');
-    
-    // กำหนดธีมสี
     const theme = {
         overlay: isDark ? 'rgba(2, 6, 23, 0.85)' : 'rgba(15, 23, 42, 0.5)',
         modalBg: isDark ? '#0f172a' : '#ffffff',
-        // จุดที่แก้ไข: ใส่สีน้ำเงินเข้มไล่เฉดทั้งในโหมดมืดและโหมดสว่าง
-        headerBg: isDark 
-            ? 'linear-gradient(180deg, #001529 0%, #002b5c 100%)' // น้ำเงินมิดไนท์สำหรับโหมดมืด
-            : 'linear-gradient(180deg, #001c3d 0%, #003366 100%)', // น้ำเงินเข้มจัดสำหรับโหมดสว่าง
-        headerText: '#ffffff', // สีขาวทั้งสองโหมดเพื่อให้เด่นบนพื้นน้ำเงิน
+        headerBg: 'linear-gradient(180deg, #001c3d 0%, #003366 100%)',
         border: isDark ? '#1e293b' : '#e2e8f0',
         mainText: isDark ? '#ffffff' : '#1e293b',
         subText: isDark ? '#94a3b8' : '#64748b',
@@ -8415,76 +8506,79 @@ function _openViewModal(id) {
 
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    modal.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:${theme.overlay};backdrop-filter:blur(8px);animation:fadeIn .2s ease`;
+    modal.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:${theme.overlay};backdrop-filter:blur(8px);`;
     
     modal.innerHTML = `
-    <div style="background:${theme.modalBg}; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,0.4); width:90%; max-width:920px; overflow:hidden; border:1px solid ${theme.border}; animation:modalPop .2s ease; display:flex; flex-direction:column; max-height:95vh">
+    <div style="background:${theme.modalBg}; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,0.4); width:90%; max-width:850px; overflow:hidden; border:1px solid ${theme.border}; animation:modalPop .2s ease; display:flex; flex-direction:column;">
         
-        <!-- Blue Header for both Dark & Light Mode -->
-        <div style="background:${theme.headerBg}; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.2);">
+        <!-- 1. Compact Header -->
+        <div style="background:${theme.headerBg}; padding:8px 16px; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:10px; font-weight:800; letter-spacing:.05em; color:${theme.headerText}; text-transform:uppercase">🔍 CASE RECORD</span>
-                <span style="color:rgba(255,255,255,0.5); font-size:10px; font-weight:500;">#${item.id}</span>
+                <span style="font-size:9px; font-weight:800; color:#fff; text-transform:uppercase; letter-spacing:1px;">🔍 CASE RECORD</span>
+                <span style="color:rgba(255,255,255,0.5); font-size:9px;">#${item.id}</span>
             </div>
-            <button onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:rgba(255,255,255,0.7); cursor:pointer; font-size:18px; line-height:1;">✕</button>
+            <button onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:#fff; cursor:pointer; font-size:16px;">✕</button>
         </div>
 
-        <div style="flex:1; overflow-y:auto; scrollbar-width: none;">
+        <div style="overflow-y:auto; scrollbar-width: none;">
             
-            <!-- Summary Info -->
-            <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center; padding:15px 20px;">
-                <div style="flex:1; min-width:280px;">
-                    <p style="font-size:13px; font-weight:600; color:${theme.mainText}; line-height:1.4; margin:0 0 10px 0;">
-                        On <span style="color:#3b82f6">${item.eventDate || '-'}</span> OSA inform quality problem about <span style="color:#3b82f6">${_esc(item.part)}</span> found defect <span style="color:#ef4444">${_esc(item.problem)}</span>
+            <!-- 2. Summary Info (Reduced Spacing) -->
+            <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; padding:12px 16px;">
+                <div style="flex:1; min-width:250px;">
+                    <p style="font-size:12px; font-weight:600; color:${theme.mainText}; line-height:1.4; margin:0 0 6px 0;">
+                        On <span style="color:#3b82f6">${item.eventDate || '-'}</span> OSA inform quality problem about <span style="color:#3b82f6">${item.part}</span> found defect <span style="color:#ef4444">${item.problem}</span>
                     </p>
-                    <div style="display:flex; gap:6px;">
-                        <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:3px 8px; font-size:9px; font-weight:700">📅 ${item.eventDate || '-'}</span>
-                        <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:3px 8px; font-size:9px; font-weight:700">🔧 ${_esc(item.action)}</span>
-                        <span style="border-radius:4px; padding:3px 8px; font-size:9px; font-weight:800; ${tc}">${item.report}</span>
+                    <div style="display:flex; gap:5px;">
+                        <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:2px 6px; font-size:8px; font-weight:700">📅 ${item.eventDate || '-'}</span>
+                        <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:2px 6px; font-size:8px; font-weight:700">🔧 ${item.action}</span>
+                        <span style="border-radius:4px; padding:2px 6px; font-size:8px; font-weight:800; ${tc}">${item.report}</span>
                     </div>
                 </div>
 
-                <!-- KPI Boxes -->
-                <div style="display:flex; gap:8px;">
-                    <div style="text-align:center; border:1px solid #10b981; border-radius:8px; padding:5px 10px; min-width:55px;">
-                        <div style="font-size:8px; font-weight:800; color:#10b981;">OK</div>
-                        <div style="font-size:16px; font-weight:900; color:#10b981;">${item.ok.toLocaleString()}</div>
+                <!-- Small KPI Boxes -->
+                <div style="display:flex; gap:6px;">
+                    <div style="text-align:center; border:1px solid #10b981; border-radius:8px; padding:3px 8px; min-width:45px; background:rgba(16,185,129,0.02)">
+                        <div style="font-size:7px; font-weight:800; color:#10b981;">OK</div>
+                        <div style="font-size:14px; font-weight:900; color:#10b981;">${item.ok}</div>
                     </div>
-                    <div style="text-align:center; border:1px solid #ef4444; border-radius:8px; padding:5px 10px; min-width:55px;">
-                        <div style="font-size:8px; font-weight:800; color:#ef4444;">NG</div>
-                        <div style="font-size:16px; font-weight:900; color:#ef4444;">${item.ng.toLocaleString()}</div>
+                    <div style="text-align:center; border:1px solid #ef4444; border-radius:8px; padding:3px 8px; min-width:45px; background:rgba(239,68,68,0.02)">
+                        <div style="font-size:7px; font-weight:800; color:#ef4444;">NG</div>
+                        <div style="font-size:14px; font-weight:900; color:#ef4444;">${item.ng}</div>
                     </div>
-                    <div style="text-align:center; border:1px solid #3b82f6; border-radius:8px; padding:5px 10px; min-width:55px;">
-                        <div style="font-size:8px; font-weight:800; color:#3b82f6;">TOTAL</div>
-                        <div style="font-size:16px; font-weight:900; color:#3b82f6;">${(item.ok + item.ng).toLocaleString()}</div>
+                    <div style="text-align:center; border:1px solid #3b82f6; border-radius:8px; padding:3px 8px; min-width:45px; background:rgba(59,130,246,0.02)">
+                        <div style="font-size:7px; font-weight:800; color:#3b82f6;">TOTAL</div>
+                        <div style="font-size:14px; font-weight:900; color:#3b82f6;">${item.ok + item.ng}</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Image Strip (Prevents distortion) -->
-            <div style="width:100%; display:flex; gap:4px; background:${isDark?'#020617':'#f1f5f9'}; border-top:1px solid ${theme.border}; border-bottom:1px solid ${theme.border}; overflow-x:auto; padding:4px; scrollbar-width:none;">
-                ${item.imageUrl 
-                    ? `<img src="${item.imageUrl}" style="height:200px; width:auto; flex-shrink:0; object-fit:contain; border-radius:4px; background:#000;">` 
-                    : ''
-                }
-                <img src="${item.imageUrl}" style="height:200px; width:auto; flex-shrink:0; object-fit:contain; border-radius:4px; background:#000;">
-                <img src="${item.imageUrl}" style="height:200px; width:auto; flex-shrink:0; object-fit:contain; border-radius:4px; background:#000;">
-            </div>
 
-            <!-- Remark (Compact) -->
-            <div style="padding:15px 20px;">
-                <div style="background:${theme.remarkBg}; border:1px solid ${theme.border}; border-left:3px solid #f59e0b; padding:10px 15px; border-radius:8px;">
-                    <span style="font-size:8px; font-weight:900; color:#f59e0b; text-transform:uppercase; display:block; margin-bottom:4px;">📝 REMARK / NOTE</span>
-                    <p style="font-size:12px; color:${theme.mainText}; margin:0; font-weight:500; line-height:1.4; font-style: italic;">
-                        "${_esc(item.remark) || 'No additional remarks found.'}"
+
+<div style="width:100%; background:${theme.modalBg}; border-top:1px solid ${theme.border}; border-bottom:1px solid ${theme.border}; display:flex; justify-content:center; align-items:center; padding:0;">
+    ${item.imageUrl 
+        ? `<img src="${item.imageUrl}" 
+                onclick="WapSupportLogs._openLightbox('${item.imageUrl}')"
+                style="max-width:100%; height:auto; max-height:500px; display:block; cursor:pointer; 
+                       image-rendering: -webkit-optimize-contrast; /* บังคับให้เบราว์เซอร์เรนเดอร์ภาพแบบคมชัด */
+                       image-rendering: crisp-edges;">` 
+        : '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:10px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>'
+    }
+</div>
+
+            <!-- 4. Remark Section (Reduced Padding) -->
+            <div style="padding:10px 16px;">
+                <div style="background:${theme.remarkBg}; border:1px solid ${theme.border}; border-left:3px solid #f59e0b; padding:8px 12px; border-radius:8px;">
+                    <span style="font-size:8px; font-weight:900; color:#f59e0b; text-transform:uppercase; display:block; margin-bottom:2px;">📝 REMARK / NOTE</span>
+                    <p style="font-size:11px; color:${theme.mainText}; margin:0; font-weight:500; font-style: italic;">
+                        "${item.remark || 'No additional remarks found.'}"
                     </p>
                 </div>
             </div>
 
-            <!-- Slim Footer -->
-            <div style="padding:8px 20px; border-top:1px solid ${theme.border}; background:${isDark?'#020617':'#f8fafc'}; display:flex; align-items:center; justify-content:space-between">
+            <!-- 5. Slim Footer -->
+            <div style="padding:6px 16px; border-top:1px solid ${theme.border}; background:${isDark?'#020617':'#f8fafc'}; display:flex; align-items:center; justify-content:space-between">
                 <span style="font-size:8px; font-weight:700; color:${theme.subText}; text-transform:uppercase">Record Initialized By</span>
-                <span style="font-size:9px; font-weight:800; color:${theme.mainText}">${(item._user || 'NATTHAWUT.CHAISING').split('@')[0].toUpperCase()}</span>
+                <span style="font-size:9px; font-weight:800; color:${theme.mainText}">${(item._user || 'System').split('@')[0].toUpperCase()}</span>
             </div>
         </div>
     </div>`;
@@ -8506,6 +8600,7 @@ function _openViewModal(id) {
             toast('ลบไม่สำเร็จ', 'error');
         }
     }
+
 
     function _fromDb(r) {
         return {
@@ -8552,19 +8647,58 @@ function _openViewModal(id) {
         }
     }
 
+/* ──────────────────────────────────────────
+       NEW: LIGHTBOX VIEWER (ขยายรูปภาพพรีเมียม)
+       ────────────────────────────────────────── */
+    function _openLightbox(url) {
+        if (!url) return;
+
+        const lightbox = document.createElement('div');
+        lightbox.className = 'lightbox-overlay';
+        lightbox.innerHTML = `
+            <div class="lightbox-content">
+                <button class="lightbox-close">✕</button>
+                <img src="${url}" class="lightbox-img">
+                <div style="text-align:center; color:white; margin-top:15px;">
+                    <p style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; opacity:0.8;">Case Image Preview</p>
+                    <p style="font-size:10px; opacity:0.5;">Click anywhere to close</p>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(lightbox);
+
+        // เล่น Animation ด้วย GSAP
+        requestAnimationFrame(() => {
+            lightbox.style.opacity = '1';
+            lightbox.querySelector('.lightbox-content').style.transform = 'scale(1)';
+        });
+
+        // ปิด Lightbox
+        const closeLB = () => {
+            lightbox.style.opacity = '0';
+            lightbox.querySelector('.lightbox-content').style.transform = 'scale(0.9)';
+            setTimeout(() => lightbox.remove(), 400);
+        };
+
+        lightbox.onclick = closeLB;
+        lightbox.querySelector('.lightbox-close').onclick = closeLB;
+    }
+
     function destroy() {
         _alive = false;
         if ($.tbody) $.tbody.innerHTML = '';
     }
 
-    return {
+return {
         init, destroy, applyDateFilter,
         _openViewModal,
         _openFormModal,
         _confirmDelete,
-        showPartAC,   // เพิ่มบรรทัดนี้
-    selectPartAC,  // เพิ่มบรรทัดนี้
-    calcNG
+        _openLightbox, // <--- เพิ่มบรรทัดนี้
+        showPartAC,   
+        selectPartAC,  
+        calcNG
     };
 
 

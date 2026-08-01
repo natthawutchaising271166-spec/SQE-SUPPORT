@@ -14042,3 +14042,72 @@ body.dark-mode #sync-container p[style*="color: #1e293b"] {
 body.dark-mode .toggle-slider {
     background-color: #1e293b;
 }
+
+/* ============================================================
+   PREMIUM IMAGE LIGHTBOX (ขยายรูปภาพเต็มจอ)
+   ============================================================ */
+.lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10001; /* สูงกว่า Modal ปกติ */
+    background: rgba(2, 6, 23, 0.92);
+    backdrop-filter: blur(15px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-out;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.lightbox-content {
+    max-width: 95%;
+    max-height: 90vh;
+    position: relative;
+    transform: scale(0.9);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.lightbox-img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 12px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lightbox-close {
+    position: absolute;
+    top: -50px;
+    right: 0;
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.lightbox-close:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    transform: rotate(90deg);
+}
+/* เมื่อชี้ไปที่รูปหลักใน Modal หรือรูปที่มีการคลิกดู Lightbox */
+.modal-overlay img, 
+.img-thumb {
+    cursor: zoom-in !important;
+}
+
+/* เพิ่มเติม: เมื่อชี้แล้วให้รูปสว่างขึ้นเล็กน้อยเพื่อให้รู้ว่ากดได้ */
+.modal-overlay img:hover {
+    filter: brightness(1.05);
+    transition: filter 0.2s ease;
+}
