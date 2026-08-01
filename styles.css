@@ -13979,3 +13979,66 @@ body:has(.system-banner:not(.hidden)) #dashboard-view {
 body.dark-mode #sm-bar-list::-webkit-scrollbar-thumb {
     background: #334155;
 }
+/* --- Premium Sync Toggle Switch --- */
+.premium-toggle {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.premium-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #e2e8f0;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+input:checked + .toggle-slider {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+/* เอฟเฟกต์ Glow เมื่อเปิดใช้งาน */
+input:checked + .toggle-slider {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+/* Dark Mode Support */
+body.dark-mode #sync-container {
+    background: rgba(59, 130, 246, 0.1) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+body.dark-mode #sync-container p[style*="color: #1e293b"] {
+    color: #ffffff !important;
+}
+
+body.dark-mode .toggle-slider {
+    background-color: #1e293b;
+}

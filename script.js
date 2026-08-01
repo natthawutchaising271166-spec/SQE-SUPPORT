@@ -7916,6 +7916,86 @@ function onAttYearChange(val) {
  *  WAP Support Line — FULLY FIXED & EDITABLE (V5.9 - Clean)
  * ═══════════════════════════════════════════════════════
  */
+
+// 1. เพิ่มตัวแปรเก็บข้อมูลหมวดหมู่ (ดึงมาจาก Radar Chart)
+// 1. วางตัวแปรข้อมูลไว้ด้านบนสุดของ WapSupportLogs
+const RADAR_CATEGORIES = [
+    "Insulation parts", "(Mold Part)", "Packaging part", "Rubber parts", 
+    "Plastic Resin", "Plastic Resin (Foam)", "Packaging part Foam", 
+    "Aluminium Part", "Steel", "Copper Part", "Terminal", 
+    "Remote Control", "Motors", "Electric Controls", "PCBA", 
+    "Compressors", "Printing part"
+];
+
+// 2. เพิ่มฟังก์ชันจัดการในตัวโมดูล
+const showPartAC = (inputEl) => {
+    const query = inputEl.value.toLowerCase();
+    const dropdown = document.getElementById('sup-part-ac');
+    if (!dropdown) return;
+
+    const filtered = RADAR_CATEGORIES.filter(cat => 
+        cat.toLowerCase().includes(query)
+    );
+
+    if (filtered.length > 0) {
+        dropdown.style.display = 'block';
+        dropdown.innerHTML = `
+            <div style="padding: 10px 15px; font-size: 9px; font-weight: 850; color: #94a3b8; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; letter-spacing: 0.05em; background: #fafafa;">
+                Radar Categories
+            </div>
+            ${filtered.map(cat => `
+                <div class="ac-item" 
+                     style="padding: 10px 15px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 10px;"
+                     onclick="WapSupportLogs.selectPartAC('${cat}')">
+                    <div style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; box-shadow: 0 0 6px rgba(59,130,246,0.4);"></div>
+                    <span style="font-size: 12px; font-weight: 700; color: #334155;">${cat}</span>
+                </div>
+            `).join('')}
+        `;
+    } else {
+        dropdown.style.display = 'none';
+    }
+};
+
+const selectPartAC = (val) => {
+    const input = document.getElementById('f-sup-part');
+    if (input) {
+        input.value = val;
+        input.classList.add('valid'); 
+    }
+    document.getElementById('sup-part-ac').style.display = 'none';
+};
+
+/* --- ฟังก์ชันคำนวณ NG อัตโนมัติ --- */
+const calcNG = () => {
+    const lotInput = document.getElementById('f-sup-lot');
+    const okInput = document.getElementById('f-sup-ok');
+    const ngInput = document.getElementById('f-sup-ng');
+
+    if (!lotInput || !okInput || !ngInput) return;
+
+    const totalLot = parseInt(lotInput.value) || 0;
+    const okQty = parseInt(okInput.value) || 0;
+
+    // คำนวณค่าที่เหลือ
+    const result = totalLot - okQty;
+
+    // ใส่ค่าลงในช่อง NG (ถ้าผลลัพธ์น้อยกว่า 0 ให้แสดง 0)
+    ngInput.value = result >= 0 ? result : 0;
+
+    // เพิ่มกิมมิก: ถ้ามีของเสีย (NG > 0) ให้ช่อง NG มีพื้นหลังสีแดงอ่อนๆ
+    if (result > 0) {
+        ngInput.style.backgroundColor = '#fff1f2';
+        ngInput.style.color = '#ef4444';
+        ngInput.style.fontWeight = 'bold';
+    } else {
+        ngInput.style.backgroundColor = '#f8fafc';
+        ngInput.style.color = '';
+        ngInput.style.fontWeight = 'normal';
+    }
+};
+
+
 const WapSupportLogs = (function () {
 
     const TABLE = 'support_records';
@@ -8070,14 +8150,12 @@ const WapSupportLogs = (function () {
         $.tbody.innerHTML = htmlRows;
     }
 
+
     /* ──────────────────────────────────────────
-       FORM MODAL (เหลือชุดเดียว — ลบ _renderFormModal /
-       _handleImgChange / _handleSubmit เดิมที่เป็น dead code ซ้ำซ้อนออก)
+       FORM MODAL (เพิ่มระบบ Sync To Special Jobs)
        ────────────────────────────────────────── */
     function _openFormModal(id) {
         _editingId = id || null;
-
-        // แก้: ถ้าหา record ไม่เจอ (เผื่อกรณี id ผิด) ให้ fallback เป็นฟอร์มว่างแทนการพัง
         const r = id ? (_records.find(x => x.id === id) || _blankRecord()) : _blankRecord();
 
         const modal = document.createElement('div');
@@ -8093,6 +8171,7 @@ const WapSupportLogs = (function () {
                     </h3>
                     <button type="button" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:#64748b; cursor:pointer; font-size:20px;">✕</button>
                 </div>
+                
                 <form id="sup-form" style="padding:22px; display:flex; flex-direction:column; gap:15px; overflow-y:auto;">
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
                         <div>
@@ -8101,61 +8180,127 @@ const WapSupportLogs = (function () {
                         </div>
                         <div>
                             <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">🔧 การแก้ไข (ACTION)</label>
-                            <select name="action" class="form-input" style="width:100%;">
-                                <option value="Rework" ${r.action==='Rework'?'selected':''}>Rework (ซ่อมแซม/คัดชิ้นดี)</option>
-                                <option value="Replace" ${r.action==='Replace'?'selected':''}>Replace (ส่งคืนซัพพลายเออร์)</option>
-                                <option value="Sorting" ${r.action==='Sorting'?'selected':''}>Sorting 100%</option>
-                                <option value="Use as is" ${r.action==='Use as is'?'selected':''}>Use as is (อนุโลมใช้งาน)</option>
-                            </select>
+<select id="f-sup-action" name="action" class="form-input" style="width:100%;">
+    <!-- กลุ่มมาตรฐานเดิม -->
+    <option value="Rework" ${r.action==='Rework'?'selected':''}>Rework (ซ่อมแซมให้ได้ตาม Spec)</option>
+    <option value="Replace" ${r.action==='Replace'?'selected':''}>Replace (เปลี่ยนชิ้นส่วนใหม่)</option>
+    <option value="Sorting 100%" ${r.action==='Sorting 100%'?'selected':''}>Sorting 100% (คัดแยก 100%)</option>
+    <option value="Use as is" ${r.action==='Use as is'?'selected':''}>Use as is (อนุโลมใช้งาน / Deviation)</option>
+    
+    <!-- เพิ่มหัวข้อระดับสากลใหม่ -->
+    <option value="Scrap" ${r.action==='Scrap'?'selected':''}>Scrap (ตัดทิ้ง / ทำลายเป็นของเสีย)</option>
+    <option value="Return to Vendor" ${r.action==='Return to Vendor'?'selected':''}>RTV (ส่งคืนซัพพลายเออร์เพื่อเคลม)</option>
+    <option value="Containment" ${r.action==='Containment'?'selected':''}>Containment (กักกันสินค้าเสี่ยงใน Line/WIP)</option>
+    <option value="Purge Stock" ${r.action==='Purge Stock'?'selected':''}>Purge Stock (เรียกคืนและตรวจสอบสต็อกทั้งหมด)</option>
+    <option value="Investigation" ${r.action==='On-hold for Investigation'?'selected':''}>On-hold (ระงับเพื่อรอผลวิเคราะห์เชิงลึก)</option>
+    <option value="Retrofit" ${r.action==='Retrofit'?'selected':''}>Retrofit (ปรับเปลี่ยนแก้ไขหน้างาน)</option>
+</select>
                         </div>
                     </div>
                     <div>
                         <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📝 รายละเอียดปัญหา</label>
-                        <textarea name="problem" class="form-textarea" style="height:80px; width:100%;" required placeholder="ระบุปัญหาที่พบ...">${_esc(r.problem)}</textarea>
+                        <textarea id="f-sup-problem" name="problem" class="form-textarea" style="height:80px; width:100%;" required placeholder="ระบุปัญหาที่พบ...">${_esc(r.problem)}</textarea>
                     </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-                        <div><label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน</label>
-                             <input type="text" name="part" value="${_esc(r.part)}" class="form-input" style="width:100%;" placeholder="เช่น Steel part"></div>
-                        <div><label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">LOT NO.</label>
-                             <input type="text" name="lot" value="${_esc(r.lot)}" class="form-input" style="width:100%;" placeholder="เช่น 52"></div>
-                    </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px;">
-                        <div><label style="font-size:10px; font-weight:800; color:#059669; display:block; margin-bottom:5px;">✅ OK</label>
-                             <input type="number" name="ok" value="${r.ok}" class="form-input" style="width:100%;"></div>
-                        <div><label style="font-size:10px; font-weight:800; color:#ef4444; display:block; margin-bottom:5px;">❌ NG</label>
-                             <input type="number" name="ng" value="${r.ng}" class="form-input" style="width:100%;"></div>
-                        <div><label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📋 ประเภท</label>
-                            <select name="report" class="form-input" style="width:100%;">
-                                <option value="VF" ${r.report==='VF'?'selected':''}>VF Report</option>
-                                <option value="RP" ${r.report==='RP'?'selected':''}>RP Report</option>
-                            </select>
-                        </div>
-                    </div>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+    <!-- ฝั่งซ้าย: พาร์ทชิ้นส่วนพร้อมระบบ Dropdown -->
+    <div>
+        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน</label>
+        <div class="form-input-wrap" style="position:relative;">
+            <input type="text" id="f-sup-part" name="part" value="${_esc(r.part)}" 
+                   class="form-input" style="width:100%;" placeholder="ค้นหาหมวดหมู่พาร์ท..." 
+                   onfocus="WapSupportLogs.showPartAC(this)" 
+                   oninput="WapSupportLogs.showPartAC(this)"
+                   autocomplete="off">
+            <!-- Dropdown Container -->
+            <div id="sup-part-ac" class="ac-dropdown shadow-2xl" 
+                 style="display:none; position:absolute; top:105%; left:0; right:0; background:white; z-index:1000; border-radius:14px; border:1px solid #e2e8f0; max-height:200px; overflow-y:auto; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">LOT NO. (QTY)</label>
+        <!-- เพิ่ม id="f-sup-lot" และ oninput -->
+        <input type="number" id="f-sup-lot" name="lot" value="${r.lot}" 
+               class="form-input" style="width:100%;" placeholder="จำนวนทั้งหมด" 
+               oninput="WapSupportLogs.calcNG()">
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px;">
+    <div>
+        <label style="font-size:10px; font-weight:800; color:#059669; display:block; margin-bottom:5px;">✅ OK</label>
+        <!-- เพิ่ม id="f-sup-ok" และ oninput -->
+        <input type="number" id="f-sup-ok" name="ok" value="${r.ok}" 
+               class="form-input" style="width:100%;" 
+               oninput="WapSupportLogs.calcNG()">
+    </div>
+    <div>
+        <label style="font-size:10px; font-weight:800; color:#ef4444; display:block; margin-bottom:5px;">❌ NG</label>
+        <!-- เพิ่ม id="f-sup-ng" -->
+        <input type="number" id="f-sup-ng" name="ng" value="${r.ng}" 
+               class="form-input" style="width:100%; background:#f8fafc;" readonly>
+    </div>
+    <div>
+        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📋 ประเภท</label>
+        <select name="report" class="form-input" style="width:100%;">
+            <option value="VF" ${r.report==='VF'?'selected':''}>VF Report</option>
+            <option value="RP" ${r.report==='RP'?'selected':''}>RP Report</option>
+            <option value="RECORDS" ${r.report==='RECORDS'?'selected':''}>Records</option> 
+        </select>
+    </div>
+</div>
                     <div>
                         <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">💬 Remark</label>
                         <input type="text" name="remark" value="${_esc(r.remark)}" class="form-input" style="width:100%;" placeholder="หมายเหตุเพิ่มเติม...">
                     </div>
+                    
+                    <!-- ส่วนอัปโหลดรูปภาพ -->
                     <div>
                         <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:8px;">📸 Evidence Photo</label>
-                        <div style="border:2px dashed #cbd5e1; border-radius:16px; background:#f8fafc; position:relative; min-height:120px; display:flex; align-items:center; justify-content:center;">
+                        <div style="border:2px dashed #cbd5e1; border-radius:16px; background:#f8fafc; position:relative; min-height:100px; display:flex; align-items:center; justify-content:center;">
                             <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;">
-                            <div id="img-preview-area" style="text-align:center;" data-image="${r.imageUrl || ''}">
-                                ${r.imageUrl ? `<img src="${r.imageUrl}" style="max-height:100px; border-radius:8px;">` : `<p style="font-size:11px; color:#94a3b8;">คลิกเพื่ออัปโหลดรูปภาพ</p>`}
+                            <div id="img-preview-area" style="text-align:center;">
+                                ${r.imageUrl ? `<img src="${r.imageUrl}" style="max-height:80px; border-radius:8px;">` : `<p style="font-size:11px; color:#94a3b8;">คลิกเพื่ออัปโหลดรูปภาพ</p>`}
                             </div>
                         </div>
                     </div>
+
+                    <!-- [NEW]: NEURAL SYNC TO SPECIAL JOBS SECTION -->
+                    <div style="margin-top: 5px; padding: 12px 16px; background: rgba(59, 130, 246, 0.04); border: 1.5px dashed rgba(59, 130, 246, 0.25); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; transition: 0.3s;" id="sync-container">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 34px; height: 34px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #3b82f6;">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                            <div>
+                                <p style="font-size: 11px; font-weight: 900; color: #1e293b; margin: 0; text-transform: uppercase; letter-spacing: 0.02em;">บันทึกเป็นภารกิจพิเศษ</p>
+                                <p style="font-size: 9px; font-weight: 600; color: #64748b; margin: 1px 0 0 0;">คัดลอกลงใน Special Jobs History</p>
+                            </div>
+                        </div>
+                        <label class="premium-toggle" style="position:relative; display:inline-block; width:40px; height:22px;">
+                            <input type="checkbox" id="sync-to-special" style="opacity:0; width:0; height:0;">
+                            <span class="toggle-slider" style="position:absolute; cursor:pointer; inset:0; background-color:#e2e8f0; transition:.4s; border-radius:34px;"></span>
+                        </label>
+                    </div>
+
                     <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:10px;">
                         <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding:10px 25px; border-radius:12px; border:1.5px solid #e2e8f0; background:#fff; font-weight:700; color:#64748b;">ยกเลิก</button>
-                        <button type="submit" id="sup-form-submit-btn" style="padding:10px 30px; border-radius:12px; border:none; background:linear-gradient(135deg,#4f46e5,#3b82f6); color:#fff; font-weight:800;">บันทึกข้อมูล</button>
+                        <button type="submit" id="sup-form-submit-btn" style="padding:10px 30px; border-radius:12px; border:none; background:linear-gradient(135deg,#4f46e5,#3b82f6); color:#fff; font-weight:800; cursor:pointer;">บันทึกข้อมูล</button>
                     </div>
                 </form>
             </div>`;
 
         document.body.appendChild(modal);
 
-        // ตัวแปรเก็บรูปภาพของฟอร์มนี้โดยเฉพาะ (local ต่อ modal ไม่ปนกับ modal อื่น)
-        let currentImage = r.imageUrl || null;
+        // --- Logic สำหรับ Toggle Switch (Visual Only) ---
+        const syncCheck = document.getElementById('sync-to-special');
+        const syncCont = document.getElementById('sync-container');
+        syncCheck.onchange = (e) => {
+            syncCont.style.borderColor = e.target.checked ? '#3b82f6' : 'rgba(59, 130, 246, 0.25)';
+            syncCont.style.background = e.target.checked ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.04)';
+        };
 
+        let currentImage = r.imageUrl || null;
         const imgInput = document.getElementById('img-input');
         imgInput.onchange = (e) => {
             const file = e.target.files[0];
@@ -8163,7 +8308,7 @@ const WapSupportLogs = (function () {
             const reader = new FileReader();
             reader.onload = (ev) => {
                 currentImage = ev.target.result;
-                document.getElementById('img-preview-area').innerHTML = `<img src="${ev.target.result}" style="max-height:100px; border-radius:8px;">`;
+                document.getElementById('img-preview-area').innerHTML = `<img src="${ev.target.result}" style="max-height:80px; border-radius:8px;">`;
             };
             reader.readAsDataURL(file);
         };
@@ -8173,11 +8318,13 @@ const WapSupportLogs = (function () {
 
         formEl.onsubmit = async (e) => {
             e.preventDefault();
-            if (submitBtn.disabled) return; // กันกดซ้ำซ้อน
+            if (submitBtn.disabled) return;
             submitBtn.disabled = true;
             submitBtn.textContent = 'กำลังบันทึก...';
 
             const fd = new FormData(e.target);
+            const isSyncActive = document.getElementById('sync-to-special').checked;
+
             const payload = {
                 id: _editingId || 'SUP-' + Date.now(),
                 user_id: S.currentUser,
@@ -8195,11 +8342,38 @@ const WapSupportLogs = (function () {
             };
 
             try {
+                // 1. บันทึกลงตาราง Support Line (หลัก)
                 const { error } = await wapClient.from(TABLE).upsert([payload]);
                 if (error) throw error;
-                toast('บันทึกข้อมูลสำเร็จ', 'success');
+
+                // 2. ถ้าติ๊ก Sync ให้บันทึกลงตาราง Special Jobs
+                // ค้นหาบรรทัด specialPayload ภายใน formEl.onsubmit ของโมดูล WapSupportLogs
+if (isSyncActive) {
+    const specialPayload = {
+        id: 'SJ-SYNC-' + Date.now(),
+        user_id: S.currentUser,
+        project: `[SUPPORT] ${payload.problem}`, 
+        date: payload.event_date,
+        assigned_by: 'SQE EN',
+        result: 'Done', // <--- เปลี่ยนจากข้อความยาวๆ เป็น "Done" ตามที่คุณต้องการ
+        full_timestamp: new Date().toISOString()
+    };
+    
+    try {
+        await wapClient.from('special_jobs').insert([specialPayload]);
+        console.log("Sync to Special Jobs successful");
+    } catch (syncErr) {
+        console.error("Sync to Special Jobs failed", syncErr);
+    }
+}
+
+                toast(isSyncActive ? '✅ บันทึกและ Sync ไปที่ SQE EN สำเร็จ' : 'บันทึกข้อมูลสำเร็จ', 'success');
                 modal.remove();
                 await _fetch();
+                
+                // สั่งรีเฟรชข้อมูล Special Jobs หากหน้าจอเปิดค้างอยู่
+                if (typeof WapSpecialJobs !== 'undefined') WapSpecialJobs.fetchRecords();
+
             } catch (err) {
                 console.error('[WapSupport] Save error:', err);
                 toast('บันทึกล้มเหลว', 'error');
@@ -8208,6 +8382,7 @@ const WapSupportLogs = (function () {
             }
         };
     }
+
 
     /* ──────────────────────────────────────────
        VIEW MODAL
@@ -8386,8 +8561,12 @@ function _openViewModal(id) {
         init, destroy, applyDateFilter,
         _openViewModal,
         _openFormModal,
-        _confirmDelete
+        _confirmDelete,
+        showPartAC,   // เพิ่มบรรทัดนี้
+    selectPartAC,  // เพิ่มบรรทัดนี้
+    calcNG
     };
+
 
 })();
 
