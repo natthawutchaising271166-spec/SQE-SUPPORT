@@ -10628,54 +10628,19 @@ body.dark-mode .att-cyber-table thead th {
     height: 100% !important;
 }
 
-/* 4. แถวล่าง: แบบฟอร์ม, ตาราง และ Submission Tracker */
+/* 4. แถวล่าง: แบบฟอร์ม & ตาราง */
 .att-bottom-row {
-    display: grid !important;
-    grid-template-columns: 1fr 1.3fr 1fr !important;
-    gap: 12px;
-    width: 100%;
-    flex: 1.3 !important;
-    min-height: 0 !important;
-    margin-bottom: 2px;
+    display: flex !important; gap: 12px; flex: 1.3 !important; min-height: 0 !important; margin-bottom: 2px;
 }
 .att-panel {
-    background: #fff;
-    border-radius: 20px;
-    border: 1px solid #f1f5f9;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    height: 100%;
-    min-height: 0;
-    min-width: 0 !important;
-    width: 100%;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-    transition: all 0.3s ease;
+    background: #fff; border-radius: 20px; border: 1px solid #f1f5f9; display: flex; flex-direction: column; overflow: hidden; height: 100%; min-height: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.02);
 }
 
 .panel-form {
-    width: 100% !important;
-    min-width: 0 !important;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
+    width: 330px; flex-shrink: 0; display: flex; flex-direction: column; height: 100%; min-height: 0;
 }
 .panel-table {
-    width: 100% !important;
-    min-width: 0 !important;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-}
-.panel-tracker {
-    width: 100% !important;
-    min-width: 0 !important;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
+    flex: 1 !important; display: flex; flex-direction: column; min-width: 0; height: 100%; min-height: 0;
 }
 
 
@@ -11192,10 +11157,8 @@ body.dark-mode .l-item {
     color: #94a3b8 !important;
 }
 
-/* --- [3] แผงฟอร์มกรอกข้อมูล, ตารางประวัติ, และ Submission Tracker --- */
-body.dark-mode .panel-form,
-body.dark-mode .panel-table,
-body.dark-mode .panel-tracker {
+/* --- [3] แผงฟอร์มกรอกข้อมูล (ซ้ายล่าง) --- */
+body.dark-mode .panel-form {
     background: #0f172a !important;
     border-color: #1e293b !important;
 }
@@ -12221,20 +12184,9 @@ body.dark-mode .ot-progress-circle circle.bg {
    ============================================================ */
 
 /* 1. คอนเทนเนอร์หลัก */
-#ot-management-content:not(.hidden-view) {
-    display: flex !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: calc(100vh - 64px) !important;
-    overflow: hidden !important;
-    box-sizing: border-box;
-}
-
 #ot-management-content:not(.hidden-view) .ot-master-layout {
     background-color: #f8fafc;
-    height: 100% !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    height: calc(100vh - 64px) !important;
     display: flex !important;
     flex-direction: column !important;
     padding: 10px 14px;
@@ -12247,24 +12199,19 @@ body.dark-mode .ot-progress-circle circle.bg {
 /* 2. KPI Cards (Top Row) */
 .ot-kpi-row {
     display: grid !important;
-    grid-template-columns: repeat(5, 1fr) !important;
+    grid-template-columns: 240px repeat(4, 1fr) !important;
     gap: 12px;
     flex-shrink: 0;
-    width: 100% !important;
-    box-sizing: border-box;
 }
 
 .ot-card-v2 {
     background: #ffffff;
     border-radius: 18px;
-    padding: 12px 14px;
+    padding: 14px 18px;
     display: flex;
     flex-direction: column;
     position: relative;
     box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-    min-width: 0 !important;
-    box-sizing: border-box;
-    overflow: hidden;
 }
 
 .border-t-blue {
@@ -12368,13 +12315,11 @@ body.dark-mode .ot-progress-circle circle.bg {
     flex: 1 !important;
     min-height: 0;
     margin-bottom: 5px;
-    width: 100% !important;
-    box-sizing: border-box;
 }
 
 .ot-console-box {
-    width: 310px; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0;
-    display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; box-sizing: border-box;
+    width: 360px; background: #ffffff; border-radius: 24px; border: 1px solid #e2e8f0;
+    display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
 }
 .console-head {
     padding: 18px 24px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #f1f5f9;
@@ -12421,71 +12366,36 @@ body.dark-mode .ot-progress-circle circle.bg {
 
 /* 5. Analytics Cards */
 .ot-analytics-column {
-    flex: 1 !important; display: flex; flex-direction: column; gap: 12px; min-width: 0 !important; width: 100% !important; box-sizing: border-box;
+    flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0;
 }
 .analytics-card-white {
-    background: #ffffff; border-radius: 20px; border: 1px solid #f1f5f9; padding: 16px 18px; display: flex; flex-direction: column; min-width: 0 !important; box-sizing: border-box; overflow: hidden;
+    background: #ffffff; border-radius: 24px; border: 1px solid #f1f5f9; padding: 20px; display: flex; flex-direction: column;
 }
 .analytics-bottom-split {
-    display: flex !important; gap: 12px; min-width: 0 !important; width: 100% !important; box-sizing: border-box; flex: 1 !important; min-height: 0;
+    display: flex; gap: 12px;
 }
 
 .chart-title-v2 {
     font-size: 11px; font-weight: 950; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;
 }
 .chart-wrap-v2 {
-    flex: 1; width: 100%; height: 100%; min-height: 0; position: relative; overflow: hidden;
-}
-
-#ot-management-content #ot-dist-chart,
-#ot-management-content #ot-trend-chart {
-    height: 100% !important;
-    width: 100% !important;
-    min-height: 0 !important;
-}
-
-/* OT Distribution Legend Horizontal Alignment */
-#ot-dist-chart .apexcharts-legend {
-    display: flex !important;
-    flex-direction: row !important;
-    justify-content: center !important;
-    align-items: center !important;
-    flex-wrap: nowrap !important;
-    gap: 8px !important;
-    padding: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-}
-
-#ot-dist-chart .apexcharts-legend-series {
-    display: inline-flex !important;
-    align-items: center !important;
-    margin-right: 0 !important;
-    white-space: nowrap !important;
-}
-
-@media (max-width: 768px) {
-    #ot-dist-chart .apexcharts-datalabel-label,
-    #ot-dist-chart .apexcharts-datalabel-name {
-        display: none !important;
-    }
+    flex: 1; width: 100%; min-height: 0;
 }
 
 /* Recent Table */
 .recent-table-wrap {
-    flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 2px; min-width: 0 !important; width: 100% !important; box-sizing: border-box;
+    flex: 1; overflow-y: auto; padding-right: 5px;
 }
 .recent-table {
-    width: 100% !important; border-collapse: separate; border-spacing: 0; table-layout: fixed;
+    width: 100%; border-collapse: separate; border-spacing: 0;
 }
 .recent-table thead th {
     position: sticky; top: 0; background: #fff; z-index: 5;
-    padding: 8px 10px; font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase;
+    padding: 8px 12px; font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase;
     border-bottom: 1.5px solid #f1f5f9; text-align: left;
 }
 .recent-table tbody td {
-    padding: 10px 8px; font-size: 11px; font-weight: 700; color: #475569; border-bottom: 1px solid #f8fafc;
+    padding: 12px; font-size: 11px; font-weight: 700; color: #475569; border-bottom: 1px solid #f8fafc;
 }
 .recent-table tbody tr:hover {
     background: #fcfdfe;
@@ -12817,31 +12727,13 @@ body.dark-mode #record-count {
 }
 
 /* ============================================================
-   RESPONSIVE ADJUSTMENTS FOR DAILY REPORT (ATTENDANCE LOGS)
+   RESPONSIVE ADJUSTMENTS FOR SMALL SCREENS
    ============================================================ */
 
-/* Maintain 3-column grid layout like EXEC DASHBOARD compact-feed-grid */
-@media (max-width: 1280px) {
-    .att-bottom-row {
-        grid-template-columns: 1fr 1.2fr 1fr !important;
-        gap: 10px !important;
-    }
-}
-
-@media (max-width: 1024px) {
-    .att-kpi-row {
-        grid-template-columns: repeat(4, 1fr) !important;
-        gap: 8px !important;
-    }
-    .att-bottom-row {
-        grid-template-columns: 1fr 1.2fr 1fr !important;
-        gap: 8px !important;
-    }
-}
-
-@media (max-width: 768px) {
+@media (max-width: 640px) {
     .att-kpi-row {
         grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
     }
 }
 /* ค้นหาคลาส white-box ที่หุ้มกราฟเทรนด์ และปรับดังนี้ */
@@ -13306,10 +13198,7 @@ header {
     gap: 6px;
     padding: 6px 14px;
     border-radius: 99px;
-    font-weight: 900;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: -0.05em;
+    font-[900] text-[10px] uppercase tracking-tighter;
 }
 
 .key-code {
@@ -13498,11 +13387,10 @@ body.dark-mode .user-row-premium:hover {
 
 /* --- Admin Console Premium Styling --- */
 
-/* ค้นหาจุดนี้ใน styles.css */
+/* ปรับระยะห่างรวมของหน้าให้กระชับ */
 #admin-console-content {
-    /* เปลี่ยนจาก #f8fafc เป็นสีดำลึก */
-    background-color: #070c14 !important; 
     padding: 1.5rem !important;
+    background-color: #f8fafc;
 }
 
 /* ส่วนของตาราง: ทำให้แถวเล็กลง (Compact Row) */
@@ -14367,619 +14255,4 @@ body.dark-mode .glass-stat-card, body.dark-mode .analytics-card {
 }
 body.dark-mode .stat-val, body.dark-mode .stat-val-text, body.dark-mode .card-head h3 {
     color: #fff !important;
-}
-
-/* ใส่ใน styles.css */
-tr[data-sync="pending"] {
-    border-left: 3px solid #f59e0b !important; /* ขีดสีส้มเตือนว่ายังไม่ออนไลน์ */
-    background-color: rgba(245, 158, 11, 0.05) !important;
-}
-/* 1. บังคับให้เซลล์ ACTIONS ยอมให้มีเนื้อหาแลบออกมาได้ */
-.col-actions {
-    overflow: visible !important; 
-    position: relative;
-}
-
-/* 2. เมื่อเอาเมาส์ไปวางที่กลุ่มปุ่ม ให้ยกเลเยอร์ขึ้นมาหน้าสุด */
-.row-actions:hover {
-    z-index: 50; 
-}
-
-/* 3. ปรับ Tooltip (::after) ให้มีลำดับสูงสุดจริงๆ */
-.row-btn::after {
-    z-index: 99999 !important; /* อยู่บนสุดของโลก */
-    pointer-events: none;      /* ห้ามขวางการคลิก */
-    position: absolute;
-    /* ย้ายให้ออกห่างจากขอบด้านบนเล็กน้อยเพื่อไม่ให้โดนตัด */
-    bottom: 120%; 
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-/* 4. ปรับหัวตาราง Sticky ให้ Z-index น้อยกว่า Tooltip */
-.data-table thead {
-    z-index: 20 !important;
-}
-
-/* บังคับให้ Tooltip ของกราฟทุุกตัวโผล่พ้นขอบ */
-.apexcharts-tooltip {
-    z-index: 99999 !important;
-    pointer-events: none;
-    /* ป้องกันการกระพริบ */
-    transition: opacity 0.15s ease !important;
-}
-
-/* หากเป็นกราฟวงกลม/Donut ให้มั่นใจว่ากางออกนอกขอบได้ */
-.chart-wrapper, .chart-canvas-wrap {
-    overflow: visible !important;
-}
-
-/* ยกเลเยอร์ของกล่องกราฟขณะใช้งาน */
-.chart-box:hover, .analytics-card:hover {
-    z-index: 40;
-}
-/* แก้ Tooltip ถูกตัด เฉพาะกล่องที่มีกราฟเท่านั้น (ไม่กระทบ Feed/Pareto/Table) */
-.white-box:has(.apexcharts-canvas), 
-.exec-chart-box:has(.apexcharts-canvas), 
-.analytics-card:has(.apexcharts-canvas) {
-    overflow: visible !important;
-}
-
-/* บังคับให้เฉพาะ Tooltip กราฟลอยมาอยู่หน้าสุด */
-.apexcharts-tooltip {
-    z-index: 99999 !important;
-}
-
-/* ============================================================
-   #f-part VISUAL LOADING INDICATOR (SPINNER) FOR AUTOCOMPLETE
-   ============================================================ */
-#f-part {
-    position: relative;
-    transition: padding-right 0.2s ease;
-}
-
-#f-part.is-loading,
-#f-part.ac-loading,
-#f-part.valid,
-#f-part.invalid {
-    padding-right: 32px !important;
-}
-
-#f-part-spinner,
-.f-part-spinner {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 15px;
-    height: 15px;
-    border: 2px solid rgba(59, 130, 246, 0.25);
-    border-top-color: #2563eb;
-    border-radius: 50%;
-    animation: f-part-spin 0.6s linear infinite;
-    pointer-events: none;
-    z-index: 10;
-    transition: opacity 0.2s ease;
-}
-
-.f-part-status-icon {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    z-index: 10;
-    transition: all 0.2s ease;
-    animation: f-part-icon-pop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.f-part-status-icon.hidden {
-    display: none !important;
-}
-
-.f-part-status-icon.success svg {
-    filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.3));
-}
-
-.f-part-status-icon.error svg {
-    filter: drop-shadow(0 0 4px rgba(244, 63, 94, 0.3));
-}
-
-@keyframes f-part-icon-pop {
-    0% {
-        opacity: 0;
-        transform: translateY(-50%) scale(0.4);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(-50%) scale(1);
-    }
-}
-
-body.dark-mode #f-part-spinner,
-body.dark-mode .f-part-spinner {
-    border-color: rgba(96, 165, 250, 0.25);
-    border-top-color: #60a5fa;
-}
-
-@keyframes f-part-spin {
-    0% { transform: translateY(-50%) rotate(0deg); }
-    100% { transform: translateY(-50%) rotate(360deg); }
-}
-
-/* ============================================================
-   CYBER HACKER COMMAND CENTER - ADMIN USER CONTROL STYLING
-   ============================================================ */
-.cyber-admin-tab {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #94a3b8;
-    background: transparent;
-    border: 1px solid transparent;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.cyber-admin-tab:hover {
-    color: #34d399;
-    background: rgba(16, 185, 129, 0.08);
-    border-color: rgba(16, 185, 129, 0.2);
-}
-
-.cyber-admin-tab.active {
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.15);
-    border-color: rgba(16, 185, 129, 0.4);
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
-}
-
-.cyber-kpi-card {
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(30, 41, 59, 0.8);
-    border-radius: 16px;
-    padding: 14px 16px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.25s ease;
-}
-
-.cyber-kpi-card:hover {
-    transform: translateY(-2px);
-    border-color: rgba(16, 185, 129, 0.4);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(16, 185, 129, 0.15);
-}
-
-.cyber-kpi-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--kpi-accent, #10b981);
-    opacity: 0.8;
-}
-
-.cyber-table-row {
-    transition: all 0.15s ease;
-}
-
-.cyber-table-row:hover {
-    background-color: rgba(16, 185, 129, 0.06) !important;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(15, 23, 42, 0.6);
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(51, 65, 85, 0.8);
-    border-radius: 3px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(16, 185, 129, 0.5);
-}
-/* แก้ไขแถบขาวส่วนหัวตารางในหน้า Admin Console */
-body.dark-mode #admin-table-head th {
-    background-color: #0f172a !important; /* สี Midnight Navy (สีเดียวกับการ์ดตาราง) */
-    color: #94a3b8 !important;            /* สีตัวหนังสือเทาฟ้า */
-    border-bottom: 1px solid #1e293b !important; /* เส้นขอบด้านล่างสีเข้ม */
-}
-
-/* เพิ่มเติม: ปรับแต่งแถบหัวเรื่องด้านบนตาราง (AGENT & IDENTITY CONTROL) */
-body.dark-mode .bg-slate-950\/90 {
-    background-color: #020617 !important; /* ดำสนิท */
-    border-bottom: 1px solid #1e293b !important;
-}
-
-/* ปรับสีพื้นหลังของแถวตารางให้เข้มสม่ำเสมอกัน */
-body.dark-mode #admin-table-body tr {
-    background-color: #0f172a !important;
-}
-
-body.dark-mode #admin-table-body tr:hover {
-    background-color: rgba(16, 185, 129, 0.05) !important; /* ไฮไลท์เขียวนีออนบางๆ เมื่อวางเมาส์ */
-}
-
-/* Cyber Analytics UI */
-.cyber-kpi-v3 {
-    background: #020617;
-    border: 1px solid rgba(255,255,255,0.05);
-    border-left: 4px solid;
-    padding: 14px 18px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-}
-
-.cyber-chart-card {
-    background: #0f172a;
-    border: 1px solid #1e293b;
-    border-radius: 20px;
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-}
-
-/* อนิเมชั่นสำหรับการสลับ Tab */
-.animate-fadeIn {
-    animation: cyberFadeIn 0.5s ease-out forwards;
-}
-
-@keyframes cyberFadeIn {
-    from { opacity: 0; transform: translateY(15px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-/* จัดการ ApexCharts ในโหมด Cyber */
-.apexcharts-canvas {
-    filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.1));
-}
-.apexcharts-tooltip {
-    background: #020617 !important;
-    border: 1px solid #334155 !important;
-    color: white !important;
-}
-/* ==========================================
-   CYBER ANALYTICS - PIXEL PERFECT STYLING
-   ========================================== */
-#admin-analytics-view {
-    background: #020617;
-    background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.02) 1px, transparent 0);
-    background-size: 24px 24px; /* สร้างลายตารางจางๆ แบบในรูป */
-    padding: 20px;
-    border-radius: 24px;
-}
-
-.cyber-kpi-v3 {
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-left: 4px solid var(--accent-color);
-    border-radius: 12px;
-    padding: 16px;
-    transition: 0.3s;
-}
-
-.cyber-chart-card {
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 20px;
-    height: 100%;
-}
-
-/* เอฟเฟกต์ปุ่มสลับเวลา */
-.time-btn-active {
-    background: rgba(6, 182, 212, 0.3);
-    color: #22d3ee;
-    box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
-    border: 1px solid rgba(34, 211, 238, 0.5);
-}
-#admin-analytics-view .apexcharts-inner {
-    overflow: visible !important;
-}
-/* ปรับแต่งกล่อง Data Label ในกราฟ Admin Analytics */
-.apexcharts-datalabel-bg {
-    /* ทำให้กล่องพื้นหลังดูมีมิติ */
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-}
-
-.apexcharts-datalabel-text {
-    /* ทำให้ตัวเลขดูเป็นฟอนต์ระบบ Matrix */
-    font-family: 'DM Mono', 'SF Mono', monospace !important;
-}
-
-/* บังคับให้ Tooltip และ Label ลอยอยู่เหนือ Grid */
-#admin-analytics-view .apexcharts-inner {
-    overflow: visible !important;
-}
-/* --- Sentinel Hub Styles --- */
-.cyber-sentinel-hub {
-    background: #070c14;
-    border: 1px solid rgba(0, 242, 255, 0.15);
-    border-radius: 20px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-}
-
-.sentinel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    padding-bottom: 15px;
-    margin-bottom: 20px;
-}
-
-.sentinel-title-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.status-orb {
-    width: 12px;
-    height: 12px;
-    background: #00f2ff;
-    border-radius: 50%;
-    box-shadow: 0 0 15px #00f2ff;
-    animation: pulse 2s infinite;
-}
-
-.sentinel-icon { width: 24px; height: 24px; filter: brightness(2); }
-
-.sentinel-header h2 {
-    font-size: 14px;
-    font-weight: 900;
-    color: #fff;
-    letter-spacing: 2px;
-}
-
-.version-tag {
-    font-size: 9px;
-    font-weight: 900;
-    padding: 3px 10px;
-    background: rgba(0, 242, 255, 0.1);
-    border: 1px solid rgba(0, 242, 255, 0.3);
-    color: #00f2ff;
-    border-radius: 20px;
-}
-
-.sentinel-status-group {
-    display: flex;
-    gap: 20px;
-}
-
-.status-item {
-    font-size: 9px;
-    font-weight: 800;
-    color: #64748b;
-    font-family: 'DM Mono', monospace;
-}
-
-/* Grid System */
-.sentinel-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 15px;
-}
-
-.sentinel-card {
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 14px;
-    padding: 16px;
-    transition: 0.3s;
-}
-
-.card-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.card-label { font-size: 10px; font-weight: 800; color: #cbd5e1; }
-
-.card-desc {
-    font-size: 10px;
-    color: #64748b;
-    margin-bottom: 15px;
-    height: 30px;
-}
-
-/* Badge Styles */
-[class^="badge-"] {
-    font-size: 8px;
-    font-weight: 900;
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid transparent;
-}
-
-.badge-running { background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.2); }
-.badge-shield { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.2); }
-.badge-optimal { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); }
-.badge-ready { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; border-color: rgba(139, 92, 246, 0.2); }
-
-/* Button Styles */
-.sentinel-btn {
-    width: 100%;
-    height: 38px;
-    border-radius: 10px;
-    font-size: 9px;
-    font-weight: 900;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    cursor: pointer;
-    transition: 0.2s;
-    background: transparent;
-}
-
-.btn-blue { border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; }
-.btn-green { border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; }
-.btn-amber { border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; }
-.btn-purple { border: 1px solid rgba(139, 92, 246, 0.4); color: #a78bfa; }
-
-.sentinel-btn:hover { background: rgba(255, 255, 255, 0.05); transform: translateY(-2px); }
-
-/* Glow Borders for Cards */
-.border-blue { border-left: 3px solid #3b82f6; }
-.border-green { border-left: 3px solid #10b981; }
-.border-amber { border-left: 3px solid #f59e0b; }
-.border-purple { border-left: 3px solid #8b5cf6; }
-/* กล่องครอบขนาดใหญ่สำหรับ Analytics */
-.cyber-master-frame {
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px solid rgba(34, 211, 238, 0.15); /* สี Cyan บางๆ */
-    border-radius: 24px;
-    padding: 24px;
-    margin-bottom: 25px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3), 
-                inset 0 0 20px rgba(34, 211, 238, 0.02);
-    position: relative;
-    overflow: hidden;
-}
-
-/* เอฟเฟกต์แสง Scanline วิ่งผ่านกล่อง */
-.cyber-master-frame::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.3), transparent);
-    animation: scanLineVertical 8s linear infinite;
-}
-
-@keyframes scanLineVertical {
-    0% { top: 0%; }
-    100% { top: 100%; }
-}
-
-.cyber-kpi-v3 {
-    background: rgba(2, 6, 23, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 15px;
-    transition: 0.3s;
-}
-
-.cyber-kpi-v3:hover {
-    background: rgba(34, 211, 238, 0.05);
-    border-color: rgba(34, 211, 238, 0.3);
-    transform: translateY(-2px);
-}
-/* บังคับกาง Analytics ในหน้า Admin Console เสมอ */
-#admin-console-content #admin-analytics-view {
-    display: flex !important;   /* บังคับโชว์เป็น Flex */
-    visibility: visible !important;
-    opacity: 1 !important;
-    height: auto !important;
-}
-
-/* ลบเงื่อนไขการซ่อนจากคลาสเดิม */
-#admin-console-content .hidden-view#admin-analytics-view {
-    display: flex !important;
-}
-/* --- สไตล์สำหรับปุ่ม Analytics ที่ย้ายเข้ามา --- */
-.analytics-inline-badge {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 2px 10px;
-    background: rgba(34, 211, 238, 0.1);
-    border: 1px solid rgba(34, 211, 238, 0.3);
-    border-radius: 6px;
-    color: #22d3ee;
-    font-size: 9px;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    margin-left: 5px; /* เว้นระยะห่างจากชื่อหัวข้อนิดเดียว */
-}
-
-/* --- ลดระยะห่างทั้งหมดในหน้า Admin --- */
-
-/* 1. ลดช่องว่างระหว่างกล่อง Dashboard ใหญ่ๆ */
-#admin-console-content {
-    padding: 15px !important; /* ลด padding รอบนอกหน้าจอ */
-    gap: 12px !important; /* ลดระยะห่างระหว่าง Sentinel Hub และ Analytics */
-}
-
-/* 2. ลดช่องว่างใน Sentinel Hub */
-.cyber-sentinel-hub {
-    padding: 12px 15px !important;
-    margin-bottom: 0 !important;
-}
-
-/* 3. ลดระยะห่างของแถว KPI 5 ใบด้านบนกราฟ */
-#admin-analytics-view .grid-cols-5 {
-    gap: 8px !important;
-}
-
-/* 4. ลดระยะห่างระหว่างกราฟซ้ายและขวา */
-#admin-analytics-view .lg\:grid-cols-2 {
-    gap: 12px !important;
-}
-
-/* 5. ลดระยะห่างในกล่องตารางฐานข้อมูลด้านล่าง */
-#admin-db-table-container {
-    margin-top: -5px; /* ดึงตารางขึ้นมาชิดกราฟมากขึ้น */
-}
-
-/* 6. ลดระยะห่างของแถบ Sub-Tabs (Agents, Suppliers...) */
-.cyber-admin-tab {
-    padding: 4px 10px !important;
-    font-size: 9px !important;
-}
-
-/* บังคับให้ Browser ใช้ GPU ในการประมวลผลกล่องที่มีอนิเมชั่นเยอะๆ */
-.kpi-card-v2, 
-.white-box, 
-.exec-card-premium, 
-.glass-stat-card, 
-.sj-glass-card,
-.vf-feed-card,
-#sidebar {
-    backface-visibility: hidden;
-    transform: translateZ(0); /* เปิดใช้งาน 3D Acceleration */
-    will-change: transform, opacity;
-}
-
-/* ลดภาระการคำนวณเงาขณะเลื่อน (Scroll) */
-.scroll-custom {
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
-}
-
-/* ซ่อน Element ที่ไม่ได้มองเห็นให้ขาดจาก DOM Tree เพื่อประหยัด RAM */
-.hidden-view {
-    display: none !important;
-    visibility: hidden;
-    pointer-events: none;
-}
-
-/* ปิดอนิเมชั่นหนักๆ สำหรับอุปกรณ์สเปกต่ำ */
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation: none !important;
-        transition: none !important;
-    }
 }
