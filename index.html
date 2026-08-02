@@ -1486,7 +1486,7 @@
 <div id="skill-matrix-content" class="hidden-view">
     <div class="sm-ultra-layout">
         
-        <!-- แถวที่ 1: Glass KPI Cards พร้อมเอฟเฟกต์เรืองแสง -->
+        <!-- แถวที่ 1: Glass KPI Cards (ความเชี่ยวชาญภาพรวม) -->
         <div class="sm-top-kpis">
             <div class="glass-stat-card blue">
                 <div class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
@@ -1494,10 +1494,10 @@
                     <p class="stat-label">Competency Index</p>
                     <h2 class="stat-val" id="sm-kpi-avg">0%</h2>
                 </div>
-                <div class="stat-progress-mini"><div class="fill" style="width: 62%"></div></div>
+                <div id="sm-level-badge" class="level-pill">LEVEL: --</div>
             </div>
             
-            <div class="glass-stat-card orange">
+            <div class="glass-stat-card emerald">
                 <div class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-1.006 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946 1.006 3.42 3.42 0 013.138 3.138 3.42 3.42 0 001.006 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-1.006 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946 1.006 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-1.006 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-1.006-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 001.006-1.946 3.42 3.42 0 013.138-3.138z"/></svg></div>
                 <div class="stat-info">
                     <p class="stat-label">Total Skills Asset</p>
@@ -1508,26 +1508,26 @@
             <div class="glass-stat-card purple">
                 <div class="stat-info">
                     <p class="stat-label">Primary Strength</p>
-                    <h2 class="stat-val-text truncate" id="sm-kpi-top">RUBBER PARTS</h2>
+                    <h2 class="stat-val-text truncate" id="sm-kpi-top">--</h2>
                 </div>
                 <div class="strength-tag"></div>
             </div>
 
-            <div class="glass-stat-card red">
+            <div class="glass-stat-card indigo">
                 <div class="stat-info">
                     <p class="stat-label">Critical Gap</p>
-                    <h2 class="stat-val-text text-red-500 truncate" id="sm-kpi-weak">COPPER PART</h2>
+                    <h2 class="stat-val-text truncate" id="sm-kpi-weak">--</h2>
                 </div>
-                <div class="gap-alert"></div>
+                <div class="gap-tag"></div>
             </div>
         </div>
 
-        <!-- แถวที่ 2: Futuristic Console Bar (Input) -->
+        <!-- แถวที่ 2: Command Console (แถบอัปเดตทักษะ) -->
         <div class="sm-console-bar">
             <div class="console-inner">
                 <div class="flex-1 relative">
                     <span class="input-tag">Skill Identity</span>
-                    <input type="text" id="sm-f-name" class="console-input" placeholder="e.g. Mold Design, Quality Control...">
+                    <input type="text" id="sm-f-name" class="console-input" placeholder="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)...">
                 </div>
                 <div class="w-40 relative">
                     <span class="input-tag">Proficiency</span>
@@ -1540,31 +1540,28 @@
             </div>
         </div>
 
-        <!-- แถวที่ 3: Deep Analytics (3 Columns) -->
+        <!-- แถวที่ 3: Deep Analytics (Spider Chart & Proficiency Bars) -->
         <div class="sm-analytics-grid">
-            <!-- Radar Chart -->
-            <div class="analytics-card flex-[1]">
-                <div class="card-head"><h3>Radar Performance</h3></div>
+            <!-- 3.1 Radar Map -->
+            <div class="analytics-card flex-[1.2]">
+                <div class="card-head"><h3>Skill Radar Map</h3></div>
                 <div class="card-body"><div id="sm-radar-chart"></div></div>
             </div>
 
-            <!-- Detailed Proficiency Bars -->
-            <div class="analytics-card flex-[1.4]">
+            <!-- 3.2 Neon Proficiency Bars (รายการทักษะแบบเลื่อน) -->
+            <div class="analytics-card flex-[1.5]">
                 <div class="card-head flex justify-between items-center">
-                    <h3>Proficiency Levels</h3>
-                    <div class="flex gap-2">
-                        <span class="status-indicator"><span class="dot expert"></span> Expert</span>
-                        <span class="status-indicator"><span class="dot basic"></span> Basic</span>
-                    </div>
+                    <h3>Proficiency Breakdown</h3>
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Live Sync</span>
                 </div>
                 <div id="sm-bar-list" class="card-body scroll-hide">
-                    <!-- Bars with Neon Glow -->
+                    <!-- รายการบาร์ทักษะจะถูกฉีดเข้าที่นี่ -->
                 </div>
             </div>
 
-            <!-- Distribution Donut -->
+            <!-- 3.3 Skill Weight Donut -->
             <div class="analytics-card flex-[0.8]">
-                <div class="card-head"><h3>Skill Weight</h3></div>
+                <div class="card-head"><h3>Competency Weight</h3></div>
                 <div class="card-body flex flex-col items-center">
                     <div id="sm-donut-chart"></div>
                     <div id="sm-donut-legend" class="w-full mt-4"></div>
@@ -1773,16 +1770,16 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div class="form-group">
                             <label>วันที่ทำงาน</label>
-                            <input type="date" id="ot-f-date" class="ot-input-modern">
+                            <input type="date" id="ot-f-date" class="ot-input-modern" onchange="WapOTManagement.autoSchedule(this.value)">
                         </div>
                         <div class="form-group">
                             <label>ประเภท (MULTIPLIER)</label>
-                            <select id="ot-f-type" class="ot-input-modern">
-                                <option value="">-- เลือกประเภท --</option>
-                                <option value="1.5">วันปกติ (x1.5)</option>
-                                <option value="1.0">วันเสาร์ (x1.0)</option>
-                                <option value="3.0">อาทิตย์/นักขัตฯ (x3.0)</option>
-                            </select>
+<select id="ot-f-type" class="ot-input-modern" onchange="WapOTManagement.applyTypeSchedule(this.value)">
+    <option value="">-- เลือกประเภท --</option>
+    <option value="1.5">วันปกติ (x1.5)</option>
+    <option value="1.0">วันเสาร์ (x1.0)</option>
+    <option value="3.0">อาทิตย์/นักขัตฯ (x3.0)</option>
+</select>
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4 mt-4">
@@ -1975,30 +1972,6 @@
     </div>
 </div>
 
-<!-- Maintenance View Overlay -->
-<div id="maintenance-view" class="hidden-view fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900">
-    <div class="background-scene absolute inset-0 opacity-40">
-        <video autoplay muted loop playsinline class="w-full h-full object-cover grayscale">
-            <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260619_191346_9d19d66e-86a4-47f7-8dc6-712c1788c3b2.mp4" type="video/mp4">
-        </video>
-    </div>
-    
-    <div class="relative z-10 text-center p-8 max-w-lg">
-        <div class="mb-6 inline-flex w-20 h-20 items-center justify-center rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.2)]">
-            <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        </div>
-        <h1 class="text-3xl font-black text-white mb-2 uppercase tracking-tight">System Maintenance</h1>
-        <p class="text-slate-400 text-sm leading-relaxed mb-8">
-            ขณะนี้ระบบกำลังอยู่ระหว่างการปรับปรุงฐานข้อมูลชั่วคราว <br>
-            ขออภัยในความไม่สะดวก พนักงานจะสามารถใช้งานได้อีกครั้งในเร็วๆ นี้
-        </p>
-        <div class="py-3 px-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md inline-block">
-            <span class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Estimated time: 30-60 mins</span>
-        </div>
-    </div>
-</div>
-
-
 <!-- ADMIN MASTER MODAL (หน้าต่างสำหรับเพิ่มข้อมูลในหน้า Admin) -->
 <div id="admin-master-modal" class="hidden-view fixed inset-0 z-[10000] flex items-center justify-center p-4">
     <!-- ฉากหลังมืด -->
@@ -2012,7 +1985,7 @@
     </div>
 </div>
 
-
+<div id="maintenance-view" class="jarvis-maintenance hidden-view">
     <script src="script.js"></script>
 </body>
 

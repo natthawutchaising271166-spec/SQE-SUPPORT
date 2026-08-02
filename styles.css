@@ -14111,3 +14111,148 @@ body.dark-mode .toggle-slider {
     filter: brightness(1.05);
     transition: filter 0.2s ease;
 }
+
+/* สไตล์เพิ่มเติมสำหรับปุ่ม LINE */
+.btn-line-share {
+    background: #06c755 !important; /* สีเขียว LINE */
+    color: white !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 12px;
+    height: 46px;
+    width: 100%;
+    margin-top: 10px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(6, 199, 85, 0.3);
+}
+
+.line-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+/* เน้นช่องที่คำนวณอัตโนมัติ */
+input[readonly] {
+    background-color: #f1f5f9 !important;
+    color: #64748b !important;
+    cursor: not-allowed;
+}
+/* ============================================================
+   DARK MODE - SUBMISSION TRACKER (PREMIUM DESIGN)
+   ============================================================ */
+
+/* 1. ตัวกล่องหลักในโหมดมืด */
+body.dark-mode .att-panel {
+    background: #0f172a !important; /* Midnight Navy */
+    border: 1px solid #1e293b !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 2. หัวข้อตัวหนังสือ */
+body.dark-mode .att-panel h4 {
+    color: #ffffff !important;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+/* 3. จัดการปุ่มวันที่ (Default / No Data) */
+body.dark-mode #daily-submit-matrix .bg-slate-200 {
+    background-color: #1e293b !important; /* พื้นหลังปุ่มวันที่ว่างๆ */
+    border-color: #334155 !important;
+    color: #64748b !important; /* เลขวันที่จางๆ */
+}
+
+/* 4. สถานะ WORKED (สีเขียวนีออน) */
+body.dark-mode #daily-submit-matrix .bg-emerald-500 {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+/* 5. สถานะ LEAVE (สีเหลืองทอง) */
+body.dark-mode #daily-submit-matrix .bg-yellow-400 {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.3) !important;
+    color: #000000 !important;
+    border: none !important;
+}
+
+/* 6. สถานะ HOLIDAY (สีแดง Rose) */
+body.dark-mode #daily-submit-matrix .bg-red-600 {
+    background: linear-gradient(135deg, #ef4444 0%, #be123c 100%) !important;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+/* 7. ปรับแต่งคำอธิบายสถานะ (Legend) ด้านบน */
+body.dark-mode .text-slate-400.uppercase {
+    color: #94a3b8 !important; /* ตัวหนังสือ Worked, Leave... */
+}
+
+/* เอฟเฟกต์เมื่อเอาเมาส์วางบนวันที่ */
+body.dark-mode #daily-submit-matrix div:hover {
+    transform: scale(1.15) translateY(-2px) !important;
+    z-index: 10;
+    filter: brightness(1.2);
+}
+/* Layout หลัก */
+.sm-ultra-layout {
+    display: flex; flex-direction: column; gap: 15px; height: 100%;
+}
+
+/* Glass Stat Card */
+.glass-stat-card {
+    background: #ffffff; border-radius: 20px; padding: 18px;
+    border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 15px;
+    position: relative; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+}
+.glass-stat-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+}
+.glass-stat-card.blue::before { background: #3b82f6; }
+.glass-stat-card.emerald::before { background: #10b981; }
+.glass-stat-card.purple::before { background: #8b5cf6; }
+.glass-stat-card.indigo::before { background: #6366f1; }
+
+.level-pill {
+    position: absolute; top: 12px; right: 12px; padding: 2px 10px;
+    background: #f1f5f9; border-radius: 20px; font-size: 8px; font-weight: 900; color: #64748b;
+}
+
+/* Command Console */
+.sm-console-bar {
+    background: #0f172a; border-radius: 24px; padding: 4px; box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+}
+.console-inner {
+    background: rgba(255,255,255,0.02); border-radius: 22px; padding: 15px 25px;
+    display: flex; gap: 20px; align-items: flex-end;
+}
+.input-tag {
+    font-size: 7.5px; font-weight: 900; color: #3b82f6; text-transform: uppercase;
+    position: absolute; top: -14px; left: 5px; letter-spacing: 0.1em;
+}
+
+/* Neon Progress Bars */
+.neon-bar-item { margin-bottom: 20px; padding: 12px; border-radius: 16px; transition: 0.3s; border: 1px solid transparent; }
+.neon-bar-item:hover { background: #f8fafc; border-color: #eef2f6; }
+
+.neon-bar-fill {
+    height: 100%; border-radius: 10px; transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fill-expert { background: linear-gradient(90deg, #10b981, #34d399); box-shadow: 0 0 12px rgba(16, 185, 129, 0.3); }
+.fill-advanced { background: linear-gradient(90deg, #3b82f6, #60a5fa); box-shadow: 0 0 12px rgba(59, 130, 246, 0.3); }
+
+/* Dark Mode Overrides */
+body.dark-mode .glass-stat-card, body.dark-mode .analytics-card {
+    background: #0f172a !important; border-color: #1e293b !important;
+}
+body.dark-mode .stat-val, body.dark-mode .stat-val-text, body.dark-mode .card-head h3 {
+    color: #fff !important;
+}

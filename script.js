@@ -3659,33 +3659,21 @@ async function handleLogin() {
     }
 }
 
-/**
- * ตรวจสอบสถานะ Supervisor จาก Profile
- */
 async function checkSupervisorRole(email) {
+    let isSupervisor = false; // ✅ ประกาศ local ป้องกัน global leak
     try {
-        const sb = getSupabase();
-        // ดึงข้อมูลจากตาราง users (หรือ profiles ตามโครงสร้างของคุณ)
-        const { data: profile, error } = await sb
-            .from('users') 
-            .select('role, email')
-            .eq('email', email)
-            .single();
-
+        const { data: profile, error } = await getSupabase()
+            .from('users').select('role, email').eq('email', email).single();
         if (error) throw error;
-
-        // ตรวจสอบคำว่า supervisor ในบทบาท
         const supervisorRoles = ['supervisor', 'manager', 'lead', 'หัวหน้างาน'];
-        isSupervisor = supervisorRoles.some(r => 
+        isSupervisor = supervisorRoles.some(r =>
             profile.role && profile.role.toLowerCase().includes(r.toLowerCase())
         );
-        
-        return isSupervisor;
     } catch (err) {
         console.error('checkSupervisorRole error:', err);
-        isSupervisor = (S.loginRole === 'supervisor'); // fallback
-        return isSupervisor;
+        isSupervisor = (S.loginRole === 'supervisor');
     }
+    return isSupervisor;
 }
 
 // ฟังก์ชันจดจำบัญชี
@@ -4326,32 +4314,26 @@ async function writeAuditLog(action, details) {
     } catch (e) { console.error("Audit Error:", e); }
 }
 
-// ฟังก์ชัน 2: สั่งลบข้อมูลใน Database และ Local State
 async function deleteRecordFromCloud(id) {
-    const sb = getSupabase(); // ดึงตัวเชื่อมต่อ Supabase
-    
-    // 1. ลบใน Cloud (ถ้า Online)
+    const sb = getSupabase();
+    const targetRecord = S.records.find(r => String(r.id) === String(id)); // ✅ ประกาศไว้ก่อน
+
     if (sb && navigator.onLine) {
         try {
             const { error } = await sb.from('records').delete().eq('id', id);
             if (error) throw error;
+            writeAuditLog('DELETE', `ลบข้อมูล Claim Ref: ${targetRecord?.ref} (พาร์ท: ${targetRecord?.partNo})`); // ✅ อยู่ในtry, ใช้ targetRecord
         } catch (e) {
             console.error("Cloud Delete Error:", e);
             toast('❌ ไม่สามารถลบข้อมูลในระบบ Cloud ได้', 'error');
-            return false; // หยุดทำงานถ้าลบใน DB ไม่สำเร็จ
+            return false;
         }
-        writeAuditLog('DELETE', `ลบข้อมูล Claim หมายเลข Ref: ${r.ref} (พาร์ท: ${r.partNo})`);
     }
 
-    // 2. ลบในหน่วยความจำเครื่อง (Local State)
-    // กรองเอาเฉพาะข้อมูลที่ไม่ใช่ ID ที่เราเพิ่งสั่งลบ
     S.records = S.records.filter(r => String(r.id) !== String(id));
-    
-    // 3. อัปเดตสมอง AI (เพื่อให้จดจำรายการใหม่หลังลบ)
     rebuildSmartMemory();
     updateAIBrain();
-
-    return true; // ยืนยันว่าลบสำเร็จ
+    return true;
 }
 
 async function cloudSyncAll() {
@@ -5648,19 +5630,17 @@ async function fetchWAPData() {
     if (!targetUser) return false;
 
     try {
-        const [resAct, resS5, resAtt, resOT, resSkill, resSJ] = await Promise.all([
+        const [resAct, resS5, resAtt, resSJ] = await Promise.all([
             wapClient.from('support_records').select('*').eq('user_id', targetUser).order('event_date', { ascending: false }),
             wapClient.from('s5_records').select('*').eq('user_id', targetUser).order('month', { ascending: false }),
             wapClient.from('daily_reports').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
-            wapClient.from('ot_records').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
-            wapClient.from('skill_matrix').select('*').eq('user_id', targetUser),
             wapClient.from('special_jobs').select('*').eq('user_id', targetUser).order('date', { ascending: false })
         ]);
 
-        // อัปเดตข้อมูลลง State ให้ถูกต้อง
+        // อัปเดตข้อมูลลง State
         S.wapData.achievements = resAct.data || []; 
         S.wapData.score5s = resS5.data || [];
-        S.wapData.specialJobs = resSJ.data || []; // <--- ตรวจสอบบรรทัดนี้
+        S.wapData.specialJobs = resSJ.data || [];
         S.attLeaveRecords = resAtt.data || [];
         
         return true;
@@ -6250,15 +6230,10 @@ function refreshClaimDashboard() {
         });
     }
 }
-// ส่วนนี้มีอยู่ในโค้ดเดิมของคุณแล้ว แต่ต้องตรวจสอบให้แน่ใจว่าเรียกใช้ function วาดกราฟใหม่
+let resizeTimer2 = null;
 window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-        // สั่งให้วาด Dashboard ใหม่เพื่อให้กราฟคำนวณความกว้างหน้าจอใหม่
-        if (typeof refreshClaimDashboard === 'function') {
-            refreshClaimDashboard();
-        }
-    }, 250);
+    clearTimeout(resizeTimer2);
+    resizeTimer2 = setTimeout(() => { refreshClaimDashboard(); }, 250);
 });
 // ฟังก์ชันสำหรับดึงชื่อ Supplier ทั้งหมดที่มีในระบบมาใส่ในตัวเลือก
 function populateVendorFilter() {
@@ -6562,17 +6537,6 @@ function renderPareto(filtered) {
     }
 }
 
-// ฟังก์ชันล้างสถานะปุ่ม Active (ใช้สีขาวปกติ)
-function clearDbPresetActive() {
-    const ids = ['db-preset-today', 'db-preset-week', 'db-preset-month'];
-    ids.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            // ปรับสีกลับเป็นแบบมาตรฐาน (พื้นหลังขาว ตัวอักษรเทาเข้ม)
-            el.className = "h-6 px-1.5 text-[8px] font-bold bg-white rounded border border-slate-200 shadow-sm hover:bg-slate-50 text-slate-700";
-        }
-    });
-}
 
 function applyDbDatePreset(preset) {
     clearDbPresetActive(); // ล้างสีปุ่มอื่นก่อน
@@ -6778,52 +6742,6 @@ function applyExecPreset(preset) {
     $id('exec-end').value = now.toISOString().split('T')[0];
     
     initExecDashboard();
-}
-
-
-// ฟังก์ชันคำนวณสถิติการเข้างานชุดกลาง (Shared Calculation)
-// ฟังก์ชันคำนวณสถิติการเข้างานมาตรฐาน (ใช้เหมือนกันทุกหน้า)
-function getGlobalAttendanceStats(year) {
-    const targetYear = year || new Date().getFullYear();
-    const allRecords = S.attLeaveRecords || [];
-    
-    // 1. กรองข้อมูลเฉพาะปีที่เลือก
-    const yearRecords = allRecords.filter(r => r.date && new Date(r.date).getFullYear() === targetYear);
-    
-    // 2. แยกประเภทการลาและวันหยุด
-    const leaveRecords = yearRecords.filter(r => r.type !== 'holiday'); 
-    const holidayRecords = yearRecords.filter(r => r.type === 'holiday');
-
-    const leaveCount = leaveRecords.length;
-    const holidayCount = holidayRecords.length;
-
-    // 3. คำนวณวันทำงานตามเป้าหมาย (จันทร์-ศุกร์ จนถึงปัจจุบัน)
-    const now = new Date();
-    const rangeStart = new Date(targetYear, 0, 1);
-    let rangeEnd;
-    
-    if (targetYear === now.getFullYear()) rangeEnd = now;
-    else if (targetYear < now.getFullYear()) rangeEnd = new Date(targetYear, 11, 31);
-    else rangeEnd = rangeStart;
-
-    // วันทำงานที่เป็นไปได้ทั้งหมด (จันทร์-ศุกร์)
-    const totalWorkingDays = countWeekdaysInRange(rangeStart, rangeEnd);
-    
-    // วันที่ต้องเข้างานจริง (วันทำงานหักวันหยุดนักขัตฤกษ์)
-    const scheduledDays = Math.max(0, totalWorkingDays - holidayCount);
-    
-    // วันที่เข้างานจริง (วันทำงานหักวันลา)
-    const actualWorked = Math.max(0, scheduledDays - leaveCount);
-
-    // 4. คำนวณอัตราส่วน (%) - ปัดเศษทศนิยม 1 ตำแหน่งเพื่อให้เหมือนกัน
-    const rate = scheduledDays > 0 ? ((actualWorked / scheduledDays) * 100).toFixed(1) : "100.0";
-
-    return {
-        rate: rate, // เช่น "95.6"
-        leave: leaveCount,
-        worked: actualWorked,
-        holiday: holidayCount
-    };
 }
 
 // เพิ่มฟังก์ชันใหม่นี้เข้าไปใน script.js
@@ -7070,53 +6988,69 @@ async function updateAIBannerInsight(filteredActs) {
  * actData = ข้อมูล Activity (Support เคส)
  * s5Data = ข้อมูล 5S จากตาราง WAP
  */
+/**
+ * แก้ไขกราฟ Monthly Activity Trends: รวมข้อมูล Support, 5S และ Special Jobs
+ */
+/**
+ * กราฟ Monthly Activity Trends: ผูกข้อมูล Support, 5S และ Special Jobs เข้ากับ Global Filter
+ */
 function renderExecTrends(actData, s5Data) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    // ============================================================
-    // 1. ระบุปีเป้าหมาย (Target Year) จากตัวกรองวันที่ใน Header
-    // ============================================================
-    const startVal = document.getElementById('cd-start-date')?.value;
+    // 1. ดึงช่วงวันที่จาก Global Filter ใน Header
+    const startVal = document.getElementById('cd-start-date')?.value || ""; 
+    const endVal = document.getElementById('cd-end-date')?.value || "";
+    
+    // กำหนดปีเป้าหมาย (ถ้าไม่เลือกฟิลเตอร์ ให้ใช้ปีปัจจุบัน)
     const targetYear = startVal ? new Date(startVal).getFullYear() : new Date().getFullYear();
 
-    // ============================================================
-    // 2. ประมวลผลข้อมูล Support (เส้นสีน้ำเงิน) - กรองทั้งเดือนและปี
-    // ============================================================
+    // 2. ฟังก์ชันช่วยกรองข้อมูลตาม "เดือน" และ "ช่วงวันที่ที่เลือก"
+    const filterByDate = (dateStr, monthIndex) => {
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        const isWithinYear = d.getFullYear() === targetYear;
+        const isWithinMonth = d.getMonth() === monthIndex;
+        
+        // ถ้ามีการเลือกฟิลเตอร์วันที่ ให้เช็คด้วยว่าอยู่ในช่วง Start - End หรือไม่
+        if (startVal && endVal) {
+            return isWithinYear && isWithinMonth && (dateStr >= startVal && dateStr <= endVal);
+        }
+        return isWithinYear && isWithinMonth;
+    };
+
+    // 3. ประมวลผลข้อมูล Support (เส้นสีน้ำเงิน)
     const supportData = months.map((m, i) => {
-        return actData.filter(r => {
-            const d = new Date(r.event_date);
-            return d.getMonth() === i && d.getFullYear() === targetYear;
-        }).length;
+        // actData คือข้อมูลที่ถูกกรองเบื้องต้นมาจาก initExecDashboard
+        return actData.filter(r => filterByDate(r.event_date, i)).length;
     });
 
-    // ============================================================
-    // 3. ประมวลผลข้อมูล 5S (เส้นสีม่วง) - กรองทั้งเดือนและปี
-    // ============================================================
+    // 4. ประมวลผลข้อมูล 5S (เส้นสีม่วง)
     const s5CalculatedData = months.map((m, i) => {
         const monthlyS5 = s5Data.filter(r => {
-            // ดึงวันที่จากคอลัมน์ date หรือ month (กรณีบันทึกเป็นรายเดือน)
-            let dateStr = r.date || (r.month ? `${r.month}-01` : null);
-            if (!dateStr) return false;
-            
-            const d = new Date(dateStr);
-            return d.getMonth() === i && d.getFullYear() === targetYear;
+            const dateStr = r.date || (r.month ? `${r.month}-01` : null);
+            return filterByDate(dateStr, i);
         });
-
-        // คำนวณหาผลรวมของจุดบกพร่องที่พบในเดือนนั้นๆ
         return monthlyS5.reduce((sum, curr) => sum + (Number(curr.issue_count) || 0), 0);
     });
 
-    // 4. คำนวณค่าสูงสุดเพื่อตั้งค่าสเกลกราฟให้สวยงาม
-    const maxVal = Math.max(...supportData, ...s5CalculatedData, 5);
+    // 5. ประมวลผลข้อมูล SPECIAL JOBS (เส้นสีเขียว)
+    const sjRaw = S.wapData.specialJobs || [];
+    const specialJobsData = months.map((m, i) => {
+        return sjRaw.filter(r => filterByDate(r.date, i)).length;
+    });
+
+    // 6. คำนวณค่าสูงสุด (Dynamic Y-Axis)
+    const maxVal = Math.max(...supportData, ...s5CalculatedData, ...specialJobsData, 5);
     const dynamicMax = Math.ceil(maxVal / 5) * 5 + 5;
 
-    // 5. วาดกราฟใหม่
+    // 7. วาดกราฟใหม่
     if (execCharts.trend) execCharts.trend.destroy();
     
     execCharts.trend = new ApexCharts(document.getElementById('exec-trend-chart'), {
         series: [
-            { name: '5S Findings (จุด)', data: s5CalculatedData },
-            { name: 'Support เคส (รายการ)', data: supportData }
+            { name: '5S Findings', data: s5CalculatedData },
+            { name: 'Support Line', data: supportData },
+            { name: 'Special Missions', data: specialJobsData }
         ],
         chart: {
             type: 'line',
@@ -7127,15 +7061,20 @@ function renderExecTrends(actData, s5Data) {
             fontFamily: 'Inter, sans-serif',
             animations: { enabled: true, easing: 'easeinout', speed: 800 }
         },
-        colors: ['#a855f7', '#3b82f6'], 
-        stroke: { curve: 'smooth', width: [3, 4], lineCap: 'round' },
+        colors: ['#a855f7', '#3b82f6', '#10b981'], // ม่วง, น้ำเงิน, เขียว
+        stroke: { curve: 'smooth', width: [3, 4, 3], lineCap: 'round' },
         markers: {
-            size: 4, colors: ['#ffffff'], strokeColors: ['#a855f7', '#3b82f6'], strokeWidth: 2
+            size: 4, 
+            colors: ['#ffffff'], 
+            strokeColors: ['#a855f7', '#3b82f6', '#10b981'], 
+            strokeWidth: 2
         },
         grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
         xaxis: {
             categories: months,
-            labels: { style: { colors: '#94a3b8', fontSize: '10px', fontWeight: 600 } }
+            labels: { 
+                style: { colors: '#94a3b8', fontSize: '10px', fontWeight: 600 } 
+            }
         },
         yaxis: {
             min: 0,
@@ -7144,6 +7083,15 @@ function renderExecTrends(actData, s5Data) {
                 style: { colors: '#94a3b8', fontSize: '10px', fontWeight: 600 },
                 formatter: (val) => Math.floor(val)
             }
+        },
+        legend: {
+            show: true,
+            position: 'top',
+            horizontalAlign: 'right',
+            fontSize: '10px',
+            fontWeight: 800,
+            markers: { radius: 12 },
+            labels: { colors: '#64748b' }
         },
         tooltip: { theme: 'dark', shared: true, intersect: false }
     });
@@ -7387,17 +7335,6 @@ var attStatusMap = {
 function isWeekendDate(d) {
     var day = d.getDay();
     return day === 0 || day === 6;
-}
-
-function countWeekdaysInRange(start, end) {
-    var count = 0;
-    var cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    var last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-    while (cur <= last) {
-        if (!isWeekendDate(cur)) count++;
-        cur.setDate(cur.getDate() + 1);
-    }
-    return count;
 }
 
 async function fetchAttendanceRecords() {
@@ -7704,20 +7641,17 @@ function updateAttKPI() {
         animateValue('att-kpi-rate', 0, parseFloat(stats.rate), 1200, 1);
     }
 }
-// ฟังก์ชันคำนวณสถิติเข้างานแบบ "นับทุกวันในปฏิทิน" (เพื่อให้ค่าตรงกันทุกหน้า)
+
 function getUnifiedAttendanceStats(startDate, endDate) {
     const allRecords = S.attLeaveRecords || [];
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // 1. คำนวณจำนวนวันทั้งหมดในปฏิทิน (รวมเสาร์-อาทิตย์)
-    const diffTime = Math.abs(end - start);
-    const totalCalendarDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    // ✅ นับเฉพาะวันจันทร์-ศุกร์ ให้ตรงกับกราฟ
+    const totalWorkableDays = countWeekdaysInRange(start, end);
 
-    // 2. นับจำนวนวันที่ลงบันทึกไว้ (ลา และ วันหยุด)
     const leaveDates = new Set();
     const holidayDates = new Set();
-
     allRecords.forEach(r => {
         const rDate = new Date(r.date);
         if (rDate >= start && rDate <= end) {
@@ -7726,15 +7660,12 @@ function getUnifiedAttendanceStats(startDate, endDate) {
         }
     });
 
-    // 3. คำนวณวันทำงานสะสม = วันทั้งหมด - (ลา + หยุด)
-    const actualWorked = Math.max(0, totalCalendarDays - (leaveDates.size + holidayDates.size));
-    
-    // 4. คำนวณอัตราเข้างาน (%) = (วันทำงานจริง / (วันทำงานจริง + วันลา)) * 100
-    const scheduledDays = actualWorked + leaveDates.size;
+    const scheduledDays = Math.max(0, totalWorkableDays - holidayDates.size);
+    const actualWorked = Math.max(0, scheduledDays - leaveDates.size);
     const rate = scheduledDays > 0 ? (actualWorked / scheduledDays * 100) : 100;
 
     return {
-        rate: rate.toFixed(1), // ทศนิยม 1 ตำแหน่ง เช่น 95.6
+        rate: rate.toFixed(1),
         leave: leaveDates.size,
         worked: actualWorked,
         holiday: holidayDates.size
@@ -8011,37 +7942,48 @@ function onAttYearChange(val) {
  * ═══════════════════════════════════════════════════════
  */
 
-// 1. เพิ่มตัวแปรเก็บข้อมูลหมวดหมู่ (ดึงมาจาก Radar Chart)
-// 1. วางตัวแปรข้อมูลไว้ด้านบนสุดของ WapSupportLogs
-const RADAR_CATEGORIES = [
-    "Insulation parts", "(Mold Part)", "Packaging part", "Rubber parts", 
-    "Plastic Resin", "Plastic Resin (Foam)", "Packaging part Foam", 
-    "Aluminium Part", "Steel", "Copper Part", "Terminal", 
-    "Remote Control", "Motors", "Electric Controls", "PCBA", 
-    "Compressors", "Printing part"
+// 1. รายการหมวดหมู่พาร์ทที่กำหนดมา
+const SUPPORT_PART_CATEGORIES = [
+    "insulation parts",
+    "(Mold Part)",
+    "Packaging part",
+    "Rubber parts",
+    "Plastic Resin (Mold Part)",
+    "Plastic Resin (Assy)",
+    "Packaging part Form",
+    "Aluminium Part",
+    "Steel",
+    "Copper Part",
+    "Terminal",
+    "Remote Control",
+    "Motors",
+    "Electric Controls",
+    "PCBA",
+    "Compressors",
+    "Printing part"
 ];
 
-// 2. เพิ่มฟังก์ชันจัดการในตัวโมดูล
+// 2. ฟังก์ชันแสดง Dropdown เมื่อคลิกที่ช่องพาร์ท
 const showPartAC = (inputEl) => {
-    const query = inputEl.value.toLowerCase();
     const dropdown = document.getElementById('sup-part-ac');
     if (!dropdown) return;
 
-    const filtered = RADAR_CATEGORIES.filter(cat => 
+    const query = inputEl.value.toLowerCase();
+    const filtered = SUPPORT_PART_CATEGORIES.filter(cat => 
         cat.toLowerCase().includes(query)
     );
 
     if (filtered.length > 0) {
         dropdown.style.display = 'block';
         dropdown.innerHTML = `
-            <div style="padding: 10px 15px; font-size: 9px; font-weight: 850; color: #94a3b8; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; letter-spacing: 0.05em; background: #fafafa;">
-                Radar Categories
+            <div style="padding: 10px 15px; font-size: 9px; font-weight: 850; color: #94a3b8; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; background: #fafafa;">
+                Select Category
             </div>
             ${filtered.map(cat => `
                 <div class="ac-item" 
-                     style="padding: 10px 15px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 10px;"
+                     style="padding: 10px 15px; cursor: pointer; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #f8fafc;"
                      onclick="WapSupportLogs.selectPartAC('${cat}')">
-                    <div style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; box-shadow: 0 0 6px rgba(59,130,246,0.4);"></div>
+                    <div style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;"></div>
                     <span style="font-size: 12px; font-weight: 700; color: #334155;">${cat}</span>
                 </div>
             `).join('')}
@@ -8055,7 +7997,7 @@ const selectPartAC = (val) => {
     const input = document.getElementById('f-sup-part');
     if (input) {
         input.value = val;
-        input.classList.add('valid'); 
+        input.classList.add('valid'); // ใส่สีเขียวเรืองแสงเมื่อเลือกแล้ว
     }
     document.getElementById('sup-part-ac').style.display = 'none';
 };
@@ -8244,10 +8186,6 @@ const WapSupportLogs = (function () {
         $.tbody.innerHTML = htmlRows;
     }
 
-
-    /* ──────────────────────────────────────────
-       FORM MODAL (เพิ่มระบบ Sync To Special Jobs)
-       ────────────────────────────────────────── */
     /* ──────────────────────────────────────────
        FORM MODAL (เพิ่มระบบ Sync To Special Jobs + Commander Suggestion)
        ────────────────────────────────────────── */
@@ -8255,7 +8193,34 @@ const WapSupportLogs = (function () {
         _editingId = id || null;
         const r = id ? (_records.find(x => x.id === id) || _blankRecord()) : _blankRecord();
 
-        // [NEW]: ดึงรายชื่อ Commander เดิมจากประวัติเพื่อทำเป็นตัวเลือก (Auto-suggest)
+        // 1. รายการหมวดหมู่พาร์ทที่กำหนด (สำหรับ Dropdown)
+        const partCategories = [
+            "insulation parts",
+            "Mold Part",
+            "Packaging part",
+            "Rubber parts",
+            "Plastic Resin Mold Part",
+            "Plastic Resin (Assy)",
+            "Packaging part Form",
+            "Aluminium Part",
+            "Steel",
+            "Copper Part",
+            "Terminal",
+            "Remote Control",
+            "Motors",
+            "Electric Controls",
+            "PCBA",
+            "Compressors",
+            "Piping Part",
+            "Printing part"
+        ];
+
+        // 2. สร้าง HTML สำหรับตัวเลือกใน Dropdown
+        const partOptions = partCategories.map(cat => 
+            `<option value="${cat}" ${r.part === cat ? 'selected' : ''}>${cat}</option>`
+        ).join('');
+
+        // ดึงรายชื่อ Commander เดิมจากประวัติ
         const existingCommanders = [...new Set((S.wapData.specialJobs || []).map(j => j.assigned_by).filter(Boolean))];
         const commanderOptions = existingCommanders.map(name => `<option value="${name}">`).join('');
 
@@ -8293,13 +8258,16 @@ const WapSupportLogs = (function () {
                     </div>
                     <div>
                         <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📝 รายละเอียดปัญหา</label>
-                        <textarea id="f-sup-problem" name="problem" class="form-textarea" style="height:80px; width:100%;" required placeholder="ระบุปัญหาที่พบ...">${_esc(r.problem)}</textarea>
+                        <textarea id="f-sup-problem" name="problem" class="form-textarea" style="height:80px; width:100%;" required placeholder="ระบุปัญหาที่พบ...">${r.problem || ''}</textarea>
                     </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
                         <div>
-                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน</label>
-                            <input type="text" id="f-sup-part" name="part" value="${_esc(r.part)}" class="form-input" style="width:100%;" placeholder="ค้นหาหมวดหมู่พาร์ท..." onfocus="WapSupportLogs.showPartAC(this)" oninput="WapSupportLogs.showPartAC(this)" autocomplete="off">
-                            <div id="sup-part-ac" class="ac-dropdown shadow-2xl" style="display:none; position:absolute; z-index:1000; background:white; border-radius:14px; border:1px solid #e2e8f0; max-height:200px; overflow-y:auto;"></div>
+                            <!-- เปลี่ยนจาก Input เป็น Select (Dropdown) -->
+                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน (เลือกรายการ)</label>
+                            <select name="part" class="form-input" style="width:100%; cursor:pointer;" required>
+                                <option value="">-- โปรดเลือกหมวดหมู่พาร์ท --</option>
+                                ${partOptions}
+                            </select>
                         </div>
                         <div>
                             <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">LOT NO. (QTY)</label>
@@ -8327,10 +8295,9 @@ const WapSupportLogs = (function () {
                     </div>
                     <div>
                         <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">💬 Remark</label>
-                        <input type="text" name="remark" value="${_esc(r.remark)}" class="form-input" style="width:100%;" placeholder="หมายเหตุเพิ่มเติม...">
+                        <input type="text" name="remark" value="${r.remark || ''}" class="form-input" style="width:100%;" placeholder="หมายเหตุเพิ่มเติม...">
                     </div>
                     
-                    <!-- ส่วนอัปโหลดรูปภาพ -->
                     <div>
                         <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:8px;">📸 Evidence Photo</label>
                         <div style="border:2px dashed #cbd5e1; border-radius:16px; background:#f8fafc; position:relative; min-height:100px; display:flex; align-items:center; justify-content:center;">
@@ -8341,7 +8308,6 @@ const WapSupportLogs = (function () {
                         </div>
                     </div>
 
-                    <!-- [NEW]: NEURAL SYNC TO SPECIAL JOBS SECTION (WITH COMMANDER INPUT) -->
                     <div style="margin-top: 5px; padding: 16px; background: rgba(59, 130, 246, 0.04); border: 1.5px dashed rgba(59, 130, 246, 0.25); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; gap: 15px;" id="sync-container">
                         <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                             <div style="width: 34px; height: 34px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #3b82f6; flex-shrink: 0;">
@@ -8349,15 +8315,11 @@ const WapSupportLogs = (function () {
                             </div>
                             <div style="flex: 1;">
                                 <p style="font-size: 11px; font-weight: 900; color: #1e293b; margin: 0; text-transform: uppercase;">บันทึกเป็นภารกิจพิเศษ</p>
-                                
-                                <!-- ช่องใส่ชื่อ Commander -->
                                 <div style="margin-top: 6px;">
                                     <input type="text" id="sync-commander-name" list="commander-list" 
                                            placeholder="ระบุชื่อผู้สั่งงาน (Commander)..."
                                            style="width: 100%; height: 30px; font-size: 11px; border: 1px solid #dbeafe; border-radius: 8px; padding: 0 10px; outline: none; background: rgba(255,255,255,0.7); font-weight: 600; color: #2563eb;">
-                                    <datalist id="commander-list">
-                                        ${commanderOptions}
-                                    </datalist>
+                                    <datalist id="commander-list">${commanderOptions}</datalist>
                                 </div>
                             </div>
                         </div>
@@ -8376,7 +8338,7 @@ const WapSupportLogs = (function () {
 
         document.body.appendChild(modal);
 
-        // --- Logic สำหรับ Toggle Switch UI ---
+        // --- Logic สำหรับ Toggle Switch ---
         const syncCheck = document.getElementById('sync-to-special');
         const syncCont = document.getElementById('sync-container');
         const commanderInput = document.getElementById('sync-commander-name');
@@ -8387,7 +8349,6 @@ const WapSupportLogs = (function () {
             syncCont.style.background = isActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.04)';
             commanderInput.style.display = isActive ? 'block' : 'none';
         };
-        // เริ่มต้นให้ซ่อนช่อง Commander ถ้าไม่ได้ติ๊ก Sync
         commanderInput.style.display = 'none';
 
         // --- Logic สำหรับอัปโหลดรูปภาพ ---
@@ -8416,7 +8377,7 @@ const WapSupportLogs = (function () {
             
             const fd = new FormData(e.target);
             const isSyncActive = syncCheck.checked;
-            const commanderName = commanderInput.value.trim() || 'SQE EN'; // ดึงค่าจากช่องที่พิมพ์ใหม่
+            const commanderName = commanderInput.value.trim() || 'SQE EN';
 
             submitBtn.disabled = true;
             submitBtn.textContent = 'กำลังบันทึก...';
@@ -8438,38 +8399,26 @@ const WapSupportLogs = (function () {
             };
 
             try {
-                // 1. บันทึกลงตารางหลัก (Support Line)
-                const { error } = await wapClient.from(TABLE).upsert([payload]);
+                // 1. บันทึกลงตารางหลัก (TABLE อ้างอิงจากตัวแปรด้านบนโมดูล)
+                const { error } = await wapClient.from('support_records').upsert([payload]);
                 if (error) throw error;
 
                 if (isSyncActive) {
-    // ดึงค่าจากช่องใส่ชื่อ Commander ที่เพิ่งเพิ่มเข้าไป
-    const commanderName = document.getElementById('sync-commander-name').value.trim() || 'SQE EN';
+                    const specialPayload = {
+                        id: 'SJ-SYNC-' + Date.now(),
+                        user_id: S.currentUser,
+                        project: `[SUPPORT] ${payload.problem}`, 
+                        date: payload.event_date,
+                        assigned_by: commanderName,
+                        result: 'Done', 
+                        full_timestamp: new Date().toISOString()
+                    };
+                    await wapClient.from('special_jobs').insert([specialPayload]);
+                }
 
-    const specialPayload = {
-        id: 'SJ-SYNC-' + Date.now(),
-        user_id: S.currentUser,
-        project: `[SUPPORT] ${payload.problem}`, 
-        date: payload.event_date,
-        assigned_by: commanderName, // <--- ใช้ชื่อที่พิมพ์หรือเลือกมาจากช่อง Commander
-        result: 'Done', 
-        full_timestamp: new Date().toISOString()
-    };
-    
-    try {
-        await wapClient.from('special_jobs').insert([specialPayload]);
-        console.log("Sync to Special Jobs successful with Commander:", commanderName);
-    } catch (syncErr) {
-        console.error("Sync to Special Jobs failed", syncErr);
-    }
-}
-
-                toast(isSyncActive ? '✅ บันทึกและส่งภารกิจให้ ' + commanderName + ' สำเร็จ' : 'บันทึกข้อมูลสำเร็จ', 'success');
+                toast('บันทึกข้อมูลสำเร็จ', 'success');
                 modal.remove();
-                await _fetch(); // รีเฟรชตาราง
-                
-                // รีเฟรชหน้าจอ Special Jobs (ถ้าเปิดอยู่)
-                if (typeof WapSpecialJobs !== 'undefined') WapSpecialJobs.fetchRecords();
+                await _fetch(); // โหลดข้อมูลตารางใหม่
 
             } catch (err) {
                 console.error('[WapSupport] Save error:', err);
@@ -8696,7 +8645,7 @@ return {
         _openFormModal,
         _confirmDelete,
         _openLightbox, // <--- เพิ่มบรรทัดนี้
-        showPartAC,   
+        showPartAC,  
         selectPartAC,  
         calcNG
     };
@@ -9081,29 +9030,6 @@ async function submit() {
     return { init, fetchRecords, remove, applyDateFilter,submit  };
 })();
 
-function renderAll() {
-    updateKPIs();
-    renderChart();
-    renderRanking();
-    renderTable();
-
-    // >>> [เพิ่ม GSAP Stagger สำหรับหน้า 5S] <<<
-    if (!$id('five-s-content').classList.contains('hidden-view')) {
-        gsap.killTweensOf(".s5-kpi-card, .chart-card, .s5-ranking-card, .form-container, .table-card");
-        
-        gsap.fromTo(".s5-kpi-card, .chart-card, .s5-ranking-card, .form-container, .table-card", 
-            { opacity: 0, y: 12 },
-            { 
-                opacity: 1, 
-                y: 0, 
-                duration: 0.4, 
-                stagger: 0.03, 
-                ease: "expo.out",
-                clearProps: "all" 
-            }
-        );
-    }
-}
 /**
  * ═══════════════════════════════════════════════════════
  *  WAP SKILL MATRIX - Isolated Module (Fixed Schema)
@@ -9780,6 +9706,87 @@ function calcHours() {
         }
     }
 
+
+    // ✅ เพิ่มฟังก์ชันใหม่ตรงนี้ (หลัง calcHours)
+    function autoSchedule(dateValue) {
+        if (!dateValue) return;
+        const d = new Date(dateValue + 'T00:00:00'); // กันปัญหา timezone offset
+        const day = d.getDay(); // 0=อาทิตย์, 6=เสาร์
+
+        // เช็คว่าเป็นวันหยุดนักขัตฤกษ์ที่บันทึกไว้ในระบบ Attendance หรือไม่
+        const isRegisteredHoliday = (S.attLeaveRecords || []).some(
+            r => r.date === dateValue && r.type === 'holiday'
+        );
+
+        const isSaturday = (day === 6);
+        const isSundayOrHoliday = (day === 0) || isRegisteredHoliday;
+        const isOffDay = isSaturday || isSundayOrHoliday;
+
+        const startEl = $id('ot-start');
+        const endEl   = $id('ot-end');
+        const breakEl = $id('ot-f-break');
+        const typeEl  = $id('ot-f-type');
+
+        if (isOffDay) {
+            // วันหยุดทุกชนิด (เสาร์ / อาทิตย์ / นักขัตฤกษ์): 08:00-20:00 พัก 90 นาที
+            if (startEl) startEl.value = '08:00';
+            if (endEl)   endEl.value   = '20:00';
+            if (breakEl) breakEl.value = 90;
+            // เสาร์ = x1.0, อาทิตย์/นักขัตฤกษ์ = x3.0
+            if (typeEl)  typeEl.value  = isSundayOrHoliday ? '3.0' : '1.0';
+        } else {
+            // วันทำงานปกติ (จันทร์-ศุกร์): 17:30-20:00 ไม่มีพัก x1.5
+            if (startEl) startEl.value = '17:30';
+            if (endEl)   endEl.value   = '20:00';
+            if (breakEl) breakEl.value = 0;
+            if (typeEl)  typeEl.value  = '1.5';
+        }
+
+        if (startEl) validateOtTime(startEl);
+        if (endEl)   validateOtTime(endEl);
+        calcHours(); // อัปเดตช่อง "ชั่วโมงที่จะบันทึก" ทันที
+
+        toast(
+            isOffDay
+                ? '📅 ตั้งเวลาวันหยุดให้อัตโนมัติ (08:00-20:00 พัก 90 นาที)'
+                : '📅 ตั้งเวลาวันทำงานปกติให้อัตโนมัติ (17:30-20:00)',
+            'info'
+        );
+    }
+
+   // ✅ เติมเวลา/พัก/ชื่องาน อัตโนมัติจากประเภทที่เลือก (ไม่อิงวันที่)
+    function applyTypeSchedule(typeValue) {
+        const startEl = $id('ot-start');
+        const endEl   = $id('ot-end');
+        const breakEl = $id('ot-f-break');
+        const jobEl   = $id('ot-f-job');
+
+        if (!typeValue) return;
+
+        if (typeValue === '1.5') {
+            // วันปกติ: 17:30-20:00 ไม่มีพัก
+            if (startEl) startEl.value = '17:30';
+            if (endEl)   endEl.value   = '20:00';
+            if (breakEl) breakEl.value = 0;
+            if (jobEl && !jobEl.value.trim()) jobEl.value = 'Support งานล่วงเวลาวันปกติ';
+        } else if (typeValue === '1.0' || typeValue === '3.0') {
+            // วันเสาร์ / อาทิตย์-นักขัตฤกษ์: 08:00-20:00 พัก 90 นาที
+            if (startEl) startEl.value = '08:00';
+            if (endEl)   endEl.value   = '20:00';
+            if (breakEl) breakEl.value = 90;
+            if (jobEl && !jobEl.value.trim()) {
+                jobEl.value = (typeValue === '1.0')
+                    ? 'Support งานล่วงเวลาวันเสาร์'
+                    : 'Support งานล่วงเวลาวันหยุด/นักขัตฤกษ์';
+            }
+        }
+
+        if (startEl) validateOtTime(startEl);
+        if (endEl)   validateOtTime(endEl);
+        calcHours(); // อัปเดตช่อง "ชั่วโมงที่จะบันทึก" ทันที
+
+        toast('📋 เติมเวลาและรายละเอียดงานอัตโนมัติตามประเภทที่เลือก', 'info');
+    } 
     // --- กรองข้อมูลตามช่วงวันที่จาก Header ---
     function applyDateFilter() {
         const start = $id('cd-start-date')?.value;
@@ -10173,7 +10180,8 @@ async function remove(id) {
         updateUI();
     }
 
-    return { init, fetchRecords, remove, applyDateFilter, updateTarget, calcHours: function(){
+    // ✅ ใหม่ (เพิ่ม autoSchedule)
+return { init, fetchRecords, remove, applyDateFilter, updateTarget, autoSchedule, applyTypeSchedule, calcHours: function(){
         // เรียกใช้ฟังก์ชันคำนวณที่ทำไว้เดิม
         const start = $id('ot-start').value;
         const end = $id('ot-end').value;
@@ -10188,7 +10196,7 @@ async function remove(id) {
             return { actual };
         }
         return { actual: 0 };
-    }, save: async function() {
+}, save: async function() {
         const timeData = this.calcHours();
         const job = $id('ot-f-job').value.trim();
         const typeRate = $id('ot-f-type').value;
@@ -10207,14 +10215,37 @@ async function remove(id) {
             full_timestamp: new Date().toISOString()
         };
 
+        const btn = $id('ot-save-btn');
+        if (btn) btn.disabled = true;
+
         try {
-            await wapClient.from(TABLE).insert([payload]);
-            toast('บันทึก OT สำเร็จ', 'success');
-            $id('ot-f-job').value = '';
-            $id('ot-start').value = '';
-            $id('ot-end').value = '';
+            const { error } = await wapClient.from(TABLE).insert([payload]);
+            if (error) throw error;
+
+            toast('✅ บันทึกข้อมูล OT เรียบร้อย', 'success');
+
+            // ล้างฟอร์มทั้งหมดทันทีหลังบันทึกสำเร็จ
+            const clearField = (id, val) => { const el = $id(id); if (el) el.value = val; };
+            clearField('ot-f-date', '');
+            clearField('ot-f-job', '');
+            clearField('ot-start', '');
+            clearField('ot-end', '');
+            clearField('ot-f-break', '0');
+            clearField('ot-f-type', '');
+
+            const computed = $id('ot-f-computed');
+            if (computed) computed.textContent = '0.00';
+
+            document.querySelectorAll('#ot-management-content .valid')
+                .forEach(el => el.classList.remove('valid'));
+
             await fetchRecords();
-        } catch (e) { toast('บันทึกล้มเหลว', 'error'); }
+        } catch (e) {
+            console.error('[OT] Save error:', e);
+            toast('❌ บันทึกล้มเหลว', 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
     }};
 })();
 
@@ -10685,16 +10716,12 @@ function updateUI() {
     });
 }
 
-// ผูก event ครั้งเดียว
-document.addEventListener('ot-target-input', () => {
-    const targetInput = $id('ot-target-hours');
+// ✅ ลบทิ้งทั้งหมดของโค้ด global ด้านบน แล้วแทนที่ด้วย
+document.addEventListener('DOMContentLoaded', () => {
+    const targetInput = $id('ot-target-input');
     if (targetInput) {
-        targetInput.addEventListener('input', updateUI);
-        targetInput.addEventListener('change', updateUI);
+        targetInput.addEventListener('input', (e) => WapOTManagement.updateTarget(e.target.value));
     }
-            if (typeof WapOTManagement !== 'undefined') {
-            WapOTManagement.applyDateFilter();
-        }
 });
 
 // --- [แยกส่วน] ตัวแปรจัดการวันที่หน้า DASHBOARD LINE CLAIM ---
@@ -11194,43 +11221,6 @@ function validateEmail(input) {
     }
 }
 
-// --- 2. Password Visibility Toggle (เวอร์ชันแก้ไข Error Null) ---
-function togglePassVisibility() {
-    const passInput = document.getElementById('login-pass');
-    const eyeSlash = document.getElementById('eye-slash'); // อ้างอิงเส้นขีดฆ่าจาก SVG
-    const eyeIcon = document.getElementById('eye-icon');   // อ้างอิงไอคอนแบบเก่า (ถ้ามี)
-    
-    if (!passInput) return; // ป้องกัน Error ถ้าหาช่องรหัสผ่านไม่เจอ
-
-    if (passInput.type === 'password') {
-        passInput.type = 'text';
-        // ถ้าใช้ระบบ SVG (เส้นขีดฆ่า)
-        if (eyeSlash) eyeSlash.style.display = 'block';
-        // ถ้าใช้ระบบ Font Icon (แบบเก่า) - เช็ค null ก่อนเรียก classList
-        if (eyeIcon) eyeIcon.classList.replace('lucide-eye', 'lucide-eye-off');
-    } else {
-        passInput.type = 'password';
-        // ถ้าใช้ระบบ SVG (เส้นขีดฆ่า)
-        if (eyeSlash) eyeSlash.style.display = 'none';
-        // ถ้าใช้ระบบ Font Icon (แบบเก่า) - เช็ค null ก่อนเรียก classList
-        if (eyeIcon) eyeIcon.classList.replace('lucide-eye-off', 'lucide-eye');
-    }
-}
-
-// 2. ฟังก์ชันตรวจสอบ Caps Lock (แบบ Safe Check)
-function checkCapsLock(e) {
-    const warning = document.getElementById('caps-lock-warning');
-    if (!warning) return; // ถ้าไม่มี Element นี้ใน HTML ให้ข้ามไปเลย ไม่ต้องแสดง Error
-
-    if (e && typeof e.getModifierState === 'function') {
-        if (e.getModifierState("CapsLock")) {
-            warning.classList.remove('hidden');
-        } else {
-            warning.classList.add('hidden');
-        }
-    }
-}
-
 // เพิ่มเติม: เพื่อความชัวร์ ให้ซ่อนคำเตือนเมื่อออกจากช่องพิมพ์
 function hideCapsLock() {
     const warning = document.getElementById('caps-lock-warning');
@@ -11574,21 +11564,22 @@ async function updateAnnouncement() {
     }
 
     async function toggleMaintenance(isActive) {
-        if (S.currentUser.toLowerCase() !== masterAdminEmail.toLowerCase()) return;
-        if (!confirm(isActive ? "⚠️ ยืนยันปิดระบบ? พนักงานจะถูกตัดการเชื่อมต่อทันที" : "เปิดระบบตามปกติ?")) {
-            $id('admin-mtx-toggle').checked = !isActive;
-            return;
-        }
-        try {
-            await sqeClient.from('system_settings').update({ is_maintenance_active: isActive, updated_at: new Date() }).eq('id', 'global_config');
-            writeAuditLog('MAINTENANCE_TOGGLE', `เปลี่ยนสถานะปิดปรับปรุงเป็น: ${isActive ? 'ON' : 'OFF'}`);
-            toast(isActive ? "🚧 ระบบเข้าสู่โหมดปิดปรับปรุง" : "✅ เปิดระบบปกติแล้ว", "info");
-            if (typeof syncMaintenanceStatus === 'function') syncMaintenanceStatus();
-        } catch (e) { toast("Update Failed", "error"); }
-            const status = isActive ? 'เปิดโหมดปิดปรับปรุง' : 'ปิดโหมดปิดปรับปรุง (เปิดระบบปกติ)';
-    writeAuditLog('MAINTENANCE', `Admin ได้ทำการ ${status}`);
-        
+    if (S.currentUser.toLowerCase() !== masterAdminEmail.toLowerCase()) return;
+    if (!confirm(isActive ? "⚠️ ยืนยันปิดระบบ?" : "เปิดระบบตามปกติ?")) {
+        $id('admin-mtx-toggle').checked = !isActive;
+        return;
     }
+    try {
+        await sqeClient.from('system_settings')
+            .update({ is_maintenance_active: isActive, updated_at: new Date() })
+            .eq('id', 'global_config');
+
+        const status = isActive ? 'เปิดโหมดปิดปรับปรุง' : 'ปิดโหมดปิดปรับปรุง (เปิดระบบปกติ)';
+        writeAuditLog('MAINTENANCE', `Admin ได้ทำการ ${status}`); // ✅ ยิงครั้งเดียว เฉพาะตอนสำเร็จ
+        toast(isActive ? "🚧 ระบบเข้าสู่โหมดปิดปรับปรุง" : "✅ เปิดระบบปกติแล้ว", "info");
+        if (typeof syncMaintenanceStatus === 'function') syncMaintenanceStatus();
+    } catch (e) { toast("Update Failed", "error"); }
+}
 
     async function writeAuditLog(action, details) {
         try {
@@ -11611,17 +11602,17 @@ async function updateAnnouncement() {
         } catch (e) { toast("เปลี่ยนสถานะไม่สำเร็จ", "error"); }
     }
 
-    async function setForceReset(userId, email) {
-        if (!confirm(`พนักงาน (${email}) จะต้องตั้งค่ารหัสผ่านใหม่ในการเข้าใช้งานครั้งหน้า ยืนยัน?`)) return;
-        try {
-            const { error } = await sqeClient.from('users').update({ force_reset: true }).eq('id', userId);
-            if (error) throw error;
-            writeAuditLog('USER_FORCE_RESET', `บังคับ Reset Key ให้กับ: ${email}`);
-            toast("ตั้งค่าบังคับเปลี่ยนรหัสผ่านแล้ว", "success");
-            loadData();
-        } catch (e) { toast("ดำเนินการไม่สำเร็จ", "error"); }
-        writeAuditLog('SECURITY', `บังคับให้ User: ${email} ทำการเปลี่ยนรหัสผ่านใหม่`);
-    }
+// ✅ ย้าย writeAuditLog เข้าไปอยู่ท้าย try บล็อกเดียวจบ ไม่ต้องมีบรรทัดซ้ำท้ายฟังก์ชัน
+async function setForceReset(userId, email) {
+    if (!confirm(`พนักงาน (${email}) จะต้องตั้งค่ารหัสผ่านใหม่ในการเข้าใช้งานครั้งหน้า ยืนยัน?`)) return;
+    try {
+        const { error } = await sqeClient.from('users').update({ force_reset: true }).eq('id', userId);
+        if (error) throw error;
+        writeAuditLog('USER_FORCE_RESET', `บังคับ Reset Key ให้กับ: ${email}`); // ✅ ครั้งเดียว
+        toast("ตั้งค่าบังคับเปลี่ยนรหัสผ่านแล้ว", "success");
+        loadData();
+    } catch (e) { toast("ดำเนินการไม่สำเร็จ", "error"); }
+}
 
 async function switchTab(tab) {
     _currentTab = tab;
@@ -11962,48 +11953,6 @@ function updateStats() {
         showLoader(false);
     }
 
-// แก้ไขฟังก์ชัน deployNewVersion ให้ชื่อ ID ตรงกับหน้าจอ
-async function deployNewVersion() {
-    // ดึง Element มาเก็บไว้ก่อน
-    const versionEl = document.getElementById('admin-version-input');
-    const changelogEl = document.getElementById('admin-changelog-input');
-
-    // ตรวจสอบว่าหา Element เจอไหม (กัน Error null)
-    if (!versionEl || !changelogEl) {
-        console.error("System inputs not found in DOM");
-        return;
-    }
-
-    const ver = versionEl.value.trim();
-    const log = changelogEl.value.trim();
-
-    if (!ver) {
-        toast("โปรดระบุเลขเวอร์ชัน", "error");
-        return;
-    }
-
-    try {
-        // บันทึกลง Supabase
-        const { error } = await sqeClient
-            .from('system_settings')
-            .update({
-                app_version: ver,
-                update_details: log,
-                updated_at: new Date()
-            })
-            .eq('id', 'global_config');
-
-        if (error) throw error;
-        
-        toast(`🚀 อัปเดตเวอร์ชัน ${ver} สำเร็จ`, "success");
-        writeAuditLog('VERSION_UPDATE', `เปลี่ยนเวอร์ชันเป็น v${ver}`);
-        
-    } catch (e) {
-        console.error(e);
-        toast("ดำเนินการไม่สำเร็จ: " + e.message, "error");
-    }
-}
-
 async function triggerForceUpdate() {
     if(!confirm("⚠️ บังคับพนักงานทุกคนรีโหลดหน้าจอ?")) return;
     try {
@@ -12200,51 +12149,6 @@ async function syncMaintenanceStatus() {
     }
 }
 
-// ฟังก์ชันตรวจสอบและบังคับล็อคหน้าจอ
-async function enforceMaintenanceMode() {
-    try {
-        const { data, error } = await sqeClient
-            .from('system_settings')
-            .select('is_maintenance_active')
-            .eq('id', 'global_config')
-            .single();
-
-        if (error) return;
-
-        const isMtx = !!data.is_maintenance_active;
-        const mtxView = document.getElementById('maintenance-view');
-        const dashView = document.getElementById('dashboard-view');
-        const loginView = document.getElementById('login-view');
-
-        // ตรวจสอบว่าเป็น Master Admin หรือไม่
-        const isMaster = S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
-
-        if (isMtx && !isMaster) {
-            // บังคับโชว์หน้าปิดปรับปรุง (ลบ hidden-view และเปลี่ยน display)
-            if (mtxView) {
-                mtxView.classList.remove('hidden-view');
-                mtxView.style.display = 'flex'; 
-            }
-            // ซ่อนหน้าจออื่นๆ ทั้งหมด
-            if (dashView) dashView.style.display = 'none';
-            if (loginView) loginView.style.display = 'none';
-        } else {
-            // ปิดหน้าจอปรับปรุง
-            if (mtxView) {
-                mtxView.classList.add('hidden-view');
-                mtxView.style.display = 'none';
-            }
-            // คืนค่าหน้าจอตามสถานะ Login จริง
-            if (S.isLoggedIn) {
-                if (dashView) dashView.style.display = 'flex';
-            } else {
-                if (loginView) loginView.style.display = 'flex';
-            }
-        }
-    } catch (err) {
-        console.error("Maintenance Sync Error:", err);
-    }
-}
 // ฟังก์ชันให้ Admin ปลดล็อคหน้า Maintenance เพื่อไปหน้า Login
 function unlockMaintenanceForAdmin() {
     const mtxView = document.getElementById('maintenance-view');
@@ -12493,22 +12397,6 @@ async function deployNewVersion() {
         console.error(e);
         toast("อัปเดตไม่สำเร็จ: " + e.message, "error"); 
     }
-}
-
-// ฟังก์ชันบังคับรีเฟรชเครื่องพนักงานทุกคน (Force Update)
-async function triggerForceUpdate() {
-    if(!confirm("⚠️ พนักงานทุกคนที่เปิดแอปอยู่จะถูกบังคับให้โหลดหน้าจอใหม่ทันที ยืนยัน?")) return;
-    
-    try {
-        const { error } = await sqeClient
-            .from('system_settings')
-            .update({ force_update_trigger: new Date().toISOString() })
-            .eq('id', 'global_config');
-
-        if(error) throw error;
-        toast("⚡ ส่งสัญญาณบังคับรีเฟรชสำเร็จ", "success");
-        writeAuditLog('FORCE_REFRESH', 'สั่งให้ทุกเครื่องโหลดหน้าจอใหม่');
-    } catch (e) { toast("ส่งสัญญาณล้มเหลว", "error"); }
 }
 
 // อย่าลืมเพิ่ม deployNewVersion และ triggerForceUpdate ลงใน return ของ WapAdminSystem ด้วย
