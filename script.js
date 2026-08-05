@@ -4531,28 +4531,39 @@ async function loadStaffList() {
 }
 
 async function loadRecords() {
-    // ดักจับ Target User: ถ้าเป็นหัวหน้าให้ดูคนที่เลือก (viewingUser) ถ้าเป็นพนักงานให้ดูตัวเอง (currentUser)
-    const targetUser = S.userRole === 'supervisor' ? (S.viewingUser || S.currentUser) : S.currentUser;
+    // 1. ตรวจสอบชื่อผู้ใช้งาน
+    let targetUser = S.userRole === 'supervisor' ? (S.viewingUser || S.currentUser) : S.currentUser;
+
+    // --- ส่วนที่เพิ่มเพื่อ Debug (ลบออกได้ภายหลัง) ---
+    console.log("Current Login User:", S.currentUser);
+    console.log("Target User Filter:", targetUser);
+    // -------------------------------------------
 
     const sb = getSupabase();
     if (sb && navigator.onLine) {
         try {
             let query = sb.from('records').select('*');
+
             if (targetUser && targetUser !== 'ALL') {
-                query = query.eq('inspector', targetUser);
+                // แก้ไขจุดนี้: เปลี่ยนจาก .eq เป็น .ilike 
+                // .ilike จะช่วยให้ค้นหาแบบไม่สนตัวพิมพ์เล็ก-ใหญ่ (Case-Insensitive)
+                // และเพิ่มการลบช่องว่าง (trim) เพื่อป้องกันกรณีมี Space ต่อท้ายชื่อ
+                query = query.ilike('inspector', targetUser.trim());
             }
+
             const { data, error } = await query.order('created_at', { ascending: false });
 
             if (error) throw error;
             
-            // อัปเดตข้อมูลลง Global State
+            // ตรวจสอบว่าถ้า query สำเร็จแต่ data เป็นว่างเปล่า [] 
+            if (data && data.length === 0) {
+                console.warn("Query success but 0 records found for:", targetUser);
+            }
+
             S.records = (data || []).map(normalizeRecord);
             
-            // สั่งให้สมอง AI เรียนรู้ข้อมูลของคนนี้ใหม่
             rebuildSmartMemory();
             updateAIBrain();
-            
-            // วาดตารางใหม่
             renderTable();
             return;
         } catch (e) {
@@ -4560,7 +4571,7 @@ async function loadRecords() {
             toast(getFriendlyErrorMessage(e), 'error');
         }
     }
-    // กรณีออฟไลน์หรือไม่มีข้อมูล
+    
     if (!S.records) S.records = [];
     renderTable();
 }
@@ -5513,7 +5524,6 @@ function renderTable() {
 
     /**
      * 4. สร้างโครงสร้างใหม่ (Virtual DOM Structure)
-     * แก้ไขจุดนี้: ใส่ data-i18n ให้กับทุกหัวข้อคอลัมน์ (<th>)
      */
     container.innerHTML = `
         <div id="table-runway" style="position: relative; width: 100%; height: ${total * FIXED_ROW_HEIGHT + HEADER_HEIGHT}px;">
@@ -5556,12 +5566,21 @@ function renderTable() {
     container.removeEventListener('scroll', handleTableScroll);
     container.addEventListener('scroll', handleTableScroll, { passive: true });
 
-    // 6. [จุดสำคัญ] สั่งแปลภาษาหัวตารางทันทีหลังวาด HTML
+    // 6. [จุดสำคัญ] สั่งแปลภาษาหัวตาราง
     const currentLang = safeGetStorage('local', 'carrier_lang', 'en');
     applyLanguage(currentLang);
 
-    // 7. สั่งวาดข้อมูลแถวแรกๆ
-    handleTableScroll();
+    // 7. แก้ไขจุดนี้: ใช้ setTimeout เพื่อรอให้ Browser คำนวณ ClientHeight ให้เสร็จก่อน
+    setTimeout(() => {
+        requestAnimationFrame(() => {
+            handleTableScroll();
+            // Force Reflow สำหรับเครื่องที่ Layout ค้าง
+            if (container.clientHeight === 0) {
+                console.warn("Table container height is 0, forcing re-render");
+                handleTableScroll(); 
+            }
+        });
+    }, 100); // รอ 100ms เพื่อความชัวร์
 }
 
 
@@ -5579,15 +5598,28 @@ function handleTableScroll() {
     const allData = virtualTableState.allRows;
     const totalCount = allData.length;
     const scrollTop = container.scrollTop;
-    const viewHeight = container.clientHeight;
-    
+
+    // --- แก้ไขจุดนี้: ระบบดักจับความสูง 0 (Visual Height Fallback) ---
+    let viewHeight = container.clientHeight;
+
+    if (viewHeight <= 0) {
+        // หาก clientHeight เป็น 0 ให้ลองใช้ offsetHeight 
+        // หรือใช้ความสูงหน้าจอ (Viewport) ลบด้วยความสูง Header โดยประมาณ (250px)
+        viewHeight = container.offsetHeight || (window.innerHeight - 250);
+        
+        // กรณีเลวร้ายที่สุด ถ้ายังเป็น 0 ให้กำหนดค่าคงที่ไว้ที่ 600px เพื่อให้ตารางยอมวาดข้อมูล
+        if (viewHeight <= 0) viewHeight = 600; 
+        
+        console.warn("Table container height detected as 0. Using fallback height:", viewHeight);
+    }
+    // -----------------------------------------------------------
+
     // 1. คำนวณหา Index ของแถวที่ต้องแสดงผล
-    // เราใช้ BUFFER 3-5 แถวเพื่อให้ตอนเลื่อนเร็วๆ ไม่เห็นพื้นที่สีขาว
     const BUFFER = 3;
     let startIdx = Math.floor(scrollTop / FIXED_ROW_HEIGHT) - BUFFER;
     let endIdx = Math.ceil((scrollTop + viewHeight) / FIXED_ROW_HEIGHT) + BUFFER;
 
-    // ตรวจสอบขอบเขตของ Index (ไม่ให้ต่ำกว่า 0 หรือเกินจำนวนข้อมูลที่มี)
+    // ตรวจสอบขอบเขตของ Index
     startIdx = Math.max(0, startIdx);
     endIdx = Math.min(totalCount, endIdx);
 
@@ -5598,16 +5630,18 @@ function handleTableScroll() {
     virtualTableState.prevEnd = endIdx;
 
     // 3. การคำนวณตำแหน่ง (The Magic Logic)
-    // ดีดเฉพาะส่วนของ Tbody ลงมาให้ตรงกับตำแหน่งที่กำลัง Scroll
     const offsetY = startIdx * FIXED_ROW_HEIGHT;
     
-    // ใช้ Transform แทนการเปลี่ยน Margin/Padding เพื่อให้ลื่นไหล (60 FPS)
+    // ใช้ Transform เพื่อความลื่นไหล
     tbody.style.transform = `translateY(${offsetY}px)`;
 
     // 4. วนลูปสร้างเฉพาะ HTML ของแถวในช่วงที่คำนวณได้
     let loopHtml = '';
     for (let i = startIdx; i < endIdx; i++) {
-        loopHtml += buildRow(allData[i], i);
+        // ตรวจสอบความปลอดภัยของข้อมูลก่อนส่งเข้า buildRow
+        if (allData[i]) {
+            loopHtml += buildRow(allData[i], i);
+        }
     }
 
     // 5. ฉีดข้อมูลเข้าสู่ Tbody
@@ -13947,7 +13981,40 @@ async function exportToPPTX() {
 
             const rectShape = pptx.shapes?.RECTANGLE || pptx.ShapeType?.rect || 'rect';
 
-            // 1. สร้างตาราง Native PPTX Tables แก้ไขเซลล์ได้ 100%
+            // 1. คัดเลือก Native Text Candidates ไว้ล่วงหน้า
+            const rawCandidates = Array.from(container.querySelectorAll('h1, h2, h3, h4, label, [contenteditable="true"], input, textarea, span, p, div')).filter(el => {
+                if (el.closest('table')) return false;
+                if (el.offsetWidth === 0 || el.offsetHeight === 0) return false;
+
+                const isEditable = el.getAttribute('contenteditable') === 'true' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
+                const isHeading = ['H1','H2','H3','H4','LABEL','P'].includes(el.tagName);
+
+                let hasDirectText = false;
+                for (const child of el.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE && child.nodeValue.trim().length > 0) {
+                        hasDirectText = true;
+                        break;
+                    }
+                }
+
+                if (isEditable || isHeading || hasDirectText) return true;
+                return false;
+            });
+
+            // คัดเลือก Text Candidates โดยหากโหนดมี [contenteditable="true"] ให้ยึดเป็นกล่องข้อความหลักอันเดียว ไม่แตกโหนดย่อย
+            const leafTextCandidates = rawCandidates.filter(el => {
+                if (el.getAttribute('contenteditable') === 'true') {
+                    const hasEditableChild = el.querySelector('[contenteditable="true"]');
+                    return !hasEditableChild;
+                }
+                if (el.parentElement && el.parentElement.closest('[contenteditable="true"]')) {
+                    return false;
+                }
+                const hasCandidateChild = rawCandidates.some(other => other !== el && el.contains(other));
+                return !hasCandidateChild;
+            });
+
+            // 2. สร้างตาราง Native PPTX Tables แก้ไขเซลล์ได้ 100% พร้อมคำนวณสัดส่วนคอลัมน์ (colW) ไม่ให้กางออก
             const tables = Array.from(container.querySelectorAll('table'));
             for (const table of tables) {
                 const pos = getPos(table);
@@ -14008,36 +14075,74 @@ async function exportToPPTX() {
                 }
 
                 if (rows.length > 0) {
-                    slide.addTable(rows, {
+                    let colW = [];
+                    // Find the row with maximum number of individual cells (no colspan or least colspan)
+                    let maxCellsRow = null;
+                    let maxCount = 0;
+                    for (const tr of trs) {
+                        const cells = Array.from(tr.querySelectorAll('td, th'));
+                        if (cells.length > maxCount) {
+                            maxCount = cells.length;
+                            maxCellsRow = tr;
+                        }
+                    }
+
+                    if (maxCellsRow) {
+                        const rowCells = Array.from(maxCellsRow.querySelectorAll('td, th'));
+                        const totalCellWidth = rowCells.reduce((sum, c) => sum + (c.getBoundingClientRect().width || 0), 0);
+                        if (totalCellWidth > 0) {
+                            colW = rowCells.map(c => {
+                                const cellW = c.getBoundingClientRect().width || 0;
+                                return Number(((cellW / totalCellWidth) * pos.w).toFixed(3));
+                            });
+                        }
+                    }
+
+                    const tableOpts = {
                         x: pos.x,
                         y: pos.y,
                         w: pos.w,
                         h: pos.h,
                         border: { type: 'solid', pt: 1, color: '000000' }
-                    });
+                    };
+                    if (colW.length > 0) {
+                        tableOpts.colW = colW;
+                    }
+
+                    slide.addTable(rows, tableOpts);
                 }
             }
 
-            // 2. สร้างรูปทรงพื้นหลัง กล่อง กรอบ แถบประดับ (Native PPTX Shapes)
+            // 3. สร้างรูปทรงพื้นหลัง กล่อง กรอบ แถบประดับ (Native PPTX Shapes) ข้ามการวาดซ้ำสำหรับกล่องข้อความ
             const boxElements = Array.from(container.querySelectorAll('div, section, header')).filter(el => {
                 if (el.closest('table')) return false;
+                if (leafTextCandidates.includes(el)) return false;
+                // ถ้าเป็น Footer หรือมีข้อความ Proprietary and Confidential ให้ข้ามการวาดกล่อง/เส้นขอบ
+                if (el.textContent && el.textContent.includes('Proprietary and Confidential')) return false;
+
                 const style = window.getComputedStyle(el);
                 const bg = _pptRgbToHex(style.backgroundColor);
                 const borderW = parseFloat(style.borderWidth) || 0;
                 const borderCol = _pptRgbToHex(style.borderColor);
 
                 const hasBg = bg && bg !== 'FFFFFF' && bg !== '00000000';
-                const hasBorder = borderW > 0 && style.borderStyle !== 'none' && borderCol;
+                const hasBorder = borderW > 0 && style.borderStyle !== 'none' && borderCol && borderCol !== 'FFFFFF' && borderCol !== 'F1F5F9';
 
                 return (hasBg || hasBorder) && el.offsetWidth > 15 && el.offsetHeight > 3;
             });
 
             for (const box of boxElements) {
+                if (box.textContent && box.textContent.includes('Proprietary and Confidential')) continue;
+
                 const pos = getPos(box);
                 const style = window.getComputedStyle(box);
                 const bgHex = _pptRgbToHex(style.backgroundColor);
                 const borderCol = _pptRgbToHex(style.borderColor);
-                const borderW = parseFloat(style.borderWidth) || 0;
+
+                const bt = parseFloat(style.borderTopWidth) || 0;
+                const bb = parseFloat(style.borderBottomWidth) || 0;
+                const bl = parseFloat(style.borderLeftWidth) || 0;
+                const br = parseFloat(style.borderRightWidth) || 0;
 
                 const shapeOpts = {
                     x: pos.x,
@@ -14049,38 +14154,27 @@ async function exportToPPTX() {
                 if (bgHex && bgHex !== 'FFFFFF' && bgHex !== '00000000') {
                     shapeOpts.fill = { color: bgHex };
                 }
-                if (borderW > 0 && borderCol && style.borderStyle !== 'none') {
-                    shapeOpts.line = { color: borderCol, width: Math.max(1, Math.round(borderW)) };
-                }
 
-                slide.addShape(rectShape, shapeOpts);
+                // หากมีขอบครบทั้ง 4 ด้าน และสีขอบไม่ใช่สีขาว/เทาจาง
+                if (bt > 0 && bb > 0 && bl > 0 && br > 0 && borderCol && borderCol !== 'FFFFFF' && borderCol !== 'F1F5F9' && style.borderStyle !== 'none') {
+                    shapeOpts.line = { color: borderCol, width: Math.max(1, Math.round(parseFloat(style.borderWidth) || 1)) };
+                    slide.addShape(rectShape, shapeOpts);
+                } else if (bt > 0 && bb === 0 && bl === 0 && br === 0 && borderCol && borderCol !== 'FFFFFF' && borderCol !== 'F1F5F9' && style.borderStyle !== 'none') {
+                    // ถ้ามีเฉพาะขอบบน (Divider line) ให้วาดเป็นเส้นตรงเดี่ยว (LINE shape)
+                    const lineShape = pptx.shapes?.LINE || pptx.ShapeType?.line || 'line';
+                    slide.addShape(lineShape, {
+                        x: pos.x,
+                        y: pos.y,
+                        w: pos.w,
+                        h: 0,
+                        line: { color: borderCol, width: Math.max(1, Math.round(bt)) }
+                    });
+                } else if (bgHex && bgHex !== 'FFFFFF' && bgHex !== '00000000') {
+                    slide.addShape(rectShape, shapeOpts);
+                }
             }
 
-            // 3. สร้างกล่องข้อความ Native Textboxes (นอกตาราง)
-            const rawCandidates = Array.from(container.querySelectorAll('h1, h2, h3, h4, label, [contenteditable="true"], input, textarea, span, p, div')).filter(el => {
-                if (el.closest('table')) return false;
-                if (el.offsetWidth === 0 || el.offsetHeight === 0) return false;
-
-                const isEditable = el.getAttribute('contenteditable') === 'true' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
-                const isHeading = ['H1','H2','H3','H4','LABEL','P'].includes(el.tagName);
-
-                let hasDirectText = false;
-                for (const child of el.childNodes) {
-                    if (child.nodeType === Node.TEXT_NODE && child.nodeValue.trim().length > 0) {
-                        hasDirectText = true;
-                        break;
-                    }
-                }
-
-                if (isEditable || isHeading || hasDirectText) return true;
-                return false;
-            });
-
-            // คัดเอาโหนดล่างสุด (Leaf Candidates) เพื่อป้องกันข้อความทับซ้อน
-            const leafTextCandidates = rawCandidates.filter(el => {
-                const hasCandidateChild = rawCandidates.some(other => other !== el && el.contains(other));
-                return !hasCandidateChild;
-            });
+            // 4. สร้างกล่องข้อความ Native Textboxes (นอกตาราง)
 
             for (const el of leafTextCandidates) {
                 const val = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? el.value : el.innerText;
@@ -14110,7 +14204,7 @@ async function exportToPPTX() {
                     bold: isBold,
                     italic: isItalic,
                     align: align,
-                    valign: 'middle',
+                    valign: 'top',
                     wrap: true,
                     margin: 1
                 };
@@ -14151,7 +14245,8 @@ async function exportToPPTX() {
                             x: pos.x,
                             y: pos.y,
                             w: pos.w,
-                            h: pos.h
+                            h: pos.h,
+                            sizing: { type: 'contain', w: pos.w, h: pos.h }
                         });
                     }
                 }
@@ -14392,7 +14487,7 @@ function renderDashboard() {
 
         // --- 2. Helper: Standard Footer (คงที่ทุกหน้า) ---
         const getFooter = () => `
-            <div style="margin-top: auto; padding-top: 15px; border-top: 1.5px solid #f1f5f9; display: flex; align-items: center; width: 100%; flex-shrink: 0;">
+            <div style="margin-top: auto; padding-top: 15px; border: none; background: transparent; display: flex; align-items: center; width: 100%; flex-shrink: 0;">
                 <div style="width: 120px;">
                     <svg viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="width:100px; display:block;">
                         <ellipse cx="100" cy="40" rx="95" ry="38" fill="#003366" />
@@ -14403,7 +14498,9 @@ function renderDashboard() {
                 <div style="flex: 1; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">
                     Proprietary and Confidential
                 </div>
-                <div style="width: 120px;"></div>
+                <div style="font-size: 11px; font-weight: 800; color: #003366; min-width: 120px; text-align: right; flex-shrink: 0;">
+                    PAGE ${_currentSlide + 1} / 16
+                </div>
             </div>
         `;
 
@@ -14417,71 +14514,71 @@ if (_currentSlide === 0) {
     const isRP = repInfo.isRP;
     
     const checkRP = isRP 
-        ? `<span style="background:#000; color:#fff; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border:2px solid #000; font-weight:bold; margin-right:8px; font-size:14px; box-sizing:border-box;">X</span>` 
-        : `<span style="width:22px; height:22px; display:inline-block; border:2px solid #000; background:#fff; margin-right:8px; box-sizing:border-box;"></span>`;
+        ? `<span style="background:#000; color:#fff; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; border:2px solid #000; font-weight:950; margin-right:8px; font-size:13px; box-sizing:border-box;">X</span>` 
+        : `<span style="width:20px; height:20px; display:inline-block; border:2px solid #000; background:#fff; margin-right:8px; box-sizing:border-box;"></span>`;
 
     const checkVF = !isRP 
-        ? `<span style="background:#000; color:#fff; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border:2px solid #000; font-weight:bold; margin-right:8px; font-size:14px; box-sizing:border-box;">X</span>` 
-        : `<span style="width:22px; height:22px; display:inline-block; border:2px solid #000; background:#fff; margin-right:8px; box-sizing:border-box;"></span>`;
+        ? `<span style="background:#000; color:#fff; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; border:2px solid #000; font-weight:950; margin-right:8px; font-size:13px; box-sizing:border-box;">X</span>` 
+        : `<span style="width:20px; height:20px; display:inline-block; border:2px solid #000; background:#fff; margin-right:8px; box-sizing:border-box;"></span>`;
     
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; box-sizing: border-box;">
             <!-- 1. Header: หัวข้อใหญ่และกล่องแจ้งเตือนสีเหลือง -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 5px; flex-shrink: 0; box-sizing: border-box;">
-                    <h1 contenteditable="true" style="font-size: 42px; font-weight: 950; color: #000; margin: 0; outline: none; letter-spacing: -1.5px;">8D Report</h1>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 8px; flex-shrink: 0; box-sizing: border-box;">
+                    <h1 contenteditable="true" style="font-size: 48px; font-weight: 950; color: #000; margin: 0; outline: none; letter-spacing: -1.5px; line-height: 1;">8D Report</h1>
                     
-                    <div contenteditable="true" style="background:#ffff99; border:1.2px solid #ffcc00; padding:8px 15px; width:340px; color:red; font-size:10px; font-weight:900; border-radius:4px; line-height:1.2; outline: none; text-align:left; box-sizing: border-box;">
+                    <div contenteditable="true" style="background:#ffff80; border:1.2px solid #ffcc00; padding:6px 12px; max-width:400px; color:#ff0000; font-size:11px; font-weight:950; line-height:1.25; outline: none; text-align:left; box-sizing: border-box;">
                         Suppliers can use any format of the report as long as all mandatory information is present.
                     </div>
                 </div>
 
                 <!-- เส้นแบ่งหนาสีน้ำเงินมาตรฐาน (ฟิคขนาดเท่าหน้า D2) -->
-                <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 15px; flex-shrink: 0; box-sizing: border-box;"></div>
+                <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 20px; flex-shrink: 0; box-sizing: border-box;"></div>
 
                 <!-- 2. ส่วนเลือกประเภท (Checkboxes) -->
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 15px; flex-shrink: 0; width: 100%; box-sizing: border-box;">
-                    <div style="border: 2px solid #000; padding: 6px 18px; display: flex; gap: 30px; font-weight: 900; font-size: 14px; background:#fff; box-sizing: border-box;">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 20px; flex-shrink: 0; width: 100%; box-sizing: border-box;">
+                    <div style="border: 2px solid #000; padding: 6px 16px; display: flex; gap: 24px; font-weight: 950; font-size: 14px; background:#fff; box-sizing: border-box; align-items: center;">
                         <div onclick="Wap8DSystem.setReportType('RP')" style="display:flex; align-items:center; cursor:pointer; user-select:none;">
-                            ${checkRP} <span style="font-weight:900; color:#000;">[IQC Rejected, RP]</span>
+                            ${checkRP} <span style="font-weight:950; color:#000;">[IQC Rejected, RP]</span>
                         </div>
                         <div onclick="Wap8DSystem.setReportType('VF')" style="display:flex; align-items:center; cursor:pointer; user-select:none;">
-                            ${checkVF} <span style="font-weight:900; color:#000;">[Line claim, VF]</span>
+                            ${checkVF} <span style="font-weight:950; color:#000;">[Line claim, VF]</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- 3. ส่วนแสดงหัวข้อปัญหา (Problem Title) -->
                 <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: 5px 0;">
-                    <label style="font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">PROBLEM :</label>
-                    <div contenteditable="true" style="font-size: 24px; font-weight: 950; color: #000; line-height: 1.3; outline: none;">
+                    <div style="font-size: 13px; font-weight: 950; color: #64748b; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">PROBLEM :</div>
+                    <div contenteditable="true" style="font-size: 28px; font-weight: 950; color: #000; line-height: 1.35; outline: none;">
                         ${c.problem_title || ''}
                     </div>
                 </div>
 
                 <!-- 4. Approve Table: ส่วนการยืนยันด้านล่าง -->
-                <div style="align-self: flex-end; width: 550px; margin-bottom: 10px; flex-shrink: 0;">
-                    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; text-align: center; font-size: 11px;">
-                        <tr style="background: #99badd; font-weight: 950;">
-                            <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">Suppliers submit</td>
-                            <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">CTC confirm</td>
+                <div style="align-self: flex-end; width: 560px; margin-bottom: 10px; flex-shrink: 0;">
+                    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; text-align: center; font-size: 11px; font-family: Arial, Helvetica, sans-serif;">
+                        <tr style="background: #8ea9db; font-weight: 950; color: #000;">
+                            <td colspan="2" style="background: #8ea9db; border: 1.2px solid #000; padding: 6px; text-transform: uppercase; font-size: 12px; font-weight: 950; color: #000;">SUPPLIERS SUBMIT</td>
+                            <td colspan="2" style="background: #8ea9db; border: 1.2px solid #000; padding: 6px; text-transform: uppercase; font-size: 12px; font-weight: 950; color: #000;">CTC CONFIRM</td>
                         </tr>
-                        <tr style="font-weight: 800; background: #f8f9fa; height: 22px;">
-                            <td style="border: 1px solid #000; width: 25%;">Confirmed (PIC)</td>
-                            <td style="border: 1px solid #000; width: 25%;">Approved (QA Mgr)</td>
-                            <td style="border: 1px solid #000; width: 25%;">Confirmed (Eng)</td>
-                            <td style="border: 1px solid #000; width: 25%;">Approved (Spec)</td>
+                        <tr style="font-weight: 950; background: #fff; height: 24px; color: #000;">
+                            <td style="border: 1.2px solid #000; width: 25%; font-weight: 950; color: #000; background: #fff;">Confirmed (PIC)</td>
+                            <td style="border: 1.2px solid #000; width: 25%; font-weight: 950; color: #000; background: #fff;">Approved (QA Mgr)</td>
+                            <td style="border: 1.2px solid #000; width: 25%; font-weight: 950; color: #000; background: #fff;">Confirmed (Eng)</td>
+                            <td style="border: 1.2px solid #000; width: 25%; font-weight: 950; color: #000; background: #fff;">Approved (Spec)</td>
                         </tr>
                         <tr style="height: 55px; background:#fff;">
-                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
-                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
-                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
-                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1.2px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1.2px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1.2px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1.2px solid #000; outline: none;"></td>
                         </tr>
-                        <tr style="background: #fff; font-weight:800; height: 22px;">
-                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                        <tr style="background: #fff; font-weight: 950; height: 24px; color: #000;">
+                            <td style="border: 1.2px solid #000; text-align: left; padding-left: 6px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                            <td style="border: 1.2px solid #000; text-align: left; padding-left: 6px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                            <td style="border: 1.2px solid #000; text-align: left; padding-left: 6px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                            <td style="border: 1.2px solid #000; text-align: left; padding-left: 6px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
                         </tr>
                     </table>
                 </div>
@@ -14492,10 +14589,15 @@ if (_currentSlide === 0) {
         // ==========================================
         else if (_currentSlide === 1) {
             const renderTable = (title, isSupplier = false) => `
-                <table style="width:100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; flex: 1;">
-                    <thead style="background: #99badd;">
+                <table style="width:100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; flex: 1; font-family: Arial, Helvetica, sans-serif; box-sizing: border-box;">
+                    <colgroup>
+                        <col style="width: 25%;">
+                        <col style="width: 18%;">
+                        <col style="width: 57%;">
+                    </colgroup>
+                    <thead style="background: #8ea9db;">
                         <tr>
-                            <th colspan="3" contenteditable="true" style="padding: 6px 5px; border: 1.2px solid #000; font-size: 13px; font-weight: 900; text-align: center; color: ${isSupplier ? 'red' : '#000'}; text-transform: uppercase; outline: none;">
+                            <th colspan="3" contenteditable="true" style="background: #8ea9db; padding: 6px 5px; border: 1.2px solid #000; font-size: 13px; font-weight: 950; text-align: center; color: #000; text-transform: uppercase; outline: none;">
                                 ${title}
                             </th>
                         </tr>
@@ -14511,12 +14613,12 @@ if (_currentSlide === 0) {
                             return `
                             <tr style="height: 27px;">
                                 <td rowspan="2" contenteditable="true" style="width: 25%; text-align: center; font-weight: 950; border: 1.2px solid #000; font-size: 11px; background: #fff; color: #000; outline: none;">Person${i}</td>
-                                <td style="width: 15%; font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Name:</td>
-                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyName}</td>
+                                <td style="width: 18%; font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Name:</td>
+                                <td contenteditable="true" style="width: 57%; border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyName}</td>
                             </tr>
                             <tr style="height: 27px;">
-                                <td style="font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Role:</td>
-                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyRole}</td>
+                                <td style="width: 18%; font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Role:</td>
+                                <td contenteditable="true" style="width: 57%; border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyRole}</td>
                             </tr>
                         `}).join('')}
                     </tbody>
@@ -14528,18 +14630,18 @@ if (_currentSlide === 0) {
                         <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
                             D1- Assign person in charge
                         </h1>
-                        <div contenteditable="true" style="background: blue; color: yellow; padding: 3px 12px; font-weight: 950; font-size: 11px; border: 1px solid #000; text-transform: uppercase; flex-shrink: 0; margin-left: 15px; outline: none;">
+                        <div contenteditable="true" style="background: blue; color: yellow; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; flex-shrink: 0; margin-left: 15px; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                             &lt;Fill by CTC & Supplier&gt;
                         </div>
                     </div>
                     <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
 
-                    <div style="flex: 1; min-height: 0; display: flex; gap: 25px; align-items: flex-start; justify-content: space-between; width: 100%; overflow: hidden;">
+                    <div style="flex: 1; min-height: 0; display: flex; gap: 15px; align-items: flex-start; justify-content: space-between; width: 100%; overflow: hidden;">
                         <div style="flex: 1; min-width: 0;">
-                            ${renderTable('TCTC member', false)}
+                            ${renderTable('TCTC MEMBER', false)}
                         </div>
                         <div style="flex: 1; min-width: 0;">
-                            ${renderTable('Supplier name member', true)}
+                            ${renderTable('SUPPLIER NAME MEMBER', true)}
                         </div>
                     </div>
                 </div>
@@ -14586,7 +14688,7 @@ else if (_currentSlide === 2) {
                 <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000; outline: none; letter-spacing: -1.5px; line-height: 0.9;">
                     D2-Define the Problem
                 </h1>
-                <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 2px 10px; font-weight: 950; font-size: 13px; border: 1.2px solid #000; text-transform: uppercase; outline: none; margin-bottom: 4px;">
+                <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; text-align: center;">
                     &lt;Fill by CTC &gt;
                 </div>
             </div>
@@ -14598,9 +14700,9 @@ else if (_currentSlide === 2) {
                 <!-- ฝั่งซ้าย: ตาราง (บีบอัดความสูงให้พอดีพื้นที่) -->
                 <div style="flex: 0 0 45%; display: flex; flex-direction: column; min-height: 0;">
                     <table style="width: 100%; height: 100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; font-size: 11px;">
-                        <tr style="background:#2563eb; color:#fff; font-weight:900; height: 8.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; width:40%;">${isRP ? 'RP No.' : 'VF No.'}</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-weight:950; font-family: monospace;">${c.id}</td>
+                        <tr style="background:#3b62f0; color:#ffffff; font-weight:950; height: 8.5%;">
+                            <td style="border:1.2px solid #000; padding:1px 8px; width:40%; background:#3b62f0; color:#ffffff; font-weight:950; font-size:12px;">${isRP ? 'RP No.' : 'VF No.'}</td>
+                            <td contenteditable="true" style="border:1.2px solid #000; padding:1px 8px; outline: none; background:#3b62f0; color:#ffffff; font-weight:950; font-family: monospace; font-size:12px;">${c.id}</td>
                         </tr>
                         <tr style="height: 7.5%;">
                             <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Issue Date</td>
@@ -14653,13 +14755,17 @@ else if (_currentSlide === 2) {
                     </table>
                 </div>
                 
-                <!-- ฝั่งขวา: รูปภาพ (ยืดหดตามตาราง) -->
+                <!-- ฝั่งขวา: รูปภาพ (คงสัดส่วนธรรมชาติ Center) -->
                 <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
-                    <h3 contenteditable="true" style="font-size: 15px; font-weight: 950; margin: 0 0 5px 0; color: #000; outline: none; text-transform: uppercase;">
-                        Describe of Defect <span style="background: yellow; color: red; padding: 0 5px; font-style: italic; font-size: 11px; font-weight: 800;">(Picture and Judgement method)</span>
-                    </h3>
-                    <div style="flex: 1; border: 2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-image: url('${supportImage}'); background-size: contain; background-repeat: no-repeat; background-position: center; border-radius: 4px;">
-                        ${!supportImage ? '<span style="color:#eee; font-size:40px; font-weight:900;">PHOTO AREA</span>' : ''}
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: nowrap;">
+                        <span contenteditable="true" style="font-size: 15px; font-weight: 950; color: #000; outline: none; letter-spacing: -0.2px; font-family: Arial, sans-serif;">DESCRIBE OF DEFECT</span> 
+                        <span contenteditable="true" style="background: #ffff00; color: #000; padding: 2px 8px; font-style: italic; font-weight: 950; font-size: 11px; border: 1px solid #000; display: inline-block; outline: none; line-height: 1.3; font-family: Arial, sans-serif;">(PICTURE AND JUDGEMENT METHOD)</span>
+                    </div>
+                    <div style="flex: 1; border: 1.2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+                        ${supportImage 
+                            ? `<img src="${supportImage}" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">` 
+                            : '<span style="color:#eee; font-size:40px; font-weight:900;">PHOTO AREA</span>'
+                        }
                     </div>
                 </div>
             </div>
@@ -14668,7 +14774,7 @@ else if (_currentSlide === 2) {
         </div>`;
 }
 // ==========================================
-// แผ่นที่ 4: D2- [Further Detail] (ฉบับสมบูรณ์: ดึงรูปภาพ + ดึง Remark อัตโนมัติ)
+// แผ่นที่ 4: D2- [Further Detail] (ฉบับสมบูรณ์: จัด DETAIL รวมในกล่องข้อความเดียวกัน)
 // ==========================================
 else if (_currentSlide === 3) {
     // 1. ดึงข้อมูลพื้นฐานจากเคส
@@ -14680,21 +14786,18 @@ else if (_currentSlide === 3) {
         year: 'numeric'
     });
     
-    // 2. ดึงรูปภาพจาก JSON (ที่เราย้ายมาเก็บไว้เพื่อประหยัดพื้นที่)
+    // 2. ดึงรูปภาพจาก JSON
     const supportImage = c.report_data?.evidence_img || ""; 
 
     // 3. ดึงข้อมูลหมายเหตุ (Remark) มาทำเป็น Temporary Actions
-    // หากไม่มีหมายเหตุ ให้ใช้ข้อความ Default เป็นไกด์ไลน์
     const rawRemark = c.report_data?.source_remark || "";
     let tempActionContent = "";
 
     if (rawRemark.trim() !== "") {
-        // แปลงข้อความหมายเหตุ โดยถ้ามีการขึ้นบรรทัดใหม่ ให้ใส่จุด Bullet (•) นำหน้าทุกบรรทัด
         tempActionContent = rawRemark.split('\n')
             .map(line => `• ${line.trim()}`)
             .join('<br>');
     } else {
-        // กรณีไม่มีข้อมูลหมายเหตุส่งมา (Fallback)
         tempActionContent = `• Sorting 100% at line / WIP Stock<br>
                              • Inform vendor for urgent root cause analysis<br>
                              • Set point of control for next lot shipment`;
@@ -14702,14 +14805,13 @@ else if (_currentSlide === 3) {
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
-            <!-- 1. Header: สไตล์ภาพที่ 2 (ตัวหนังสือใหญ่ แถบน้ำเงิน-เหลืองคมชัด) -->
+            <!-- 1. Header: D2-Define the Problem [Further Detail] -->
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000; outline: none; letter-spacing: -1.5px; line-height: 1;">
                         D2-Define the Problem <span style="color:#003366; font-size: 24px; font-weight: 700;">[Further Detail]</span>
                     </h1>
                     
-                    <!-- ✅ แถบสถานะน้ำเงิน-เหลือง Contrast สูง -->
-                    <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 3px 12px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1;">
+                    <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1.2; display: flex; align-items: center; justify-content: center; text-align: center;">
                         &lt;Fill by CTC &gt;
                     </div>
                 </div>
@@ -14718,33 +14820,33 @@ else if (_currentSlide === 3) {
                 <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
 
                 <!-- 2. ส่วนเนื้อหา (แบ่งซ้าย-ขวา) -->
-                <div style="display: flex; gap: 35px; flex: 1; min-height: 0; align-items: stretch; margin-bottom: 10px;">
+                <div style="display: flex; gap: 25px; flex: 1; min-height: 0; align-items: stretch; margin-bottom: 10px;">
                     
-                    <!-- ฝั่งซ้าย: รูปภาพขนาดใหญ่ (Auto-Sync จากหน้า Support) -->
-                    <div style="flex: 0 0 55%; border: 2.5px solid #000; background: #f8fafc; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: 4px;">
+                    <!-- ฝั่งซ้าย: รูปภาพขนาดใหญ่ (คงสัดส่วนเดิมไม่ยืดบิดเบี้ยว) -->
+                    <div style="flex: 0 0 52%; border: 2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: 4px;">
                         ${supportImage 
-                            ? `<img src="${supportImage}" style="max-width:98%; max-height:98%; object-fit:contain;">` 
+                            ? `<img src="${supportImage}" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">` 
                             : '<span style="color:#cbd5e1; font-weight:900; font-size:24px; letter-spacing:1px;">NO EVIDENCE PHOTO</span>'
                         }
                     </div>
 
-                    <!-- ฝั่งขวา: รายละเอียดข้อความ -->
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; padding-top: 5px;">
+                    <!-- ฝั่งขวา: รายละเอียดข้อความจัดรวมอยู่ในกล่องเดียวกันเสมอ -->
+                    <div style="flex: 1; border: 2px solid #000; background: #fff; padding: 18px; border-radius: 4px; display: flex; flex-direction: column; gap: 20px; min-width: 0;">
                         
-                        <!-- Block: Detail (ข้อมูลเบื้องต้น) -->
+                        <!-- Block: DETAIL -->
                         <div>
-                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">DETAIL</h3>
-                            <p contenteditable="true" style="font-size: 15px; color: #000; line-height: 1.5; outline: none; margin: 0; font-weight: 600;">
+                            <h3 contenteditable="true" style="font-size: 16px; font-weight: 950; color: #003366; text-transform: uppercase; margin: 0 0 6px 0; border-bottom: 2.5px solid #003366; display: inline-block; outline: none;">DETAIL</h3>
+                            <div contenteditable="true" style="color: #000; font-weight: 600; margin-top: 6px; font-size: 14px; line-height: 1.6; outline: none;">
                                 On <span style="color:#2563eb; font-weight: 900;">${createDate}</span> OSA inform quality problem about 
                                 <span style="color: #2563eb; font-weight: 900;">${partName}</span> 
                                 found defect <span style="color:red; font-weight:900;">${problemTitle}</span>
-                            </p>
+                            </div>
                         </div>
 
-                        <!-- ✅ Block: Temporary Actions (ดึงมาจากช่อง Remark อัตโนมัติ) -->
+                        <!-- Block: Temporary actions -->
                         <div>
-                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">Temporary actions</h3>
-                            <div contenteditable="true" style="font-size: 14px; color: #334155; line-height: 1.6; outline: none; font-weight: 600;">
+                            <h3 contenteditable="true" style="font-size: 16px; font-weight: 950; color: #003366; text-transform: uppercase; margin: 0 0 6px 0; border-bottom: 2.5px solid #003366; display: inline-block; outline: none;">Temporary actions</h3>
+                            <div contenteditable="true" style="color: #334155; font-weight: 600; margin-top: 6px; font-size: 14px; line-height: 1.6; outline: none;">
                                 ${tempActionContent}
                             </div>
                         </div>
@@ -14767,7 +14869,7 @@ else if (_currentSlide === 3) {
                         <h1 contenteditable="true" style="font-size: 28px; font-weight: 950; margin: 0; color: #000; letter-spacing: -0.5px; outline: none; white-space: nowrap; flex: 1;">
                             D3-Interim Containment Action (ICA)
                         </h1>
-                        <div contenteditable="true" style="background: blue; color: yellow; padding: 3px 12px; font-weight: 950; font-size: 11px; border: 1.2px solid #000; outline: none; flex-shrink: 0; margin-left: 15px;">
+                        <div contenteditable="true" style="background: blue; color: yellow; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; outline: none; flex-shrink: 0; margin-left: 15px; display: flex; align-items: center; justify-content: center; text-align: center;">
                             &lt;Fill by CTC & Supplier&gt;
                         </div>
                     </div>
@@ -14809,27 +14911,29 @@ else if (_currentSlide === 3) {
                         </table>
                     </div>
 
-                    <!-- Bottom Sections -->
-                    <div style="display: flex; gap: 0; margin-top: 10px; border: 1.2px solid #000; flex: 1; min-height: 0; background: #f1f5f9;">
-                        <div style="flex: 1.2; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
-                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Sort/Rework Method Used:</div>
-                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; line-height: 1.4; outline: none; background: #fff;">
-                                V.TKCP screw Sorting parts in stock<br>Stock : 0 Pcs.<br>OK : .... Pcs.<br>NG : .... Pcs.
-                            </div>
-                        </div>
-                        <div style="flex: 0.8; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
-                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Identify mark:</div>
-                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; outline: none; background: #fff;">
-                                Mark label ok control
-                            </div>
-                        </div>
-                        <div style="flex: 1; display: flex; flex-direction: column;">
-                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Sorting/Rework lot Ship Date</div>
-                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; line-height: 1.4; outline: none; background: #fff;">
-                                Sorting date : ....<br>Shipment replacement part date : ....
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Bottom Sections (Clear Grid Table) -->
+                    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; margin-top: 10px; table-layout: fixed; flex: 1; min-height: 0; font-family: Arial, Helvetica, sans-serif;">
+                        <thead>
+                            <tr style="background: #8ea9db; height: 22px;">
+                                <th style="width: 38%; border: 1.5px solid #000; background: #8ea9db; padding: 2px 8px; text-align: left; font-weight: 800; font-size: 11.5px; color: #000; vertical-align: middle; line-height: 1.1;">Sort/Rework Method Used:</th>
+                                <th style="width: 30%; border: 1.5px solid #000; background: #8ea9db; padding: 2px 8px; text-align: left; font-weight: 800; font-size: 11.5px; color: #000; vertical-align: middle; line-height: 1.1;">Identify mark:</th>
+                                <th style="width: 32%; border: 1.5px solid #000; background: #8ea9db; padding: 2px 8px; text-align: left; font-weight: 800; font-size: 11.5px; color: #000; vertical-align: middle; line-height: 1.1;">Sorting/Rework lot Ship Date</th>
+                            </tr>
+                        </thead>
+                        <tbody style="height: calc(100% - 22px);">
+                            <tr style="height: 100%;">
+                                <td contenteditable="true" style="border: 1.5px solid #000; padding: 10px 8px; font-size: 11.5px; line-height: 1.45; vertical-align: top; background: #fff; outline: none; color: #000; height: 100%;">
+                                    V.TKCP screw Sorting parts in stock<br>Stock : 0 Pcs.<br>OK : .... Pcs.<br>NG : .... Pcs.
+                                </td>
+                                <td contenteditable="true" style="border: 1.5px solid #000; padding: 10px 8px; font-size: 11.5px; line-height: 1.45; vertical-align: top; background: #fff; outline: none; color: #000; height: 100%;">
+                                    Mark label ok control
+                                </td>
+                                <td contenteditable="true" style="border: 1.5px solid #000; padding: 10px 8px; font-size: 11.5px; line-height: 1.45; vertical-align: top; background: #fff; outline: none; color: #000; height: 100%;">
+                                    Sorting date : ....<br>Shipment replacement part date : ....
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
 
                     <!-- Instruction Footer -->
                     <div style="background: #ffffcc; border: 1px solid #ffcc00; margin-top: 8px; padding: 5px 10px; font-size: 10px; line-height: 1.3; flex-shrink: 0;">
@@ -14852,11 +14956,15 @@ else if (_currentSlide === 5) {
             ? `position: relative; width: 190px; height: 50px; display: flex; align-items: center; justify-content: center;`
             : `width: 190px; height: 38px; background: #d9d9d9; border: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; text-transform: uppercase; color: ${isRed ? 'red' : '#000'}; outline: none; box-shadow: 2px 2px 0px #000;`;
 
+        const fontSize = isDiamond 
+            ? (text.length > 22 ? '7.5px' : text.length > 15 ? '8.5px' : '10px') 
+            : '12px';
+
         const leftContent = isDiamond ? `
             <svg viewBox="0 0 100 45" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 0px #000);">
                 <polygon points="50,2 98,22.5 50,43 2,22.5" fill="#fff" stroke="#000" stroke-width="1.2"/>
             </svg>
-            <div contenteditable="true" style="position: absolute; font-weight: 900; font-size: 10px; text-align: center; width: 75%; line-height: 1.1; text-transform: uppercase; outline: none;">${text}</div>
+            <div contenteditable="true" style="position: absolute; font-weight: 900; font-size: ${fontSize}; text-align: center; width: 82%; line-height: 1.05; text-transform: uppercase; outline: none; word-wrap: break-word;">${text}</div>
         ` : `<div contenteditable="true" style="outline:none;">${text}</div>`;
 
         return `
@@ -14882,7 +14990,7 @@ else if (_currentSlide === 5) {
                 <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1.5px; outline: none; line-height: 1;">
                     D4-Identify Root cause and Escape cause
                 </h1>
-                <div style="background: blue; color: white; padding: 2px 12px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px;">
+                <div contenteditable="true" style="background: blue; color: white; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; margin-bottom: 4px; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                     &lt;Fill by Supplier&gt;
                 </div>
             </div>
@@ -14935,33 +15043,22 @@ else if (_currentSlide === 5) {
 }
 // ==========================================
 // แผ่นที่ 7: D4-Identify Root cause and Escape cause
-// ปรับขนาดให้พอดีหน้าจอ และรักษาเส้นแบ่งมาตรฐานเดียวกับหน้าอื่น
 // ==========================================
 else if (_currentSlide === 6) {
-    const whyRow = (label, content = "") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
-            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
-                ${label}
-            </div>
-            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
-                ${content}
-            </div>
-        </div>`;
-
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; font-family: Arial, Helvetica, sans-serif;">
             
             <!-- Header Section -->
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
                         D4-Identify Root cause and Escape cause
                     </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
+                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; white-space: nowrap; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
                 
-                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น (Standard Blue Divider) -->
+                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น -->
                 <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
                 
                 <!-- Sub-Header Area -->
@@ -14970,34 +15067,50 @@ else if (_currentSlide === 6) {
                     <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why problem happen ?)</span>
                 </div>
 
-                <!-- Table Content -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <!-- Question Header -->
-                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
-                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
-                            1
-                        </div>
-                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
-                            Why was the non conformity made?
-                        </div>
-                    </div>
-
-                    <!-- Why Rows -->
-                    <div>
-                        ${whyRow('Why1')}
-                        ${whyRow('Why2')}
-                        ${whyRow('Why3')}
-                        ${whyRow('Why4')}
-                        ${whyRow('Why5')}
-                    </div>
-                </div>
+                <!-- Table Content (HTML Table with complete grid lines) -->
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
+                    <colgroup>
+                        <col style="width: 60px;">
+                        <col>
+                    </colgroup>
+                    <thead>
+                        <tr style="background: #e6f0ff; height: 36px;">
+                            <th style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; padding: 0; background: #e6f0ff;">1</th>
+                            <th contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; text-align: left; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; outline: none; background: #e6f0ff;">
+                                Why was the non conformity made?
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why1</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why2</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why3</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why4</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why5</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                    </tbody>
+                </table>
 
                 <!-- Instruction Box -->
-                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
-                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                <div style="margin-top: 10px; padding: 8px 12px; background: #ffffcc; border: 1.5px solid #000; font-size: 11px; line-height: 1.4; flex-shrink: 0;">
+                    <div style="color: red; font-weight: 800; font-style: italic; margin-bottom: 2px;">D4 - Identify Root Cause and Escape Cause</div>
+                    <div style="color: #000;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
+                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
                 </div>
         </div>
     `;
@@ -15007,25 +15120,15 @@ else if (_currentSlide === 6) {
 // แผ่นที่ 8: D4-Identify Escape cause (ESCAPE CAUSE ANALYSIS)
 // ==========================================
 else if (_currentSlide === 7) {
-    const whyRow = (label, content = "") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
-            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
-                ${label}
-            </div>
-            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
-                ${content}
-            </div>
-        </div>`;
-
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; font-family: Arial, Helvetica, sans-serif;">
             
             <!-- 1. Header Section -->
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
                         D4-Identify Root cause and Escape cause
                     </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
+                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; white-space: nowrap; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
@@ -15039,34 +15142,50 @@ else if (_currentSlide === 7) {
                     <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why not detected ?)</span>
                 </div>
 
-                <!-- 3. Table Content -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <!-- Question Header -->
-                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
-                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
-                            1
-                        </div>
-                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
-                            Why was the non conformity could not detect ?
-                        </div>
-                    </div>
-
-                    <!-- Why Rows -->
-                    <div>
-                        ${whyRow('Why1')}
-                        ${whyRow('Why2')}
-                        ${whyRow('Why3')}
-                        ${whyRow('Why4')}
-                        ${whyRow('Why5')}
-                    </div>
-                </div>
+                <!-- 3. Table Content (HTML Table with complete grid lines) -->
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
+                    <colgroup>
+                        <col style="width: 60px;">
+                        <col>
+                    </colgroup>
+                    <thead>
+                        <tr style="background: #e6f0ff; height: 36px;">
+                            <th style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; padding: 0; background: #e6f0ff;">1</th>
+                            <th contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; text-align: left; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; outline: none; background: #e6f0ff;">
+                                Why was the non conformity could not detect ?
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why1</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why2</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why3</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why4</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why5</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                    </tbody>
+                </table>
 
                 <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
-                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                <div style="margin-top: 10px; padding: 8px 12px; background: #ffffcc; border: 1.5px solid #000; font-size: 11px; line-height: 1.4; flex-shrink: 0;">
+                    <div style="color: red; font-weight: 800; font-style: italic; margin-bottom: 2px;">D4 - Identify Root Cause and Escape Cause</div>
+                    <div style="color: #000;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
+                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
                 </div>
         </div>
     `;
@@ -15076,25 +15195,15 @@ else if (_currentSlide === 7) {
 // แผ่นที่ 9: D4-Identify System cause (SYSTEM CAUSE ANALYSIS)
 // ==========================================
 else if (_currentSlide === 8) {
-    const whyRow = (label, content = "") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
-            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
-                ${label}
-            </div>
-            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
-                ${content}
-            </div>
-        </div>`;
-
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; font-family: Arial, Helvetica, sans-serif;">
             
             <!-- 1. Header Section -->
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
                         D4-Identify Root cause and Escape cause
                     </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
+                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; white-space: nowrap; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
@@ -15108,107 +15217,142 @@ else if (_currentSlide === 8) {
                     <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why system failed ?)</span>
                 </div>
 
-                <!-- 3. Table Content -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <!-- Question Header -->
-                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
-                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
-                            1
-                        </div>
-                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
-                            Why was the process & system failed ?
-                        </div>
-                    </div>
-
-                    <!-- Why Rows -->
-                    <div>
-                        ${whyRow('Why1')}
-                        ${whyRow('Why2')}
-                        ${whyRow('Why3')}
-                        ${whyRow('Why4')}
-                        ${whyRow('Why5')}
-                    </div>
-                </div>
+                <!-- 3. Table Content (HTML Table with complete grid lines) -->
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
+                    <colgroup>
+                        <col style="width: 60px;">
+                        <col>
+                    </colgroup>
+                    <thead>
+                        <tr style="background: #e6f0ff; height: 36px;">
+                            <th style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; padding: 0; background: #e6f0ff;">1</th>
+                            <th contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; text-align: left; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; outline: none; background: #e6f0ff;">
+                                Why was the process &amp; system failed ?
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why1</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why2</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why3</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why4</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                        <tr style="height: 48px;">
+                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why5</td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
+                        </tr>
+                    </tbody>
+                </table>
 
                 <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
-                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                <div style="margin-top: 10px; padding: 8px 12px; background: #ffffcc; border: 1.5px solid #000; font-size: 11px; line-height: 1.4; flex-shrink: 0;">
+                    <div style="color: red; font-weight: 800; font-style: italic; margin-bottom: 2px;">D4 - Identify Root Cause and Escape Cause</div>
+                    <div style="color: #000;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
+                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
                 </div>
         </div>
     `;
 }
 
 // ==========================================
-// แผ่นที่ 10: D5-Developing permanent corrective action
+// แผ่นที่ 10: D5-Developing permanent corrective action (ROOT CAUSE ACTION)
 // ==========================================
 else if (_currentSlide === 9) {
     const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
+        <tr style="height: 56px;">
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${before}</td>
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${after}</td>
             
-            <!-- Improvement Detail: Photo & File Attachment -->
-            <div style="width: 220px; border-right: 1.2px solid #000; padding: 3px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;">
-                <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
-                    <span style="font-size: 8px; color: #999;">Add Photo</span>
-                    <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
+            <!-- Improvement Detail Column: Photo (Left) & File Attachment (Right) -->
+            <td style="border: 1.5px solid #000; padding: 0; vertical-align: middle;">
+                <div style="display: flex; align-items: center; justify-content: stretch; height: 100%; min-height: 52px;">
+                    <!-- ฝั่งซ้าย: Photo -->
+                    <div style="flex: 1; border-right: 1px solid #d0d0d0; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                        <div onclick="this.querySelector('.photo-in').click()" style="width: 52px; height: 36px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
+                            <span style="font-size: 8px; color: #999;">Add Photo</span>
+                            <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
+                        </div>
+                    </div>
+                    <!-- ฝั่งขวา: File Attachment -->
+                    <div style="flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                        <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
+                            <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 14px; height: 14px; flex-shrink: 0;">
+                            <span class="fname" style="font-size: 9px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px;">${improvementText}</span>
+                            <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
+                        </div>
+                    </div>
                 </div>
-                <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; border-top: 1px solid #eee; padding-top: 2px; width: 95%; justify-content: center;">
-                    <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px;">
-                    <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${improvementText}</span>
-                    <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
-                </div>
-            </div>
+            </td>
 
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
-        </div>`;
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
+        </tr>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 36px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 24px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D5-Developing permanent corrective action
                     </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 3px 12px; font-weight: 950; font-size: 13px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
                 
                 <!-- เส้นแถบสีน้ำเงิน (Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
                 
                 <!-- 2. Sub-Header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
-                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">ROOT CAUSE ACTION</div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; flex-shrink: 0;">
+                    <div contenteditable="true" style="font-size: 14px; font-weight: bold; text-decoration: underline; outline: none;">ROOT CAUSE ACTION</div>
                     <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
                 </div>
 
                 <!-- 3. Table Structure -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
-                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
-                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
-                    </div>
-
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                </div>
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
+                    <colgroup>
+                        <col style="width: 18%;">
+                        <col style="width: 18%;">
+                        <col style="width: 28%;">
+                        <col style="width: 11%;">
+                        <col style="width: 11%;">
+                        <col style="width: 14%;">
+                    </colgroup>
+                    <thead>
+                        <tr style="background: #b4c7e7; height: 30px;">
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Before</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">After</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Improvement Detail</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10.5px; color: #000; vertical-align: middle; padding: 2px;">Effective lot</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10px; color: #000; vertical-align: middle; padding: 2px;">Identify lot</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 11px; color: #000; vertical-align: middle; padding: 2px;">MP Level</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${createD5Row()}
+                        ${createD5Row()}
+                        ${createD5Row()}
+                        ${createD5Row()}
+                    </tbody>
+                </table>
 
                 <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0;">
+                <div style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.3; flex-shrink: 0;">
                     <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
                     <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement.</div>
                     <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List corrective actions to permanently eliminate root cause.</div>
@@ -15224,69 +15368,88 @@ else if (_currentSlide === 9) {
 // ==========================================
 else if (_currentSlide === 10) {
     const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
+        <tr style="height: 56px;">
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${before}</td>
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${after}</td>
             
-            <!-- Improvement Detail Column: Photo & File Attachment -->
-            <div style="width: 220px; border-right: 1.2px solid #000; padding: 3px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;">
-                <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
-                    <span style="font-size: 8px; color: #999;">Add Photo</span>
-                    <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
+            <!-- Improvement Detail Column: Photo (Left) & File Attachment (Right) -->
+            <td style="border: 1.5px solid #000; padding: 0; vertical-align: middle;">
+                <div style="display: flex; align-items: center; justify-content: stretch; height: 100%; min-height: 52px;">
+                    <!-- ฝั่งซ้าย: Photo -->
+                    <div style="flex: 1; border-right: 1px solid #d0d0d0; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                        <div onclick="this.querySelector('.photo-in').click()" style="width: 52px; height: 36px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
+                            <span style="font-size: 8px; color: #999;">Add Photo</span>
+                            <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
+                        </div>
+                    </div>
+                    <!-- ฝั่งขวา: File Attachment -->
+                    <div style="flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                        <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
+                            <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 14px; height: 14px; flex-shrink: 0;">
+                            <span class="fname" style="font-size: 9px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px;">${improvementText}</span>
+                            <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
+                        </div>
+                    </div>
                 </div>
-                <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; border-top: 1px solid #eee; padding-top: 2px; width: 95%; justify-content: center;">
-                    <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px;">
-                    <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${improvementText}</span>
-                    <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
-                </div>
-            </div>
+            </td>
 
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
-        </div>`;
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
+        </tr>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header (Standard Style) -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 36px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 24px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D5-Developing permanent corrective action
                     </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 3px 12px; font-weight: 950; font-size: 13px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
                 
                 <!-- เส้นแถบสีน้ำเงิน (Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
                 
                 <!-- 2. Sub-Header (เปลี่ยนเป็น ESCAPE CAUSE ACTION) -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
-                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">ESCAPE CAUSE ACTION</div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; flex-shrink: 0;">
+                    <div contenteditable="true" style="font-size: 14px; font-weight: bold; text-decoration: underline; outline: none;">ESCAPE CAUSE ACTION</div>
                     <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
                 </div>
 
                 <!-- 3. Table Structure -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
-                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
-                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
-                    </div>
-
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                </div>
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
+                    <colgroup>
+                        <col style="width: 18%;">
+                        <col style="width: 18%;">
+                        <col style="width: 28%;">
+                        <col style="width: 11%;">
+                        <col style="width: 11%;">
+                        <col style="width: 14%;">
+                    </colgroup>
+                    <thead>
+                        <tr style="background: #b4c7e7; height: 30px;">
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Before</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">After</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Improvement Detail</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10.5px; color: #000; vertical-align: middle; padding: 2px;">Effective lot</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10px; color: #000; vertical-align: middle; padding: 2px;">Identify lot</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 11px; color: #000; vertical-align: middle; padding: 2px;">MP Level</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${createD5Row()}
+                        ${createD5Row()}
+                        ${createD5Row()}
+                        ${createD5Row()}
+                    </tbody>
+                </table>
 
                 <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0; cursor: text;">
+                <div style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.3; flex-shrink: 0;">
                     <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
                     <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
                     <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List chosen corrective actions necessary to permanently eliminate root cause.</div>
@@ -15302,69 +15465,88 @@ else if (_currentSlide === 10) {
 // ==========================================
 else if (_currentSlide === 11) {
     const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
+        <tr style="height: 56px;">
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${before}</td>
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${after}</td>
             
-            <!-- Improvement Detail Column: Photo & File Attachment -->
-            <div style="width: 220px; border-right: 1.2px solid #000; padding: 3px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;">
-                <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
-                    <span style="font-size: 8px; color: #999;">Add Photo</span>
-                    <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
+            <!-- Improvement Detail Column: Photo (Left) & File Attachment (Right) -->
+            <td style="border: 1.5px solid #000; padding: 0; vertical-align: middle;">
+                <div style="display: flex; align-items: center; justify-content: stretch; height: 100%; min-height: 52px;">
+                    <!-- ฝั่งซ้าย: Photo -->
+                    <div style="flex: 1; border-right: 1px solid #d0d0d0; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                        <div onclick="this.querySelector('.photo-in').click()" style="width: 52px; height: 36px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
+                            <span style="font-size: 8px; color: #999;">Add Photo</span>
+                            <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
+                        </div>
+                    </div>
+                    <!-- ฝั่งขวา: File Attachment -->
+                    <div style="flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                        <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
+                            <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 14px; height: 14px; flex-shrink: 0;">
+                            <span class="fname" style="font-size: 9px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px;">${improvementText}</span>
+                            <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
+                        </div>
+                    </div>
                 </div>
-                <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; border-top: 1px solid #eee; padding-top: 2px; width: 95%; justify-content: center;">
-                    <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px;">
-                    <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${improvementText}</span>
-                    <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
-                </div>
-            </div>
+            </td>
 
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
-        </div>`;
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
+            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
+        </tr>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 36px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 24px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D5-Developing permanent corrective action
                     </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 3px 12px; font-weight: 950; font-size: 13px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
                 
                 <!-- เส้นแถบสีน้ำเงิน (Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
                 
                 <!-- 2. Sub-Header (เปลี่ยนเป็น SYSTEM CAUSE ACTION) -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
-                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">SYSTEM CAUSE ACTION</div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; flex-shrink: 0;">
+                    <div contenteditable="true" style="font-size: 14px; font-weight: bold; text-decoration: underline; outline: none;">SYSTEM CAUSE ACTION</div>
                     <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
                 </div>
 
                 <!-- 3. Table Structure (4 แถวตามภาพ) -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
-                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
-                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
-                    </div>
-
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                </div>
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
+                    <colgroup>
+                        <col style="width: 18%;">
+                        <col style="width: 18%;">
+                        <col style="width: 28%;">
+                        <col style="width: 11%;">
+                        <col style="width: 11%;">
+                        <col style="width: 14%;">
+                    </colgroup>
+                    <thead>
+                        <tr style="background: #b4c7e7; height: 30px;">
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Before</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">After</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Improvement Detail</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10.5px; color: #000; vertical-align: middle; padding: 2px;">Effective lot</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10px; color: #000; vertical-align: middle; padding: 2px;">Identify lot</th>
+                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 11px; color: #000; vertical-align: middle; padding: 2px;">MP Level</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${createD5Row()}
+                        ${createD5Row()}
+                        ${createD5Row()}
+                        ${createD5Row()}
+                    </tbody>
+                </table>
 
                 <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0; cursor: text;">
+                <div style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.3; flex-shrink: 0;">
                     <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
                     <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
                     <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List chosen corrective actions necessary to permanently eliminate root cause.</div>
@@ -15397,7 +15579,7 @@ else if (_currentSlide === 12) {
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D6-Implement permanent corrective action
                     </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
@@ -15426,7 +15608,7 @@ else if (_currentSlide === 12) {
                 </div>
 
                 <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 8px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
+                <div style="margin-top: 8px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; flex-shrink: 0;">
                     <div style="color: red; font-weight: bold; font-style: italic;">6D - Implement Permanent Corrective Actions</div>
                     <div style="color: #000;">Create a clear action plan to solve the problem by stating WHO will do WHAT and by WHEN. How to verify the corrective actions with before and after result.</div>
                 </div>
@@ -15455,7 +15637,7 @@ else if (_currentSlide === 13) {
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D7-Preventive Recurrence
                     </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
@@ -15526,7 +15708,7 @@ else if (_currentSlide === 13) {
                 </table>
 
                 <!-- 5. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 6px; padding: 5px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.25; outline: none; cursor: text; flex-shrink: 0;">
+                <div style="margin-top: 6px; padding: 5px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.25; flex-shrink: 0;">
                     <div style="color: red; font-weight: bold; font-style: italic;">7D - Prevent Recurrence</div>
                     <div style="color: #000;">Ensure the problem does not happen again ANYWHERE by using Foolproof, POKAYOKE etc. Communicate your results to all areas including similar part. Submit revised all related documents to us to review. (if have)</div>
                 </div>
@@ -15551,7 +15733,7 @@ else if (_currentSlide === 14) {
                 <!-- Header -->
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 28px; font-weight: 800; margin: 0; color: #000; outline: none;">D8-Team and Individual Recognition</h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">&lt;Fill by Supplier&gt;</div>
+                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">&lt;Fill by Supplier&gt;</div>
                 </div>
                 <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
 
@@ -15581,7 +15763,7 @@ else if (_currentSlide === 14) {
                 </div>
 
                 <!-- Instruction Box -->
-                <div contenteditable="true" style="padding: 8px 12px; background: #fffde7; border: 2px solid #fbc02d; border-radius: 8px; font-size: 10px; outline: none; flex-shrink: 0;">
+                <div style="padding: 8px 12px; background: #fffde7; border: 2px solid #fbc02d; border-radius: 8px; font-size: 10px; flex-shrink: 0;">
                     <div style="color: #d32f2f; font-weight: 900; font-style: italic;">8D – Team and Individual Recognition</div>
                     <div style="color: #333;">8D process is the time to recognize the team efforts and special team member contributions.</div>
                 </div>
@@ -15641,7 +15823,7 @@ else if (_currentSlide === 15) {
 
     function getFooter() {
         return `
-            <div style="flex-shrink: 0; height: 32px; border-top: 1.5px solid #003366; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; padding-top: 4px; margin-top: auto; font-family: system-ui, sans-serif;">
+            <div style="flex-shrink: 0; height: 32px; border: none; background: transparent; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; padding-top: 4px; margin-top: auto; font-family: system-ui, sans-serif;">
                 <div style="width: 100px; height: 26px; flex-shrink: 0; display: flex; align-items: center;">
                     <svg viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="width:85px; height:24px; display:block;">
                         <ellipse cx="100" cy="40" rx="95" ry="38" fill="#003366" />
