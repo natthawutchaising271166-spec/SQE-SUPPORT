@@ -8941,6 +8941,22 @@ formEl.onsubmit = async (e) => {
 };
     }
 
+// ฟังก์ชันสำหรับจัดรูปแบบข้อความ: เปลี่ยนฟอนต์, เน้นสีเลข 10 หลัก (น้ำเงิน) และเลขเศษส่วน (แดง)
+function formatBeautifulText(text) {
+    if (!text) return '';
+    
+    let formatted = text;
+
+    // 1. เน้นตัวเลขจำนวนที่อยู่ติดกับเครื่องหมาย / (เช่น 20 / 100) ให้เป็นสีแดง
+    // ค้นหารูปแบบ ตัวเลข / ตัวเลข
+    formatted = formatted.replace(/(\d+\s*[\/]\s*\d+)/g, '<span style="color: #ef4444; font-weight: 800; font-family: \'DM Mono\', monospace;">$1</span>');
+
+    // 2. เน้นตัวเลข 10 หลัก (เช่น 1129810301) ให้เป็นสีน้ำเงิน
+    // ค้นหาตัวเลขที่เรียงกัน 10 ตัว
+    formatted = formatted.replace(/\b(\d{10})\b/g, '<span style="color: #2563eb; font-weight: 800; font-family: \'DM Mono\', monospace;">$1</span>');
+
+    return formatted;
+}
 
     /* ──────────────────────────────────────────
        VIEW MODAL
@@ -8986,9 +9002,9 @@ function _openViewModal(id) {
             <!-- 2. Summary Info (Reduced Spacing) -->
             <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; padding:12px 16px;">
                 <div style="flex:1; min-width:250px;">
-                    <p style="font-size:12px; font-weight:600; color:${theme.mainText}; line-height:1.4; margin:0 0 6px 0;">
-                        On <span style="color:#3b82f6">${item.eventDate || '-'}</span> OSA inform quality problem about <span style="color:#3b82f6">${item.part}</span> found defect <span style="color:#ef4444">${item.problem}</span>
-                    </p>
+<p style="font-size:13px; font-weight:500; color:${theme.mainText}; line-height:1.6; margin:0 0 6px 0; font-family: 'Inter', sans-serif;">
+    ${formatBeautifulText(item.problem)}
+</p>
                     <div style="display:flex; gap:5px;">
                         <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:2px 6px; font-size:8px; font-weight:700">📅 ${item.eventDate || '-'}</span>
                         <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:2px 6px; font-size:8px; font-weight:700">🔧 ${item.action}</span>
@@ -14857,11 +14873,9 @@ else if (_currentSlide === 3) {
                         <!-- Block: DETAIL -->
                         <div>
                             <h3 contenteditable="true" style="font-size: 16px; font-weight: 950; color: #003366; text-transform: uppercase; margin: 0 0 6px 0; border-bottom: 2.5px solid #003366; display: inline-block; outline: none;">DETAIL</h3>
-                            <div contenteditable="true" style="color: #000; font-weight: 600; margin-top: 6px; font-size: 14px; line-height: 1.6; outline: none;">
-                                On <span style="color:#2563eb; font-weight: 900;">${createDate}</span> OSA inform quality problem about 
-                                <span style="color: #2563eb; font-weight: 900;">${partName}</span> 
-                                found defect <span style="color:red; font-weight:900;">${problemTitle}</span>
-                            </div>
+<div contenteditable="true" style="color: #334155; font-weight: 600; margin-top: 6px; font-size: 15px; line-height: 1.6; outline: none; font-family: 'Inter', sans-serif;">
+    ${formatBeautifulText(problemTitle)}
+</div>
                         </div>
 
                         <!-- Block: Temporary actions -->
