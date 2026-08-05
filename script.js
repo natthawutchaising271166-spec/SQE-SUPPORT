@@ -6,6 +6,28 @@
    PRIMARY BOOT FUNCTIONS (วางไว้บนสุดของ script.js)
    ========================================================================== */
 
+// --- GLOBAL ERROR GUARD & ANTI-WHITE-SCREEN PROTECTION ---
+window.addEventListener('error', function(e) {
+    console.error('[Global Error Guard Captured]', e.error || e.message);
+    try {
+        const mtx = document.getElementById('maintenance-view');
+        const login = document.getElementById('login-view');
+        const dashboard = document.getElementById('dashboard-view');
+        if (mtx && login && dashboard) {
+            if (mtx.classList.contains('hidden-view') && login.classList.contains('hidden-view') && dashboard.classList.contains('hidden-view')) {
+                login.classList.remove('hidden-view');
+                login.style.display = 'flex';
+            }
+        }
+    } catch (err) {
+        console.error('[Error Guard Fallback Error]', err);
+    }
+});
+
+window.addEventListener('unhandledrejection', function(e) {
+    console.warn('[Global Unhandled Promise Rejection]', e.reason);
+});
+
 // ฟังก์ชันปลดล็อคหน้า Maintenance
 window.unlockMaintenanceForAdmin = function() {
     console.log("Admin Bypass Activated");
@@ -3399,38 +3421,6 @@ const VENDOR_MASTER = {
 // ตั้งค่าฐานข้อมูลในเครื่อง
 // --- บรรทัดที่ 1 ของไฟล์ script.js ---
 // เพิ่มฟังก์ชันนี้ไว้บนสุดของ script.js
-const _memStorage = {};
-function safeGetStorage(type, key, defaultVal = null) {
-    try {
-        const store = type === 'session' ? window.sessionStorage : window.localStorage;
-        if (!store) return _memStorage[key] !== undefined ? _memStorage[key] : defaultVal;
-        const val = store.getItem(key);
-        return val !== null ? val : defaultVal;
-    } catch (e) {
-        return _memStorage[key] !== undefined ? _memStorage[key] : defaultVal;
-    }
-}
-
-function safeSetStorage(type, key, val) {
-    try {
-        const store = type === 'session' ? window.sessionStorage : window.localStorage;
-        if (store) store.setItem(key, val);
-        _memStorage[key] = String(val);
-    } catch (e) {
-        _memStorage[key] = String(val);
-    }
-}
-
-function safeRemoveStorage(type, key) {
-    try {
-        const store = type === 'session' ? window.sessionStorage : window.localStorage;
-        if (store) store.removeItem(key);
-        delete _memStorage[key];
-    } catch (e) {
-        delete _memStorage[key];
-    }
-}
-
 function safeSetText(id, value) {
     const el = document.getElementById(id);
     if (el) {
@@ -3756,9 +3746,9 @@ async function checkSupervisorRole(email) {
 // ฟังก์ชันจดจำบัญชี
 function finalizeLoginProcess(email, role, remember) {
     if (remember) {
-        safeSetStorage('local', 'carrier_remembered_email', email);
+        localStorage.setItem('carrier_remembered_email', email);
     } else {
-        safeRemoveStorage('local', 'carrier_remembered_email');
+        localStorage.removeItem('carrier_remembered_email');
     }
     finalizeLogin(email, role);
 }
@@ -3938,7 +3928,7 @@ function animateNumber(id, targetValue, duration = 1500) {
  * 1. จุดเริ่มต้นหลังกดปุ่ม Login
  */
 function finalizeLogin(email, role) {
-    safeSetStorage('session', 'sqe_session', JSON.stringify({ email, role }));
+    sessionStorage.setItem('sqe_session', JSON.stringify({ email, role }));
     startNeuralBootSequence(email, role);
 }
 
@@ -3972,8 +3962,8 @@ async function startNeuralBootSequence(email, role) {
                     await reg.update();
                     if (reg.installing || reg.waiting) {
                         updateStatus(35, "Update Detected!", "installing latest system core...");
-                        safeSetStorage('session', 'reboot_login_email', email);
-                        safeSetStorage('session', 'reboot_login_role', role);
+                        sessionStorage.setItem('reboot_login_email', email);
+                        sessionStorage.setItem('reboot_login_role', role);
                         await new Promise(r => setTimeout(r, 1000));
                         window.location.reload(true);
                         return;
@@ -4082,57 +4072,53 @@ async function enforceMaintenanceMode() {
  * 5. ระบบ INITIALIZATION เมื่อโหลดหน้าเว็บ
  */
 window.addEventListener('load', () => {
-    try {
-        console.log("SQE & WAP System: Final Initializing...");
+    console.log("SQE & WAP System: Final Initializing...");
 
-        if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
-        if (typeof autoHideBanner === 'function') autoHideBanner();
+    if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
+    if (typeof autoHideBanner === 'function') autoHideBanner();
 
-        const savedLang = safeGetStorage('local', 'carrier_lang') || (navigator.language.startsWith('th') ? 'th' : 'en');
-        applyLanguage(savedLang);
+    const savedLang = localStorage.getItem('carrier_lang') || (navigator.language.startsWith('th') ? 'th' : 'en');
+    applyLanguage(savedLang);
 
-        const savedEmail = safeGetStorage('local', 'carrier_remembered_email');
-        if (savedEmail) {
-            const emailIn = document.getElementById('login-email');
-            if (emailIn) { emailIn.value = savedEmail; emailIn.classList.add('valid'); }
+    const savedEmail = localStorage.getItem('carrier_remembered_email');
+    if (savedEmail) {
+        const emailIn = document.getElementById('login-email');
+        if (emailIn) { emailIn.value = savedEmail; emailIn.classList.add('valid'); }
+    }
+
+    // ตรวจสอบ Auto-Login หลังอัปเดต
+    const rebootEmail = sessionStorage.getItem('reboot_login_email');
+    const rebootRole = sessionStorage.getItem('reboot_login_role');
+    if (rebootEmail && rebootRole) {
+        sessionStorage.removeItem('reboot_login_email');
+        sessionStorage.removeItem('reboot_login_role');
+        startNeuralBootSequence(rebootEmail, rebootRole);
+        return; 
+    }
+
+    // ตรวจสอบ Session เดิม
+    const session = sessionStorage.getItem('sqe_session');
+    if (session) {
+        try {
+            const userData = JSON.parse(session);
+            startNeuralBootSequence(userData.email, userData.role);
+        } catch (e) { sessionStorage.removeItem('sqe_session'); }
+    }
+
+    // รันระบบ Background
+    watchSystemUpdate();
+    setInterval(watchSystemUpdate, 180000);
+    enforceMaintenanceMode(); // เรียกฟังก์ชันที่เคย Error
+    setInterval(enforceMaintenanceMode, 30000);
+    updateUserPresence();
+    setInterval(updateUserPresence, 300000);
+
+    if ('serviceWorker' in navigator) {
+        try {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log('PWA Error', err));
+        } catch (e) {
+            console.log('PWA Register Error', e);
         }
-
-        // ตรวจสอบ Auto-Login หลังอัปเดต
-        const rebootEmail = safeGetStorage('session', 'reboot_login_email');
-        const rebootRole = safeGetStorage('session', 'reboot_login_role');
-        if (rebootEmail && rebootRole) {
-            safeRemoveStorage('session', 'reboot_login_email');
-            safeRemoveStorage('session', 'reboot_login_role');
-            startNeuralBootSequence(rebootEmail, rebootRole);
-            return; 
-        }
-
-        // ตรวจสอบ Session เดิม
-        const session = safeGetStorage('session', 'sqe_session');
-        if (session) {
-            try {
-                const userData = JSON.parse(session);
-                startNeuralBootSequence(userData.email, userData.role);
-            } catch (e) { safeRemoveStorage('session', 'sqe_session'); }
-        }
-
-        // รันระบบ Background
-        watchSystemUpdate();
-        setInterval(watchSystemUpdate, 180000);
-        enforceMaintenanceMode(); // เรียกฟังก์ชันที่เคย Error
-        setInterval(enforceMaintenanceMode, 30000);
-        updateUserPresence();
-        setInterval(updateUserPresence, 300000);
-
-        if ('serviceWorker' in navigator) {
-            try {
-                navigator.serviceWorker.register('sw.js').catch(err => console.log('PWA Error', err));
-            } catch (e) {
-                console.log('PWA Register Error', e);
-            }
-        }
-    } catch (err) {
-        console.warn("Init load sequence warning:", err);
     }
 });
 
@@ -4228,8 +4214,13 @@ function handleLogout() {
     }
 
     // 3. สลับหน้าจอกลับไปที่ Login View
-    document.getElementById('dashboard-view').classList.add('hidden-view');
-    document.getElementById('login-view').classList.remove('hidden-view');
+    const dashView = document.getElementById('dashboard-view');
+    const loginView = document.getElementById('login-view');
+    if (dashView) dashView.classList.add('hidden-view');
+    if (loginView) {
+        loginView.classList.remove('hidden-view');
+        loginView.style.display = 'flex';
+    }
 
     // 4. ล้างช่องรหัสผ่านเพื่อความปลอดภัย
     const passIn = document.getElementById('login-pass');
@@ -4247,7 +4238,7 @@ function handleLogout() {
 
 async function showDashboard() {
     // --- [เพิ่มส่วนนี้: อัปเดตธีมทันทีที่เปลี่ยนหน้า] ---
-    const savedTheme = safeGetStorage('local', 'carrier_theme');
+    const savedTheme = localStorage.getItem('carrier_theme');
     const isDark = (savedTheme === 'dark');
     if (isDark) {
         document.body.classList.add('dark-mode');
@@ -4530,49 +4521,161 @@ async function loadStaffList() {
     }
 }
 
-async function loadRecords() {
-    // 1. ตรวจสอบชื่อผู้ใช้งาน
-    let targetUser = S.userRole === 'supervisor' ? (S.viewingUser || S.currentUser) : S.currentUser;
+let _8dLookupMapCache = null;
+let _8dLookupLastCasesRef = null;
 
-    // --- ส่วนที่เพิ่มเพื่อ Debug (ลบออกได้ภายหลัง) ---
-    console.log("Current Login User:", S.currentUser);
-    console.log("Target User Filter:", targetUser);
-    // -------------------------------------------
+function invalidate8DCaseMap() {
+    _8dLookupMapCache = null;
+    _8dLookupLastCasesRef = null;
+}
+
+function get8DCaseMap() {
+    const cases = (S.eightDCases || (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases ? Wap8DSystem.getCases() : [])) || [];
+    if (cases === _8dLookupLastCasesRef && _8dLookupMapCache) {
+        return _8dLookupMapCache;
+    }
+    _8dLookupLastCasesRef = cases;
+    const map = new Map();
+    for (let i = 0; i < cases.length; i++) {
+        const c = cases[i];
+        if (!c) continue;
+        const supId = String(c.support_id || '').trim();
+        const repData = c.report_data || {};
+        const recId = String(repData.record_id || '').trim();
+        const repRef = String(repData.ref || '').trim();
+
+        if (supId) map.set(supId, c);
+        if (recId) map.set(recId, c);
+        if (repRef) map.set(repRef, c);
+    }
+    _8dLookupMapCache = map;
+    return map;
+}
+
+function get8DCaseForRecord(r) {
+    if (!r) return null;
+    const map = get8DCaseMap();
+    if (map.size === 0) return null;
+
+    const rId = String(r.id || '').trim();
+    if (rId && map.has(rId)) return map.get(rId);
+
+    const rRef = String(r.ref || '').trim();
+    if (rRef && map.has(rRef)) return map.get(rRef);
+
+    return null;
+}
+
+async function create8DFromClaimRecord(recordId) {
+    const r = S.records.find(x => String(x.id) === String(recordId));
+    if (!r) return toast("❌ ไม่พบข้อมูลเคสนี้ในระบบ", "error");
+
+    const existingCase = get8DCaseForRecord(r);
+    if (existingCase) {
+        toast(`⚠️ เคสนี้มีการออก 8D แล้ว (${existingCase.id})`, "info");
+        switchPage('8D REPORT');
+        setTimeout(() => { if (typeof Wap8DSystem !== 'undefined') Wap8DSystem.openReport(existingCase.id); }, 150);
+        return;
+    }
+
+    if (!confirm(`🤖 ต้องการสร้างรายงาน 8D Report จากเคส:\nRef: ${r.ref || '-'}\nPart: ${r.partName || r.partNo}\nDefect: ${r.defect || '-'} ใช่หรือไม่?`)) {
+        return;
+    }
+
+    toast("⏳ กำลังสร้างเคส 8D อัตโนมัติ...", "info");
+
+    const newId = '8D-' + Date.now();
+    const payload = {
+        id: newId,
+        user_id: S.currentUser,
+        support_id: r.id || r.ref || newId,
+        problem_title: `${r.defect || 'Defect'} - ${r.partName || r.partNo || ''}`.trim(),
+        part_name: r.partName || '-',
+        part_group: r.partNo || '-',
+        lot_no: Number(r.qty) || 0,
+        ok_qty: 0,
+        ng_qty: Number(r.qty) || 0,
+        status: 'D1_OPEN',
+        report_data: {
+            source_remark: r.remark || "",
+            record_id: r.id,
+            ref: r.ref || "",
+            supplier: r.supplier || "",
+            line: r.line || "",
+            shift: r.shift || "",
+            qty: r.qty || 0,
+            unit: r.unit || 'PCS'
+        },
+        created_at: new Date().toISOString()
+    };
+
+    try {
+        const { error } = await sqeClient.from('eight_d_reports').insert([payload]);
+        if (error) throw error;
+
+        toast("✅ สร้างเคส 8D สำเร็จแล้ว!", "success");
+        if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
+            await Wap8DSystem.fetchCases();
+        }
+        renderTable();
+        
+        switchPage('8D REPORT');
+        setTimeout(() => {
+            if (typeof Wap8DSystem !== 'undefined') Wap8DSystem.openReport(newId);
+        }, 200);
+
+    } catch (e) {
+        console.error("8D Create Error:", e);
+        toast("❌ สร้างเคส 8D ไม่สำเร็จ: " + e.message, "error");
+    }
+}
+
+function openReportFromRecord(caseId) {
+    switchPage('8D REPORT');
+    setTimeout(() => {
+        if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.openReport) {
+            Wap8DSystem.openReport(caseId);
+        }
+    }, 200);
+}
+
+async function loadRecords() {
+    // ดักจับ Target User: ถ้าเป็นหัวหน้าให้ดูคนที่เลือก (viewingUser) ถ้าเป็นพนักงานให้ดูตัวเอง (currentUser)
+    const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
+    if (!targetUser) return;
 
     const sb = getSupabase();
     if (sb && navigator.onLine) {
         try {
-            let query = sb.from('records').select('*');
-
-            if (targetUser && targetUser !== 'ALL') {
-                // แก้ไขจุดนี้: เปลี่ยนจาก .eq เป็น .ilike 
-                // .ilike จะช่วยให้ค้นหาแบบไม่สนตัวพิมพ์เล็ก-ใหญ่ (Case-Insensitive)
-                // และเพิ่มการลบช่องว่าง (trim) เพื่อป้องกันกรณีมี Space ต่อท้ายชื่อ
-                query = query.ilike('inspector', targetUser.trim());
-            }
-
-            const { data, error } = await query.order('created_at', { ascending: false });
+            // ดึงข้อมูล Claim โดยกรองจากชื่อผู้ตรวจ (inspector)
+            const { data, error } = await sb.from('records')
+                .select('*')
+                .eq('inspector', targetUser)
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
             
-            // ตรวจสอบว่าถ้า query สำเร็จแต่ data เป็นว่างเปล่า [] 
-            if (data && data.length === 0) {
-                console.warn("Query success but 0 records found for:", targetUser);
-            }
-
+            // อัปเดตข้อมูลลง Global State
             S.records = (data || []).map(normalizeRecord);
+
+            // ดึงข้อมูลเคส 8D ล่าสุดเพื่อเทียบสถานะ
+            if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
+                await Wap8DSystem.fetchCases();
+            }
             
+            // สั่งให้สมอง AI เรียนรู้ข้อมูลของคนนี้ใหม่
             rebuildSmartMemory();
             updateAIBrain();
+            
+            // วาดตารางใหม่
             renderTable();
             return;
         } catch (e) {
-            console.error("loadRecords Error:", e);
             toast(getFriendlyErrorMessage(e), 'error');
         }
     }
-    
-    if (!S.records) S.records = [];
+    // กรณีออฟไลน์หรือไม่มีข้อมูล
+    S.records = [];
     renderTable();
 }
 
@@ -5236,21 +5339,30 @@ function getFilteredRecords() {
         filtered = filtered.filter(r => r.date >= start && r.date <= end);
     }
 
-    // กรองตาม Judgment (ALL, SF, VENDOR...)
-    if (S.activeFilter !== 'ALL') filtered = filtered.filter(r => r.judgment === S.activeFilter);
+    // กรองตาม Judgment หรือ 8D Status
+    if (S.activeFilter === '8D_HAS') {
+        filtered = filtered.filter(r => !!get8DCaseForRecord(r));
+    } else if (S.activeFilter === '8D_NO') {
+        filtered = filtered.filter(r => !get8DCaseForRecord(r));
+    } else if (S.activeFilter !== 'ALL') {
+        filtered = filtered.filter(r => r.judgment === S.activeFilter);
+    }
     
     // กรองตามคำค้นหา
     if (S.searchKeyword) {
         const kw = S.searchKeyword.toLowerCase();
-        filtered = filtered.filter(r =>
-            (r.ref || '').toLowerCase().includes(kw) ||
-            (r.partNo || '').toLowerCase().includes(kw) ||
-            (r.partName || '').toLowerCase().includes(kw) ||
-            (r.supplier || '').toLowerCase().includes(kw) ||
-            (r.defect || '').toLowerCase().includes(kw) ||
-            (r.line || '').toLowerCase().includes(kw) ||
-            (r.remark || '').toLowerCase().includes(kw)
-        );
+        filtered = filtered.filter(r => {
+            const has8D = get8DCaseForRecord(r);
+            const eightDId = has8D ? String(has8D.id).toLowerCase() : '';
+            return (r.ref || '').toLowerCase().includes(kw) ||
+                (r.partNo || '').toLowerCase().includes(kw) ||
+                (r.partName || '').toLowerCase().includes(kw) ||
+                (r.supplier || '').toLowerCase().includes(kw) ||
+                (r.defect || '').toLowerCase().includes(kw) ||
+                (r.line || '').toLowerCase().includes(kw) ||
+                (r.remark || '').toLowerCase().includes(kw) ||
+                eightDId.includes(kw);
+        });
     }
     return filtered;
 }
@@ -5423,6 +5535,29 @@ function buildRow(r, i) {
     else if (jdg.includes('CAN USE')) { statusClass = 'status-ok'; statusLabel = 'CAN USE'; }
     const isEditing = S.editingId === r.id;
 
+    // --- 8D Status Indicator ---
+    const eightD = get8DCaseForRecord(r);
+    let eightDUI = '';
+
+    if (eightD) {
+        const dStatus = (eightD.status || 'D1_OPEN').replace('D1_OPEN', 'D1').replace('_', ' ');
+        eightDUI = `
+            <button onclick="event.stopPropagation(); openReportFromRecord('${eightD.id}')"
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-emerald-50 text-emerald-600 border border-emerald-300 hover:bg-emerald-100 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                    title="คลิกเพื่อเปิดดู 8D Report #${eightD.id}">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>8D: ${escapeHtml(dStatus)}</span>
+            </button>`;
+    } else {
+        eightDUI = `
+            <button onclick="event.stopPropagation(); create8DFromClaimRecord('${r.id}')"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-500 hover:bg-blue-600 hover:text-white border border-slate-200 hover:border-blue-600 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                    title="คลิกเพื่อสร้างรายงาน 8D จากเคสนี้ทันที">
+                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>+ ออก 8D</span>
+            </button>`;
+    }
+
      return `
     <tr class="${isEditing ? 'editing-row' : ''}" data-rid="${r.id}" style="${rowStyle}">
         <td class="col-no" style="vertical-align: middle; padding: 6px 0 !important;">
@@ -5440,19 +5575,16 @@ function buildRow(r, i) {
             </div>
         </td>
 
-        <!-- แก้ไขจุดนี้: SUPPLIER/PART INFO -->
+        <!-- SUPPLIER/PART INFO -->
         <td class="col-part-combo" style="max-width: 280px;">
             <div style="display: flex; flex-direction: column; gap: 1px;">
-                <!-- บรรทัดบน: ชื่อ Supplier (CSS จะเปลี่ยนเป็นสีขาวหนาใน Dark Mode) -->
                 <span style="font-weight: 800; color: #1e293b; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(r.supplier)}">
                     ${escapeHtml(r.supplier || '-')}
                 </span>
                 
-                <!-- บรรทัดล่าง: ชื่อพาร์ท และ หมายเลขพาร์ท -->
                 <span style="font-size: 9px; color: #64748b; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center;">
                     <span style="flex-shrink: 1; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(r.partName || '-')}</span>
                     <span style="margin: 0 4px; opacity: 0.5;">/</span>
-                    <!-- หมายเลขพาร์ท (CSS จะเปลี่ยนเป็นสีฟ้าเลเซอร์ใน Dark Mode) -->
                     <span style="font-family: monospace; letter-spacing: 0.5px;">${escapeHtml(r.partNo || '-')}</span>
                 </span>
             </div>
@@ -5524,6 +5656,7 @@ function renderTable() {
 
     /**
      * 4. สร้างโครงสร้างใหม่ (Virtual DOM Structure)
+     * แก้ไขจุดนี้: ใส่ data-i18n ให้กับทุกหัวข้อคอลัมน์ (<th>)
      */
     container.innerHTML = `
         <div id="table-runway" style="position: relative; width: 100%; height: ${total * FIXED_ROW_HEIGHT + HEADER_HEIGHT}px;">
@@ -5533,11 +5666,11 @@ function renderTable() {
                         <col style="width: 45px;">   <!-- # -->
                         <col style="width: 100px;">  <!-- DATE -->
                         <col style="width: 130px;">  <!-- REF/LINE -->
-                        <col style="width: 280px;">  <!-- SUPPLIER/PART -->
+                        <col style="width: 260px;">  <!-- SUPPLIER/PART -->
                         <col style="width: 70px;">   <!-- QTY -->
                         <col style="width: 140px;">  <!-- DEFECT -->
-                        <col style="width: 180px;">  <!-- REMARK -->
-                        <col style="width: 140px;">  <!-- STATUS -->
+                        <col style="width: 160px;">  <!-- REMARK -->
+                        <col style="width: 120px;">  <!-- STATUS -->
                         <col style="width: 100px;">  <!-- ACTIONS -->
                     </colgroup>
                     <thead class="sticky top-0 z-30">
@@ -5561,118 +5694,86 @@ function renderTable() {
         </div>
     `;
 
-    // 5. รีเซ็ตตำแหน่งการเลื่อน และผูก Event ใหม่
+    // 5. รีเซ็ตตำแหน่งการเลื่อน และผูก Event ใหม่ (ใช้ requestAnimationFrame เพื่อ 60FPS ลื่นไหล)
     container.scrollTop = 0;
     container.removeEventListener('scroll', handleTableScroll);
-    container.addEventListener('scroll', handleTableScroll, { passive: true });
+    container.removeEventListener('scroll', _onTableScrollThrottled);
+    container.addEventListener('scroll', _onTableScrollThrottled, { passive: true });
 
-    // 6. [จุดสำคัญ] สั่งแปลภาษาหัวตาราง
-    const currentLang = safeGetStorage('local', 'carrier_lang', 'en');
+    // 6. [จุดสำคัญ] สั่งแปลภาษาหัวตารางทันทีหลังวาด HTML
+    const currentLang = localStorage.getItem('carrier_lang') || 'en';
     applyLanguage(currentLang);
 
-    // 7. แก้ไขจุดนี้: ใช้ setTimeout เพื่อรอให้ Browser คำนวณ ClientHeight ให้เสร็จก่อน
-    setTimeout(() => {
-        requestAnimationFrame(() => {
-            handleTableScroll();
-            // Force Reflow สำหรับเครื่องที่ Layout ค้าง
-            if (container.clientHeight === 0) {
-                console.warn("Table container height is 0, forcing re-render");
-                handleTableScroll(); 
-            }
-        });
-    }, 100); // รอ 100ms เพื่อความชัวร์
+    // 7. สั่งวาดข้อมูลแถวแรกๆ
+    handleTableScroll();
 }
 
+let _tableScrollTicking = false;
+function _onTableScrollThrottled() {
+    if (!_tableScrollTicking) {
+        _tableScrollTicking = true;
+        requestAnimationFrame(() => {
+            handleTableScroll();
+            _tableScrollTicking = false;
+        });
+    }
+}
 
 /**
- * 🚀 ฟังก์ชันจัดการ Virtual Scroll ระดับสูง 
- * ออกแบบมาเพื่อแก้ปัญหา GPU Rendering Error และรองรับการแสดงผลทุกขนาดหน้าจอ
+ * ฟังก์ชันจัดการ Virtual Scroll (High Performance)
+ * ใช้การคำนวณตำแหน่งและดีดเนื้อหาด้วย Transform
  */
 function handleTableScroll() {
-    // [1] อ้างอิง Element สำคัญ
     const container = document.getElementById('table-container');
     const tbody = document.getElementById('table-render-target');
     
-    // [2] Guard Clause: ตรวจสอบความพร้อมก่อนทำงาน
-    // หากไม่มี Container หรือ ข้อมูลยังโหลดไม่เสร็จ ให้หยุดการทำงานเพื่อป้องกัน Error
-    if (!container || !tbody || !virtualTableState.allRows || virtualTableState.allRows.length === 0) {
-        return;
-    }
+    // ตรวจสอบความพร้อมของข้อมูลและ Element
+    if (!container || !tbody || !virtualTableState.allRows.length) return;
 
     const allData = virtualTableState.allRows;
     const totalCount = allData.length;
     const scrollTop = container.scrollTop;
-
-    // ============================================================
-    // 🛡️ [RECOVERY ENGINE] ระบบตรวจจับและแก้ไขความสูงหน้าจอแบบ 3 ชั้น
-    // แก้ปัญหาเครื่องที่รายงานค่า clientHeight เป็น 0 เนื่องจาก GPU หรือ Scaling เพี้ยน
-    // ============================================================
-    let viewHeight = container.clientHeight;
-
-    if (viewHeight <= 0) {
-        // ขั้นที่ 1: ตรวจสอบค่า OffsetHeight (ความสูงรวมขอบ)
-        viewHeight = container.offsetHeight;
-
-        // ขั้นที่ 2: คำนวณจาก Viewport จริง (หักลบพื้นที่ด้านบนและล่างออก)
-        if (viewHeight <= 0) {
-            const rect = container.getBoundingClientRect();
-            // window.innerHeight คือความสูงจริงของหน้าต่าง Browser
-            // rect.top คือตำแหน่งที่ตารางเริ่มวาง
-            viewHeight = window.innerHeight - rect.top - 50; 
-        }
-        
-        // ขั้นที่ 3: Safety Fallback (Hardcoded)
-        // หากคำนวณทุกอย่างแล้วยังเป็น 0 ให้บังคับความสูงเป็นค่ามาตรฐาน 600px 
-        // เพื่อบังคับให้ Code วาดแถวข้อมูลออกมาให้ User เห็น
-        if (viewHeight <= 0) viewHeight = 600; 
-
-        // บันทึก Log เพื่อแจ้งเตือนนักพัฒนาว่าเครื่องนี้มีการ Recovery
-        console.warn("Table Recovery: GPU error bypassed. Height used:", viewHeight);
-    }
-    // ============================================================
-
-    // [3] คำนวณขอบเขตแถวที่ต้องแสดงผล (Dynamic Index Calculation)
-    // BUFFER คือจำนวนแถวที่วาดรอไว้ก่อนเลื่อนถึง เพื่อป้องกัน "หน้าจอขาว" เวลาเลื่อนเร็วๆ
-    const BUFFER = 8; 
+    const viewHeight = Math.max(container.clientHeight || 0, window.innerHeight || 600);
+    
+    // 1. คำนวณหา Index ของแถวที่ต้องแสดงผล
+    // ใช้ BUFFER 6 แถวและ fallback viewHeight เพื่อป้องกันพื้นที่สีขาวเมื่อคำนวณขนาดจอคลาดเคลื่อน
+    const BUFFER = 6;
     let startIdx = Math.floor(scrollTop / FIXED_ROW_HEIGHT) - BUFFER;
     let endIdx = Math.ceil((scrollTop + viewHeight) / FIXED_ROW_HEIGHT) + BUFFER;
 
-    // ตรวจสอบขอบเขต (Clamp) ไม่ให้ Index หลุดช่วง 0 ถึงจำนวนข้อมูลจริง
+    // ตรวจสอบขอบเขตของ Index (ไม่ให้ต่ำกว่า 0 หรือเกินจำนวนข้อมูลที่มี)
     startIdx = Math.max(0, startIdx);
     endIdx = Math.min(totalCount, endIdx);
 
-    // [4] ระบบ Performance Lock
-    // หากเลื่อนจอแล้วยังอยู่ในช่วง Index เดิม ไม่ต้องทำอะไร (ประหยัดพลังงานเครื่อง)
-    if (startIdx === virtualTableState.prevStart && endIdx === virtualTableState.prevEnd) {
-        return;
-    }
+    // 2. Performance Check: หากเลื่อนไปแล้วยังอยู่ในช่วงเดิม ไม่ต้องวาด DOM ใหม่
+    if (startIdx === virtualTableState.prevStart && endIdx === virtualTableState.prevEnd) return;
     
     virtualTableState.prevStart = startIdx;
     virtualTableState.prevEnd = endIdx;
 
-    // [5] การจัดวางตำแหน่งตารางแบบ GPU-Accelerated
-    // ใช้ CSS Transform 'translateY' ซึ่งทำงานบนชั้น Layer ของการ์ดจอโดยตรง 
-    // ทำให้ลื่นไหลกว่าการใช้ Margin หรือ Top มาก
+    // 3. การคำนวณตำแหน่ง (The Magic Logic)
+    // ดีดเฉพาะส่วนของ Tbody ลงมาให้ตรงกับตำแหน่งที่กำลัง Scroll
     const offsetY = startIdx * FIXED_ROW_HEIGHT;
-    tbody.style.transform = `translateY(${offsetY}px)`;
+    
+    // ใช้ translate3d เพื่อกระตุ้น Hardware GPU Acceleration ให้ลื่นไหล (60 FPS) บนทุกอุปกรณ์
+    tbody.style.transform = `translate3d(0, ${offsetY}px, 0)`;
 
-    // [6] กระบวนการวาดแถวข้อมูล (Render Loop)
+    // 4. วนลูปสร้างเฉพาะ HTML ของแถวในช่วงที่คำนวณได้
     let loopHtml = '';
     for (let i = startIdx; i < endIdx; i++) {
-        if (allData[i]) {
-            // เรียกฟังก์ชัน buildRow ของระบบเดิมเพื่อสร้าง HTML ของแต่ละแถว
-            loopHtml += buildRow(allData[i], i);
-        }
+        loopHtml += buildRow(allData[i], i);
     }
 
-    // [7] อัปเดตข้อมูลเข้าสู่หน้าจอ
+    // 5. ฉีดข้อมูลเข้าสู่ Tbody
     tbody.innerHTML = loopHtml;
+    if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
 }
 
 /**
  * ปรับปรุง: ฟังก์ชันสลับหน้าย่อยให้ "ฉลาดเรื่องภาษา" (Smart i18n Aware)
  */
 function switchSubTerminal(view) {
+    if (typeof clearTableSelection === 'function') clearTableSelection();
     const entryDiv = $id('entry-terminal-content');
     const cockpitDiv = $id('overview-cockpit-content');
     const btnEntry = $id('sub-btn-entry');
@@ -5688,7 +5789,7 @@ function switchSubTerminal(view) {
     const vendorDivider = $id('vendor-divider');
 
     // ดึงข้อมูลภาษาปัจจุบัน
-    const currentLang = safeGetStorage('local', 'carrier_lang', 'en');
+    const currentLang = localStorage.getItem('carrier_lang') || 'en';
     const langData = translations[currentLang];
 
     // อ้างอิงกลุ่มเครื่องมือ
@@ -5779,6 +5880,7 @@ function switchSubTerminal(view) {
  * ═══════════════════════════════════════════════════════
  */
 function switchPage(name, el) {
+    if (typeof clearTableSelection === 'function') clearTableSelection();
     const pageNameUpper = name.toUpperCase();
     const titleEl = document.getElementById('header-title');
     const subNav = document.getElementById('terminal-sub-nav'); 
@@ -5831,7 +5933,7 @@ function switchPage(name, el) {
             adminHeaderTools.classList.add('flex');
         }
         if (window._preAdminThemeChoice === undefined || window._preAdminThemeChoice === null) {
-            window._preAdminThemeChoice = safeGetStorage('local', 'carrier_theme') || (document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+            window._preAdminThemeChoice = localStorage.getItem('carrier_theme') || (document.body.classList.contains('dark-mode') ? 'dark' : 'light');
         }
         document.body.classList.add('dark-mode');
         if (typeof updateThemeIcon === 'function') updateThemeIcon(true);
@@ -5889,7 +5991,9 @@ function switchPage(name, el) {
         'SKILL MATRIX': 'skill-matrix-content',
         'SPECIAL JOBS': 'special-jobs-content',
         'OT MANAGEMENT': 'ot-management-content',
-        '8D REPORT': 'eight-d-content' // <--- เพิ่มบรรทัดนี้
+        '8D REPORT': 'eight-d-content',
+        'SQE EN': 'eight-d-content',
+        'SME RECEIVABLES': 'eight-d-content'
     };
 
     const targetId = targetIdMap[pageNameUpper];
@@ -5908,7 +6012,10 @@ function switchPage(name, el) {
             case 'SKILL MATRIX': WapSkillMatrix.init(); break;
             case 'SPECIAL JOBS': WapSpecialJobs.init(); break;
             case 'OT MANAGEMENT': WapOTManagement.init(); break;
-            case '8D REPORT': Wap8DSystem.init(); break; // <--- เพิ่มบรรทัดนี้
+            case '8D REPORT':
+            case 'SQE EN':
+            case 'SME RECEIVABLES':
+                Wap8DSystem.init(); break;
 case 'ADMIN CONSOLE': 
     if (typeof WapAdminSystem !== 'undefined') {
         WapAdminSystem.init(); 
@@ -5930,7 +6037,7 @@ function applyLanguage(lang) {
     const data = translations[lang];
     if (!data) return;
 
-    safeSetStorage('local', 'carrier_lang', lang);
+    localStorage.setItem('carrier_lang', lang);
 
     // 2.1 แปลข้อความที่มี data-i18n (รองรับการรักษาไอคอน SVG)
     document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -6360,12 +6467,281 @@ document.addEventListener('click', e => {
     if (!e.target.closest('.form-input-wrap')) closeAllAC();
 });
 
+// ============================================================
+// TABLE KEYBOARD NAVIGATION ENGINE
+// ============================================================
+let tableKbdNavState = {
+    selectedRowId: null,
+    selectedIndex: -1,
+    activeType: null
+};
+
+function getActiveTableContext() {
+    const pageTargets = [
+        { id: 'entry-terminal-content', type: 'claim', tbodyId: 'table-render-target', containerId: 'table-container' },
+        { id: 'eight-d-content', type: '8d', tbodyId: 'eight-d-list-body', containerId: 'eight-d-dashboard' },
+        { id: 'line-support-logs-content', type: 'support', tbodyId: 'tableBody', containerId: 'tableScrollArea' },
+        { id: 'attendance-logs', type: 'attendance', tbodyId: 'att-records-tbody', containerId: null },
+        { id: 'five-s-content', type: '5s', tbodyId: 's5-table-body', containerId: null },
+        { id: 'special-jobs-content', type: 'special', tbodyId: 'sj-table-body', containerId: null },
+        { id: 'ot-management-content', type: 'ot', tbodyId: 'ot-table-body', containerId: null },
+        { id: 'admin-console-content', type: 'admin', tbodyId: 'admin-table-body', containerId: 'admin-db-table-container' }
+    ];
+
+    for (const page of pageTargets) {
+        const pageEl = document.getElementById(page.id);
+        if (pageEl && !pageEl.classList.contains('hidden-view') && pageEl.style.display !== 'none' && pageEl.offsetWidth > 0) {
+            const tbody = document.getElementById(page.tbodyId);
+            if (tbody) {
+                const container = page.containerId ? document.getElementById(page.containerId) : tbody.closest('.overflow-auto, .overflow-y-auto, div');
+                return { page, tbody, container, type: page.type };
+            }
+        }
+    }
+    return null;
+}
+
+function highlightTableRow(tr) {
+    document.querySelectorAll('tr.kbd-row-selected').forEach(r => r.classList.remove('kbd-row-selected'));
+    if (tr) {
+        tr.classList.add('kbd-row-selected');
+    }
+}
+
+function reapplyKbdRowSelection() {
+    const ctx = getActiveTableContext();
+    if (!ctx || !ctx.tbody) return;
+
+    if (tableKbdNavState.selectedRowId) {
+        const tr = ctx.tbody.querySelector(`tr[data-rid="${tableKbdNavState.selectedRowId}"]`);
+        if (tr) {
+            highlightTableRow(tr);
+            return;
+        }
+    }
+
+    if (ctx.type === 'claim' && tableKbdNavState.selectedIndex >= 0) {
+        const allData = (typeof virtualTableState !== 'undefined' && virtualTableState.allRows) ? virtualTableState.allRows : [];
+        if (allData[tableKbdNavState.selectedIndex]) {
+            const id = allData[tableKbdNavState.selectedIndex].id;
+            const tr = ctx.tbody.querySelector(`tr[data-rid="${id}"]`);
+            if (tr) highlightTableRow(tr);
+        }
+    }
+}
+window.reapplyKbdRowSelection = reapplyKbdRowSelection;
+
+function moveTableSelection(ctx, direction) {
+    if (!ctx) ctx = getActiveTableContext();
+    if (!ctx || !ctx.tbody) return;
+
+    if (ctx.type === 'claim') {
+        const allData = (typeof virtualTableState !== 'undefined' && virtualTableState.allRows) ? virtualTableState.allRows : [];
+        if (allData.length === 0) return;
+
+        let currentIdx = tableKbdNavState.selectedIndex;
+        if (tableKbdNavState.selectedRowId && currentIdx === -1) {
+            currentIdx = allData.findIndex(r => r.id === tableKbdNavState.selectedRowId);
+        }
+
+        let newIdx = currentIdx + direction;
+        if (currentIdx === -1) {
+            newIdx = direction > 0 ? 0 : allData.length - 1;
+        }
+        newIdx = Math.max(0, Math.min(allData.length - 1, newIdx));
+
+        tableKbdNavState.selectedIndex = newIdx;
+        tableKbdNavState.selectedRowId = allData[newIdx].id;
+        tableKbdNavState.activeType = ctx.type;
+
+        const container = ctx.container || document.getElementById('table-container');
+        if (container) {
+            const FIXED_ROW_H = typeof FIXED_ROW_HEIGHT !== 'undefined' ? FIXED_ROW_HEIGHT : 52;
+            const rowTop = newIdx * FIXED_ROW_H;
+            const containerHeight = container.clientHeight || 500;
+            if (rowTop < container.scrollTop + 40 || rowTop > container.scrollTop + containerHeight - 80) {
+                container.scrollTop = Math.max(0, rowTop - Math.floor(containerHeight / 2));
+            }
+        }
+
+        reapplyKbdRowSelection();
+    } else {
+        const rows = Array.from(ctx.tbody.querySelectorAll('tr')).filter(tr => tr.offsetWidth > 0 && tr.offsetHeight > 0 && !tr.querySelector('td[colspan]'));
+        if (rows.length === 0) return;
+
+        let currentIdx = -1;
+        if (tableKbdNavState.selectedRowId) {
+            currentIdx = rows.findIndex(r => r.dataset.rid === tableKbdNavState.selectedRowId);
+        }
+        if (currentIdx === -1) currentIdx = tableKbdNavState.selectedIndex;
+
+        let newIdx = currentIdx + direction;
+        if (currentIdx === -1) {
+            newIdx = direction > 0 ? 0 : rows.length - 1;
+        }
+        newIdx = Math.max(0, Math.min(rows.length - 1, newIdx));
+
+        const targetRow = rows[newIdx];
+        tableKbdNavState.selectedIndex = newIdx;
+        tableKbdNavState.selectedRowId = targetRow.dataset.rid || targetRow.id || `row-${newIdx}`;
+        tableKbdNavState.activeType = ctx.type;
+
+        highlightTableRow(targetRow);
+        targetRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+}
+
+function clearTableSelection() {
+    tableKbdNavState.selectedRowId = null;
+    tableKbdNavState.selectedIndex = -1;
+    document.querySelectorAll('tr.kbd-row-selected').forEach(r => r.classList.remove('kbd-row-selected'));
+}
+window.clearTableSelection = clearTableSelection;
+
+function triggerSelectedRowAction(ctx) {
+    if (!ctx) ctx = getActiveTableContext();
+    if (!ctx || !ctx.tbody) return;
+
+    const rowId = tableKbdNavState.selectedRowId;
+
+    if (ctx.type === 'claim') {
+        if (rowId && typeof editRecord === 'function') {
+            editRecord(rowId);
+            if (typeof toast === 'function') toast(`✏️ Selected Record: ${rowId.slice(0, 8)}`, 'info');
+        } else if (tableKbdNavState.selectedIndex >= 0) {
+            const allData = (typeof virtualTableState !== 'undefined' && virtualTableState.allRows) ? virtualTableState.allRows : [];
+            const item = allData[tableKbdNavState.selectedIndex];
+            if (item && typeof editRecord === 'function') {
+                editRecord(item.id);
+                if (typeof toast === 'function') toast(`✏️ Selected Record: ${item.ref || item.id}`, 'info');
+            }
+        }
+    } else if (ctx.type === '8d') {
+        if (rowId && typeof Wap8DSystem !== 'undefined' && Wap8DSystem.openReport) {
+            Wap8DSystem.openReport(rowId);
+        } else {
+            const tr = ctx.tbody.querySelector(`tr[data-rid="${rowId}"]`) || ctx.tbody.querySelectorAll('tr')[tableKbdNavState.selectedIndex];
+            if (tr) {
+                const btn = tr.querySelector('button[onclick*="openReport"], button');
+                if (btn) btn.click();
+            }
+        }
+    } else if (ctx.type === 'support') {
+        if (rowId && typeof WapSupportLogs !== 'undefined' && WapSupportLogs._openViewModal) {
+            WapSupportLogs._openViewModal(rowId);
+        } else {
+            const tr = ctx.tbody.querySelector(`tr[data-rid="${rowId}"]`) || ctx.tbody.querySelectorAll('tr')[tableKbdNavState.selectedIndex];
+            if (tr) {
+                const btn = tr.querySelector('button');
+                if (btn) btn.click();
+            }
+        }
+    } else if (ctx.type === 'attendance') {
+        if (rowId && typeof editAttRecord === 'function') {
+            editAttRecord(rowId);
+        } else {
+            const tr = ctx.tbody.querySelector(`tr[data-rid="${rowId}"]`) || ctx.tbody.querySelectorAll('tr')[tableKbdNavState.selectedIndex];
+            if (tr) {
+                const btn = tr.querySelector('button.att-btn-edit, button');
+                if (btn) btn.click();
+            }
+        }
+    } else {
+        let tr = null;
+        if (rowId) {
+            tr = ctx.tbody.querySelector(`tr[data-rid="${rowId}"]`);
+        }
+        if (!tr && tableKbdNavState.selectedIndex >= 0) {
+            const rows = Array.from(ctx.tbody.querySelectorAll('tr')).filter(r => r.offsetWidth > 0 && !r.querySelector('td[colspan]'));
+            tr = rows[tableKbdNavState.selectedIndex];
+        }
+
+        if (tr) {
+            const primaryBtn = tr.querySelector('button.act-btn-view, button.act-btn-edit, button.row-btn-edit, button.row-btn-clone, button:not(.act-btn-del):not(.row-btn-del)');
+            if (primaryBtn) {
+                primaryBtn.click();
+            } else {
+                tr.click();
+            }
+        }
+    }
+}
+
+function handleGlobalTableKeydown(e) {
+    const activeEl = document.activeElement;
+    const isTyping = activeEl && (
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.tagName === 'SELECT' ||
+        activeEl.isContentEditable ||
+        (activeEl.tagName === 'INPUT' && !['button', 'checkbox', 'radio', 'submit'].includes(activeEl.type))
+    );
+
+    const ctx = getActiveTableContext();
+    if (!ctx) return;
+
+    if (isTyping && (e.key === 'ArrowDown' || e.key === 'Down')) {
+        const isSearchInput = activeEl.id === 'filter-search' || 
+                              activeEl.id === 'eightDSearch' || 
+                              activeEl.id === 'searchInput' || 
+                              activeEl.classList.contains('search-input') || 
+                              activeEl.type === 'search';
+        if (isSearchInput) {
+            activeEl.blur();
+            e.preventDefault();
+            moveTableSelection(ctx, 1);
+            return;
+        }
+    }
+
+    if (isTyping) return;
+
+    if (e.key === 'ArrowDown' || e.key === 'Down' || e.key === 'j') {
+        e.preventDefault();
+        moveTableSelection(ctx, 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'Up' || e.key === 'k') {
+        e.preventDefault();
+        moveTableSelection(ctx, -1);
+    } else if (e.key === 'Enter') {
+        if (tableKbdNavState.selectedIndex >= 0 || tableKbdNavState.selectedRowId) {
+            e.preventDefault();
+            triggerSelectedRowAction(ctx);
+        }
+    } else if (e.key === 'Escape') {
+        clearTableSelection();
+    }
+}
+
+function initTableKeyboardNavigation() {
+    document.removeEventListener('keydown', handleGlobalTableKeydown, false);
+    document.addEventListener('keydown', handleGlobalTableKeydown, false);
+
+    document.addEventListener('click', (e) => {
+        const tr = e.target.closest('tbody tr');
+        if (tr && !tr.querySelector('td[colspan]')) {
+            const ctx = getActiveTableContext();
+            if (ctx && ctx.tbody.contains(tr)) {
+                const rid = tr.dataset.rid || tr.id;
+                tableKbdNavState.selectedRowId = rid || null;
+                tableKbdNavState.activeType = ctx.type;
+
+                const rows = Array.from(ctx.tbody.querySelectorAll('tr')).filter(r => r.offsetWidth > 0 && !r.querySelector('td[colspan]'));
+                tableKbdNavState.selectedIndex = rows.indexOf(tr);
+
+                highlightTableRow(tr);
+                return;
+            }
+        }
+        clearTableSelection();
+    });
+}
+
 function initKeyboardAwareness() {
     const inputs = document.querySelectorAll('.form-input, .form-textarea, .login-input, select');
     inputs.forEach(input => {
         input.addEventListener('focus', function () { setTimeout(() => this.classList.add('keyboard-focus-active'), 300); });
         input.addEventListener('blur', function () { this.classList.remove('keyboard-focus-active'); });
     });
+    initTableKeyboardNavigation();
 }
 
 
@@ -6548,20 +6924,25 @@ let resizeTimer = null;
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-        renderTable();
-        if (charts.yield || charts.trend) {
-            const activePage = $id('overview-cockpit-content');
-            if (activePage && !activePage.classList.contains('hidden-view')) refreshDashboard();
+        try {
+            renderTable();
+            if (charts && (charts.yield || charts.trend)) {
+                const activePage = $id('overview-cockpit-content');
+                if (activePage && !activePage.classList.contains('hidden-view')) refreshDashboard();
+            }
+            const execPage = $id('exec-dashboard-content');
+            if (execPage && !execPage.classList.contains('hidden-view') && typeof initExecDashboard === 'function') {
+                initExecDashboard();
+            }
+            const attPage = $id('attendance-logs');
+            if (attPage && !attPage.classList.contains('hidden-view') && typeof initAttMonthlyChart === 'function') {
+                initAttMonthlyChart();
+            }
+            const sidebar = $id('sidebar');
+            if (sidebar && window.innerWidth <= 768) sidebar.classList.add('collapsed');
+        } catch (err) {
+            console.warn('[Resize Handler Guard]', err);
         }
-const execPage = $id('exec-dashboard-content');
-if (execPage && !execPage.classList.contains('hidden-view')) {
-    initExecDashboard();
-}
-const attPage = $id('attendance-logs');
-if (attPage && !attPage.classList.contains('hidden-view') && typeof initAttMonthlyChart === 'function') {
-    initAttMonthlyChart();
-}
-if (window.innerWidth <= 768) $id('sidebar').classList.add('collapsed');
     }, 200);
 });
 
@@ -7894,7 +8275,7 @@ async function renderAttRecords() {
         const t = attTypeMap[r.type] || attTypeMap.other;
         const isEditing = (attEditingId === r.id);
         html += `
-            <tr class="${isEditing ? 'att-editing-row' : ''}">
+            <tr class="${isEditing ? 'att-editing-row' : ''}" data-rid="${r.id}">
                 <td><span class="att-record-date">${formatDateTH(r.date)}</span></td>
                 <td><span class="att-type-tag ${t.cls}">${t.label}</span></td>
                 <td><span class="att-record-reason">${escapeHtml(r.note || '-')}</span></td>
@@ -7910,6 +8291,7 @@ async function renderAttRecords() {
     tbody.innerHTML = html;
     if (countEl) countEl.textContent = `${records.length} รายการ`;
     renderDailySubmissionMatrix(); 
+    if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
 }
 
 function cancelEditAttRecord() {
@@ -8500,11 +8882,11 @@ const WapSupportLogs = (function () {
         const myToken = ++_fetchToken;
 
         try {
-            let query = wapClient.from(TABLE).select('*');
-            if (_user && _user !== 'ALL') {
-                query = query.eq('user_id', _user);
-            }
-            const { data, error } = await query.order('created_at', { ascending: false });
+            const { data, error } = await wapClient
+                .from(TABLE)
+                .select('*')
+                .eq('user_id', _user)
+                .order('created_at', { ascending: false });
             if (error) throw error;
 
             // ถ้ามีรอบใหม่แซงเข้ามาระหว่างรอ หรือโมดูลถูก destroy ไปแล้ว ทิ้งผลลัพธ์รอบนี้
@@ -8553,112 +8935,65 @@ const WapSupportLogs = (function () {
         _render();
     }
 
-// ฟังก์ชันช่วยกำหนดสีตามประเภทการแก้ไข
-const getActionBadgeStyle = (action) => {
-    const act = (action || '').trim();
-    switch(act) {
-        case 'Replace':
-            return 'background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;'; // สีน้ำเงิน
-        case 'Sorting 100%':
-            return 'background: #fdf2f8; color: #9d174d; border: 1px solid #fbcfe8;'; // สีชมพู
-        case 'Scrap':
-            return 'background: #fef2f2; color: #991b1b; border: 1px solid #fecaca;'; // สีแดง
-        case 'Use as is':
-            return 'background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;'; // สีเขียว
-        case 'Return to Vendor':
-            return 'background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;'; // สีส้มอิฐ
-        case 'Rework':
-            return 'background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;'; // สีเทาเข้ม
-        default:
-            return 'background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;'; // สีเทาอ่อน (N/A)
-    }
-};
-
     function _render() {
-    if (!$.tbody) return;
+        if (!$.tbody) return;
 
-    if ($.count) $.count.textContent = _filtered.length + ' Case Logs';
+        if ($.count) $.count.textContent = _filtered.length + ' Case Logs';
 
-    if (_filtered.length === 0) {
-        $.tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:80px;color:#cbd5e1;font-weight:600;letter-spacing:0.1em;">NO RECORDS FOUND</td></tr>`;
-        return;
+        if (_filtered.length === 0) {
+            $.tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:80px;color:#cbd5e1;font-weight:600;letter-spacing:0.1em;">NO RECORDS FOUND</td></tr>`;
+            return;
+        }
+
+        const htmlRows = _filtered.map((item, index) => {
+            const total = (Number(item.ok) || 0) + (Number(item.ng) || 0);
+            const ngRate = total > 0 ? Math.round((item.ng / total) * 100) : 0;
+            const delay = index < 15 ? (index * 0.04).toFixed(2) : 0;
+
+            let statusCls = 'status-sf';
+            if (item.report === 'RP') statusCls = 'status-vendor';
+            if (item.report === 'RECORDS') statusCls = 'status-ctc';
+
+            return `
+                <tr style="animation-delay: ${delay}s" data-rid="${item.id}">
+                    <td class="col-date">${item.eventDate || '-'}</td>
+                    <td class="col-problem">
+                        <div class="col-problem">
+    ${_esc(item.problem).replace(/(\d+)/g, '<span class="num-blue">$1</span>')}
+</div>
+                    </td>
+                    <td><span class="col-action-badge">${_esc(item.action)}</span></td>
+                    <td class="col-part"><span class="text-main">${_esc(item.part)}</span></td>
+                    <td class="col-lot" style="font-family:monospace;">${_esc(item.lot)}</td>
+                    <td class="col-ok" style="text-align:center; font-weight:800; color:#059669;">${(item.ok || 0).toLocaleString()}</td>
+                    <td style="text-align:center;">
+                        <div class="col-ng-wrap">
+                            <span class="col-ng-num ${item.ng > 0 ? 'has-ng' : 'no-ng'}" style="font-weight:800;">${(item.ng || 0).toLocaleString()}</span>
+                            ${item.ng > 0 ? `<div class="col-ng-rate" style="font-size:9px; color:#ef4444; font-weight:700;">${ngRate}%</div>` : ''}
+                        </div>
+                    </td>
+                    <td style="text-align:center;"><span class="status-pill ${statusCls}">${item.report}</span></td>
+                    <td style="text-align:center;">
+                        ${item.imageUrl ?
+                            `<span class="img-thumb" onclick="WapSupportLogs._openViewModal('${item.id}')">
+                                <img src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover;">
+                             </span>` :
+                            `<span style="color:#e2e8f0; font-size:10px; font-weight:700;">N/A</span>`}
+                    </td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="act-btn act-btn-view" onclick="WapSupportLogs._openViewModal('${item.id}')" data-tip="View"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button class="act-btn act-btn-edit" onclick="WapSupportLogs._openFormModal('${item.id}')" data-tip="Edit"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                            <button class="act-btn act-btn-del" onclick="WapSupportLogs._confirmDelete('${item.id}')" data-tip="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                        </div>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        $.tbody.innerHTML = htmlRows;
+        if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
     }
 
-    // --- ฟังก์ชันช่วยกำหนดสี Badge ตามประเภทการแก้ไข (Action) ---
-    const getActionStyle = (act) => {
-        const a = (act || '').trim();
-        switch(a) {
-            case 'Replace':
-                return 'background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;'; // น้ำเงิน
-            case 'Sorting 100%':
-                return 'background: #fdf2f8; color: #9d174d; border: 1px solid #fbcfe8;'; // ชมพู
-            case 'Scrap':
-                return 'background: #fef2f2; color: #991b1b; border: 1px solid #fecaca;'; // แดง
-            case 'Use as is':
-                return 'background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;'; // เขียว
-            case 'Return to Vendor':
-                return 'background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;'; // ส้ม
-            case 'Rework':
-                return 'background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;'; // เทาเข้ม
-            default:
-                return 'background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;'; // เทาอ่อน
-        }
-    };
-
-    const htmlRows = _filtered.map((item, index) => {
-        const total = (Number(item.ok) || 0) + (Number(item.ng) || 0);
-        const ngRate = total > 0 ? Math.round((item.ng / total) * 100) : 0;
-        const delay = index < 15 ? (index * 0.04).toFixed(2) : 0;
-
-        let statusCls = 'status-sf';
-        if (item.report === 'RP') statusCls = 'status-vendor';
-        if (item.report === 'RECORDS') statusCls = 'status-ctc';
-
-        return `
-            <tr style="animation-delay: ${delay}s">
-                <td class="col-date">${item.eventDate || '-'}</td>
-                <td class="col-problem">
-                    <div style="font-size: 11px; font-weight: 700; color: #334155; line-height: 1.4;">
-                        ${_esc(item.problem).replace(/(\d+)/g, '<span style="color:#2563eb">$1</span>')}
-                    </div>
-                </td>
-                
-                <!-- ✅ คอลัมน์ "การแก้ไข" ที่ปรับปรุงใหม่ -->
-                <td style="text-align:center;">
-                    <span class="col-action-badge" style="${getActionStyle(item.action)} padding: 4px 12px; border-radius: 8px; font-size: 10px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.02em; display: inline-block; min-width: 80px;">
-                        ${_esc(item.action || 'N/A')}
-                    </span>
-                </td>
-
-                <td class="col-part"><span class="text-main" style="font-weight:700;">${_esc(item.part)}</span></td>
-                <td class="col-lot" style="font-family:monospace; text-align:center;">${_esc(item.lot)}</td>
-                <td class="col-ok" style="text-align:center; font-weight:800; color:#059669;">${(item.ok || 0).toLocaleString()}</td>
-                <td style="text-align:center;">
-                    <div class="col-ng-wrap">
-                        <span class="col-ng-num ${item.ng > 0 ? 'has-ng' : 'no-ng'}" style="font-weight:800;">${(item.ng || 0).toLocaleString()}</span>
-                        ${item.ng > 0 ? `<div class="col-ng-rate" style="font-size:9px; color:#ef4444; font-weight:700;">${ngRate}%</div>` : ''}
-                    </div>
-                </td>
-                <td style="text-align:center;"><span class="status-pill ${statusCls}">${item.report}</span></td>
-                <td style="text-align:center;">
-                    ${item.imageUrl ?
-                        `<span class="img-thumb" onclick="WapSupportLogs._openViewModal('${item.id}')">
-                            <img src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover;">
-                         </span>` :
-                        `<span style="color:#e2e8f0; font-size:10px; font-weight:700;">N/A</span>`}
-                </td>
-                <td>
-                    <div class="action-btns">
-                        <button class="act-btn act-btn-view" onclick="WapSupportLogs._openViewModal('${item.id}')" data-tip="View"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                        <button class="act-btn act-btn-edit" onclick="WapSupportLogs._openFormModal('${item.id}')" data-tip="Edit"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                        <button class="act-btn act-btn-del" onclick="WapSupportLogs._confirmDelete('${item.id}')" data-tip="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-                    </div>
-                </td>
-            </tr>`;
-    }).join('');
-
-    $.tbody.innerHTML = htmlRows;
-}
     /* ──────────────────────────────────────────
        FORM MODAL (เพิ่มระบบ Sync To Special Jobs + Commander Suggestion)
        ────────────────────────────────────────── */
@@ -8941,22 +9276,6 @@ formEl.onsubmit = async (e) => {
 };
     }
 
-// ฟังก์ชันสำหรับจัดรูปแบบข้อความ: เปลี่ยนฟอนต์, เน้นสีเลข 10 หลัก (น้ำเงิน) และเลขเศษส่วน (แดง)
-function formatBeautifulText(text) {
-    if (!text) return '';
-    
-    let formatted = text;
-
-    // 1. เน้นตัวเลขจำนวนที่อยู่ติดกับเครื่องหมาย / (เช่น 20 / 100) ให้เป็นสีแดง
-    // ค้นหารูปแบบ ตัวเลข / ตัวเลข
-    formatted = formatted.replace(/(\d+\s*[\/]\s*\d+)/g, '<span style="color: #ef4444; font-weight: 800; font-family: \'DM Mono\', monospace;">$1</span>');
-
-    // 2. เน้นตัวเลข 10 หลัก (เช่น 1129810301) ให้เป็นสีน้ำเงิน
-    // ค้นหาตัวเลขที่เรียงกัน 10 ตัว
-    formatted = formatted.replace(/\b(\d{10})\b/g, '<span style="color: #2563eb; font-weight: 800; font-family: \'DM Mono\', monospace;">$1</span>');
-
-    return formatted;
-}
 
     /* ──────────────────────────────────────────
        VIEW MODAL
@@ -9002,9 +9321,18 @@ function _openViewModal(id) {
             <!-- 2. Summary Info (Reduced Spacing) -->
             <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; padding:12px 16px;">
                 <div style="flex:1; min-width:250px;">
-<p style="font-size:13px; font-weight:500; color:${theme.mainText}; line-height:1.6; margin:0 0 6px 0; font-family: 'Inter', sans-serif;">
-    ${formatBeautifulText(item.problem)}
-</p>
+                    <p style="font-size:12px; font-weight:600; color:${theme.mainText}; line-height:1.4; margin:0 0 6px 0;">
+                        ${(() => {
+                            const cleanProb = getCleanProblemTitle(item.problem || "");
+                            if (/inform quality problem/i.test(cleanProb)) {
+                                return cleanProb
+                                    .replace(/^On\s+(.*?)\s+inform quality problem/i, 'On <span style="color:#3b82f6">$1</span> inform quality problem')
+                                    .replace(/about\s+(.*?)\s+found defect/i, 'about <span style="color:#3b82f6">$1</span> found defect')
+                                    .replace(/found defect\s+(.*)$/i, 'found defect <span style="color:#ef4444">$1</span>');
+                            }
+                            return `On <span style="color:#3b82f6">${item.eventDate || '-'}</span> OSA inform quality problem about <span style="color:#3b82f6">${item.part || '-'}</span> found defect <span style="color:#ef4444">${cleanProb || '-'}</span>`;
+                        })()}
+                    </p>
                     <div style="display:flex; gap:5px;">
                         <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:2px 6px; font-size:8px; font-weight:700">📅 ${item.eventDate || '-'}</span>
                         <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:2px 6px; font-size:8px; font-weight:700">🔧 ${item.action}</span>
@@ -9084,21 +9412,14 @@ function _openViewModal(id) {
     }
 
 
-function _fromDb(r) {
-    return {
-        id: r.id,
-        problem: r.problem || '',
-        // ดึงจากฟิลด์ action ใน Supabase
-        action: r.action || 'N/A', 
-        part: r.part || '-',
-        lot: r.lot || '-',
-        ok: Number(r.ok_qty) || 0,
-        ng: Number(r.ng_qty) || 0,
-        report: r.report_type || 'VF',
-        eventDate: r.event_date || '',
-        imageUrl: r.image_url || null
-    };
-}
+    function _fromDb(r) {
+        return {
+            id: r.id, problem: r.problem || '', action: r.action || 'Rework',
+            part: r.part || '-', lot: r.lot || '-', ok: Number(r.ok_qty) || 0,
+            ng: Number(r.ng_qty) || 0, report: r.report_type || 'VF',
+            remark: r.remark || '', eventDate: r.event_date || '', imageUrl: r.image_url || null, _user: r.user_id
+        };
+    }
 
     function _esc(s) {
         const d = document.createElement('div');
@@ -9220,11 +9541,11 @@ const Wap5SExcellence = (function() {
         if (!navigator.onLine) return;
         
         try {
-            let query = wapClient.from(TABLE).select('*');
-            if (targetUser && targetUser !== 'ALL') {
-                query = query.eq('user_id', targetUser);
-            }
-            const { data, error } = await query.order('month', { ascending: false });
+            const { data, error } = await wapClient
+                .from(TABLE)
+                .select('*')
+                .eq('user_id', targetUser)
+                .order('month', { ascending: false });
 
             if (error) throw error;
             _allRecords = data || [];
@@ -9467,7 +9788,7 @@ function renderTable() {
 
         // 2. วาด HTML โดยกำหนดให้แถวเริ่มต้นที่สถานะซ่อน (Opacity 0 และเลื่อนไปทางซ้ายเล็กน้อย)
         tbody.innerHTML = _filteredRecords.map(r => `
-            <tr class="s5-table-row border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors opacity-0" style="transform: translateX(-10px)">
+            <tr class="s5-table-row border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors opacity-0" data-rid="${r.id}" style="transform: translateX(-10px)">
                 <td class="py-3 px-3">
                     <div class="text-[11px] font-black text-slate-700 leading-tight uppercase tracking-tight">${r.area}</div>
                 </td>
@@ -9508,6 +9829,7 @@ function renderTable() {
                 ease: "power2.out",
                 clearProps: "transform" // ล้าง transform ทิ้งหลังจบเพื่อให้ hover ทำงานปกติ
             });
+            if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
         });
     }
 
@@ -9652,11 +9974,11 @@ async function fetchRecords() {
         }
 
         try {
-            let query = wapClient.from(TABLE).select('*');
-            if (targetUser && targetUser !== 'ALL') {
-                query = query.eq('user_id', targetUser);
-            }
-            const { data, error } = await query.order('skill_value', { ascending: false });
+            const { data, error } = await wapClient
+                .from(TABLE)
+                .select('*')
+                .eq('user_id', targetUser)
+                .order('skill_value', { ascending: false });
 
             if (error) throw error;
             _records = data || [];
@@ -10339,11 +10661,10 @@ function calcHours() {
         if (!navigator.onLine || !targetUser) return;
 
         try {
-            let query = wapClient.from(TABLE).select('*');
-            if (targetUser && targetUser !== 'ALL') {
-                query = query.eq('user_id', targetUser);
-            }
-            const { data, error } = await query.order('date', { ascending: false });
+            const { data, error } = await wapClient.from(TABLE)
+                .select('*')
+                .eq('user_id', targetUser)
+                .order('date', { ascending: false });
 
             if (error) throw error;
             _allRecords = data || [];
@@ -10880,7 +11201,7 @@ function renderTable() {
     
     // วาด HTML โดยตั้งค่าเริ่มต้นให้ซ่อนและเลื่อนลงล่างเล็กน้อย
     tbody.innerHTML = _filteredRecords.slice(0, 15).map(r => `
-        <tr class="ot-table-row border-b border-slate-50 opacity-0" style="transform: translateY(10px)">
+        <tr class="ot-table-row border-b border-slate-50 opacity-0" data-rid="${r.id}" style="transform: translateY(10px)">
             <td class="py-2 px-2 font-mono text-[9px] text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis">${r.date}</td>
             <td class="py-2 px-2 font-bold text-slate-700 uppercase truncate" style="font-size:10px;" title="${r.job_name}">${r.job_name}</td>
             <td class="py-2 px-1 text-center text-blue-600 font-black whitespace-nowrap" style="font-size:12px;">${parseFloat(r.actual_hours).toFixed(2)}</td>
@@ -10902,6 +11223,7 @@ function renderTable() {
             ease: "power2.out",
             clearProps: "transform"
         });
+        if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
     });
 }
 
@@ -10996,11 +11318,11 @@ const WapSpecialJobs = (function() {
         if (!navigator.onLine || !targetUser) return;
 
         try {
-            let query = wapClient.from(TABLE).select('*');
-            if (targetUser && targetUser !== 'ALL') {
-                query = query.eq('user_id', targetUser);
-            }
-            const { data, error } = await query.order('date', { ascending: false });
+            const { data, error } = await wapClient
+                .from(TABLE)
+                .select('*')
+                .eq('user_id', targetUser)
+                .order('date', { ascending: false });
 
             if (error) throw error;
             _allRecords = data || [];
@@ -11083,7 +11405,7 @@ function renderTable() {
     tbody.innerHTML = _filteredRecords.map((r, i) => {
         const hasResult = r.result && r.result !== '-' && r.result !== '';
         return `
-        <tr class="sj-table-row border-b border-slate-50 opacity-0"> <!-- เพิ่มคลาส sj-table-row และ opacity-0 -->
+        <tr class="sj-table-row border-b border-slate-50 opacity-0" data-rid="${r.id}"> <!-- เพิ่มคลาส sj-table-row และ opacity-0 -->
             <td class="text-center font-bold text-slate-300">${i+1}</td>
             <td style="max-width: 0; width: 40%;"> <!-- บังคับให้ cell คำนวณความกว้างใหม่เพื่อทำ Ellipsis -->
                 <div class="flex flex-col">
@@ -11123,6 +11445,7 @@ function renderTable() {
             ease: "power2.out",
             clearProps: "transform"
         });
+        if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
     });
 }
     function renderCharts() {
@@ -11778,7 +12101,7 @@ function toggleTheme() {
     const body = document.body;
     const isDark = body.classList.toggle('dark-mode');
     
-    safeSetStorage('local', 'carrier_theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('carrier_theme', isDark ? 'dark' : 'light');
     updateThemeIcon(isDark);
 }
 
@@ -11817,7 +12140,7 @@ const translations = {
         nav_skill_matrix: "ตารางทักษะ",
         nav_special_jobs: "ภารกิจพิเศษ",
         nav_ot: "จัดการล่วงเวลา",
-        nav_sme: "ลูกหนี้ SME", // ใส่คอมม่าปิดท้ายบรรทัดนี้ด้วย
+        nav_sme: "SQE EN", // ใส่คอมม่าปิดท้ายบรรทัดนี้ด้วย
 
         // --- ปุ่มสลับหน้า (Pill Buttons) และหัวข้อ Header ---
         tab_claim_entry: "บันทึกเคลม",
@@ -11840,7 +12163,7 @@ const translations = {
         nav_skill_matrix: "Skill Matrix",
         nav_special_jobs: "Special Jobs",
         nav_ot: "OT Management",
-        nav_sme: "SME Receivables", // ใส่คอมม่าปิดท้ายบรรทัดนี้ด้วย
+        nav_sme: "SQE EN", // ใส่คอมม่าปิดท้ายบรรทัดนี้ด้วย
 
         // --- ปุ่มสลับหน้า (Pill Buttons) และหัวข้อ Header ---
         tab_claim_entry: "PART CLAIM",
@@ -11864,7 +12187,7 @@ window.addEventListener('click', function(e) {
 });
 
 function changeLanguage(lang) {
-    safeSetStorage('local', 'carrier_lang', lang);
+    localStorage.setItem('carrier_lang', lang);
     applyLanguage(lang);
     document.getElementById('lang-menu').classList.remove('show');
 }
@@ -11941,70 +12264,104 @@ function autoHideBanner() {
    ============================================================ */
 
 window.addEventListener('load', () => {
+    console.log("SQE & WAP System: Initializing...");
+
+    // 1. ระบบสถานะและการแสดงผลเบื้องต้น
+    if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
+    if (typeof autoHideBanner === 'function') autoHideBanner();
+
+    // 2. ระบบจัดการภาษา (ตรวจสอบค่าที่จำไว้ หรือใช้ภาษาของ Browser)
+    const savedLang = localStorage.getItem('carrier_lang');
+    const browserLang = navigator.language.startsWith('th') ? 'th' : 'en';
+    const finalLang = savedLang || browserLang;
+    applyLanguage(finalLang);
+
+    // 3. ระบบจดจำบัญชี (Remember Me)
+    const savedEmail = localStorage.getItem('carrier_remembered_email');
+    if (savedEmail) {
+        const emailIn = document.getElementById('login-email');
+        const rememberCheck = document.getElementById('remember-me');
+        if (emailIn) {
+            emailIn.value = savedEmail;
+            emailIn.classList.add('valid');
+        }
+        if (rememberCheck) rememberCheck.checked = true;
+        // เช็คสถานะทันทีที่เปิดเว็บ
+        let lastKnownTrigger = null;
+
+async function watchSystemUpdate() {
     try {
-        console.log("SQE & WAP System: Initializing...");
+        const { data } = await sqeClient
+            .from('system_settings')
+            .select('app_version, update_details, force_update_trigger')
+            .eq('id', 'global_config')
+            .single();
 
-        // 1. ระบบสถานะและการแสดงผลเบื้องต้น
-        if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
-        if (typeof autoHideBanner === 'function') autoHideBanner();
-
-        // 2. ระบบจัดการภาษา (ตรวจสอบค่าที่จำไว้ หรือใช้ภาษาของ Browser)
-        const savedLang = safeGetStorage('local', 'carrier_lang');
-        const browserLang = navigator.language.startsWith('th') ? 'th' : 'en';
-        const finalLang = savedLang || browserLang;
-        applyLanguage(finalLang);
-
-        // 3. ระบบจดจำบัญชี (Remember Me)
-        const savedEmail = safeGetStorage('local', 'carrier_remembered_email');
-        if (savedEmail) {
-            const emailIn = document.getElementById('login-email');
-            const rememberCheck = document.getElementById('remember-me');
-            if (emailIn) {
-                emailIn.value = savedEmail;
-                emailIn.classList.add('valid');
+        if (data) {
+            // 1. ตรวจสอบการบังคับรีเฟรช (Force Update)
+            if (lastKnownTrigger && data.force_update_trigger !== lastKnownTrigger) {
+                toast("🛡️ Admin สั่งอัปเดตระบบด่วน...", "info");
+                setTimeout(() => {
+                    window.location.reload(true); // บังคับรีโหลดและล้าง Cache
+                }, 2000);
             }
-            if (rememberCheck) rememberCheck.checked = true;
-        }
+            lastKnownTrigger = data.force_update_trigger;
 
-        // 4. ระบบจัดการคลิกภายนอก (Global Click Events)
-        window.addEventListener('click', (e) => {
-            const langSelector = document.getElementById('lang-selector');
-            const langMenu = document.getElementById('lang-menu');
-            if (langSelector && !langSelector.contains(e.target)) {
-                if (langMenu) langMenu.classList.remove('show');
-            }
-        });
-
-        // 5. ตรวจสอบ Session เก่า (Auto Login)
-        const session = safeGetStorage('session', 'sqe_session');
-        if (session) {
-            try {
-                const userData = JSON.parse(session);
-                console.log("Restoring session for:", userData.email);
-                finalizeLogin(userData.email, userData.role);
-            } catch (err) {
-                console.error("Session restore failed:", err);
-                safeRemoveStorage('session', 'sqe_session');
-            }
+            // 2. แสดง Change Log ใน Sidebar (Optional)
+            const verDisplay = document.querySelector('.brand-sub');
+            if(verDisplay) verDisplay.textContent = `V${data.app_version} | SQE SYSTEM`;
         }
+    } catch (e) { console.log("Update check failed"); }
+}
 
-        // 6. เริ่มการซิงค์ข้อมูลค้างส่ง
-        if (typeof syncPendingData === 'function') {
-            setTimeout(syncPendingData, 3000);
-        }
+// ตรวจสอบทุกๆ 3 นาที
+setInterval(watchSystemUpdate, 180000);
+// และตรวจทันทีที่เปิดแอป
+watchSystemUpdate();
+enforceMaintenanceMode();
 
-        // 7. การลงทะเบียน PWA Service Worker
-        if ('serviceWorker' in navigator) {
-            try {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('PWA: Service Worker Registered!'))
-                    .catch(err => console.log('PWA Register Failed:', err));
-            } catch (e) {
-                console.log('PWA ServiceWorker error:', e);
-            }
+// และเช็คซ้ำทุกๆ 30 วินาที (เพื่อให้หน้าจอคนอื่นล็อคเองอัตโนมัติ)
+setInterval(enforceMaintenanceMode, 30000);
+    }
+
+    // 4. ระบบจัดการคลิกภายนอก (Global Click Events)
+    window.addEventListener('click', (e) => {
+        // ปิดเมนูภาษาเมื่อคลิกข้างนอก
+        const langSelector = document.getElementById('lang-selector');
+        const langMenu = document.getElementById('lang-menu');
+        if (langSelector && !langSelector.contains(e.target)) {
+            if (langMenu) langMenu.classList.remove('show');
         }
-    } catch (globalInitErr) {
-        console.warn("Global init load warning:", globalInitErr);
+    });
+
+    // 5. ตรวจสอบ Session เก่า (Auto Login)
+    const session = sessionStorage.getItem('sqe_session');
+    if (session) {
+        try {
+            const userData = JSON.parse(session);
+            console.log("Restoring session for:", userData.email);
+            // เรียกใช้ finalizeLogin เพื่อข้ามหน้า Login ไป Dashboard (พร้อม Warp Effect)
+            finalizeLogin(userData.email, userData.role);
+        } catch (err) {
+            console.error("Session restore failed:", err);
+            sessionStorage.removeItem('sqe_session');
+        }
+    }
+
+    // 6. เริ่มการซิงค์ข้อมูลค้างส่ง (หน่วงเวลา 3 วินาทีเพื่อให้แอปพร้อม)
+    if (typeof syncPendingData === 'function') {
+        setTimeout(syncPendingData, 3000);
+    }
+
+    // 7. การลงทะเบียน PWA Service Worker
+    if ('serviceWorker' in navigator) {
+        try {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('PWA: Service Worker Registered!'))
+                .catch(err => console.log('PWA: Registration Failed', err));
+        } catch (e) {
+            console.log('PWA: Registration Error', e);
+        }
     }
 });
 
@@ -12252,6 +12609,7 @@ async function init() {
     }
 
     async function switchTab(tab) {
+        if (typeof clearTableSelection === 'function') clearTableSelection();
         _currentTab = tab;
         _query = '';
         
@@ -12448,7 +12806,7 @@ async function init() {
                     const safeEmail = u.email || 'unknown@carrier.com';
                     const isReset = !!u.force_reset;
                     return `
-                    <tr class="cyber-table-row border-b border-slate-800/40">
+                    <tr class="cyber-table-row border-b border-slate-800/40" data-rid="${u.id}">
                         <td class="px-6 py-3">
                             <div class="flex items-center gap-3">
                                 <div class="relative">
@@ -12507,7 +12865,7 @@ async function init() {
                     else if (action.includes('INSERT') || action.includes('UPDATE') || action.includes('CREATE')) colorClass = 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40';
 
                     return `
-                    <tr class="cyber-table-row border-b border-slate-800/40">
+                    <tr class="cyber-table-row border-b border-slate-800/40" data-rid="${l.id}">
                         <td class="px-6 py-2.5 font-mono text-[10px] text-slate-400">${new Date(l.created_at).toLocaleString()}</td>
                         <td class="px-6 py-2.5 font-bold text-cyan-400">${(l.user_email || 'System').split('@')[0]}</td>
                         <td class="px-6 py-2.5"><span class="px-2 py-0.5 rounded text-[9px] font-black uppercase ${colorClass}">${action}</span></td>
@@ -12520,7 +12878,7 @@ async function init() {
             tbody.innerHTML = _data.suppliers
                 .filter(s => (s.name || '').toLowerCase().includes(_query))
                 .map(s => `
-                <tr class="cyber-table-row border-b border-slate-800/40">
+                <tr class="cyber-table-row border-b border-slate-800/40" data-rid="${s.id}">
                     <td class="px-6 py-3 font-mono font-bold text-slate-100 uppercase tracking-wide flex items-center gap-2">
                         <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> ${s.name}
                     </td>
@@ -12532,7 +12890,7 @@ async function init() {
             tbody.innerHTML = _data.parts
                 .filter(p => (p.part_no || '').toLowerCase().includes(_query) || (p.part_name || '').toLowerCase().includes(_query))
                 .map(p => `
-                <tr class="cyber-table-row border-b border-slate-800/40">
+                <tr class="cyber-table-row border-b border-slate-800/40" data-rid="${p.id}">
                     <td class="px-6 py-3 font-bold text-slate-200">${p.part_name || '-'}</td>
                     <td class="px-6 py-3 text-center"><span class="bg-emerald-950/80 text-emerald-300 px-3 py-1 rounded-md border border-emerald-500/40 font-mono text-[11px] font-bold">${p.part_no}</span></td>
                     <td class="px-6 py-3 text-right">${btnDel('master_parts', p.id)}</td>
@@ -12543,7 +12901,7 @@ async function init() {
             tbody.innerHTML = _data.defects
                 .filter(d => (d.defect_name || '').toLowerCase().includes(_query))
                 .map(d => `
-                <tr class="cyber-table-row border-b border-slate-800/40">
+                <tr class="cyber-table-row border-b border-slate-800/40" data-rid="${d.id}">
                     <td class="px-6 py-3 font-mono font-bold uppercase text-amber-300 flex items-center gap-2">
                         <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> ${d.defect_name}
                     </td>
@@ -12552,6 +12910,7 @@ async function init() {
         }
 
         document.getElementById('admin-record-count').textContent = `${tbody.rows.length} RECORDS`;
+        if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
     }
 
     function updateStats() {
@@ -13277,7 +13636,7 @@ setInterval(updateUserPresence, 300000); // 300,000 ms = 5 นาที
 
 async function checkChangelog() {
     const { data } = await sqeClient.from('system_settings').select('app_version, update_details').eq('id', 'global_config').single();
-    const localVersion = safeGetStorage('local', 'last_seen_version', "0.0.0");
+    const localVersion = localStorage.getItem('last_seen_version') || "0.0.0";
 
     if (data && data.app_version !== localVersion) {
         // สร้าง Modal แจ้งข่าวสารอัปเดต
@@ -13296,7 +13655,7 @@ async function checkChangelog() {
 }
 
 function closeUpdateModal(newVer) {
-    safeSetStorage('local', 'last_seen_version', newVer);
+    localStorage.setItem('last_seen_version', newVer);
     document.getElementById('update-modal').remove();
 }
 
@@ -13610,6 +13969,45 @@ function updateStars() {
     requestAnimationFrame(updateStars);
 }
 
+function getCleanProblemTitle(title) {
+    if (!title) return "";
+    let str = String(title).trim();
+
+    if (/inform quality problem/i.test(str)) {
+        const parts = str.split(/inform quality problem/i);
+        if (parts.length > 2) {
+            const lastPart = parts[parts.length - 1];
+            const prevPart = parts[parts.length - 2];
+            const lastOnIdx = prevPart.lastIndexOf('On ');
+            const onPrefix = lastOnIdx !== -1 ? prevPart.substring(lastOnIdx).trim() : 'On';
+            str = `${onPrefix} inform quality problem ${lastPart}`.replace(/\s+/g, ' ').trim();
+        }
+    }
+    return str;
+}
+
+function formatDetailSentence(c) {
+    if (!c) return "";
+    const rawTitle = c.problem_title || "-";
+    const cleanTitle = getCleanProblemTitle(rawTitle);
+    const createDate = new Date(c.created_at || Date.now()).toLocaleDateString('en-GB', {
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric'
+    });
+    const partName = c.part_name || "-";
+
+    if (/inform quality problem/i.test(cleanTitle)) {
+        let formatted = cleanTitle;
+        formatted = formatted.replace(/^On\s+(.*?)\s+inform quality problem/i, 'On <span style="color:#2563eb; font-weight: 900;">$1</span> inform quality problem');
+        formatted = formatted.replace(/about\s+(.*?)\s+found defect/i, 'about <span style="color:#2563eb; font-weight: 900;">$1</span> found defect');
+        formatted = formatted.replace(/found defect\s+(.*)$/i, 'found defect <span style="color:red; font-weight:900;">$1</span>');
+        return formatted;
+    } else {
+        return `On <span style="color:#2563eb; font-weight: 900;">${createDate}</span> OSA inform quality problem about <span style="color: #2563eb; font-weight: 900;">${partName}</span> found defect <span style="color:red; font-weight:900;">${cleanTitle}</span>`;
+    }
+}
+
 const Wap8DSystem = (function() {
     const TABLE = 'eight_d_reports'; // ตารางนี้อยู่ในฐานข้อมูล SQE
     const TABLE_SUPPORT = 'support_records'; // ตารางต้นทางอยู่ในฐานข้อมูล WAP
@@ -13641,16 +14039,17 @@ const Wap8DSystem = (function() {
     }
 
     async function fetchCases() {
-        const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
         try {
-            let query = sqeClient.from(TABLE).select('*');
-            if (targetUser && targetUser !== 'ALL') {
-                query = query.eq('user_id', targetUser);
-            }
-            const { data, error } = await query.order('created_at', { ascending: false });
+            const { data, error } = await sqeClient
+                .from(TABLE)
+                .select('*')
+                .order('created_at', { ascending: false });
             if (error) throw error;
             _cases = data || [];
-        } catch (e) { console.error("8D Fetch Error:", e); }
+            S.eightDCases = _cases;
+            invalidate8DCaseMap();
+            return _cases;
+        } catch (e) { console.error("8D Fetch Error:", e); return []; }
     }
 
     // 2. ฟังก์ชันดูดข้อมูลจากช่อง ContentEditable
@@ -13743,18 +14142,17 @@ async function createNewCase(supportData) {
         id: newId,
         user_id: S.currentUser,
         support_id: supportData.id,
-        problem_title: supportData.problem,
+        problem_title: getCleanProblemTitle(supportData.problem),
         part_name: supportData.part,
         part_group: supportData.part,
         lot_no: total,
         ok_qty: ok,
         ng_qty: ng,
         status: 'D1_OPEN',
-        // ✅ เก็บข้อมูลรูปภาพ หมายเหตุ และประเภทรายงานไว้ใน JSON เพื่อนำไปใช้ในสไลด์อัตโนมัติ
+        // ✅ เก็บข้อมูลรูปภาพและหมายเหตุไว้ใน JSON เพื่อนำไปใช้ในสไลด์อัตโนมัติ
         report_data: {
             evidence_img: evidenceImg,
-            source_remark: supportData.remark || "",
-            source_report_type: (supportData.report || supportData.report_type || supportData.reportType || (supportData.type === 'RP' ? 'RP' : 'VF') || 'VF').toString().toUpperCase()
+            source_remark: supportData.remark || "" // เพิ่มบรรทัดนี้เพื่อเก็บหมายเหตุ
         },
         created_at: new Date().toISOString()
     };
@@ -13916,45 +14314,12 @@ async function _pptSvgToDataUrl(svgElement) {
     } catch (e) { return null; }
 }
 
-// ✅ Helper: ตรวจสอบและสกัดประเภทรายงาน (RP หรือ VF) จากทุกฟิลด์ข้อมูลที่มี
-function _getCaseReportType(c) {
-    if (!c) return { isRP: false, isVF: true, typeName: 'VF', label: '[Line claim, VF]' };
-    
-    let raw = '';
-    if (c.report_data && typeof c.report_data === 'object') {
-        raw = c.report_data.source_report_type || c.report_data.report_type || c.report_data.type || '';
-    } else if (c.report_data && typeof c.report_data === 'string') {
-        try {
-            const parsed = JSON.parse(c.report_data);
-            raw = parsed.source_report_type || parsed.report_type || parsed.type || '';
-        } catch(e){}
-    }
-    if (!raw) {
-        raw = c.source_report_type || c.report_type || c.claim_type || c.type || c.report || '';
-    }
-    const upper = raw.toString().toUpperCase();
-    const titleUpper = (c.problem_title || '').toString().toUpperCase();
-    
-    const isRP = upper === 'RP' || upper === 'IQC' || ((titleUpper.includes('IQC') || titleUpper.includes('RP') || titleUpper.includes('REJECTED')) && !titleUpper.includes('VF') && !titleUpper.includes('LINE CLAIM'));
-    return {
-        isRP: isRP,
-        isVF: !isRP,
-        typeName: isRP ? 'RP' : 'VF',
-        label: isRP ? '[IQC Rejected, RP]' : '[Line claim, VF]'
-    };
-}
-
-function setReportType(type) {
-    if (!_currentCase) return;
-    if (!_currentCase.report_data) _currentCase.report_data = {};
-    _currentCase.report_data.source_report_type = type;
-    renderSlide();
-    _rehydrateUI();
-    toast(`อัปเดตประเภทรายงานเป็น [${type === 'RP' ? 'IQC Rejected, RP' : 'Line claim, VF'}] เรียบร้อย`, 'info');
-}
-
 // ✅ ฟังก์ชันส่งออกรายงานเป็น PowerPoint (.pptx) ที่สร้างเป็น Native Objects 100% (Tables, Shapes, Textboxes, Images) แก้ไขได้ทุกจุด
-async function exportToPPTX() {
+async function exportToPPTX(targetCaseId) {
+    if (targetCaseId) {
+        const found = _cases.find(x => x.id === targetCaseId);
+        if (found) _currentCase = found;
+    }
     if (!_currentCase) return toast("No case selected", "error");
 
     const PptxConstructor = window.PptxGenJS || window.pptxgen;
@@ -13962,7 +14327,16 @@ async function exportToPPTX() {
         return toast("❌ ไม่พบไลบรารี PowerPoint Generation โปรดรีเฟรชหน้าเว็บแล้วลองอีกครั้ง", "error");
     }
 
-    toast("⏳ กำลังสร้างไฟล์ PowerPoint (16 หน้า) แบบ Native PowerPoint Objects แก้ไขได้ 100%...", "info");
+    const dashboardEl = document.getElementById('eight-d-dashboard');
+    const reportViewEl = document.getElementById('eight-d-report-view');
+    const wasDashboardVisible = dashboardEl && !dashboardEl.classList.contains('hidden');
+
+    if (wasDashboardVisible) {
+        dashboardEl.classList.add('hidden');
+        reportViewEl.classList.remove('hidden');
+    }
+
+    toast("⏳ กำลังสร้างไฟล์ PowerPoint (16 หน้า) แบบ Native PowerPoint Objects แท้ 100%...", "info");
 
     const pptx = new PptxConstructor();
     pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches (16:9 Widescreen)
@@ -13976,7 +14350,7 @@ async function exportToPPTX() {
             _rehydrateUI();
 
             // รอให้ DOM และรูปภาพวาดบนหน้าจอสมบูรณ์
-            await new Promise(r => setTimeout(r, 180));
+            await new Promise(r => setTimeout(r, 200));
 
             const container = document.getElementById('eight-d-slide-content');
             if (!container) continue;
@@ -14051,7 +14425,7 @@ async function exportToPPTX() {
                 return !hasCandidateChild;
             });
 
-            // 2. สร้างตาราง Native PPTX Tables แก้ไขเซลล์ได้ 100% พร้อมคำนวณสัดส่วนคอลัมน์ (colW) ไม่ให้กางออก
+            // 2. สร้างตาราง Native PPTX Tables แก้ไขเซลล์ได้ 100% พร้อมคำนวณสัดส่วนคอลัมน์ (colW)
             const tables = Array.from(container.querySelectorAll('table'));
             for (const table of tables) {
                 const pos = getPos(table);
@@ -14091,6 +14465,7 @@ async function exportToPPTX() {
                         const cellOpt = {
                             text: text,
                             options: {
+                                fontFace: 'Arial',
                                 color: fgHex,
                                 bold: isBold,
                                 align: align,
@@ -14113,7 +14488,6 @@ async function exportToPPTX() {
 
                 if (rows.length > 0) {
                     let colW = [];
-                    // Find the row with maximum number of individual cells (no colspan or least colspan)
                     let maxCellsRow = null;
                     let maxCount = 0;
                     for (const tr of trs) {
@@ -14150,11 +14524,10 @@ async function exportToPPTX() {
                 }
             }
 
-            // 3. สร้างรูปทรงพื้นหลัง กล่อง กรอบ แถบประดับ (Native PPTX Shapes) ข้ามการวาดซ้ำสำหรับกล่องข้อความ
+            // 3. สร้างรูปทรงพื้นหลัง กล่อง กรอบ Banners (Native PPTX Shapes)
             const boxElements = Array.from(container.querySelectorAll('div, section, header')).filter(el => {
                 if (el.closest('table')) return false;
                 if (leafTextCandidates.includes(el)) return false;
-                // ถ้าเป็น Footer หรือมีข้อความ Proprietary and Confidential ให้ข้ามการวาดกล่อง/เส้นขอบ
                 if (el.textContent && el.textContent.includes('Proprietary and Confidential')) return false;
 
                 const style = window.getComputedStyle(el);
@@ -14192,12 +14565,10 @@ async function exportToPPTX() {
                     shapeOpts.fill = { color: bgHex };
                 }
 
-                // หากมีขอบครบทั้ง 4 ด้าน และสีขอบไม่ใช่สีขาว/เทาจาง
                 if (bt > 0 && bb > 0 && bl > 0 && br > 0 && borderCol && borderCol !== 'FFFFFF' && borderCol !== 'F1F5F9' && style.borderStyle !== 'none') {
                     shapeOpts.line = { color: borderCol, width: Math.max(1, Math.round(parseFloat(style.borderWidth) || 1)) };
                     slide.addShape(rectShape, shapeOpts);
                 } else if (bt > 0 && bb === 0 && bl === 0 && br === 0 && borderCol && borderCol !== 'FFFFFF' && borderCol !== 'F1F5F9' && style.borderStyle !== 'none') {
-                    // ถ้ามีเฉพาะขอบบน (Divider line) ให้วาดเป็นเส้นตรงเดี่ยว (LINE shape)
                     const lineShape = pptx.shapes?.LINE || pptx.ShapeType?.line || 'line';
                     slide.addShape(lineShape, {
                         x: pos.x,
@@ -14212,7 +14583,6 @@ async function exportToPPTX() {
             }
 
             // 4. สร้างกล่องข้อความ Native Textboxes (นอกตาราง)
-
             for (const el of leafTextCandidates) {
                 const val = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? el.value : el.innerText;
                 const txt = (val || '').trim();
@@ -14236,6 +14606,7 @@ async function exportToPPTX() {
                     y: pos.y,
                     w: pos.w,
                     h: pos.h,
+                    fontFace: 'Arial',
                     fontSize: fSizePt,
                     color: fgHex,
                     bold: isBold,
@@ -14254,7 +14625,7 @@ async function exportToPPTX() {
                 slide.addText(txt, tbOpts);
             }
 
-            // 4. Native Images (รูปภาพแนบ Uploaded Photos & Background Images)
+            // 5. Native Images (รูปภาพแนบ Uploaded Photos & Background Images)
             const imgEls = Array.from(container.querySelectorAll('img')).concat(
                 Array.from(container.querySelectorAll('div, span')).filter(el => {
                     const bg = window.getComputedStyle(el).backgroundImage;
@@ -14289,7 +14660,7 @@ async function exportToPPTX() {
                 }
             }
 
-            // 5. Native SVGs (โลโก้, ไอคอน, ผังกระบวนการ)
+            // 6. Native SVGs (โลโก้, ไอคอน, ผังกระบวนการ)
             const svgEls = Array.from(container.querySelectorAll('svg'));
             for (const svg of svgEls) {
                 if (svg.offsetWidth === 0 || svg.offsetHeight === 0) continue;
@@ -14316,8 +14687,13 @@ async function exportToPPTX() {
         toast("❌ เกิดข้อผิดพลาดในการสร้างไฟล์ PPTX: " + (err.message || err), "error");
     } finally {
         _currentSlide = originalSlideIndex;
-        renderSlide();
-        _rehydrateUI();
+        if (wasDashboardVisible && dashboardEl && reportViewEl) {
+            dashboardEl.classList.remove('hidden');
+            reportViewEl.classList.add('hidden');
+        } else {
+            renderSlide();
+            _rehydrateUI();
+        }
     }
 }
 
@@ -14363,8 +14739,12 @@ function renderDashboard() {
     const searchInput = document.getElementById('eightDSearch');
     if (searchInput && !searchInput.dataset.hasListener) {
         searchInput.dataset.hasListener = 'true';
+        let searchDebounceTimer = null;
         searchInput.addEventListener('input', () => {
-            renderDashboard();
+            if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                renderDashboard();
+            }, 120);
         });
     }
     const query = searchInput ? (searchInput.value || '').trim().toLowerCase() : '';
@@ -14413,7 +14793,7 @@ function renderDashboard() {
         const displayTitle = c.problem_title || 'Untitled Report';
         
         return `
-        <tr class="group hover:bg-blue-50/40 transition-all duration-300">
+        <tr class="group hover:bg-blue-50/40 transition-all duration-300" data-rid="${c.id}">
             <!-- คอลัมน์ ID & ประเภท -->
             <td class="px-6 py-5">
                 <div class="flex flex-col">
@@ -14464,8 +14844,17 @@ function renderDashboard() {
             <td class="px-6 py-5 text-right">
                 <div class="flex justify-end gap-2">
                     <button onclick="Wap8DSystem.openReport('${c.id}')" 
-                            class="h-9 px-5 bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-sm">
+                            class="h-9 px-4 bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-sm">
                         OPEN REPORT
+                    </button>
+
+                    <button onclick="Wap8DSystem.exportToPPTX('${c.id}')" 
+                            class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-md shadow-emerald-100 flex items-center gap-1.5"
+                            title="Export 8D PowerPoint 100%">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>EXPORT PPTX</span>
                     </button>
 
                     <button onclick="Wap8DSystem.deleteCase('${c.id}')" 
@@ -14479,6 +14868,7 @@ function renderDashboard() {
             </td>
         </tr>`;
     }).join('');
+    if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
 }
 
 /* ──────────────────────────────────────────
@@ -14524,7 +14914,7 @@ function renderDashboard() {
 
         // --- 2. Helper: Standard Footer (คงที่ทุกหน้า) ---
         const getFooter = () => `
-            <div style="margin-top: auto; padding-top: 15px; border: none; background: transparent; display: flex; align-items: center; width: 100%; flex-shrink: 0;">
+            <div style="margin-top: auto; padding-top: 15px; border-top: 1.5px solid #f1f5f9; display: flex; align-items: center; width: 100%; flex-shrink: 0;">
                 <div style="width: 120px;">
                     <svg viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="width:100px; display:block;">
                         <ellipse cx="100" cy="40" rx="95" ry="38" fill="#003366" />
@@ -14535,9 +14925,7 @@ function renderDashboard() {
                 <div style="flex: 1; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">
                     Proprietary and Confidential
                 </div>
-                <div style="font-size: 11px; font-weight: 800; color: #003366; min-width: 120px; text-align: right; flex-shrink: 0;">
-                    PAGE ${_currentSlide + 1} / 16
-                </div>
+                <div style="width: 120px;"></div>
             </div>
         `;
 
@@ -14547,75 +14935,65 @@ function renderDashboard() {
 // แผ่นที่ 1: หน้าปก 8D Report (ปรับปรุงให้สัดส่วนเท่าหน้า D2 และพิมพ์กรอกข้อมูลได้ง่าย)
 // ==========================================
 if (_currentSlide === 0) {
-    const repInfo = _getCaseReportType(c);
-    const isRP = repInfo.isRP;
-    
-    const checkRP = isRP 
-        ? `<span style="background:#000; color:#fff; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; border:2px solid #000; font-weight:950; margin-right:8px; font-size:13px; box-sizing:border-box;">X</span>` 
-        : `<span style="width:20px; height:20px; display:inline-block; border:2px solid #000; background:#fff; margin-right:8px; box-sizing:border-box;"></span>`;
-
-    const checkVF = !isRP 
-        ? `<span style="background:#000; color:#fff; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; border:2px solid #000; font-weight:950; margin-right:8px; font-size:13px; box-sizing:border-box;">X</span>` 
-        : `<span style="width:20px; height:20px; display:inline-block; border:2px solid #000; background:#fff; margin-right:8px; box-sizing:border-box;"></span>`;
+    const isRP = c.report_data?.source_report_type === 'RP'; // เช็คประเภทจากข้อมูลตั้งต้น
+    const check = (active) => active 
+        ? `<span style="background:#000; color:#fff; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border:1.5px solid #000; font-weight:bold; margin-right:8px; font-size:14px;">X</span>` 
+        : `<span style="width:22px; height:22px; display:inline-block; border:1.5px solid #000; background:#fff; margin-right:8px;"></span>`;
     
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; box-sizing: border-box;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             <!-- 1. Header: หัวข้อใหญ่และกล่องแจ้งเตือนสีเหลือง -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 8px; flex-shrink: 0; box-sizing: border-box;">
-                    <h1 contenteditable="true" style="font-size: 48px; font-weight: 950; color: #000; margin: 0; outline: none; letter-spacing: -1.5px; line-height: 1;">8D Report</h1>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 42px; font-weight: 950; color: #000; margin: 0; outline: none; letter-spacing: -1.5px;">8D Report</h1>
                     
-                    <div contenteditable="true" style="background:#ffff80; border:1.2px solid #ffcc00; padding:6px 12px; max-width:400px; color:#ff0000; font-size:11px; font-weight:950; line-height:1.25; outline: none; text-align:left; box-sizing: border-box;">
+                    <div contenteditable="true" style="background:#ffff99; border:1.2px solid #ffcc00; padding:8px 15px; width:340px; color:red; font-size:10px; font-weight:900; border-radius:4px; line-height:1.2; outline: none; text-align:left;">
                         Suppliers can use any format of the report as long as all mandatory information is present.
                     </div>
                 </div>
 
                 <!-- เส้นแบ่งหนาสีน้ำเงินมาตรฐาน (ฟิคขนาดเท่าหน้า D2) -->
-                <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 20px; flex-shrink: 0; box-sizing: border-box;"></div>
+                <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
 
                 <!-- 2. ส่วนเลือกประเภท (Checkboxes) -->
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 20px; flex-shrink: 0; width: 100%; box-sizing: border-box;">
-                    <div style="border: 2px solid #000; padding: 6px 16px; display: flex; gap: 24px; font-weight: 950; font-size: 14px; background:#fff; box-sizing: border-box; align-items: center;">
-                        <div onclick="Wap8DSystem.setReportType('RP')" style="display:flex; align-items:center; cursor:pointer; user-select:none;">
-                            ${checkRP} <span style="font-weight:950; color:#000;">[IQC Rejected, RP]</span>
-                        </div>
-                        <div onclick="Wap8DSystem.setReportType('VF')" style="display:flex; align-items:center; cursor:pointer; user-select:none;">
-                            ${checkVF} <span style="font-weight:950; color:#000;">[Line claim, VF]</span>
-                        </div>
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 15px; flex-shrink: 0;">
+                    <div style="border: 2px solid #000; padding: 6px 18px; display: flex; gap: 30px; font-weight: 900; font-size: 14px; background:#fff;">
+                        <span style="display:flex; align-items:center;">${check(isRP)} [IQC Rejected, RP]</span>
+                        <span style="display:flex; align-items:center;">${check(!isRP)} [Line claim, VF]</span>
                     </div>
                 </div>
 
                 <!-- 3. ส่วนแสดงหัวข้อปัญหา (Problem Title) -->
                 <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: 5px 0;">
-                    <div style="font-size: 13px; font-weight: 950; color: #64748b; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">PROBLEM :</div>
-                    <div contenteditable="true" style="font-size: 28px; font-weight: 950; color: #000; line-height: 1.35; outline: none;">
-                        ${c.problem_title || ''}
+                    <label style="font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">PROBLEM :</label>
+                    <div contenteditable="true" style="font-size: 24px; font-weight: 950; color: #000; line-height: 1.3; outline: none;">
+                        ${getCleanProblemTitle(c.problem_title || '')}
                     </div>
                 </div>
 
                 <!-- 4. Approve Table: ส่วนการยืนยันด้านล่าง -->
-                <div style="align-self: flex-end; width: 560px; margin-bottom: 10px; flex-shrink: 0;">
-                    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; text-align: center; font-size: 11px; font-family: Arial, Helvetica, sans-serif;">
-                        <tr style="background: #8ea9db; font-weight: 950; color: #000;">
-                            <td colspan="2" style="background: #8ea9db; border: 1.2px solid #000; padding: 6px; text-transform: uppercase; font-size: 12px; font-weight: 950; color: #000;">SUPPLIERS SUBMIT</td>
-                            <td colspan="2" style="background: #8ea9db; border: 1.2px solid #000; padding: 6px; text-transform: uppercase; font-size: 12px; font-weight: 950; color: #000;">CTC CONFIRM</td>
+                <div style="align-self: flex-end; width: 550px; margin-bottom: 10px; flex-shrink: 0;">
+                    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; text-align: center; font-size: 11px;">
+                        <tr style="background: #99badd; font-weight: 950;">
+                            <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">Suppliers submit</td>
+                            <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">CTC confirm</td>
                         </tr>
-                        <tr style="font-weight: 950; background: #fff; height: 24px; color: #000;">
-                            <td style="border: 1.2px solid #000; width: 25%; font-weight: 950; color: #000; background: #fff;">Confirmed (PIC)</td>
-                            <td style="border: 1.2px solid #000; width: 25%; font-weight: 950; color: #000; background: #fff;">Approved (QA Mgr)</td>
-                            <td style="border: 1.2px solid #000; width: 25%; font-weight: 950; color: #000; background: #fff;">Confirmed (Eng)</td>
-                            <td style="border: 1.2px solid #000; width: 25%; font-weight: 950; color: #000; background: #fff;">Approved (Spec)</td>
+                        <tr style="font-weight: 800; background: #f8f9fa; height: 22px;">
+                            <td style="border: 1px solid #000; width: 25%;">Confirmed (PIC)</td>
+                            <td style="border: 1px solid #000; width: 25%;">Approved (QA Mgr)</td>
+                            <td style="border: 1px solid #000; width: 25%;">Confirmed (Eng)</td>
+                            <td style="border: 1px solid #000; width: 25%;">Approved (Spec)</td>
                         </tr>
                         <tr style="height: 55px; background:#fff;">
-                            <td contenteditable="true" style="border:1.2px solid #000; outline: none;"></td>
-                            <td contenteditable="true" style="border:1.2px solid #000; outline: none;"></td>
-                            <td contenteditable="true" style="border:1.2px solid #000; outline: none;"></td>
-                            <td contenteditable="true" style="border:1.2px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
                         </tr>
-                        <tr style="background: #fff; font-weight: 950; height: 24px; color: #000;">
-                            <td style="border: 1.2px solid #000; text-align: left; padding-left: 6px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                            <td style="border: 1.2px solid #000; text-align: left; padding-left: 6px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                            <td style="border: 1.2px solid #000; text-align: left; padding-left: 6px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                            <td style="border: 1.2px solid #000; text-align: left; padding-left: 6px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                        <tr style="background: #fff; font-weight:800; height: 22px;">
+                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
                         </tr>
                     </table>
                 </div>
@@ -14626,15 +15004,10 @@ if (_currentSlide === 0) {
         // ==========================================
         else if (_currentSlide === 1) {
             const renderTable = (title, isSupplier = false) => `
-                <table style="width:100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; flex: 1; font-family: Arial, Helvetica, sans-serif; box-sizing: border-box;">
-                    <colgroup>
-                        <col style="width: 25%;">
-                        <col style="width: 18%;">
-                        <col style="width: 57%;">
-                    </colgroup>
-                    <thead style="background: #8ea9db;">
+                <table style="width:100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; flex: 1;">
+                    <thead style="background: #99badd;">
                         <tr>
-                            <th colspan="3" contenteditable="true" style="background: #8ea9db; padding: 6px 5px; border: 1.2px solid #000; font-size: 13px; font-weight: 950; text-align: center; color: #000; text-transform: uppercase; outline: none;">
+                            <th colspan="3" contenteditable="true" style="padding: 6px 5px; border: 1.2px solid #000; font-size: 13px; font-weight: 900; text-align: center; color: ${isSupplier ? 'red' : '#000'}; text-transform: uppercase; outline: none;">
                                 ${title}
                             </th>
                         </tr>
@@ -14650,12 +15023,12 @@ if (_currentSlide === 0) {
                             return `
                             <tr style="height: 27px;">
                                 <td rowspan="2" contenteditable="true" style="width: 25%; text-align: center; font-weight: 950; border: 1.2px solid #000; font-size: 11px; background: #fff; color: #000; outline: none;">Person${i}</td>
-                                <td style="width: 18%; font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Name:</td>
-                                <td contenteditable="true" style="width: 57%; border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyName}</td>
+                                <td style="width: 15%; font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Name:</td>
+                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyName}</td>
                             </tr>
                             <tr style="height: 27px;">
-                                <td style="width: 18%; font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Role:</td>
-                                <td contenteditable="true" style="width: 57%; border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyRole}</td>
+                                <td style="font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Role:</td>
+                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyRole}</td>
                             </tr>
                         `}).join('')}
                     </tbody>
@@ -14667,18 +15040,18 @@ if (_currentSlide === 0) {
                         <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
                             D1- Assign person in charge
                         </h1>
-                        <div contenteditable="true" style="background: blue; color: yellow; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; flex-shrink: 0; margin-left: 15px; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                        <div contenteditable="true" style="background: blue; color: yellow; padding: 3px 12px; font-weight: 950; font-size: 11px; border: 1px solid #000; text-transform: uppercase; flex-shrink: 0; margin-left: 15px; outline: none;">
                             &lt;Fill by CTC & Supplier&gt;
                         </div>
                     </div>
                     <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
 
-                    <div style="flex: 1; min-height: 0; display: flex; gap: 15px; align-items: flex-start; justify-content: space-between; width: 100%; overflow: hidden;">
+                    <div style="flex: 1; min-height: 0; display: flex; gap: 25px; align-items: flex-start; justify-content: space-between; width: 100%; overflow: hidden;">
                         <div style="flex: 1; min-width: 0;">
-                            ${renderTable('TCTC MEMBER', false)}
+                            ${renderTable('TCTC member', false)}
                         </div>
                         <div style="flex: 1; min-width: 0;">
-                            ${renderTable('SUPPLIER NAME MEMBER', true)}
+                            ${renderTable('Supplier name member', true)}
                         </div>
                     </div>
                 </div>
@@ -14688,9 +15061,7 @@ if (_currentSlide === 0) {
 // แผ่นที่ 3: D2- Define the Problem (ฉบับ Responsive ป้องกันตารางล้น 100%)
 // ==========================================
 else if (_currentSlide === 2) {
-    const repInfo = _getCaseReportType(c);
-    const isRP = repInfo.isRP;
-    const rawTitle = c.problem_title || "";
+    const rawTitle = getCleanProblemTitle(c.problem_title || "");
     
     // --- 1. ระบบ AI Parsing แยกส่วนข้อมูล ---
     let extPartName = c.part_name || "-";
@@ -14725,7 +15096,7 @@ else if (_currentSlide === 2) {
                 <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000; outline: none; letter-spacing: -1.5px; line-height: 0.9;">
                     D2-Define the Problem
                 </h1>
-                <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; text-align: center;">
+                <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 2px 10px; font-weight: 950; font-size: 13px; border: 1.2px solid #000; text-transform: uppercase; outline: none; margin-bottom: 4px;">
                     &lt;Fill by CTC &gt;
                 </div>
             </div>
@@ -14737,9 +15108,9 @@ else if (_currentSlide === 2) {
                 <!-- ฝั่งซ้าย: ตาราง (บีบอัดความสูงให้พอดีพื้นที่) -->
                 <div style="flex: 0 0 45%; display: flex; flex-direction: column; min-height: 0;">
                     <table style="width: 100%; height: 100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; font-size: 11px;">
-                        <tr style="background:#3b62f0; color:#ffffff; font-weight:950; height: 8.5%;">
-                            <td style="border:1.2px solid #000; padding:1px 8px; width:40%; background:#3b62f0; color:#ffffff; font-weight:950; font-size:12px;">${isRP ? 'RP No.' : 'VF No.'}</td>
-                            <td contenteditable="true" style="border:1.2px solid #000; padding:1px 8px; outline: none; background:#3b62f0; color:#ffffff; font-weight:950; font-family: monospace; font-size:12px;">${c.id}</td>
+                        <tr style="background:#2563eb; color:#fff; font-weight:900; height: 8.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; width:40%;">VF/RP No.</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-weight:950; font-family: monospace;">${c.id}</td>
                         </tr>
                         <tr style="height: 7.5%;">
                             <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Issue Date</td>
@@ -14787,22 +15158,18 @@ else if (_currentSlide === 2) {
                         </tr>
                         <tr style="height: 7.5%;">
                             <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Defect Found Area</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-weight:950;">${isRP ? 'IQC Rejected' : 'Line claim'}</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">Line claim</td>
                         </tr>
                     </table>
                 </div>
                 
-                <!-- ฝั่งขวา: รูปภาพ (คงสัดส่วนธรรมชาติ Center) -->
+                <!-- ฝั่งขวา: รูปภาพ (ยืดหดตามตาราง) -->
                 <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: nowrap;">
-                        <span contenteditable="true" style="font-size: 15px; font-weight: 950; color: #000; outline: none; letter-spacing: -0.2px; font-family: Arial, sans-serif;">DESCRIBE OF DEFECT</span> 
-                        <span contenteditable="true" style="background: #ffff00; color: #000; padding: 2px 8px; font-style: italic; font-weight: 950; font-size: 11px; border: 1px solid #000; display: inline-block; outline: none; line-height: 1.3; font-family: Arial, sans-serif;">(PICTURE AND JUDGEMENT METHOD)</span>
-                    </div>
-                    <div style="flex: 1; border: 1.2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-                        ${supportImage 
-                            ? `<img src="${supportImage}" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">` 
-                            : '<span style="color:#eee; font-size:40px; font-weight:900;">PHOTO AREA</span>'
-                        }
+                    <h3 contenteditable="true" style="font-size: 15px; font-weight: 950; margin: 0 0 5px 0; color: #000; outline: none; text-transform: uppercase;">
+                        Describe of Defect <span style="background: yellow; color: red; padding: 0 5px; font-style: italic; font-size: 11px; font-weight: 800;">(Picture and Judgement method)</span>
+                    </h3>
+                    <div style="flex: 1; border: 2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-image: url('${supportImage}'); background-size: contain; background-repeat: no-repeat; background-position: center; border-radius: 4px;">
+                        ${!supportImage ? '<span style="color:#eee; font-size:40px; font-weight:900;">PHOTO AREA</span>' : ''}
                     </div>
                 </div>
             </div>
@@ -14811,7 +15178,7 @@ else if (_currentSlide === 2) {
         </div>`;
 }
 // ==========================================
-// แผ่นที่ 4: D2- [Further Detail] (ฉบับสมบูรณ์: จัด DETAIL รวมในกล่องข้อความเดียวกัน)
+// แผ่นที่ 4: D2- [Further Detail] (ฉบับสมบูรณ์: ดึงรูปภาพ + ดึง Remark อัตโนมัติ)
 // ==========================================
 else if (_currentSlide === 3) {
     // 1. ดึงข้อมูลพื้นฐานจากเคส
@@ -14823,18 +15190,21 @@ else if (_currentSlide === 3) {
         year: 'numeric'
     });
     
-    // 2. ดึงรูปภาพจาก JSON
+    // 2. ดึงรูปภาพจาก JSON (ที่เราย้ายมาเก็บไว้เพื่อประหยัดพื้นที่)
     const supportImage = c.report_data?.evidence_img || ""; 
 
     // 3. ดึงข้อมูลหมายเหตุ (Remark) มาทำเป็น Temporary Actions
+    // หากไม่มีหมายเหตุ ให้ใช้ข้อความ Default เป็นไกด์ไลน์
     const rawRemark = c.report_data?.source_remark || "";
     let tempActionContent = "";
 
     if (rawRemark.trim() !== "") {
+        // แปลงข้อความหมายเหตุ โดยถ้ามีการขึ้นบรรทัดใหม่ ให้ใส่จุด Bullet (•) นำหน้าทุกบรรทัด
         tempActionContent = rawRemark.split('\n')
             .map(line => `• ${line.trim()}`)
             .join('<br>');
     } else {
+        // กรณีไม่มีข้อมูลหมายเหตุส่งมา (Fallback)
         tempActionContent = `• Sorting 100% at line / WIP Stock<br>
                              • Inform vendor for urgent root cause analysis<br>
                              • Set point of control for next lot shipment`;
@@ -14842,13 +15212,14 @@ else if (_currentSlide === 3) {
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
-            <!-- 1. Header: D2-Define the Problem [Further Detail] -->
+            <!-- 1. Header: สไตล์ภาพที่ 2 (ตัวหนังสือใหญ่ แถบน้ำเงิน-เหลืองคมชัด) -->
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000; outline: none; letter-spacing: -1.5px; line-height: 1;">
                         D2-Define the Problem <span style="color:#003366; font-size: 24px; font-weight: 700;">[Further Detail]</span>
                     </h1>
                     
-                    <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1.2; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <!-- ✅ แถบสถานะน้ำเงิน-เหลือง Contrast สูง -->
+                    <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 3px 12px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1;">
                         &lt;Fill by CTC &gt;
                     </div>
                 </div>
@@ -14857,31 +15228,31 @@ else if (_currentSlide === 3) {
                 <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
 
                 <!-- 2. ส่วนเนื้อหา (แบ่งซ้าย-ขวา) -->
-                <div style="display: flex; gap: 25px; flex: 1; min-height: 0; align-items: stretch; margin-bottom: 10px;">
+                <div style="display: flex; gap: 35px; flex: 1; min-height: 0; align-items: stretch; margin-bottom: 10px;">
                     
-                    <!-- ฝั่งซ้าย: รูปภาพขนาดใหญ่ (คงสัดส่วนเดิมไม่ยืดบิดเบี้ยว) -->
-                    <div style="flex: 0 0 52%; border: 2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: 4px;">
+                    <!-- ฝั่งซ้าย: รูปภาพขนาดใหญ่ (Auto-Sync จากหน้า Support) -->
+                    <div style="flex: 0 0 55%; border: 2.5px solid #000; background: #f8fafc; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: 4px;">
                         ${supportImage 
-                            ? `<img src="${supportImage}" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">` 
+                            ? `<img src="${supportImage}" style="max-width:98%; max-height:98%; object-fit:contain;">` 
                             : '<span style="color:#cbd5e1; font-weight:900; font-size:24px; letter-spacing:1px;">NO EVIDENCE PHOTO</span>'
                         }
                     </div>
 
-                    <!-- ฝั่งขวา: รายละเอียดข้อความจัดรวมอยู่ในกล่องเดียวกันเสมอ -->
-                    <div style="flex: 1; border: 2px solid #000; background: #fff; padding: 18px; border-radius: 4px; display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+                    <!-- ฝั่งขวา: รายละเอียดข้อความ -->
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; padding-top: 5px;">
                         
-                        <!-- Block: DETAIL -->
+                        <!-- Block: Detail (ข้อมูลเบื้องต้น) -->
                         <div>
-                            <h3 contenteditable="true" style="font-size: 16px; font-weight: 950; color: #003366; text-transform: uppercase; margin: 0 0 6px 0; border-bottom: 2.5px solid #003366; display: inline-block; outline: none;">DETAIL</h3>
-<div contenteditable="true" style="color: #334155; font-weight: 600; margin-top: 6px; font-size: 15px; line-height: 1.6; outline: none; font-family: 'Inter', sans-serif;">
-    ${formatBeautifulText(problemTitle)}
-</div>
+                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">DETAIL</h3>
+                            <p contenteditable="true" style="font-size: 15px; color: #000; line-height: 1.5; outline: none; margin: 0; font-weight: 600;">
+                                ${formatDetailSentence(c)}
+                            </p>
                         </div>
 
-                        <!-- Block: Temporary actions -->
+                        <!-- ✅ Block: Temporary Actions (ดึงมาจากช่อง Remark อัตโนมัติ) -->
                         <div>
-                            <h3 contenteditable="true" style="font-size: 16px; font-weight: 950; color: #003366; text-transform: uppercase; margin: 0 0 6px 0; border-bottom: 2.5px solid #003366; display: inline-block; outline: none;">Temporary actions</h3>
-                            <div contenteditable="true" style="color: #334155; font-weight: 600; margin-top: 6px; font-size: 14px; line-height: 1.6; outline: none;">
+                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">Temporary actions</h3>
+                            <div contenteditable="true" style="font-size: 14px; color: #334155; line-height: 1.6; outline: none; font-weight: 600;">
                                 ${tempActionContent}
                             </div>
                         </div>
@@ -14904,7 +15275,7 @@ else if (_currentSlide === 3) {
                         <h1 contenteditable="true" style="font-size: 28px; font-weight: 950; margin: 0; color: #000; letter-spacing: -0.5px; outline: none; white-space: nowrap; flex: 1;">
                             D3-Interim Containment Action (ICA)
                         </h1>
-                        <div contenteditable="true" style="background: blue; color: yellow; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; outline: none; flex-shrink: 0; margin-left: 15px; display: flex; align-items: center; justify-content: center; text-align: center;">
+                        <div contenteditable="true" style="background: blue; color: yellow; padding: 3px 12px; font-weight: 950; font-size: 11px; border: 1.2px solid #000; outline: none; flex-shrink: 0; margin-left: 15px;">
                             &lt;Fill by CTC & Supplier&gt;
                         </div>
                     </div>
@@ -14946,29 +15317,27 @@ else if (_currentSlide === 3) {
                         </table>
                     </div>
 
-                    <!-- Bottom Sections (Clear Grid Table) -->
-                    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; margin-top: 10px; table-layout: fixed; flex: 1; min-height: 0; font-family: Arial, Helvetica, sans-serif;">
-                        <thead>
-                            <tr style="background: #8ea9db; height: 22px;">
-                                <th style="width: 38%; border: 1.5px solid #000; background: #8ea9db; padding: 2px 8px; text-align: left; font-weight: 800; font-size: 11.5px; color: #000; vertical-align: middle; line-height: 1.1;">Sort/Rework Method Used:</th>
-                                <th style="width: 30%; border: 1.5px solid #000; background: #8ea9db; padding: 2px 8px; text-align: left; font-weight: 800; font-size: 11.5px; color: #000; vertical-align: middle; line-height: 1.1;">Identify mark:</th>
-                                <th style="width: 32%; border: 1.5px solid #000; background: #8ea9db; padding: 2px 8px; text-align: left; font-weight: 800; font-size: 11.5px; color: #000; vertical-align: middle; line-height: 1.1;">Sorting/Rework lot Ship Date</th>
-                            </tr>
-                        </thead>
-                        <tbody style="height: calc(100% - 22px);">
-                            <tr style="height: 100%;">
-                                <td contenteditable="true" style="border: 1.5px solid #000; padding: 10px 8px; font-size: 11.5px; line-height: 1.45; vertical-align: top; background: #fff; outline: none; color: #000; height: 100%;">
-                                    V.TKCP screw Sorting parts in stock<br>Stock : 0 Pcs.<br>OK : .... Pcs.<br>NG : .... Pcs.
-                                </td>
-                                <td contenteditable="true" style="border: 1.5px solid #000; padding: 10px 8px; font-size: 11.5px; line-height: 1.45; vertical-align: top; background: #fff; outline: none; color: #000; height: 100%;">
-                                    Mark label ok control
-                                </td>
-                                <td contenteditable="true" style="border: 1.5px solid #000; padding: 10px 8px; font-size: 11.5px; line-height: 1.45; vertical-align: top; background: #fff; outline: none; color: #000; height: 100%;">
-                                    Sorting date : ....<br>Shipment replacement part date : ....
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <!-- Bottom Sections -->
+                    <div style="display: flex; gap: 0; margin-top: 10px; border: 1.2px solid #000; flex: 1; min-height: 0; background: #f1f5f9;">
+                        <div style="flex: 1.2; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
+                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Sort/Rework Method Used:</div>
+                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; line-height: 1.4; outline: none; background: #fff;">
+                                V.TKCP screw Sorting parts in stock<br>Stock : 0 Pcs.<br>OK : .... Pcs.<br>NG : .... Pcs.
+                            </div>
+                        </div>
+                        <div style="flex: 0.8; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
+                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Identify mark:</div>
+                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; outline: none; background: #fff;">
+                                Mark label ok control
+                            </div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column;">
+                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Sorting/Rework lot Ship Date</div>
+                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; line-height: 1.4; outline: none; background: #fff;">
+                                Sorting date : ....<br>Shipment replacement part date : ....
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Instruction Footer -->
                     <div style="background: #ffffcc; border: 1px solid #ffcc00; margin-top: 8px; padding: 5px 10px; font-size: 10px; line-height: 1.3; flex-shrink: 0;">
@@ -14991,15 +15360,11 @@ else if (_currentSlide === 5) {
             ? `position: relative; width: 190px; height: 50px; display: flex; align-items: center; justify-content: center;`
             : `width: 190px; height: 38px; background: #d9d9d9; border: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; text-transform: uppercase; color: ${isRed ? 'red' : '#000'}; outline: none; box-shadow: 2px 2px 0px #000;`;
 
-        const fontSize = isDiamond 
-            ? (text.length > 22 ? '7.5px' : text.length > 15 ? '8.5px' : '10px') 
-            : '12px';
-
         const leftContent = isDiamond ? `
             <svg viewBox="0 0 100 45" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 0px #000);">
                 <polygon points="50,2 98,22.5 50,43 2,22.5" fill="#fff" stroke="#000" stroke-width="1.2"/>
             </svg>
-            <div contenteditable="true" style="position: absolute; font-weight: 900; font-size: ${fontSize}; text-align: center; width: 82%; line-height: 1.05; text-transform: uppercase; outline: none; word-wrap: break-word;">${text}</div>
+            <div contenteditable="true" style="position: absolute; font-weight: 900; font-size: 10px; text-align: center; width: 75%; line-height: 1.1; text-transform: uppercase; outline: none;">${text}</div>
         ` : `<div contenteditable="true" style="outline:none;">${text}</div>`;
 
         return `
@@ -15025,7 +15390,7 @@ else if (_currentSlide === 5) {
                 <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1.5px; outline: none; line-height: 1;">
                     D4-Identify Root cause and Escape cause
                 </h1>
-                <div contenteditable="true" style="background: blue; color: white; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; margin-bottom: 4px; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                <div style="background: blue; color: white; padding: 2px 12px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px;">
                     &lt;Fill by Supplier&gt;
                 </div>
             </div>
@@ -15078,22 +15443,33 @@ else if (_currentSlide === 5) {
 }
 // ==========================================
 // แผ่นที่ 7: D4-Identify Root cause and Escape cause
+// ปรับขนาดให้พอดีหน้าจอ และรักษาเส้นแบ่งมาตรฐานเดียวกับหน้าอื่น
 // ==========================================
 else if (_currentSlide === 6) {
+    const whyRow = (label, content = "") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
+            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
+                ${label}
+            </div>
+            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
+                ${content}
+            </div>
+        </div>`;
+
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; font-family: Arial, Helvetica, sans-serif;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- Header Section -->
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
                         D4-Identify Root cause and Escape cause
                     </h1>
-                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; white-space: nowrap; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
                 
-                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น -->
+                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น (Standard Blue Divider) -->
                 <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
                 
                 <!-- Sub-Header Area -->
@@ -15102,50 +15478,34 @@ else if (_currentSlide === 6) {
                     <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why problem happen ?)</span>
                 </div>
 
-                <!-- Table Content (HTML Table with complete grid lines) -->
-                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
-                    <colgroup>
-                        <col style="width: 60px;">
-                        <col>
-                    </colgroup>
-                    <thead>
-                        <tr style="background: #e6f0ff; height: 36px;">
-                            <th style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; padding: 0; background: #e6f0ff;">1</th>
-                            <th contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; text-align: left; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; outline: none; background: #e6f0ff;">
-                                Why was the non conformity made?
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why1</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why2</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why3</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why4</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why5</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <!-- Table Content -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <!-- Question Header -->
+                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
+                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
+                            1
+                        </div>
+                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
+                            Why was the non conformity made?
+                        </div>
+                    </div>
+
+                    <!-- Why Rows -->
+                    <div>
+                        ${whyRow('Why1')}
+                        ${whyRow('Why2')}
+                        ${whyRow('Why3')}
+                        ${whyRow('Why4')}
+                        ${whyRow('Why5')}
+                    </div>
+                </div>
 
                 <!-- Instruction Box -->
-                <div style="margin-top: 10px; padding: 8px 12px; background: #ffffcc; border: 1.5px solid #000; font-size: 11px; line-height: 1.4; flex-shrink: 0;">
-                    <div style="color: red; font-weight: 800; font-style: italic; margin-bottom: 2px;">D4 - Identify Root Cause and Escape Cause</div>
-                    <div style="color: #000;">- Identify all potential reasons which could explain why the problem occurred.</div>
-                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
-                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
+                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
                 </div>
         </div>
     `;
@@ -15155,15 +15515,25 @@ else if (_currentSlide === 6) {
 // แผ่นที่ 8: D4-Identify Escape cause (ESCAPE CAUSE ANALYSIS)
 // ==========================================
 else if (_currentSlide === 7) {
+    const whyRow = (label, content = "") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
+            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
+                ${label}
+            </div>
+            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
+                ${content}
+            </div>
+        </div>`;
+
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; font-family: Arial, Helvetica, sans-serif;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header Section -->
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
                         D4-Identify Root cause and Escape cause
                     </h1>
-                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; white-space: nowrap; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
@@ -15177,50 +15547,34 @@ else if (_currentSlide === 7) {
                     <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why not detected ?)</span>
                 </div>
 
-                <!-- 3. Table Content (HTML Table with complete grid lines) -->
-                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
-                    <colgroup>
-                        <col style="width: 60px;">
-                        <col>
-                    </colgroup>
-                    <thead>
-                        <tr style="background: #e6f0ff; height: 36px;">
-                            <th style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; padding: 0; background: #e6f0ff;">1</th>
-                            <th contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; text-align: left; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; outline: none; background: #e6f0ff;">
-                                Why was the non conformity could not detect ?
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why1</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why2</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why3</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why4</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why5</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <!-- 3. Table Content -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <!-- Question Header -->
+                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
+                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
+                            1
+                        </div>
+                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
+                            Why was the non conformity could not detect ?
+                        </div>
+                    </div>
+
+                    <!-- Why Rows -->
+                    <div>
+                        ${whyRow('Why1')}
+                        ${whyRow('Why2')}
+                        ${whyRow('Why3')}
+                        ${whyRow('Why4')}
+                        ${whyRow('Why5')}
+                    </div>
+                </div>
 
                 <!-- 4. Instruction Box -->
-                <div style="margin-top: 10px; padding: 8px 12px; background: #ffffcc; border: 1.5px solid #000; font-size: 11px; line-height: 1.4; flex-shrink: 0;">
-                    <div style="color: red; font-weight: 800; font-style: italic; margin-bottom: 2px;">D4 - Identify Root Cause and Escape Cause</div>
-                    <div style="color: #000;">- Identify all potential reasons which could explain why the problem occurred.</div>
-                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
-                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
+                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
                 </div>
         </div>
     `;
@@ -15230,15 +15584,25 @@ else if (_currentSlide === 7) {
 // แผ่นที่ 9: D4-Identify System cause (SYSTEM CAUSE ANALYSIS)
 // ==========================================
 else if (_currentSlide === 8) {
+    const whyRow = (label, content = "") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
+            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
+                ${label}
+            </div>
+            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
+                ${content}
+            </div>
+        </div>`;
+
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; font-family: Arial, Helvetica, sans-serif;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header Section -->
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
                         D4-Identify Root cause and Escape cause
                     </h1>
-                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; white-space: nowrap; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
@@ -15252,142 +15616,111 @@ else if (_currentSlide === 8) {
                     <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why system failed ?)</span>
                 </div>
 
-                <!-- 3. Table Content (HTML Table with complete grid lines) -->
-                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
-                    <colgroup>
-                        <col style="width: 60px;">
-                        <col>
-                    </colgroup>
-                    <thead>
-                        <tr style="background: #e6f0ff; height: 36px;">
-                            <th style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; padding: 0; background: #e6f0ff;">1</th>
-                            <th contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; text-align: left; font-weight: 800; font-size: 14px; color: #000; vertical-align: middle; outline: none; background: #e6f0ff;">
-                                Why was the process &amp; system failed ?
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why1</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why2</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why3</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why4</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                        <tr style="height: 48px;">
-                            <td style="width: 60px; min-width: 60px; max-width: 60px; border: 1.5px solid #000; text-align: center; font-weight: 800; font-size: 13.5px; color: #000; vertical-align: middle; padding: 0; background: #fff;">Why5</td>
-                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 6px 12px; font-size: 12.5px; line-height: 1.4; color: #000; vertical-align: middle; outline: none;"></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <!-- 3. Table Content -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <!-- Question Header -->
+                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
+                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
+                            1
+                        </div>
+                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
+                            Why was the process & system failed ?
+                        </div>
+                    </div>
+
+                    <!-- Why Rows -->
+                    <div>
+                        ${whyRow('Why1')}
+                        ${whyRow('Why2')}
+                        ${whyRow('Why3')}
+                        ${whyRow('Why4')}
+                        ${whyRow('Why5')}
+                    </div>
+                </div>
 
                 <!-- 4. Instruction Box -->
-                <div style="margin-top: 10px; padding: 8px 12px; background: #ffffcc; border: 1.5px solid #000; font-size: 11px; line-height: 1.4; flex-shrink: 0;">
-                    <div style="color: red; font-weight: 800; font-style: italic; margin-bottom: 2px;">D4 - Identify Root Cause and Escape Cause</div>
-                    <div style="color: #000;">- Identify all potential reasons which could explain why the problem occurred.</div>
-                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
-                    <div style="color: #000;"><span style="color: red; font-style: italic; font-weight: 800;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
+                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
                 </div>
         </div>
     `;
 }
 
 // ==========================================
-// แผ่นที่ 10: D5-Developing permanent corrective action (ROOT CAUSE ACTION)
+// แผ่นที่ 10: D5-Developing permanent corrective action
 // ==========================================
 else if (_currentSlide === 9) {
     const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
-        <tr style="height: 56px;">
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${before}</td>
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${after}</td>
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
             
-            <!-- Improvement Detail Column: Photo (Left) & File Attachment (Right) -->
-            <td style="border: 1.5px solid #000; padding: 0; vertical-align: middle;">
-                <div style="display: flex; align-items: center; justify-content: stretch; height: 100%; min-height: 52px;">
-                    <!-- ฝั่งซ้าย: Photo -->
-                    <div style="flex: 1; border-right: 1px solid #d0d0d0; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
-                        <div onclick="this.querySelector('.photo-in').click()" style="width: 52px; height: 36px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
-                            <span style="font-size: 8px; color: #999;">Add Photo</span>
-                            <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
-                        </div>
-                    </div>
-                    <!-- ฝั่งขวา: File Attachment -->
-                    <div style="flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
-                        <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
-                            <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 14px; height: 14px; flex-shrink: 0;">
-                            <span class="fname" style="font-size: 9px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px;">${improvementText}</span>
-                            <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
-                        </div>
+            <!-- Improvement Detail: Photo (Left) & File (Right) with vertical divider -->
+            <div style="width: 220px; border-right: 1.2px solid #000; padding: 2px 4px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 4px;">
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; border-right: 1px solid #cbd5e1; padding-right: 4px; height: 100%;">
+                    <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative; border-radius: 4px;">
+                        <span style="font-size: 8px; color: #999; text-align: center;">Add Photo</span>
+                        <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
                     </div>
                 </div>
-            </td>
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; height: 100%; padding-left: 2px;">
+                    <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px; flex-shrink: 0;">
+                        <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">${improvementText}</span>
+                        <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
+                    </div>
+                </div>
+            </div>
 
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
-        </tr>`;
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
+        </div>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 36px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 24px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D5-Developing permanent corrective action
                     </h1>
-                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 3px 12px; font-weight: 950; font-size: 13px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
                 
                 <!-- เส้นแถบสีน้ำเงิน (Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
                 
                 <!-- 2. Sub-Header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; flex-shrink: 0;">
-                    <div contenteditable="true" style="font-size: 14px; font-weight: bold; text-decoration: underline; outline: none;">ROOT CAUSE ACTION</div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
+                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">ROOT CAUSE ACTION</div>
                     <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
                 </div>
 
                 <!-- 3. Table Structure -->
-                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
-                    <colgroup>
-                        <col style="width: 18%;">
-                        <col style="width: 18%;">
-                        <col style="width: 28%;">
-                        <col style="width: 11%;">
-                        <col style="width: 11%;">
-                        <col style="width: 14%;">
-                    </colgroup>
-                    <thead>
-                        <tr style="background: #b4c7e7; height: 30px;">
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Before</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">After</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Improvement Detail</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10.5px; color: #000; vertical-align: middle; padding: 2px;">Effective lot</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10px; color: #000; vertical-align: middle; padding: 2px;">Identify lot</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 11px; color: #000; vertical-align: middle; padding: 2px;">MP Level</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${createD5Row()}
-                        ${createD5Row()}
-                        ${createD5Row()}
-                        ${createD5Row()}
-                    </tbody>
-                </table>
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
+                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
+                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
+                    </div>
+
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                </div>
 
                 <!-- 4. Instruction Box -->
-                <div style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.3; flex-shrink: 0;">
+                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0;">
                     <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
                     <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement.</div>
                     <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List corrective actions to permanently eliminate root cause.</div>
@@ -15403,88 +15736,73 @@ else if (_currentSlide === 9) {
 // ==========================================
 else if (_currentSlide === 10) {
     const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
-        <tr style="height: 56px;">
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${before}</td>
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${after}</td>
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
             
-            <!-- Improvement Detail Column: Photo (Left) & File Attachment (Right) -->
-            <td style="border: 1.5px solid #000; padding: 0; vertical-align: middle;">
-                <div style="display: flex; align-items: center; justify-content: stretch; height: 100%; min-height: 52px;">
-                    <!-- ฝั่งซ้าย: Photo -->
-                    <div style="flex: 1; border-right: 1px solid #d0d0d0; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
-                        <div onclick="this.querySelector('.photo-in').click()" style="width: 52px; height: 36px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
-                            <span style="font-size: 8px; color: #999;">Add Photo</span>
-                            <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
-                        </div>
-                    </div>
-                    <!-- ฝั่งขวา: File Attachment -->
-                    <div style="flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
-                        <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
-                            <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 14px; height: 14px; flex-shrink: 0;">
-                            <span class="fname" style="font-size: 9px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px;">${improvementText}</span>
-                            <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
-                        </div>
+            <!-- Improvement Detail Column: Photo (Left) & File (Right) with vertical divider -->
+            <div style="width: 220px; border-right: 1.2px solid #000; padding: 2px 4px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 4px;">
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; border-right: 1px solid #cbd5e1; padding-right: 4px; height: 100%;">
+                    <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative; border-radius: 4px;">
+                        <span style="font-size: 8px; color: #999; text-align: center;">Add Photo</span>
+                        <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
                     </div>
                 </div>
-            </td>
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; height: 100%; padding-left: 2px;">
+                    <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px; flex-shrink: 0;">
+                        <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">${improvementText}</span>
+                        <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
+                    </div>
+                </div>
+            </div>
 
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
-        </tr>`;
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
+        </div>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header (Standard Style) -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 36px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 24px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D5-Developing permanent corrective action
                     </h1>
-                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 3px 12px; font-weight: 950; font-size: 13px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
                 
                 <!-- เส้นแถบสีน้ำเงิน (Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
                 
                 <!-- 2. Sub-Header (เปลี่ยนเป็น ESCAPE CAUSE ACTION) -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; flex-shrink: 0;">
-                    <div contenteditable="true" style="font-size: 14px; font-weight: bold; text-decoration: underline; outline: none;">ESCAPE CAUSE ACTION</div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
+                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">ESCAPE CAUSE ACTION</div>
                     <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
                 </div>
 
                 <!-- 3. Table Structure -->
-                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
-                    <colgroup>
-                        <col style="width: 18%;">
-                        <col style="width: 18%;">
-                        <col style="width: 28%;">
-                        <col style="width: 11%;">
-                        <col style="width: 11%;">
-                        <col style="width: 14%;">
-                    </colgroup>
-                    <thead>
-                        <tr style="background: #b4c7e7; height: 30px;">
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Before</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">After</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Improvement Detail</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10.5px; color: #000; vertical-align: middle; padding: 2px;">Effective lot</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10px; color: #000; vertical-align: middle; padding: 2px;">Identify lot</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 11px; color: #000; vertical-align: middle; padding: 2px;">MP Level</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${createD5Row()}
-                        ${createD5Row()}
-                        ${createD5Row()}
-                        ${createD5Row()}
-                    </tbody>
-                </table>
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
+                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
+                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
+                    </div>
+
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                </div>
 
                 <!-- 4. Instruction Box -->
-                <div style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.3; flex-shrink: 0;">
+                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0; cursor: text;">
                     <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
                     <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
                     <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List chosen corrective actions necessary to permanently eliminate root cause.</div>
@@ -15500,88 +15818,73 @@ else if (_currentSlide === 10) {
 // ==========================================
 else if (_currentSlide === 11) {
     const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
-        <tr style="height: 56px;">
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${before}</td>
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; line-height: 1.2; vertical-align: middle; color: #000;">${after}</td>
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
             
-            <!-- Improvement Detail Column: Photo (Left) & File Attachment (Right) -->
-            <td style="border: 1.5px solid #000; padding: 0; vertical-align: middle;">
-                <div style="display: flex; align-items: center; justify-content: stretch; height: 100%; min-height: 52px;">
-                    <!-- ฝั่งซ้าย: Photo -->
-                    <div style="flex: 1; border-right: 1px solid #d0d0d0; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
-                        <div onclick="this.querySelector('.photo-in').click()" style="width: 52px; height: 36px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
-                            <span style="font-size: 8px; color: #999;">Add Photo</span>
-                            <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
-                        </div>
-                    </div>
-                    <!-- ฝั่งขวา: File Attachment -->
-                    <div style="flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; padding: 2px;">
-                        <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
-                            <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 14px; height: 14px; flex-shrink: 0;">
-                            <span class="fname" style="font-size: 9px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px;">${improvementText}</span>
-                            <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
-                        </div>
+            <!-- Improvement Detail Column: Photo (Left) & File (Right) with vertical divider -->
+            <div style="width: 220px; border-right: 1.2px solid #000; padding: 2px 4px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 4px;">
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; border-right: 1px solid #cbd5e1; padding-right: 4px; height: 100%;">
+                    <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative; border-radius: 4px;">
+                        <span style="font-size: 8px; color: #999; text-align: center;">Add Photo</span>
+                        <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
                     </div>
                 </div>
-            </td>
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center; height: 100%; padding-left: 2px;">
+                    <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px; flex-shrink: 0;">
+                        <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">${improvementText}</span>
+                        <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
+                    </div>
+                </div>
+            </div>
 
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
-            <td contenteditable="true" style="border: 1.5px solid #000; padding: 4px; font-size: 10.5px; outline: none; vertical-align: middle; color: #000;"></td>
-        </tr>`;
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
+        </div>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 36px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 24px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D5-Developing permanent corrective action
                     </h1>
-                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 3px 12px; font-weight: 950; font-size: 13px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
                 
                 <!-- เส้นแถบสีน้ำเงิน (Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
                 
                 <!-- 2. Sub-Header (เปลี่ยนเป็น SYSTEM CAUSE ACTION) -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; flex-shrink: 0;">
-                    <div contenteditable="true" style="font-size: 14px; font-weight: bold; text-decoration: underline; outline: none;">SYSTEM CAUSE ACTION</div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
+                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">SYSTEM CAUSE ACTION</div>
                     <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
                 </div>
 
                 <!-- 3. Table Structure (4 แถวตามภาพ) -->
-                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; background: #fff; table-layout: fixed;">
-                    <colgroup>
-                        <col style="width: 18%;">
-                        <col style="width: 18%;">
-                        <col style="width: 28%;">
-                        <col style="width: 11%;">
-                        <col style="width: 11%;">
-                        <col style="width: 14%;">
-                    </colgroup>
-                    <thead>
-                        <tr style="background: #b4c7e7; height: 30px;">
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Before</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">After</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 12px; color: #000; vertical-align: middle; padding: 2px;">Improvement Detail</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10.5px; color: #000; vertical-align: middle; padding: 2px;">Effective lot</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 10px; color: #000; vertical-align: middle; padding: 2px;">Identify lot</th>
-                            <th style="border: 1.5px solid #000; text-align: center; font-weight: bold; font-size: 11px; color: #000; vertical-align: middle; padding: 2px;">MP Level</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${createD5Row()}
-                        ${createD5Row()}
-                        ${createD5Row()}
-                        ${createD5Row()}
-                    </tbody>
-                </table>
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
+                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
+                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
+                    </div>
+
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                </div>
 
                 <!-- 4. Instruction Box -->
-                <div style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.3; flex-shrink: 0;">
+                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0; cursor: text;">
                     <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
                     <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
                     <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List chosen corrective actions necessary to permanently eliminate root cause.</div>
@@ -15614,7 +15917,7 @@ else if (_currentSlide === 12) {
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D6-Implement permanent corrective action
                     </h1>
-                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
@@ -15643,7 +15946,7 @@ else if (_currentSlide === 12) {
                 </div>
 
                 <!-- 4. Instruction Box -->
-                <div style="margin-top: 8px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; flex-shrink: 0;">
+                <div contenteditable="true" style="margin-top: 8px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
                     <div style="color: red; font-weight: bold; font-style: italic;">6D - Implement Permanent Corrective Actions</div>
                     <div style="color: #000;">Create a clear action plan to solve the problem by stating WHO will do WHAT and by WHEN. How to verify the corrective actions with before and after result.</div>
                 </div>
@@ -15672,7 +15975,7 @@ else if (_currentSlide === 13) {
                     <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
                         D7-Preventive Recurrence
                     </h1>
-                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
@@ -15743,7 +16046,7 @@ else if (_currentSlide === 13) {
                 </table>
 
                 <!-- 5. Instruction Box -->
-                <div style="margin-top: 6px; padding: 5px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.25; flex-shrink: 0;">
+                <div contenteditable="true" style="margin-top: 6px; padding: 5px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.25; outline: none; cursor: text; flex-shrink: 0;">
                     <div style="color: red; font-weight: bold; font-style: italic;">7D - Prevent Recurrence</div>
                     <div style="color: #000;">Ensure the problem does not happen again ANYWHERE by using Foolproof, POKAYOKE etc. Communicate your results to all areas including similar part. Submit revised all related documents to us to review. (if have)</div>
                 </div>
@@ -15768,7 +16071,7 @@ else if (_currentSlide === 14) {
                 <!-- Header -->
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 28px; font-weight: 800; margin: 0; color: #000; outline: none;">D8-Team and Individual Recognition</h1>
-                    <div contenteditable="true" style="background: #1e1bff; color: #fff; padding: 4px 14px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; outline: none; display: flex; align-items: center; justify-content: center; text-align: center;">&lt;Fill by Supplier&gt;</div>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">&lt;Fill by Supplier&gt;</div>
                 </div>
                 <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
 
@@ -15798,7 +16101,7 @@ else if (_currentSlide === 14) {
                 </div>
 
                 <!-- Instruction Box -->
-                <div style="padding: 8px 12px; background: #fffde7; border: 2px solid #fbc02d; border-radius: 8px; font-size: 10px; flex-shrink: 0;">
+                <div contenteditable="true" style="padding: 8px 12px; background: #fffde7; border: 2px solid #fbc02d; border-radius: 8px; font-size: 10px; outline: none; flex-shrink: 0;">
                     <div style="color: #d32f2f; font-weight: 900; font-style: italic;">8D – Team and Individual Recognition</div>
                     <div style="color: #333;">8D process is the time to recognize the team efforts and special team member contributions.</div>
                 </div>
@@ -15858,19 +16161,13 @@ else if (_currentSlide === 15) {
 
     function getFooter() {
         return `
-            <div style="flex-shrink: 0; height: 32px; border: none; background: transparent; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; padding-top: 4px; margin-top: auto; font-family: system-ui, sans-serif;">
-                <div style="width: 100px; height: 26px; flex-shrink: 0; display: flex; align-items: center;">
-                    <svg viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="width:85px; height:24px; display:block;">
-                        <ellipse cx="100" cy="40" rx="95" ry="38" fill="#003366" />
-                        <ellipse cx="100" cy="40" rx="88" ry="33" fill="none" stroke="white" stroke-width="1.5" />
-                        <text x="50%" y="58" text-anchor="middle" font-family="Times New Roman, serif" font-style="italic" font-weight="bold" font-size="44" fill="white">Carrier</text>
-                    </svg>
-                </div>
-                <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; text-align: center; flex: 1;">
+            <div style="flex-shrink: 0; height: 32px; border-top: 1.2px solid #cbd5e1; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; padding-top: 4px; margin-top: auto; font-family: system-ui, sans-serif;">
+                <div style="width: 100px; height: 26px; background: url('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Carrier_Global_Logo.svg/1280px-Carrier_Global_Logo.svg.png') no-repeat center left; background-size: contain; flex-shrink: 0;"></div>
+                <div style="font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; text-align: center; flex: 1;">
                     Proprietary and Confidential
                 </div>
-                <div style="font-size: 11px; font-weight: 800; color: #003366; min-width: 60px; text-align: right; flex-shrink: 0;">
-                    PAGE ${_currentSlide + 1} / 16
+                <div style="font-size: 12px; font-weight: 800; color: #1e293b; min-width: 30px; text-align: right; flex-shrink: 0;">
+                    ${_currentSlide + 1}
                 </div>
             </div>
         `;
@@ -15878,7 +16175,9 @@ else if (_currentSlide === 15) {
 
 // --- บรรทัดสุดท้ายของโมดูล Wap8DSystem ---
 return { 
-    init, createNewCase, openReport, nextSlide, prevSlide, openHistoryPicker, pickRecord, deleteCase, exportToPPTX, filterByStat, setReportType,
+    init, createNewCase, openReport, nextSlide, prevSlide, openHistoryPicker, pickRecord, deleteCase, exportToPPTX, filterByStat, fetchCases,
+    getCases: () => _cases,
+    getCaseBySupportId: (supId) => _cases.find(c => String(c.support_id) === String(supId) || String(c.report_data?.record_id) === String(supId)),
     showDashboard: () => {
         saveCurrentProgress();
         document.getElementById('eight-d-dashboard').classList.remove('hidden');
@@ -15903,6 +16202,7 @@ if (typeof window !== 'undefined') {
         checkAnomaly, updateInputResetButton, resetInputForm, clearForm, submitEntry,
         backgroundSync, syncAllPendingData, editRecord, cloneRecord, confirmDelete,
         showModal, closeModal, getFilteredRecords, filterTable, debounceSearch,
+        get8DCaseForRecord, create8DFromClaimRecord, openReportFromRecord,
         clearFilterSearch, executeGlobalSearch, searchTable, buildRow, renderTable,
         handleTableScroll, switchSubTerminal, switchPage, applyLanguage, fetchWAPData,
         getWAPDate, toggleSidebar, rebuildSmartMemory, getMostFrequentPack, updateAIBrain,
@@ -16128,7 +16428,7 @@ window.validateEmail = validateEmail;
 
 // 3. ฟังก์ชันตรวจสอบ Caps Lock (แก้ Error checkCapsLock)
 window.checkCapsLock = checkCapsLock;
-window.addEventListener('resize', handleTableScroll);
+
 // 4. ฟังก์ชันสำคัญอื่นๆ (ใส่ไปให้หมดเพื่อให้ระบบ Login และ Sidebar ทำงานได้)
 window.handleLogin = handleLogin;
 window.toggleSidebar = toggleSidebar;
