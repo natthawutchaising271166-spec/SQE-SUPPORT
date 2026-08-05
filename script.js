@@ -5585,66 +5585,87 @@ function renderTable() {
 
 
 /**
- * ฟังก์ชันจัดการ Virtual Scroll (High Performance)
- * ใช้การคำนวณตำแหน่งและดีดเนื้อหาด้วย Transform
+ * 🚀 ฟังก์ชันจัดการ Virtual Scroll ระดับสูง 
+ * ออกแบบมาเพื่อแก้ปัญหา GPU Rendering Error และรองรับการแสดงผลทุกขนาดหน้าจอ
  */
 function handleTableScroll() {
+    // [1] อ้างอิง Element สำคัญ
     const container = document.getElementById('table-container');
     const tbody = document.getElementById('table-render-target');
     
-    // ตรวจสอบความพร้อมของข้อมูลและ Element
-    if (!container || !tbody || !virtualTableState.allRows.length) return;
+    // [2] Guard Clause: ตรวจสอบความพร้อมก่อนทำงาน
+    // หากไม่มี Container หรือ ข้อมูลยังโหลดไม่เสร็จ ให้หยุดการทำงานเพื่อป้องกัน Error
+    if (!container || !tbody || !virtualTableState.allRows || virtualTableState.allRows.length === 0) {
+        return;
+    }
 
     const allData = virtualTableState.allRows;
     const totalCount = allData.length;
     const scrollTop = container.scrollTop;
 
-    // --- แก้ไขจุดนี้: ระบบดักจับความสูง 0 (Visual Height Fallback) ---
+    // ============================================================
+    // 🛡️ [RECOVERY ENGINE] ระบบตรวจจับและแก้ไขความสูงหน้าจอแบบ 3 ชั้น
+    // แก้ปัญหาเครื่องที่รายงานค่า clientHeight เป็น 0 เนื่องจาก GPU หรือ Scaling เพี้ยน
+    // ============================================================
     let viewHeight = container.clientHeight;
 
     if (viewHeight <= 0) {
-        // หาก clientHeight เป็น 0 ให้ลองใช้ offsetHeight 
-        // หรือใช้ความสูงหน้าจอ (Viewport) ลบด้วยความสูง Header โดยประมาณ (250px)
-        viewHeight = container.offsetHeight || (window.innerHeight - 250);
-        
-        // กรณีเลวร้ายที่สุด ถ้ายังเป็น 0 ให้กำหนดค่าคงที่ไว้ที่ 600px เพื่อให้ตารางยอมวาดข้อมูล
-        if (viewHeight <= 0) viewHeight = 600; 
-        
-        console.warn("Table container height detected as 0. Using fallback height:", viewHeight);
-    }
-    // -----------------------------------------------------------
+        // ขั้นที่ 1: ตรวจสอบค่า OffsetHeight (ความสูงรวมขอบ)
+        viewHeight = container.offsetHeight;
 
-    // 1. คำนวณหา Index ของแถวที่ต้องแสดงผล
-    const BUFFER = 3;
+        // ขั้นที่ 2: คำนวณจาก Viewport จริง (หักลบพื้นที่ด้านบนและล่างออก)
+        if (viewHeight <= 0) {
+            const rect = container.getBoundingClientRect();
+            // window.innerHeight คือความสูงจริงของหน้าต่าง Browser
+            // rect.top คือตำแหน่งที่ตารางเริ่มวาง
+            viewHeight = window.innerHeight - rect.top - 50; 
+        }
+        
+        // ขั้นที่ 3: Safety Fallback (Hardcoded)
+        // หากคำนวณทุกอย่างแล้วยังเป็น 0 ให้บังคับความสูงเป็นค่ามาตรฐาน 600px 
+        // เพื่อบังคับให้ Code วาดแถวข้อมูลออกมาให้ User เห็น
+        if (viewHeight <= 0) viewHeight = 600; 
+
+        // บันทึก Log เพื่อแจ้งเตือนนักพัฒนาว่าเครื่องนี้มีการ Recovery
+        console.warn("Table Recovery: GPU error bypassed. Height used:", viewHeight);
+    }
+    // ============================================================
+
+    // [3] คำนวณขอบเขตแถวที่ต้องแสดงผล (Dynamic Index Calculation)
+    // BUFFER คือจำนวนแถวที่วาดรอไว้ก่อนเลื่อนถึง เพื่อป้องกัน "หน้าจอขาว" เวลาเลื่อนเร็วๆ
+    const BUFFER = 8; 
     let startIdx = Math.floor(scrollTop / FIXED_ROW_HEIGHT) - BUFFER;
     let endIdx = Math.ceil((scrollTop + viewHeight) / FIXED_ROW_HEIGHT) + BUFFER;
 
-    // ตรวจสอบขอบเขตของ Index
+    // ตรวจสอบขอบเขต (Clamp) ไม่ให้ Index หลุดช่วง 0 ถึงจำนวนข้อมูลจริง
     startIdx = Math.max(0, startIdx);
     endIdx = Math.min(totalCount, endIdx);
 
-    // 2. Performance Check: หากเลื่อนไปแล้วยังอยู่ในช่วงเดิม ไม่ต้องวาด DOM ใหม่
-    if (startIdx === virtualTableState.prevStart && endIdx === virtualTableState.prevEnd) return;
+    // [4] ระบบ Performance Lock
+    // หากเลื่อนจอแล้วยังอยู่ในช่วง Index เดิม ไม่ต้องทำอะไร (ประหยัดพลังงานเครื่อง)
+    if (startIdx === virtualTableState.prevStart && endIdx === virtualTableState.prevEnd) {
+        return;
+    }
     
     virtualTableState.prevStart = startIdx;
     virtualTableState.prevEnd = endIdx;
 
-    // 3. การคำนวณตำแหน่ง (The Magic Logic)
+    // [5] การจัดวางตำแหน่งตารางแบบ GPU-Accelerated
+    // ใช้ CSS Transform 'translateY' ซึ่งทำงานบนชั้น Layer ของการ์ดจอโดยตรง 
+    // ทำให้ลื่นไหลกว่าการใช้ Margin หรือ Top มาก
     const offsetY = startIdx * FIXED_ROW_HEIGHT;
-    
-    // ใช้ Transform เพื่อความลื่นไหล
     tbody.style.transform = `translateY(${offsetY}px)`;
 
-    // 4. วนลูปสร้างเฉพาะ HTML ของแถวในช่วงที่คำนวณได้
+    // [6] กระบวนการวาดแถวข้อมูล (Render Loop)
     let loopHtml = '';
     for (let i = startIdx; i < endIdx; i++) {
-        // ตรวจสอบความปลอดภัยของข้อมูลก่อนส่งเข้า buildRow
         if (allData[i]) {
+            // เรียกฟังก์ชัน buildRow ของระบบเดิมเพื่อสร้าง HTML ของแต่ละแถว
             loopHtml += buildRow(allData[i], i);
         }
     }
 
-    // 5. ฉีดข้อมูลเข้าสู่ Tbody
+    // [7] อัปเดตข้อมูลเข้าสู่หน้าจอ
     tbody.innerHTML = loopHtml;
 }
 
@@ -16093,7 +16114,7 @@ window.validateEmail = validateEmail;
 
 // 3. ฟังก์ชันตรวจสอบ Caps Lock (แก้ Error checkCapsLock)
 window.checkCapsLock = checkCapsLock;
-
+window.addEventListener('resize', handleTableScroll);
 // 4. ฟังก์ชันสำคัญอื่นๆ (ใส่ไปให้หมดเพื่อให้ระบบ Login และ Sidebar ทำงานได้)
 window.handleLogin = handleLogin;
 window.toggleSidebar = toggleSidebar;
