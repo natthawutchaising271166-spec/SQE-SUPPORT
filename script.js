@@ -2304,7 +2304,7 @@ const VENDOR_MASTER = {
     "LJ0002": "JITANANSUB COMPANY LIMITED",
     "LI0098": "ISOCAL TECHNOLOGY CO.,LTD.",
     "LI0118": "INNOVATIVE INSTRUMENT CO.,LTD.",
-    "LI0022": "IMAGE TECHNOPART CO.,LTD.",
+    "LI0022": "IMAGE TECHNOPAcontainer.innerHTML = RT CO.,LTD.",
     "LI0012": "ISONET CO.,LTD.",
     "LH0059": "HEALTH & ENVITECH CO.,LTD.",
     "LH0006": "HODAKA ELECTRONICS (THAILAND)",
@@ -3399,6 +3399,38 @@ const VENDOR_MASTER = {
 // ตั้งค่าฐานข้อมูลในเครื่อง
 // --- บรรทัดที่ 1 ของไฟล์ script.js ---
 // เพิ่มฟังก์ชันนี้ไว้บนสุดของ script.js
+const _memStorage = {};
+function safeGetStorage(type, key, defaultVal = null) {
+    try {
+        const store = type === 'session' ? window.sessionStorage : window.localStorage;
+        if (!store) return _memStorage[key] !== undefined ? _memStorage[key] : defaultVal;
+        const val = store.getItem(key);
+        return val !== null ? val : defaultVal;
+    } catch (e) {
+        return _memStorage[key] !== undefined ? _memStorage[key] : defaultVal;
+    }
+}
+
+function safeSetStorage(type, key, val) {
+    try {
+        const store = type === 'session' ? window.sessionStorage : window.localStorage;
+        if (store) store.setItem(key, val);
+        _memStorage[key] = String(val);
+    } catch (e) {
+        _memStorage[key] = String(val);
+    }
+}
+
+function safeRemoveStorage(type, key) {
+    try {
+        const store = type === 'session' ? window.sessionStorage : window.localStorage;
+        if (store) store.removeItem(key);
+        delete _memStorage[key];
+    } catch (e) {
+        delete _memStorage[key];
+    }
+}
+
 function safeSetText(id, value) {
     const el = document.getElementById(id);
     if (el) {
@@ -3724,9 +3756,9 @@ async function checkSupervisorRole(email) {
 // ฟังก์ชันจดจำบัญชี
 function finalizeLoginProcess(email, role, remember) {
     if (remember) {
-        localStorage.setItem('carrier_remembered_email', email);
+        safeSetStorage('local', 'carrier_remembered_email', email);
     } else {
-        localStorage.removeItem('carrier_remembered_email');
+        safeRemoveStorage('local', 'carrier_remembered_email');
     }
     finalizeLogin(email, role);
 }
@@ -3906,7 +3938,7 @@ function animateNumber(id, targetValue, duration = 1500) {
  * 1. จุดเริ่มต้นหลังกดปุ่ม Login
  */
 function finalizeLogin(email, role) {
-    sessionStorage.setItem('sqe_session', JSON.stringify({ email, role }));
+    safeSetStorage('session', 'sqe_session', JSON.stringify({ email, role }));
     startNeuralBootSequence(email, role);
 }
 
@@ -3934,17 +3966,21 @@ async function startNeuralBootSequence(email, role) {
         // --- STEP 1: SERVICE WORKER UPDATE ---
         updateStatus(15, "Verifying Build...", "comparing local vs server version");
         if ('serviceWorker' in navigator) {
-            const reg = await navigator.serviceWorker.getRegistration();
-            if (reg) {
-                await reg.update();
-                if (reg.installing || reg.waiting) {
-                    updateStatus(35, "Update Detected!", "installing latest system core...");
-                    sessionStorage.setItem('reboot_login_email', email);
-                    sessionStorage.setItem('reboot_login_role', role);
-                    await new Promise(r => setTimeout(r, 1000));
-                    window.location.reload(true);
-                    return;
+            try {
+                const reg = await navigator.serviceWorker.getRegistration();
+                if (reg && reg.update) {
+                    await reg.update();
+                    if (reg.installing || reg.waiting) {
+                        updateStatus(35, "Update Detected!", "installing latest system core...");
+                        safeSetStorage('session', 'reboot_login_email', email);
+                        safeSetStorage('session', 'reboot_login_role', role);
+                        await new Promise(r => setTimeout(r, 1000));
+                        window.location.reload(true);
+                        return;
+                    }
                 }
+            } catch (swErr) {
+                console.warn("ServiceWorker update skipped:", swErr);
             }
         }
 
@@ -4046,49 +4082,57 @@ async function enforceMaintenanceMode() {
  * 5. ระบบ INITIALIZATION เมื่อโหลดหน้าเว็บ
  */
 window.addEventListener('load', () => {
-    console.log("SQE & WAP System: Final Initializing...");
+    try {
+        console.log("SQE & WAP System: Final Initializing...");
 
-    if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
-    if (typeof autoHideBanner === 'function') autoHideBanner();
+        if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
+        if (typeof autoHideBanner === 'function') autoHideBanner();
 
-    const savedLang = localStorage.getItem('carrier_lang') || (navigator.language.startsWith('th') ? 'th' : 'en');
-    applyLanguage(savedLang);
+        const savedLang = safeGetStorage('local', 'carrier_lang') || (navigator.language.startsWith('th') ? 'th' : 'en');
+        applyLanguage(savedLang);
 
-    const savedEmail = localStorage.getItem('carrier_remembered_email');
-    if (savedEmail) {
-        const emailIn = document.getElementById('login-email');
-        if (emailIn) { emailIn.value = savedEmail; emailIn.classList.add('valid'); }
-    }
+        const savedEmail = safeGetStorage('local', 'carrier_remembered_email');
+        if (savedEmail) {
+            const emailIn = document.getElementById('login-email');
+            if (emailIn) { emailIn.value = savedEmail; emailIn.classList.add('valid'); }
+        }
 
-    // ตรวจสอบ Auto-Login หลังอัปเดต
-    const rebootEmail = sessionStorage.getItem('reboot_login_email');
-    const rebootRole = sessionStorage.getItem('reboot_login_role');
-    if (rebootEmail && rebootRole) {
-        sessionStorage.removeItem('reboot_login_email');
-        sessionStorage.removeItem('reboot_login_role');
-        startNeuralBootSequence(rebootEmail, rebootRole);
-        return; 
-    }
+        // ตรวจสอบ Auto-Login หลังอัปเดต
+        const rebootEmail = safeGetStorage('session', 'reboot_login_email');
+        const rebootRole = safeGetStorage('session', 'reboot_login_role');
+        if (rebootEmail && rebootRole) {
+            safeRemoveStorage('session', 'reboot_login_email');
+            safeRemoveStorage('session', 'reboot_login_role');
+            startNeuralBootSequence(rebootEmail, rebootRole);
+            return; 
+        }
 
-    // ตรวจสอบ Session เดิม
-    const session = sessionStorage.getItem('sqe_session');
-    if (session) {
-        try {
-            const userData = JSON.parse(session);
-            startNeuralBootSequence(userData.email, userData.role);
-        } catch (e) { sessionStorage.removeItem('sqe_session'); }
-    }
+        // ตรวจสอบ Session เดิม
+        const session = safeGetStorage('session', 'sqe_session');
+        if (session) {
+            try {
+                const userData = JSON.parse(session);
+                startNeuralBootSequence(userData.email, userData.role);
+            } catch (e) { safeRemoveStorage('session', 'sqe_session'); }
+        }
 
-    // รันระบบ Background
-    watchSystemUpdate();
-    setInterval(watchSystemUpdate, 180000);
-    enforceMaintenanceMode(); // เรียกฟังก์ชันที่เคย Error
-    setInterval(enforceMaintenanceMode, 30000);
-    updateUserPresence();
-    setInterval(updateUserPresence, 300000);
+        // รันระบบ Background
+        watchSystemUpdate();
+        setInterval(watchSystemUpdate, 180000);
+        enforceMaintenanceMode(); // เรียกฟังก์ชันที่เคย Error
+        setInterval(enforceMaintenanceMode, 30000);
+        updateUserPresence();
+        setInterval(updateUserPresence, 300000);
 
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(err => console.log('PWA Error', err));
+        if ('serviceWorker' in navigator) {
+            try {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log('PWA Error', err));
+            } catch (e) {
+                console.log('PWA Register Error', e);
+            }
+        }
+    } catch (err) {
+        console.warn("Init load sequence warning:", err);
     }
 });
 
@@ -4203,7 +4247,7 @@ function handleLogout() {
 
 async function showDashboard() {
     // --- [เพิ่มส่วนนี้: อัปเดตธีมทันทีที่เปลี่ยนหน้า] ---
-    const savedTheme = localStorage.getItem('carrier_theme');
+    const savedTheme = safeGetStorage('local', 'carrier_theme');
     const isDark = (savedTheme === 'dark');
     if (isDark) {
         document.body.classList.add('dark-mode');
@@ -4488,17 +4532,16 @@ async function loadStaffList() {
 
 async function loadRecords() {
     // ดักจับ Target User: ถ้าเป็นหัวหน้าให้ดูคนที่เลือก (viewingUser) ถ้าเป็นพนักงานให้ดูตัวเอง (currentUser)
-    const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-    if (!targetUser) return;
+    const targetUser = S.userRole === 'supervisor' ? (S.viewingUser || S.currentUser) : S.currentUser;
 
     const sb = getSupabase();
     if (sb && navigator.onLine) {
         try {
-            // ดึงข้อมูล Claim โดยกรองจากชื่อผู้ตรวจ (inspector)
-            const { data, error } = await sb.from('records')
-                .select('*')
-                .eq('inspector', targetUser)
-                .order('created_at', { ascending: false });
+            let query = sb.from('records').select('*');
+            if (targetUser && targetUser !== 'ALL') {
+                query = query.eq('inspector', targetUser);
+            }
+            const { data, error } = await query.order('created_at', { ascending: false });
 
             if (error) throw error;
             
@@ -4513,11 +4556,12 @@ async function loadRecords() {
             renderTable();
             return;
         } catch (e) {
+            console.error("loadRecords Error:", e);
             toast(getFriendlyErrorMessage(e), 'error');
         }
     }
     // กรณีออฟไลน์หรือไม่มีข้อมูล
-    S.records = [];
+    if (!S.records) S.records = [];
     renderTable();
 }
 
@@ -5513,7 +5557,7 @@ function renderTable() {
     container.addEventListener('scroll', handleTableScroll, { passive: true });
 
     // 6. [จุดสำคัญ] สั่งแปลภาษาหัวตารางทันทีหลังวาด HTML
-    const currentLang = localStorage.getItem('carrier_lang') || 'en';
+    const currentLang = safeGetStorage('local', 'carrier_lang', 'en');
     applyLanguage(currentLang);
 
     // 7. สั่งวาดข้อมูลแถวแรกๆ
@@ -5589,7 +5633,7 @@ function switchSubTerminal(view) {
     const vendorDivider = $id('vendor-divider');
 
     // ดึงข้อมูลภาษาปัจจุบัน
-    const currentLang = localStorage.getItem('carrier_lang') || 'en';
+    const currentLang = safeGetStorage('local', 'carrier_lang', 'en');
     const langData = translations[currentLang];
 
     // อ้างอิงกลุ่มเครื่องมือ
@@ -5716,7 +5760,7 @@ function switchPage(name, el) {
         'entry-terminal-content', 'overview-cockpit-content', 'exec-dashboard-content',
         'attendance-logs', 'line-support-logs-content', 'five-s-content',
         'skill-matrix-content', 'special-jobs-content', 'ot-management-content',
-        'admin-console-content'
+        'admin-console-content','eight-d-content' 
     ];
     allPages.forEach(id => {
         const pageEl = document.getElementById(id);
@@ -5732,7 +5776,7 @@ function switchPage(name, el) {
             adminHeaderTools.classList.add('flex');
         }
         if (window._preAdminThemeChoice === undefined || window._preAdminThemeChoice === null) {
-            window._preAdminThemeChoice = localStorage.getItem('carrier_theme') || (document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+            window._preAdminThemeChoice = safeGetStorage('local', 'carrier_theme') || (document.body.classList.contains('dark-mode') ? 'dark' : 'light');
         }
         document.body.classList.add('dark-mode');
         if (typeof updateThemeIcon === 'function') updateThemeIcon(true);
@@ -5789,7 +5833,8 @@ function switchPage(name, el) {
         '5S EXCELLENCE': 'five-s-content',
         'SKILL MATRIX': 'skill-matrix-content',
         'SPECIAL JOBS': 'special-jobs-content',
-        'OT MANAGEMENT': 'ot-management-content'
+        'OT MANAGEMENT': 'ot-management-content',
+        '8D REPORT': 'eight-d-content' // <--- เพิ่มบรรทัดนี้
     };
 
     const targetId = targetIdMap[pageNameUpper];
@@ -5808,6 +5853,7 @@ function switchPage(name, el) {
             case 'SKILL MATRIX': WapSkillMatrix.init(); break;
             case 'SPECIAL JOBS': WapSpecialJobs.init(); break;
             case 'OT MANAGEMENT': WapOTManagement.init(); break;
+            case '8D REPORT': Wap8DSystem.init(); break; // <--- เพิ่มบรรทัดนี้
 case 'ADMIN CONSOLE': 
     if (typeof WapAdminSystem !== 'undefined') {
         WapAdminSystem.init(); 
@@ -5829,7 +5875,7 @@ function applyLanguage(lang) {
     const data = translations[lang];
     if (!data) return;
 
-    localStorage.setItem('carrier_lang', lang);
+    safeSetStorage('local', 'carrier_lang', lang);
 
     // 2.1 แปลข้อความที่มี data-i18n (รองรับการรักษาไอคอน SVG)
     document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -8399,11 +8445,11 @@ const WapSupportLogs = (function () {
         const myToken = ++_fetchToken;
 
         try {
-            const { data, error } = await wapClient
-                .from(TABLE)
-                .select('*')
-                .eq('user_id', _user)
-                .order('created_at', { ascending: false });
+            let query = wapClient.from(TABLE).select('*');
+            if (_user && _user !== 'ALL') {
+                query = query.eq('user_id', _user);
+            }
+            const { data, error } = await query.order('created_at', { ascending: false });
             if (error) throw error;
 
             // ถ้ามีรอบใหม่แซงเข้ามาระหว่างรอ หรือโมดูลถูก destroy ไปแล้ว ทิ้งผลลัพธ์รอบนี้
@@ -8452,100 +8498,135 @@ const WapSupportLogs = (function () {
         _render();
     }
 
+// ฟังก์ชันช่วยกำหนดสีตามประเภทการแก้ไข
+const getActionBadgeStyle = (action) => {
+    const act = (action || '').trim();
+    switch(act) {
+        case 'Replace':
+            return 'background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;'; // สีน้ำเงิน
+        case 'Sorting 100%':
+            return 'background: #fdf2f8; color: #9d174d; border: 1px solid #fbcfe8;'; // สีชมพู
+        case 'Scrap':
+            return 'background: #fef2f2; color: #991b1b; border: 1px solid #fecaca;'; // สีแดง
+        case 'Use as is':
+            return 'background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;'; // สีเขียว
+        case 'Return to Vendor':
+            return 'background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;'; // สีส้มอิฐ
+        case 'Rework':
+            return 'background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;'; // สีเทาเข้ม
+        default:
+            return 'background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;'; // สีเทาอ่อน (N/A)
+    }
+};
+
     function _render() {
-        if (!$.tbody) return;
+    if (!$.tbody) return;
 
-        if ($.count) $.count.textContent = _filtered.length + ' Case Logs';
+    if ($.count) $.count.textContent = _filtered.length + ' Case Logs';
 
-        if (_filtered.length === 0) {
-            $.tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:80px;color:#cbd5e1;font-weight:600;letter-spacing:0.1em;">NO RECORDS FOUND</td></tr>`;
-            return;
-        }
-
-        const htmlRows = _filtered.map((item, index) => {
-            const total = (Number(item.ok) || 0) + (Number(item.ng) || 0);
-            const ngRate = total > 0 ? Math.round((item.ng / total) * 100) : 0;
-            const delay = index < 15 ? (index * 0.04).toFixed(2) : 0;
-
-            let statusCls = 'status-sf';
-            if (item.report === 'RP') statusCls = 'status-vendor';
-            if (item.report === 'RECORDS') statusCls = 'status-ctc';
-
-            return `
-                <tr style="animation-delay: ${delay}s">
-                    <td class="col-date">${item.eventDate || '-'}</td>
-                    <td class="col-problem">
-                        <div class="col-problem">
-    ${_esc(item.problem).replace(/(\d+)/g, '<span class="num-blue">$1</span>')}
-</div>
-                    </td>
-                    <td><span class="col-action-badge">${_esc(item.action)}</span></td>
-                    <td class="col-part"><span class="text-main">${_esc(item.part)}</span></td>
-                    <td class="col-lot" style="font-family:monospace;">${_esc(item.lot)}</td>
-                    <td class="col-ok" style="text-align:center; font-weight:800; color:#059669;">${(item.ok || 0).toLocaleString()}</td>
-                    <td style="text-align:center;">
-                        <div class="col-ng-wrap">
-                            <span class="col-ng-num ${item.ng > 0 ? 'has-ng' : 'no-ng'}" style="font-weight:800;">${(item.ng || 0).toLocaleString()}</span>
-                            ${item.ng > 0 ? `<div class="col-ng-rate" style="font-size:9px; color:#ef4444; font-weight:700;">${ngRate}%</div>` : ''}
-                        </div>
-                    </td>
-                    <td style="text-align:center;"><span class="status-pill ${statusCls}">${item.report}</span></td>
-                    <td style="text-align:center;">
-                        ${item.imageUrl ?
-                            `<span class="img-thumb" onclick="WapSupportLogs._openViewModal('${item.id}')">
-                                <img src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover;">
-                             </span>` :
-                            `<span style="color:#e2e8f0; font-size:10px; font-weight:700;">N/A</span>`}
-                    </td>
-                    <td>
-                        <div class="action-btns">
-                            <button class="act-btn act-btn-view" onclick="WapSupportLogs._openViewModal('${item.id}')" data-tip="View"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                            <button class="act-btn act-btn-edit" onclick="WapSupportLogs._openFormModal('${item.id}')" data-tip="Edit"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                            <button class="act-btn act-btn-del" onclick="WapSupportLogs._confirmDelete('${item.id}')" data-tip="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-                        </div>
-                    </td>
-                </tr>`;
-        }).join('');
-
-        $.tbody.innerHTML = htmlRows;
+    if (_filtered.length === 0) {
+        $.tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:80px;color:#cbd5e1;font-weight:600;letter-spacing:0.1em;">NO RECORDS FOUND</td></tr>`;
+        return;
     }
 
+    // --- ฟังก์ชันช่วยกำหนดสี Badge ตามประเภทการแก้ไข (Action) ---
+    const getActionStyle = (act) => {
+        const a = (act || '').trim();
+        switch(a) {
+            case 'Replace':
+                return 'background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;'; // น้ำเงิน
+            case 'Sorting 100%':
+                return 'background: #fdf2f8; color: #9d174d; border: 1px solid #fbcfe8;'; // ชมพู
+            case 'Scrap':
+                return 'background: #fef2f2; color: #991b1b; border: 1px solid #fecaca;'; // แดง
+            case 'Use as is':
+                return 'background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;'; // เขียว
+            case 'Return to Vendor':
+                return 'background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;'; // ส้ม
+            case 'Rework':
+                return 'background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;'; // เทาเข้ม
+            default:
+                return 'background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;'; // เทาอ่อน
+        }
+    };
+
+    const htmlRows = _filtered.map((item, index) => {
+        const total = (Number(item.ok) || 0) + (Number(item.ng) || 0);
+        const ngRate = total > 0 ? Math.round((item.ng / total) * 100) : 0;
+        const delay = index < 15 ? (index * 0.04).toFixed(2) : 0;
+
+        let statusCls = 'status-sf';
+        if (item.report === 'RP') statusCls = 'status-vendor';
+        if (item.report === 'RECORDS') statusCls = 'status-ctc';
+
+        return `
+            <tr style="animation-delay: ${delay}s">
+                <td class="col-date">${item.eventDate || '-'}</td>
+                <td class="col-problem">
+                    <div style="font-size: 11px; font-weight: 700; color: #334155; line-height: 1.4;">
+                        ${_esc(item.problem).replace(/(\d+)/g, '<span style="color:#2563eb">$1</span>')}
+                    </div>
+                </td>
+                
+                <!-- ✅ คอลัมน์ "การแก้ไข" ที่ปรับปรุงใหม่ -->
+                <td style="text-align:center;">
+                    <span class="col-action-badge" style="${getActionStyle(item.action)} padding: 4px 12px; border-radius: 8px; font-size: 10px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.02em; display: inline-block; min-width: 80px;">
+                        ${_esc(item.action || 'N/A')}
+                    </span>
+                </td>
+
+                <td class="col-part"><span class="text-main" style="font-weight:700;">${_esc(item.part)}</span></td>
+                <td class="col-lot" style="font-family:monospace; text-align:center;">${_esc(item.lot)}</td>
+                <td class="col-ok" style="text-align:center; font-weight:800; color:#059669;">${(item.ok || 0).toLocaleString()}</td>
+                <td style="text-align:center;">
+                    <div class="col-ng-wrap">
+                        <span class="col-ng-num ${item.ng > 0 ? 'has-ng' : 'no-ng'}" style="font-weight:800;">${(item.ng || 0).toLocaleString()}</span>
+                        ${item.ng > 0 ? `<div class="col-ng-rate" style="font-size:9px; color:#ef4444; font-weight:700;">${ngRate}%</div>` : ''}
+                    </div>
+                </td>
+                <td style="text-align:center;"><span class="status-pill ${statusCls}">${item.report}</span></td>
+                <td style="text-align:center;">
+                    ${item.imageUrl ?
+                        `<span class="img-thumb" onclick="WapSupportLogs._openViewModal('${item.id}')">
+                            <img src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover;">
+                         </span>` :
+                        `<span style="color:#e2e8f0; font-size:10px; font-weight:700;">N/A</span>`}
+                </td>
+                <td>
+                    <div class="action-btns">
+                        <button class="act-btn act-btn-view" onclick="WapSupportLogs._openViewModal('${item.id}')" data-tip="View"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                        <button class="act-btn act-btn-edit" onclick="WapSupportLogs._openFormModal('${item.id}')" data-tip="Edit"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                        <button class="act-btn act-btn-del" onclick="WapSupportLogs._confirmDelete('${item.id}')" data-tip="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                    </div>
+                </td>
+            </tr>`;
+    }).join('');
+
+    $.tbody.innerHTML = htmlRows;
+}
     /* ──────────────────────────────────────────
        FORM MODAL (เพิ่มระบบ Sync To Special Jobs + Commander Suggestion)
+       ────────────────────────────────────────── */
+   /* ──────────────────────────────────────────
+       FORM MODAL (Integrated: Special Jobs + 8D Report)
        ────────────────────────────────────────── */
     function _openFormModal(id) {
         _editingId = id || null;
         const r = id ? (_records.find(x => x.id === id) || _blankRecord()) : _blankRecord();
 
-        // 1. รายการหมวดหมู่พาร์ทที่กำหนด (สำหรับ Dropdown)
+        // 1. รายการหมวดหมู่พาร์ท
         const partCategories = [
-            "insulation parts",
-            "Mold Part",
-            "Packaging part",
-            "Rubber parts",
-            "Plastic Resin Mold Part",
-            "Plastic Resin (Assy)",
-            "Packaging part Form",
-            "Aluminium Part",
-            "Steel",
-            "Copper Part",
-            "Terminal",
-            "Remote Control",
-            "Motors",
-            "Electric Controls",
-            "PCBA",
-            "Compressors",
-            "Piping Part",
-            "Printing part"
+            "insulation parts", "Mold Part", "Packaging part", "Rubber parts",
+            "Plastic Resin Mold Part", "Plastic Resin (Assy)", "Packaging part Form",
+            "Aluminium Part", "Steel", "Copper Part", "Terminal", "Remote Control",
+            "Motors", "Electric Controls", "PCBA", "Compressors", "Piping Part", "Printing part"
         ];
 
-        // 2. สร้าง HTML สำหรับตัวเลือกใน Dropdown
-        const isKnownCategory = partCategories.includes(r.part);
         const partOptions = partCategories.map(cat => 
             `<option value="${cat}" ${r.part === cat ? 'selected' : ''}>${cat}</option>`
         ).join('');
 
-        // ดึงรายชื่อ Commander เดิมจากประวัติ
+        // 2. รายชื่อ Commander
         const existingCommanders = [...new Set((S.wapData.specialJobs || []).map(j => j.assigned_by).filter(Boolean))];
         const commanderOptions = existingCommanders.map(name => `<option value="${name}">`).join('');
 
@@ -8555,7 +8636,7 @@ const WapSupportLogs = (function () {
         modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);';
 
         modal.innerHTML = `
-            <div style="background:#fff; border-radius:24px; width:90%; max-width:650px; overflow:hidden; display:flex; flex-direction:column; max-height:92vh; box-shadow:0 25px 50px rgba(0,0,0,0.2); animation:modalPop .25s ease;">
+            <div style="background:#fff; border-radius:24px; width:95%; max-width:680px; overflow:hidden; display:flex; flex-direction:column; max-height:95vh; box-shadow:0 25px 50px rgba(0,0,0,0.2); animation:modalPop .25s ease;">
                 <div style="background:#161d2f; color:#fff; padding:18px 22px; display:flex; justify-content:space-between; align-items:center;">
                     <h3 style="font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em;">
                         ${id ? '📝 แก้ไขรายงานเคลมผลิต' : '✨ บันทึกรายงานเคลมใหม่'}
@@ -8563,7 +8644,8 @@ const WapSupportLogs = (function () {
                     <button type="button" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:#64748b; cursor:pointer; font-size:20px;">✕</button>
                 </div>
                 
-                <form id="sup-form" style="padding:22px; display:flex; flex-direction:column; gap:15px; overflow-y:auto;">
+                <form id="sup-form" style="padding:22px; display:flex; flex-direction:column; gap:12px; overflow-y:auto;">
+                    <!-- แถวที่ 1: วันที่ และ การแก้ไข -->
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
                         <div>
                             <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📅 วันที่รายงาน</label>
@@ -8581,16 +8663,19 @@ const WapSupportLogs = (function () {
                             </select>
                         </div>
                     </div>
+
+                    <!-- แถวที่ 2: รายละเอียดปัญหา -->
                     <div>
-                        <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📝 รายละเอียดปัญหา</label>
-                        <textarea id="f-sup-problem" name="problem" class="form-textarea" style="height:80px; width:100%;" required placeholder="ระบุปัญหาที่พบ...">${r.problem || ''}</textarea>
+                        <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📝 รายละเอียดปัญหาที่พบ</label>
+                        <textarea id="f-sup-problem" name="problem" class="form-textarea" style="height:70px; width:100%;" required placeholder="ระบุอาการเสียและจุดที่พบ...">${r.problem || ''}</textarea>
                     </div>
+
+                    <!-- แถวที่ 3: พาร์ท และ LOT -->
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
                         <div>
-                            <!-- เปลี่ยนจาก Input เป็น Select (Dropdown) -->
-                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน (เลือกรายการ)</label>
+                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน</label>
                             <select name="part" class="form-input" style="width:100%; cursor:pointer;" required>
-                                <option value="">-- โปรดเลือกหมวดหมู่พาร์ท --</option>
+                                <option value="">-- เลือกหมวดหมู่พาร์ท --</option>
                                 ${partOptions}
                             </select>
                         </div>
@@ -8600,6 +8685,7 @@ const WapSupportLogs = (function () {
                         </div>
                     </div>
 
+                    <!-- แถวที่ 4: OK / NG / ประเภท -->
                     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px;">
                         <div>
                             <label style="font-size:10px; font-weight:800; color:#059669; display:block; margin-bottom:5px;">✅ OK</label>
@@ -8610,7 +8696,7 @@ const WapSupportLogs = (function () {
                             <input type="number" id="f-sup-ng" name="ng" value="${r.ng}" class="form-input" style="width:100%; background:#f8fafc;" readonly>
                         </div>
                         <div>
-                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📋 ประเภท</label>
+                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📋 ประเภทรายงาน</label>
                             <select name="report" class="form-input" style="width:100%;">
                                 <option value="VF" ${r.report==='VF'?'selected':''}>VF Report</option>
                                 <option value="RP" ${r.report==='RP'?'selected':''}>RP Report</option>
@@ -8618,14 +8704,17 @@ const WapSupportLogs = (function () {
                             </select>
                         </div>
                     </div>
+
+                    <!-- แถวที่ 5: Remark -->
                     <div>
-                        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">💬 Remark</label>
-                        <input type="text" name="remark" value="${r.remark || ''}" class="form-input" style="width:100%;" placeholder="หมายเหตุเพิ่มเติม...">
+                        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">💬 หมายเหตุ (Remark)</label>
+                        <input type="text" name="remark" value="${r.remark || ''}" class="form-input" style="width:100%;" placeholder="ข้อมูลเพิ่มเติมสำหรับอ้างอิง...">
                     </div>
                     
+                    <!-- แถวที่ 6: รูปภาพ -->
                     <div>
-                        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:8px;">📸 Evidence Photo</label>
-                        <div style="border:2px dashed #cbd5e1; border-radius:16px; background:#f8fafc; position:relative; min-height:100px; display:flex; align-items:center; justify-content:center;">
+                        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:8px;">📸 รูปภาพหลักฐาน (Evidence)</label>
+                        <div style="border:2px dashed #cbd5e1; border-radius:16px; background:#f8fafc; position:relative; min-height:90px; display:flex; align-items:center; justify-content:center;">
                             <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;">
                             <div id="img-preview-area" style="text-align:center;">
                                 ${r.imageUrl ? `<img src="${r.imageUrl}" style="max-height:80px; border-radius:8px;">` : `<p style="font-size:11px; color:#94a3b8;">คลิกเพื่ออัปโหลดรูปภาพ</p>`}
@@ -8633,50 +8722,86 @@ const WapSupportLogs = (function () {
                         </div>
                     </div>
 
-                    <div style="margin-top: 5px; padding: 16px; background: rgba(59, 130, 246, 0.04); border: 1.5px dashed rgba(59, 130, 246, 0.25); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; gap: 15px;" id="sync-container">
-                        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                            <div style="width: 34px; height: 34px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #3b82f6; flex-shrink: 0;">
-                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                            </div>
-                            <div style="flex: 1;">
-                                <p style="font-size: 11px; font-weight: 900; color: #1e293b; margin: 0; text-transform: uppercase;">บันทึกเป็นภารกิจพิเศษ</p>
-                                <div style="margin-top: 6px;">
-                                    <input type="text" id="sync-commander-name" list="commander-list" 
-                                           placeholder="ระบุชื่อผู้สั่งงาน (Commander)..."
-                                           style="width: 100%; height: 30px; font-size: 11px; border: 1px solid #dbeafe; border-radius: 8px; padding: 0 10px; outline: none; background: rgba(255,255,255,0.7); font-weight: 600; color: #2563eb;">
-                                    <datalist id="commander-list">${commanderOptions}</datalist>
+                    <!-- ==========================================================
+                         INTEGRATED TOGGLES (Special Jobs & 8D Report)
+                         ========================================================== -->
+                    <div style="display:flex; flex-direction:column; gap:8px; margin-top:5px;">
+                        
+                        <!-- 1. Toggle: Special Jobs (Blue Theme) -->
+                        <div style="padding: 14px; background: rgba(59, 130, 246, 0.04); border: 1.5px dashed rgba(59, 130, 246, 0.25); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; gap: 15px;" id="sync-container">
+                            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                                <div style="width: 34px; height: 34px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #3b82f6; flex-shrink: 0;">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                </div>
+                                <div style="flex: 1;">
+                                    <p style="font-size: 11px; font-weight: 900; color: #1e293b; margin: 0; text-transform: uppercase;">บันทึกเป็นภารกิจพิเศษ</p>
+                                    <div style="margin-top: 6px;" id="commander-input-wrap">
+                                        <input type="text" id="sync-commander-name" list="commander-list" 
+                                               placeholder="ระบุชื่อผู้สั่งงาน (Commander)..."
+                                               style="width: 100%; height: 28px; font-size: 11px; border: 1px solid #dbeafe; border-radius: 8px; padding: 0 10px; outline: none; background: rgba(255,255,255,0.7); font-weight: 600; color: #2563eb;">
+                                        <datalist id="commander-list">${commanderOptions}</datalist>
+                                    </div>
                                 </div>
                             </div>
+                            <label class="premium-toggle">
+                                <input type="checkbox" id="sync-to-special">
+                                <span class="toggle-slider"></span>
+                            </label>
                         </div>
-                        <label class="premium-toggle" style="position:relative; display:inline-block; width:40px; height:22px; flex-shrink: 0;">
-                            <input type="checkbox" id="sync-to-special" style="opacity:0; width:0; height:0;">
-                            <span class="toggle-slider" style="position:absolute; cursor:pointer; inset:0; background-color:#e2e8f0; transition:.4s; border-radius:34px;"></span>
-                        </label>
+
+                        <!-- 2. Toggle: 8D Report (Red/Rose Theme) -->
+                        <div style="padding: 14px; background: rgba(225, 29, 72, 0.04); border: 1.5px dashed rgba(225, 29, 72, 0.25); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; gap: 15px;" id="8d-container">
+                            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                                <div style="width: 34px; height: 34px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #e11d48; flex-shrink: 0;">
+                                    <span style="font-weight:950; font-size:14px;">8D</span>
+                                </div>
+                                <div style="flex: 1;">
+                                    <p style="font-size: 11px; font-weight: 900; color: #1e293b; margin: 0; text-transform: uppercase;">เปิดเคสวิเคราะห์ 8D Report</p>
+                                    <p style="font-size: 9px; color: #64748b; margin: 0; font-weight: 600;">สร้างใบงาน Corrective Action อัตโนมัติ</p>
+                                </div>
+                            </div>
+                            <label class="premium-toggle">
+                                <input type="checkbox" id="trigger-8d-report">
+                                <span class="toggle-slider" style="background-color:#fca5a5;"></span>
+                            </label>
+                        </div>
+
                     </div>
 
-                    <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:10px;">
-                        <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding:10px 25px; border-radius:12px; border:1.5px solid #e2e8f0; background:#fff; font-weight:700; color:#64748b;">ยกเลิก</button>
-                        <button type="submit" id="sup-form-submit-btn" style="padding:10px 30px; border-radius:12px; border:none; background:linear-gradient(135deg,#4f46e5,#3b82f6); color:#fff; font-weight:800; cursor:pointer;">บันทึกข้อมูล</button>
+                    <!-- ปุ่มดำเนินการ -->
+                    <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:15px; border-top:1px solid #f1f5f9; margin-top:5px;">
+                        <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding:10px 25px; border-radius:12px; border:1.5px solid #e2e8f0; background:#fff; font-weight:700; color:#64748b; cursor:pointer;">ยกเลิก</button>
+                        <button type="submit" id="sup-form-submit-btn" style="padding:10px 35px; border-radius:12px; border:none; background:linear-gradient(135deg,#161d2f,#2563eb); color:#fff; font-weight:900; cursor:pointer; text-transform:uppercase; letter-spacing:0.05em;">บันทึกรายงาน</button>
                     </div>
                 </form>
             </div>`;
 
         document.body.appendChild(modal);
 
-        // --- Logic สำหรับ Toggle Switch ---
+        // --- Logic: Special Job Toggle Interaction ---
         const syncCheck = document.getElementById('sync-to-special');
         const syncCont = document.getElementById('sync-container');
+        const commanderWrap = document.getElementById('commander-input-wrap');
         const commanderInput = document.getElementById('sync-commander-name');
 
         syncCheck.onchange = (e) => {
             const isActive = e.target.checked;
             syncCont.style.borderColor = isActive ? '#3b82f6' : 'rgba(59, 130, 246, 0.25)';
             syncCont.style.background = isActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.04)';
-            commanderInput.style.display = isActive ? 'block' : 'none';
+            commanderWrap.style.display = isActive ? 'block' : 'none';
         };
-        commanderInput.style.display = 'none';
+        commanderWrap.style.display = 'none';
 
-        // --- Logic สำหรับอัปโหลดรูปภาพ ---
+        // --- Logic: 8D Toggle Interaction ---
+        const d8Check = document.getElementById('trigger-8d-report');
+        const d8Cont = document.getElementById('8d-container');
+        d8Check.onchange = (e) => {
+            const isActive = e.target.checked;
+            d8Cont.style.borderColor = isActive ? '#e11d48' : 'rgba(225, 29, 72, 0.25)';
+            d8Cont.style.background = isActive ? 'rgba(225, 29, 72, 0.08)' : 'rgba(225, 29, 72, 0.04)';
+        };
+
+        // --- Logic: Image Upload ---
         let currentImage = r.imageUrl || null;
         const imgInput = document.getElementById('img-input');
         imgInput.onchange = (e) => {
@@ -8690,68 +8815,75 @@ const WapSupportLogs = (function () {
             reader.readAsDataURL(file);
         };
 
-        // ──────────────────────────────────────────
-        //  SUBMIT LOGIC
-        // ──────────────────────────────────────────
+        // --- Logic: Submit Form ---
         const formEl = document.getElementById('sup-form');
         const submitBtn = document.getElementById('sup-form-submit-btn');
 
-        formEl.onsubmit = async (e) => {
-            e.preventDefault();
-            if (submitBtn.disabled) return;
-            
-            const fd = new FormData(e.target);
-            const isSyncActive = syncCheck.checked;
-            const commanderName = commanderInput.value.trim() || 'SQE EN';
+        // --- แก้ไขส่วนบันทึกข้อมูลใน Support Form ---
+formEl.onsubmit = async (e) => {
+    e.preventDefault();
+    if (submitBtn.disabled) return;
+    
+    const fd = new FormData(e.target);
+    const isSyncActive = syncCheck.checked;
+    const is8DActive = d8Check.checked; // สวิตช์เปิดเคส 8D
+    const commanderName = commanderInput.value.trim() || 'SQE EN';
 
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'กำลังบันทึก...';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'กำลังประมวลผล...';
 
-            const payload = {
-                id: _editingId || 'SUP-' + Date.now(),
+    // เตรียมข้อมูล Payload หลัก
+    const payload = {
+        id: _editingId || 'SUP-' + Date.now(),
+        user_id: S.currentUser,
+        problem: fd.get('problem'),
+        action: fd.get('action'),
+        part: fd.get('part'),
+        lot: Number(fd.get('lot')) || 0,
+        ok_qty: Number(fd.get('ok')) || 0,
+        ng_qty: Number(fd.get('ng')) || 0,
+        report_type: fd.get('report'),
+        remark: fd.get('remark'),
+        event_date: fd.get('date'),
+        image_url: currentImage,
+        created_at: new Date().toISOString()
+    };
+
+    try {
+        // STEP 1: บันทึกลงตาราง Support (WAP DB)
+        const { error: errorSup } = await wapClient.from('support_records').upsert([payload]);
+        if (errorSup) throw errorSup;
+
+        // STEP 2: บันทึกลงตาราง Special Jobs (ถ้าเลือก)
+        if (isSyncActive) {
+            await wapClient.from('special_jobs').insert([{
+                id: 'SJ-SYNC-' + Date.now(),
                 user_id: S.currentUser,
-                problem: fd.get('problem'),
-                action: fd.get('action'),
-                part: fd.get('part'),
-                lot: fd.get('lot'),
-                ok_qty: Number(fd.get('ok')),
-                ng_qty: Number(fd.get('ng')),
-                report_type: fd.get('report'),
-                remark: fd.get('remark'),
-                event_date: fd.get('date'),
-                image_url: currentImage,
-                created_at: new Date().toISOString()
-            };
+                project: `[SUPPORT] ${payload.problem}`, 
+                date: payload.event_date,
+                assigned_by: commanderName,
+                result: 'Done', 
+                full_timestamp: new Date().toISOString()
+            }]);
+        }
 
-            try {
-                // 1. บันทึกลงตารางหลัก (TABLE อ้างอิงจากตัวแปรด้านบนโมดูล)
-                const { error } = await wapClient.from('support_records').upsert([payload]);
-                if (error) throw error;
+        // STEP 3: ✅ สร้างเคส 8D อัตโนมัติ (SQE DB)
+        if (is8DActive) {
+            // เรียกใช้ฟังก์ชันสร้างเคส 8D และส่งข้อมูลไปทั้งหมด
+            await Wap8DSystem.createNewCase(payload);
+        }
 
-                if (isSyncActive) {
-                    const specialPayload = {
-                        id: 'SJ-SYNC-' + Date.now(),
-                        user_id: S.currentUser,
-                        project: `[SUPPORT] ${payload.problem}`, 
-                        date: payload.event_date,
-                        assigned_by: commanderName,
-                        result: 'Done', 
-                        full_timestamp: new Date().toISOString()
-                    };
-                    await wapClient.from('special_jobs').insert([specialPayload]);
-                }
+        toast('✨ บันทึกข้อมูลและวิเคราะห์ผลสำเร็จ', 'success');
+        modal.remove();
+        await _fetch(); // รีเฟรชตารางหน้า Support
 
-                toast('บันทึกข้อมูลสำเร็จ', 'success');
-                modal.remove();
-                await _fetch(); // โหลดข้อมูลตารางใหม่
-
-            } catch (err) {
-                console.error('[WapSupport] Save error:', err);
-                toast('บันทึกล้มเหลว', 'error');
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'บันทึกข้อมูล';
-            }
-        };
+    } catch (err) {
+        console.error('[System Error]:', err);
+        toast('❌ เกิดข้อผิดพลาด: ' + err.message, 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'บันทึกรายงาน';
+    }
+};
     }
 
 
@@ -8881,14 +9013,21 @@ function _openViewModal(id) {
     }
 
 
-    function _fromDb(r) {
-        return {
-            id: r.id, problem: r.problem || '', action: r.action || 'Rework',
-            part: r.part || '-', lot: r.lot || '-', ok: Number(r.ok_qty) || 0,
-            ng: Number(r.ng_qty) || 0, report: r.report_type || 'VF',
-            remark: r.remark || '', eventDate: r.event_date || '', imageUrl: r.image_url || null, _user: r.user_id
-        };
-    }
+function _fromDb(r) {
+    return {
+        id: r.id,
+        problem: r.problem || '',
+        // ดึงจากฟิลด์ action ใน Supabase
+        action: r.action || 'N/A', 
+        part: r.part || '-',
+        lot: r.lot || '-',
+        ok: Number(r.ok_qty) || 0,
+        ng: Number(r.ng_qty) || 0,
+        report: r.report_type || 'VF',
+        eventDate: r.event_date || '',
+        imageUrl: r.image_url || null
+    };
+}
 
     function _esc(s) {
         const d = document.createElement('div');
@@ -9010,11 +9149,11 @@ const Wap5SExcellence = (function() {
         if (!navigator.onLine) return;
         
         try {
-            const { data, error } = await wapClient
-                .from(TABLE)
-                .select('*')
-                .eq('user_id', targetUser)
-                .order('month', { ascending: false });
+            let query = wapClient.from(TABLE).select('*');
+            if (targetUser && targetUser !== 'ALL') {
+                query = query.eq('user_id', targetUser);
+            }
+            const { data, error } = await query.order('month', { ascending: false });
 
             if (error) throw error;
             _allRecords = data || [];
@@ -9442,11 +9581,11 @@ async function fetchRecords() {
         }
 
         try {
-            const { data, error } = await wapClient
-                .from(TABLE)
-                .select('*')
-                .eq('user_id', targetUser)
-                .order('skill_value', { ascending: false });
+            let query = wapClient.from(TABLE).select('*');
+            if (targetUser && targetUser !== 'ALL') {
+                query = query.eq('user_id', targetUser);
+            }
+            const { data, error } = await query.order('skill_value', { ascending: false });
 
             if (error) throw error;
             _records = data || [];
@@ -10129,10 +10268,11 @@ function calcHours() {
         if (!navigator.onLine || !targetUser) return;
 
         try {
-            const { data, error } = await wapClient.from(TABLE)
-                .select('*')
-                .eq('user_id', targetUser)
-                .order('date', { ascending: false });
+            let query = wapClient.from(TABLE).select('*');
+            if (targetUser && targetUser !== 'ALL') {
+                query = query.eq('user_id', targetUser);
+            }
+            const { data, error } = await query.order('date', { ascending: false });
 
             if (error) throw error;
             _allRecords = data || [];
@@ -10785,11 +10925,11 @@ const WapSpecialJobs = (function() {
         if (!navigator.onLine || !targetUser) return;
 
         try {
-            const { data, error } = await wapClient
-                .from(TABLE)
-                .select('*')
-                .eq('user_id', targetUser)
-                .order('date', { ascending: false });
+            let query = wapClient.from(TABLE).select('*');
+            if (targetUser && targetUser !== 'ALL') {
+                query = query.eq('user_id', targetUser);
+            }
+            const { data, error } = await query.order('date', { ascending: false });
 
             if (error) throw error;
             _allRecords = data || [];
@@ -11529,23 +11669,19 @@ async function handleImport(event) {
  */
 function animateValue(id, startOrEnd, end, duration = 1500, decimals = 0, suffix = "", prefix = "") {
     const el = document.getElementById(id);
-    if (!el) return;
+    if (!el) return; // <--- จุดเช็คความปลอดภัยจุดที่ 1
 
-    // 1. ล้างคิวอนิเมชั่นเก่าของ Element นี้ออกก่อน เพื่อป้องกันตัวเลขตีกัน
     gsap.killTweensOf(el);
 
     let startValue = 0;
     let endValue = 0;
 
-    // 2. ตรวจสอบพารามิเตอร์ (Smart Overloading)
     if (end === undefined) {
-        // กรณีส่งมา 2 ค่า: animateValue('id', 100) 
-        // ให้ endValue = 100 และ startValue = ค่าปัจจุบันที่โชว์อยู่บนจอ
         endValue = parseFloat(startOrEnd) || 0;
-        const currentText = el.textContent.replace(/[^0-9.-]/g, "");
+        // เพิ่มจุดเช็คความปลอดภัยตรงนี้ด้วย
+        const currentText = el.textContent ? el.textContent.replace(/[^0-9.-]/g, "") : "0"; 
         startValue = parseFloat(currentText) || 0;
     } else {
-        // กรณีส่งมา 3 ค่าปกติ: animateValue('id', 0, 100)
         startValue = parseFloat(startOrEnd) || 0;
         endValue = parseFloat(end) || 0;
     }
@@ -11571,7 +11707,7 @@ function toggleTheme() {
     const body = document.body;
     const isDark = body.classList.toggle('dark-mode');
     
-    localStorage.setItem('carrier_theme', isDark ? 'dark' : 'light');
+    safeSetStorage('local', 'carrier_theme', isDark ? 'dark' : 'light');
     updateThemeIcon(isDark);
 }
 
@@ -11657,7 +11793,7 @@ window.addEventListener('click', function(e) {
 });
 
 function changeLanguage(lang) {
-    localStorage.setItem('carrier_lang', lang);
+    safeSetStorage('local', 'carrier_lang', lang);
     applyLanguage(lang);
     document.getElementById('lang-menu').classList.remove('show');
 }
@@ -11734,100 +11870,70 @@ function autoHideBanner() {
    ============================================================ */
 
 window.addEventListener('load', () => {
-    console.log("SQE & WAP System: Initializing...");
-
-    // 1. ระบบสถานะและการแสดงผลเบื้องต้น
-    if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
-    if (typeof autoHideBanner === 'function') autoHideBanner();
-
-    // 2. ระบบจัดการภาษา (ตรวจสอบค่าที่จำไว้ หรือใช้ภาษาของ Browser)
-    const savedLang = localStorage.getItem('carrier_lang');
-    const browserLang = navigator.language.startsWith('th') ? 'th' : 'en';
-    const finalLang = savedLang || browserLang;
-    applyLanguage(finalLang);
-
-    // 3. ระบบจดจำบัญชี (Remember Me)
-    const savedEmail = localStorage.getItem('carrier_remembered_email');
-    if (savedEmail) {
-        const emailIn = document.getElementById('login-email');
-        const rememberCheck = document.getElementById('remember-me');
-        if (emailIn) {
-            emailIn.value = savedEmail;
-            emailIn.classList.add('valid');
-        }
-        if (rememberCheck) rememberCheck.checked = true;
-        // เช็คสถานะทันทีที่เปิดเว็บ
-        let lastKnownTrigger = null;
-
-async function watchSystemUpdate() {
     try {
-        const { data } = await sqeClient
-            .from('system_settings')
-            .select('app_version, update_details, force_update_trigger')
-            .eq('id', 'global_config')
-            .single();
+        console.log("SQE & WAP System: Initializing...");
 
-        if (data) {
-            // 1. ตรวจสอบการบังคับรีเฟรช (Force Update)
-            if (lastKnownTrigger && data.force_update_trigger !== lastKnownTrigger) {
-                toast("🛡️ Admin สั่งอัปเดตระบบด่วน...", "info");
-                setTimeout(() => {
-                    window.location.reload(true); // บังคับรีโหลดและล้าง Cache
-                }, 2000);
+        // 1. ระบบสถานะและการแสดงผลเบื้องต้น
+        if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
+        if (typeof autoHideBanner === 'function') autoHideBanner();
+
+        // 2. ระบบจัดการภาษา (ตรวจสอบค่าที่จำไว้ หรือใช้ภาษาของ Browser)
+        const savedLang = safeGetStorage('local', 'carrier_lang');
+        const browserLang = navigator.language.startsWith('th') ? 'th' : 'en';
+        const finalLang = savedLang || browserLang;
+        applyLanguage(finalLang);
+
+        // 3. ระบบจดจำบัญชี (Remember Me)
+        const savedEmail = safeGetStorage('local', 'carrier_remembered_email');
+        if (savedEmail) {
+            const emailIn = document.getElementById('login-email');
+            const rememberCheck = document.getElementById('remember-me');
+            if (emailIn) {
+                emailIn.value = savedEmail;
+                emailIn.classList.add('valid');
             }
-            lastKnownTrigger = data.force_update_trigger;
-
-            // 2. แสดง Change Log ใน Sidebar (Optional)
-            const verDisplay = document.querySelector('.brand-sub');
-            if(verDisplay) verDisplay.textContent = `V${data.app_version} | SQE SYSTEM`;
+            if (rememberCheck) rememberCheck.checked = true;
         }
-    } catch (e) { console.log("Update check failed"); }
-}
 
-// ตรวจสอบทุกๆ 3 นาที
-setInterval(watchSystemUpdate, 180000);
-// และตรวจทันทีที่เปิดแอป
-watchSystemUpdate();
-enforceMaintenanceMode();
+        // 4. ระบบจัดการคลิกภายนอก (Global Click Events)
+        window.addEventListener('click', (e) => {
+            const langSelector = document.getElementById('lang-selector');
+            const langMenu = document.getElementById('lang-menu');
+            if (langSelector && !langSelector.contains(e.target)) {
+                if (langMenu) langMenu.classList.remove('show');
+            }
+        });
 
-// และเช็คซ้ำทุกๆ 30 วินาที (เพื่อให้หน้าจอคนอื่นล็อคเองอัตโนมัติ)
-setInterval(enforceMaintenanceMode, 30000);
-    }
-
-    // 4. ระบบจัดการคลิกภายนอก (Global Click Events)
-    window.addEventListener('click', (e) => {
-        // ปิดเมนูภาษาเมื่อคลิกข้างนอก
-        const langSelector = document.getElementById('lang-selector');
-        const langMenu = document.getElementById('lang-menu');
-        if (langSelector && !langSelector.contains(e.target)) {
-            if (langMenu) langMenu.classList.remove('show');
+        // 5. ตรวจสอบ Session เก่า (Auto Login)
+        const session = safeGetStorage('session', 'sqe_session');
+        if (session) {
+            try {
+                const userData = JSON.parse(session);
+                console.log("Restoring session for:", userData.email);
+                finalizeLogin(userData.email, userData.role);
+            } catch (err) {
+                console.error("Session restore failed:", err);
+                safeRemoveStorage('session', 'sqe_session');
+            }
         }
-    });
 
-    // 5. ตรวจสอบ Session เก่า (Auto Login)
-    const session = sessionStorage.getItem('sqe_session');
-    if (session) {
-        try {
-            const userData = JSON.parse(session);
-            console.log("Restoring session for:", userData.email);
-            // เรียกใช้ finalizeLogin เพื่อข้ามหน้า Login ไป Dashboard (พร้อม Warp Effect)
-            finalizeLogin(userData.email, userData.role);
-        } catch (err) {
-            console.error("Session restore failed:", err);
-            sessionStorage.removeItem('sqe_session');
+        // 6. เริ่มการซิงค์ข้อมูลค้างส่ง
+        if (typeof syncPendingData === 'function') {
+            setTimeout(syncPendingData, 3000);
         }
-    }
 
-    // 6. เริ่มการซิงค์ข้อมูลค้างส่ง (หน่วงเวลา 3 วินาทีเพื่อให้แอปพร้อม)
-    if (typeof syncPendingData === 'function') {
-        setTimeout(syncPendingData, 3000);
-    }
-
-    // 7. การลงทะเบียน PWA Service Worker
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('PWA: Service Worker Registered!'))
-            .catch(err => console.log('PWA: Registration Failed', err));
+        // 7. การลงทะเบียน PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            try {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('PWA: Service Worker Registered!'))
+                    .catch(err => console.log('PWA Register Failed:', err));
+            } catch (e) {
+                console.log('PWA ServiceWorker error:', e);
+            }
+        }
+    } catch (globalInitErr) {
+        console.warn("Global init load warning:", globalInitErr);
     }
 });
 
@@ -13100,7 +13206,7 @@ setInterval(updateUserPresence, 300000); // 300,000 ms = 5 นาที
 
 async function checkChangelog() {
     const { data } = await sqeClient.from('system_settings').select('app_version, update_details').eq('id', 'global_config').single();
-    const localVersion = localStorage.getItem('last_seen_version') || "0.0.0";
+    const localVersion = safeGetStorage('local', 'last_seen_version', "0.0.0");
 
     if (data && data.app_version !== localVersion) {
         // สร้าง Modal แจ้งข่าวสารอัปเดต
@@ -13119,7 +13225,7 @@ async function checkChangelog() {
 }
 
 function closeUpdateModal(newVer) {
-    localStorage.setItem('last_seen_version', newVer);
+    safeSetStorage('local', 'last_seen_version', newVer);
     document.getElementById('update-modal').remove();
 }
 
@@ -13433,6 +13539,2136 @@ function updateStars() {
     requestAnimationFrame(updateStars);
 }
 
+const Wap8DSystem = (function() {
+    const TABLE = 'eight_d_reports'; // ตารางนี้อยู่ในฐานข้อมูล SQE
+    const TABLE_SUPPORT = 'support_records'; // ตารางต้นทางอยู่ในฐานข้อมูล WAP
+    let _cases = [];
+    let _currentCase = null;
+    let _currentSlide = 0;
+    let _isSaving = false;
+    let _statFilter = 'all'; // 'all' หรือ 'd1-d3'
+
+    function filterByStat(mode) {
+        _statFilter = mode;
+        renderDashboard();
+    }
+
+    // 1. โหลดเคสจาก Cloud (ใช้ sqeClient)
+    async function init() {
+        await fetchCases();
+        renderDashboard();
+        window.addEventListener('resize', fitSlideToContainer);
+        if (typeof ResizeObserver !== 'undefined') {
+            const presContainer = document.getElementById('eight-d-presentation-container');
+            if (presContainer) {
+                const ro = new ResizeObserver(() => {
+                    fitSlideToContainer();
+                });
+                ro.observe(presContainer);
+            }
+        }
+    }
+
+    async function fetchCases() {
+        const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
+        try {
+            let query = sqeClient.from(TABLE).select('*');
+            if (targetUser && targetUser !== 'ALL') {
+                query = query.eq('user_id', targetUser);
+            }
+            const { data, error } = await query.order('created_at', { ascending: false });
+            if (error) throw error;
+            _cases = data || [];
+        } catch (e) { console.error("8D Fetch Error:", e); }
+    }
+
+    // 2. ฟังก์ชันดูดข้อมูลจากช่อง ContentEditable
+    function _collectDataFromUI() {
+        const slideData = {};
+        const editables = document.querySelectorAll('#eight-d-slide-content [contenteditable="true"]');
+        editables.forEach((el, index) => {
+            slideData[`f_${index}`] = el.innerHTML;
+        });
+        return slideData;
+    }
+
+    // 3. บันทึกลง Cloud Auto-Save (ใช้ sqeClient)
+    async function saveCurrentProgress() {
+        if (!_currentCase || S.userRole === 'supervisor' || _isSaving) return;
+        _isSaving = true;
+        
+        const currentData = _collectDataFromUI();
+        const updatedReportData = { ...(_currentCase.report_data || {}) };
+        updatedReportData[`slide_${_currentSlide}`] = currentData;
+
+        try {
+            // ✅ เปลี่ยนเป็น sqeClient
+            await sqeClient.from(TABLE).update({ 
+                report_data: updatedReportData,
+                updated_at: new Date().toISOString()
+            }).eq('id', _currentCase.id);
+            _currentCase.report_data = updatedReportData; 
+            console.log("✅ 8D Cloud Synchronized");
+        } catch (e) { console.error("Save failed:", e); }
+        finally { _isSaving = false; }
+    }
+
+    // 4. หยอดข้อมูลกลับเข้าช่อง (Re-hydration)
+    function _rehydrateUI() {
+        if (!_currentCase || !_currentCase.report_data) return;
+        const savedData = _currentCase.report_data[`slide_${_currentSlide}`];
+        if (!savedData) return;
+
+        requestAnimationFrame(() => {
+            const editables = document.querySelectorAll('#eight-d-slide-content [contenteditable="true"]');
+            editables.forEach((el, index) => {
+                if (savedData[`f_${index}`] !== undefined) {
+                    el.innerHTML = savedData[`f_${index}`];
+                }
+            });
+        });
+    }
+
+    // 5. ระบบเปลี่ยนหน้า
+    async function nextSlide() {
+        if (_currentSlide < 15) {
+            await saveCurrentProgress();
+            _currentSlide++;
+            renderSlide();
+            _rehydrateUI();
+        }
+    }
+
+    async function prevSlide() {
+        if (_currentSlide > 0) {
+            await saveCurrentProgress();
+            _currentSlide--;
+            renderSlide();
+            _rehydrateUI();
+        }
+    }
+
+    async function openReport(id) {
+        _currentCase = _cases.find(x => x.id === id);
+        _currentSlide = 0;
+        document.getElementById('eight-d-dashboard').classList.add('hidden');
+        document.getElementById('eight-d-report-view').classList.remove('hidden');
+        renderSlide();
+        _rehydrateUI();
+        setTimeout(fitSlideToContainer, 30);
+    }
+
+async function createNewCase(supportData) {
+    const newId = '8D-' + Date.now();
+    
+    const ok = Number(supportData.ok_qty || supportData.ok) || 0;
+    const ng = Number(supportData.ng_qty || supportData.ng) || 0;
+    const total = ok + ng;
+
+    // ดึงรูปจาก Support
+    const evidenceImg = supportData.image_url || supportData.imageUrl || null;
+
+    const payload = {
+        id: newId,
+        user_id: S.currentUser,
+        support_id: supportData.id,
+        problem_title: supportData.problem,
+        part_name: supportData.part,
+        part_group: supportData.part,
+        lot_no: total,
+        ok_qty: ok,
+        ng_qty: ng,
+        status: 'D1_OPEN',
+        // ✅ เก็บข้อมูลรูปภาพ หมายเหตุ และประเภทรายงานไว้ใน JSON เพื่อนำไปใช้ในสไลด์อัตโนมัติ
+        report_data: {
+            evidence_img: evidenceImg,
+            source_remark: supportData.remark || "",
+            source_report_type: (supportData.report || supportData.report_type || supportData.reportType || (supportData.type === 'RP' ? 'RP' : 'VF') || 'VF').toString().toUpperCase()
+        },
+        created_at: new Date().toISOString()
+    };
+
+    try {
+        const { error } = await sqeClient.from('eight_d_reports').insert([payload]);
+        if (error) throw error;
+
+        toast("✅ สร้างเคส 8D พร้อมเชื่อมโยงข้อมูลสำเร็จ", "success");
+        await fetchCases(); 
+        renderDashboard();
+
+    } catch (e) {
+        console.error("❌ 8D Case Creation Error:", e);
+        toast("เกิดข้อผิดพลาด: " + e.message, "error");
+    }
+}
+
+    // 7. เลือกประวัติการ Support มาทำ 8D (ดึงจาก WAP แล้วเขียนลง SQE)
+    async function openHistoryPicker() {
+        toast("⌛ Loading history...", "info");
+        try {
+            // ดึงจาก WAP (ตาราง support_records อยู่บ้าน WAP)
+            const { data, error } = await wapClient.from(TABLE_SUPPORT)
+                .select('*').eq('user_id', S.currentUser).order('event_date', { ascending: false }).limit(15);
+            if (error) throw error;
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);';
+            modal.innerHTML = `
+                <div style="background:#fff; border-radius:24px; width:90%; max-width:600px; max-height:80vh; overflow:hidden; display:flex; flex-direction:column;">
+                    <div style="padding:20px; background:#1e293b; color:#fff; display:flex; justify-content:space-between;">
+                        <h3 style="font-weight:900; font-size:12px;">SELECT RECORD FOR 8D</h3>
+                        <button onclick="this.closest('.modal-overlay').remove()">✕</button>
+                    </div>
+                    <div style="overflow-y:auto; flex:1; padding:10px;">
+                        ${data.map(r => `<div onclick="Wap8DSystem.pickRecord('${r.id}')" style="padding:15px; border-bottom:1px solid #f1f5f9; cursor:pointer;">${r.problem}</div>`).join('')}
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            window._tempHistory = data;
+        } catch (e) { toast("Error", "error"); }
+    }
+
+    async function pickRecord(id) {
+        const record = window._tempHistory.find(x => x.id === id);
+        if (record) {
+            document.querySelector('.modal-overlay').remove();
+            await createNewCase(record); // เคสจะถูกเซฟเข้า SQE ในฟังก์ชันนี้
+        }
+    }
+
+// --- เพิ่มใน Wap8DSystem ---
+async function deleteCase(id) {
+    // 1. ตรวจสอบสิทธิ์ (ป้องกัน Supervisor ลบ)
+    if (S.userRole === 'supervisor') { 
+        toast('⚠️ Supervisor Mode: Read-only access', 'error'); 
+        return; 
+    }
+
+    // 2. แสดงหน้าต่างยืนยัน
+    if (!confirm("⚠️ Confirm Delete 8D Report?\nคุณแน่ใจหรือไม่ที่จะลบรายงานนี้ถาวร? ข้อมูลจะไม่สามารถกู้คืนได้")) return;
+
+    try {
+        // 3. ส่งคำสั่งลบไปยังฐานข้อมูล SQE (ที่เก็บตาราง eight_d_reports)
+        const { error } = await sqeClient
+            .from(TABLE)
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        // 4. แจ้งเตือนและอัปเดตหน้าจอ
+        toast("🗑️ Report deleted successfully", "success");
+        
+        // กรองข้อมูลใน Memory ออก และวาดตารางใหม่
+        _cases = _cases.filter(c => c.id !== id);
+        renderDashboard();
+
+    } catch (e) {
+        console.error("8D Delete Error:", e);
+        toast("❌ Failed to delete report", "error");
+    }
+}
+
+// ✅ Helper: แปลง rgb(...) หรือ hex ให้เป็น Hex 6 หลักสำหรับ PptxGenJS (ไม่มี #)
+function _pptRgbToHex(colorStr) {
+    if (!colorStr || colorStr === 'transparent' || colorStr === 'rgba(0, 0, 0, 0)' || colorStr === 'none') return null;
+    if (colorStr.startsWith('#')) {
+        let hex = colorStr.replace('#', '').trim();
+        if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+        return hex.substring(0, 6).toUpperCase();
+    }
+    const match = colorStr.match(/\d+/g);
+    if (!match || match.length < 3) return null;
+    const r = parseInt(match[0], 10).toString(16).padStart(2, '0');
+    const g = parseInt(match[1], 10).toString(16).padStart(2, '0');
+    const b = parseInt(match[2], 10).toString(16).padStart(2, '0');
+    return (r + g + b).toUpperCase();
+}
+
+// ✅ Helper: แปลง Image URL หรือ HTMLImageElement เป็น Base64 DataURL
+async function _pptGetImageDataUrl(imgSrc) {
+    if (!imgSrc) return null;
+    if (typeof imgSrc === 'string') {
+        if (imgSrc.startsWith('data:image')) return imgSrc;
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth || img.width || 300;
+                    canvas.height = img.naturalHeight || img.height || 200;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                } catch (e) { resolve(null); }
+            };
+            img.onerror = () => resolve(null);
+            img.src = imgSrc;
+        });
+    }
+    return null;
+}
+
+// ✅ Helper: แปลง SVG Element เป็น DataURL
+async function _pptSvgToDataUrl(svgElement) {
+    if (!svgElement) return null;
+    try {
+        const serializer = new XMLSerializer();
+        let svgString = serializer.serializeToString(svgElement);
+        if (!svgString.includes('xmlns=')) {
+            svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const URL = window.URL || window.webkitURL || window;
+        const blobURL = URL.createObjectURL(svgBlob);
+        
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const rect = svgElement.getBoundingClientRect();
+                canvas.width = Math.max(20, (rect.width || 100) * 2);
+                canvas.height = Math.max(20, (rect.height || 100) * 2);
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(blobURL);
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(blobURL);
+                resolve(null);
+            };
+            img.src = blobURL;
+        });
+    } catch (e) { return null; }
+}
+
+// ✅ Helper: ตรวจสอบและสกัดประเภทรายงาน (RP หรือ VF) จากทุกฟิลด์ข้อมูลที่มี
+function _getCaseReportType(c) {
+    if (!c) return { isRP: false, isVF: true, typeName: 'VF', label: '[Line claim, VF]' };
+    
+    let raw = '';
+    if (c.report_data && typeof c.report_data === 'object') {
+        raw = c.report_data.source_report_type || c.report_data.report_type || c.report_data.type || '';
+    } else if (c.report_data && typeof c.report_data === 'string') {
+        try {
+            const parsed = JSON.parse(c.report_data);
+            raw = parsed.source_report_type || parsed.report_type || parsed.type || '';
+        } catch(e){}
+    }
+    if (!raw) {
+        raw = c.source_report_type || c.report_type || c.claim_type || c.type || c.report || '';
+    }
+    const upper = raw.toString().toUpperCase();
+    const titleUpper = (c.problem_title || '').toString().toUpperCase();
+    
+    const isRP = upper === 'RP' || upper === 'IQC' || ((titleUpper.includes('IQC') || titleUpper.includes('RP') || titleUpper.includes('REJECTED')) && !titleUpper.includes('VF') && !titleUpper.includes('LINE CLAIM'));
+    return {
+        isRP: isRP,
+        isVF: !isRP,
+        typeName: isRP ? 'RP' : 'VF',
+        label: isRP ? '[IQC Rejected, RP]' : '[Line claim, VF]'
+    };
+}
+
+function setReportType(type) {
+    if (!_currentCase) return;
+    if (!_currentCase.report_data) _currentCase.report_data = {};
+    _currentCase.report_data.source_report_type = type;
+    renderSlide();
+    _rehydrateUI();
+    toast(`อัปเดตประเภทรายงานเป็น [${type === 'RP' ? 'IQC Rejected, RP' : 'Line claim, VF'}] เรียบร้อย`, 'info');
+}
+
+// ✅ ฟังก์ชันส่งออกรายงานเป็น PowerPoint (.pptx) ที่สร้างเป็น Native Objects 100% (Tables, Shapes, Textboxes, Images) แก้ไขได้ทุกจุด
+async function exportToPPTX() {
+    if (!_currentCase) return toast("No case selected", "error");
+
+    const PptxConstructor = window.PptxGenJS || window.pptxgen;
+    if (!PptxConstructor) {
+        return toast("❌ ไม่พบไลบรารี PowerPoint Generation โปรดรีเฟรชหน้าเว็บแล้วลองอีกครั้ง", "error");
+    }
+
+    toast("⏳ กำลังสร้างไฟล์ PowerPoint (16 หน้า) แบบ Native PowerPoint Objects แก้ไขได้ 100%...", "info");
+
+    const pptx = new PptxConstructor();
+    pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches (16:9 Widescreen)
+
+    const originalSlideIndex = _currentSlide;
+
+    try {
+        for (let slideIdx = 0; slideIdx < 16; slideIdx++) {
+            _currentSlide = slideIdx;
+            renderSlide();
+            _rehydrateUI();
+
+            // รอให้ DOM และรูปภาพวาดบนหน้าจอสมบูรณ์
+            await new Promise(r => setTimeout(r, 180));
+
+            const container = document.getElementById('eight-d-slide-content');
+            if (!container) continue;
+
+            const slide = pptx.addSlide();
+            slide.background = { color: 'FFFFFF' };
+
+            const cRect = container.getBoundingClientRect();
+            if (!cRect.width || !cRect.height) continue;
+
+            // คำนวณสเกลจาก พิกเซลเว็บ (960x600) -> นิ้ว PowerPoint (13.33 x 7.5 นิ้ว)
+            const scaleX = 13.33 / cRect.width;
+            const scaleY = 7.5 / cRect.height;
+
+            // ✅ บังคับขอบเขต x, y, w, h ไม่ให้เลยขอบสไลด์ฝั่งขวาและด้านล่าง (สูงสุด 13.33 นิ้วกว้าง, 7.5 นิ้วสูง)
+            const getPos = (el) => {
+                const r = el.getBoundingClientRect();
+                let x = (r.left - cRect.left) * scaleX;
+                let y = (r.top - cRect.top) * scaleY;
+                let w = r.width * scaleX;
+                let h = r.height * scaleY;
+
+                x = Math.max(0, Math.min(13.33, x));
+                y = Math.max(0, Math.min(7.5, y));
+                if (x + w > 13.33) {
+                    w = Math.max(0.05, 13.33 - x);
+                }
+                if (y + h > 7.5) {
+                    h = Math.max(0.05, 7.5 - y);
+                }
+
+                return {
+                    x: Number(x.toFixed(3)),
+                    y: Number(y.toFixed(3)),
+                    w: Number(Math.max(0.05, w).toFixed(3)),
+                    h: Number(Math.max(0.05, h).toFixed(3))
+                };
+            };
+
+            const rectShape = pptx.shapes?.RECTANGLE || pptx.ShapeType?.rect || 'rect';
+
+            // 1. สร้างตาราง Native PPTX Tables แก้ไขเซลล์ได้ 100%
+            const tables = Array.from(container.querySelectorAll('table'));
+            for (const table of tables) {
+                const pos = getPos(table);
+                const trs = Array.from(table.querySelectorAll('tr'));
+                const rows = [];
+
+                for (const tr of trs) {
+                    const rowCells = [];
+                    const cells = Array.from(tr.querySelectorAll('td, th'));
+
+                    for (const cell of cells) {
+                        const style = window.getComputedStyle(cell);
+
+                        let text = '';
+                        const inputs = cell.querySelectorAll('input, textarea, [contenteditable="true"]');
+                        if (inputs.length > 0) {
+                            const clone = cell.cloneNode(true);
+                            const cloneInputs = clone.querySelectorAll('input, textarea, [contenteditable="true"]');
+                            cloneInputs.forEach((inp, idx) => {
+                                const origVal = (inputs[idx].tagName === 'INPUT' || inputs[idx].tagName === 'TEXTAREA') ? inputs[idx].value : inputs[idx].innerText;
+                                inp.replaceWith(document.createTextNode(origVal || ''));
+                            });
+                            text = (clone.innerText || '').trim();
+                        } else {
+                            text = (cell.innerText || '').trim();
+                        }
+
+                        const bgHex = _pptRgbToHex(style.backgroundColor);
+                        const fgHex = _pptRgbToHex(style.color) || '000000';
+                        const fw = style.fontWeight;
+                        const isBold = fw === 'bold' || parseInt(fw) >= 700 || cell.tagName === 'TH';
+                        const ta = style.textAlign || 'left';
+                        const align = ta === 'center' ? 'center' : (ta === 'right' ? 'right' : 'left');
+                        const fSizePx = parseFloat(style.fontSize) || 11;
+                        const fSizePt = Math.max(7, Math.round(fSizePx * 0.72));
+
+                        const cellOpt = {
+                            text: text,
+                            options: {
+                                color: fgHex,
+                                bold: isBold,
+                                align: align,
+                                valign: 'middle',
+                                fontSize: fSizePt,
+                                border: { type: 'solid', pt: 1, color: '000000' }
+                            }
+                        };
+
+                        if (bgHex && bgHex !== 'FFFFFF' && bgHex !== '00000000') {
+                            cellOpt.options.fill = { color: bgHex };
+                        }
+                        if (cell.colSpan > 1) cellOpt.options.colspan = cell.colSpan;
+                        if (cell.rowSpan > 1) cellOpt.options.rowspan = cell.rowSpan;
+
+                        rowCells.push(cellOpt);
+                    }
+                    if (rowCells.length > 0) rows.push(rowCells);
+                }
+
+                if (rows.length > 0) {
+                    slide.addTable(rows, {
+                        x: pos.x,
+                        y: pos.y,
+                        w: pos.w,
+                        h: pos.h,
+                        border: { type: 'solid', pt: 1, color: '000000' }
+                    });
+                }
+            }
+
+            // 2. สร้างรูปทรงพื้นหลัง กล่อง กรอบ แถบประดับ (Native PPTX Shapes)
+            const boxElements = Array.from(container.querySelectorAll('div, section, header')).filter(el => {
+                if (el.closest('table')) return false;
+                const style = window.getComputedStyle(el);
+                const bg = _pptRgbToHex(style.backgroundColor);
+                const borderW = parseFloat(style.borderWidth) || 0;
+                const borderCol = _pptRgbToHex(style.borderColor);
+
+                const hasBg = bg && bg !== 'FFFFFF' && bg !== '00000000';
+                const hasBorder = borderW > 0 && style.borderStyle !== 'none' && borderCol;
+
+                return (hasBg || hasBorder) && el.offsetWidth > 15 && el.offsetHeight > 3;
+            });
+
+            for (const box of boxElements) {
+                const pos = getPos(box);
+                const style = window.getComputedStyle(box);
+                const bgHex = _pptRgbToHex(style.backgroundColor);
+                const borderCol = _pptRgbToHex(style.borderColor);
+                const borderW = parseFloat(style.borderWidth) || 0;
+
+                const shapeOpts = {
+                    x: pos.x,
+                    y: pos.y,
+                    w: pos.w,
+                    h: pos.h
+                };
+
+                if (bgHex && bgHex !== 'FFFFFF' && bgHex !== '00000000') {
+                    shapeOpts.fill = { color: bgHex };
+                }
+                if (borderW > 0 && borderCol && style.borderStyle !== 'none') {
+                    shapeOpts.line = { color: borderCol, width: Math.max(1, Math.round(borderW)) };
+                }
+
+                slide.addShape(rectShape, shapeOpts);
+            }
+
+            // 3. สร้างกล่องข้อความ Native Textboxes (นอกตาราง)
+            const rawCandidates = Array.from(container.querySelectorAll('h1, h2, h3, h4, label, [contenteditable="true"], input, textarea, span, p, div')).filter(el => {
+                if (el.closest('table')) return false;
+                if (el.offsetWidth === 0 || el.offsetHeight === 0) return false;
+
+                const isEditable = el.getAttribute('contenteditable') === 'true' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
+                const isHeading = ['H1','H2','H3','H4','LABEL','P'].includes(el.tagName);
+
+                let hasDirectText = false;
+                for (const child of el.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE && child.nodeValue.trim().length > 0) {
+                        hasDirectText = true;
+                        break;
+                    }
+                }
+
+                if (isEditable || isHeading || hasDirectText) return true;
+                return false;
+            });
+
+            // คัดเอาโหนดล่างสุด (Leaf Candidates) เพื่อป้องกันข้อความทับซ้อน
+            const leafTextCandidates = rawCandidates.filter(el => {
+                const hasCandidateChild = rawCandidates.some(other => other !== el && el.contains(other));
+                return !hasCandidateChild;
+            });
+
+            for (const el of leafTextCandidates) {
+                const val = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? el.value : el.innerText;
+                const txt = (val || '').trim();
+                if (!txt) continue;
+
+                const pos = getPos(el);
+                if (pos.w < 0.05 || pos.h < 0.05) continue;
+
+                const style = window.getComputedStyle(el);
+                const fgHex = _pptRgbToHex(style.color) || '000000';
+                const fSizePx = parseFloat(style.fontSize) || 12;
+                const fSizePt = Math.max(7, Math.round(fSizePx * 0.72));
+                const fw = style.fontWeight;
+                const isBold = fw === 'bold' || parseInt(fw) >= 700 || ['H1','H2','H3','H4','LABEL'].includes(el.tagName);
+                const isItalic = style.fontStyle === 'italic';
+                const ta = style.textAlign || 'left';
+                const align = ta === 'center' ? 'center' : (ta === 'right' ? 'right' : 'left');
+
+                const tbOpts = {
+                    x: pos.x,
+                    y: pos.y,
+                    w: pos.w,
+                    h: pos.h,
+                    fontSize: fSizePt,
+                    color: fgHex,
+                    bold: isBold,
+                    italic: isItalic,
+                    align: align,
+                    valign: 'middle',
+                    wrap: true,
+                    margin: 1
+                };
+
+                const bgHex = _pptRgbToHex(style.backgroundColor);
+                if (bgHex && bgHex !== 'FFFFFF' && bgHex !== '00000000') {
+                    tbOpts.fill = { color: bgHex };
+                }
+
+                slide.addText(txt, tbOpts);
+            }
+
+            // 4. Native Images (รูปภาพแนบ Uploaded Photos & Background Images)
+            const imgEls = Array.from(container.querySelectorAll('img')).concat(
+                Array.from(container.querySelectorAll('div, span')).filter(el => {
+                    const bg = window.getComputedStyle(el).backgroundImage;
+                    return bg && bg !== 'none' && bg.includes('url(');
+                })
+            );
+
+            for (const imgEl of imgEls) {
+                if (imgEl.closest && imgEl.closest('svg')) continue;
+                const pos = getPos(imgEl);
+                let src = '';
+                if (imgEl.tagName === 'IMG') {
+                    src = imgEl.src;
+                } else {
+                    const bg = window.getComputedStyle(imgEl).backgroundImage;
+                    const m = bg.match(/url\(['"]?(.*?)['"]?\)/);
+                    if (m) src = m[1];
+                }
+
+                if (src && !src.includes('data:image/svg+xml')) {
+                    const dataUrl = await _pptGetImageDataUrl(src);
+                    if (dataUrl) {
+                        slide.addImage({
+                            data: dataUrl,
+                            x: pos.x,
+                            y: pos.y,
+                            w: pos.w,
+                            h: pos.h
+                        });
+                    }
+                }
+            }
+
+            // 5. Native SVGs (โลโก้, ไอคอน, ผังกระบวนการ)
+            const svgEls = Array.from(container.querySelectorAll('svg'));
+            for (const svg of svgEls) {
+                if (svg.offsetWidth === 0 || svg.offsetHeight === 0) continue;
+                const pos = getPos(svg);
+                const dataUrl = await _pptSvgToDataUrl(svg);
+                if (dataUrl) {
+                    slide.addImage({
+                        data: dataUrl,
+                        x: pos.x,
+                        y: pos.y,
+                        w: pos.w,
+                        h: pos.h
+                    });
+                }
+            }
+        }
+
+        const fileName = `8D_Report_${_currentCase.id}.pptx`;
+        pptx.writeFile({ fileName });
+        toast("✅ ส่งออก PowerPoint สำเร็จ! (สร้างเป็น Native PowerPoint Objects แท้ 100% แก้ไขตาราง ข้อความ และรูปภาพได้ทุกจุด)", "success");
+
+    } catch (err) {
+        console.error("PPTX Export Error:", err);
+        toast("❌ เกิดข้อผิดพลาดในการสร้างไฟล์ PPTX: " + (err.message || err), "error");
+    } finally {
+        _currentSlide = originalSlideIndex;
+        renderSlide();
+        _rehydrateUI();
+    }
+}
+
+function renderDashboard() {
+    const tbody = document.getElementById('eight-d-list-body');
+    const statTotal = document.getElementById('stat-8d-total');
+    const statPending = document.getElementById('stat-8d-pending');
+
+    // 1. คำนวณตัวเลข Quick Stats (Total Cases และ D1-D3 Open)
+    const totalCount = _cases.length;
+    const d1ToD3Count = _cases.filter(c => {
+        const s = (c.status || '').toUpperCase();
+        const stepMatch = s.match(/D(\d+)/);
+        if (stepMatch) {
+            const num = parseInt(stepMatch[1], 10);
+            return num >= 1 && num <= 3;
+        }
+        return true; // ค่าเริ่มต้นถ้าพึ่งสร้างเคส (D1_OPEN)
+    }).length;
+
+    if (statTotal) statTotal.textContent = totalCount;
+    if (statPending) statPending.textContent = d1ToD3Count;
+
+    // 2. ปรับแต่ง UI ของ Stat Cards ปุ่มที่เลือกอยู่
+    const cardTotal = document.getElementById('card-stat-8d-total');
+    const cardPending = document.getElementById('card-stat-8d-pending');
+    if (cardTotal) {
+        if (_statFilter === 'all') {
+            cardTotal.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50/50');
+        } else {
+            cardTotal.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50/50');
+        }
+    }
+    if (cardPending) {
+        if (_statFilter === 'd1-d3') {
+            cardPending.classList.add('ring-2', 'ring-orange-500', 'bg-orange-50/50');
+        } else {
+            cardPending.classList.remove('ring-2', 'ring-orange-500', 'bg-orange-50/50');
+        }
+    }
+
+    // 3. ผูก Event Listener ช่องค้นหา (Search)
+    const searchInput = document.getElementById('eightDSearch');
+    if (searchInput && !searchInput.dataset.hasListener) {
+        searchInput.dataset.hasListener = 'true';
+        searchInput.addEventListener('input', () => {
+            renderDashboard();
+        });
+    }
+    const query = searchInput ? (searchInput.value || '').trim().toLowerCase() : '';
+
+    // 4. กรองรายการเคสตาม Filter และ Search Query
+    const filteredCases = _cases.filter(c => {
+        if (_statFilter === 'd1-d3') {
+            const s = (c.status || '').toUpperCase();
+            const stepMatch = s.match(/D(\d+)/);
+            let isD1D3 = true;
+            if (stepMatch) {
+                const num = parseInt(stepMatch[1], 10);
+                isD1D3 = (num >= 1 && num <= 3);
+            }
+            if (!isD1D3) return false;
+        }
+
+        if (!query) return true;
+        const idStr = (c.id || '').toLowerCase();
+        const titleStr = (c.problem_title || '').toLowerCase();
+        const partStr = (c.part_name || '').toLowerCase();
+        const statusStr = (c.status || '').toLowerCase();
+        return idStr.includes(query) || titleStr.includes(query) || partStr.includes(query) || statusStr.includes(query);
+    });
+
+    if (!tbody) return;
+
+    if (filteredCases.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="py-20 text-center text-slate-400">
+                    <div class="text-4xl mb-3 opacity-20">📂</div>
+                    <p class="text-[11px] font-black uppercase tracking-widest italic">${_cases.length === 0 ? 'No 8D Reports Found' : 'No Matching 8D Reports'}</p>
+                </td>
+            </tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filteredCases.map(c => {
+        // คำนวณเปอร์เซ็นต์ความคืบหน้าตาม Status
+        // D1 = 12.5%, D2 = 25%, ..., D8 = 100%
+        const stepMatch = (c.status || '').match(/D(\d+)/);
+        const stepNum = stepMatch ? parseInt(stepMatch[1], 10) : 1;
+        const progressPct = Math.min(100, Math.max(12.5, (stepNum / 8) * 100));
+
+        const displayTitle = c.problem_title || 'Untitled Report';
+        
+        return `
+        <tr class="group hover:bg-blue-50/40 transition-all duration-300">
+            <!-- คอลัมน์ ID & ประเภท -->
+            <td class="px-6 py-5">
+                <div class="flex flex-col">
+                    <span class="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md w-fit mb-1 tracking-tighter">CASE ID</span>
+                    <span class="font-mono text-[11px] text-slate-400 font-bold">${c.id}</span>
+                </div>
+            </td>
+
+            <!-- คอลัมน์ รายละเอียดปัญหา -->
+            <td class="px-6 py-5">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                    <div class="flex flex-col max-w-md">
+                        <p class="text-[13px] font-black text-slate-700 leading-tight mb-1 truncate group-hover:text-blue-700 transition-colors" title="${displayTitle}">
+                            ${displayTitle}
+                        </p>
+                        <div class="flex items-center gap-3">
+                            <span class="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                ${c.part_name || 'Generic Part'}
+                            </span>
+                            <span class="text-[10px] font-bold text-slate-300">|</span>
+                            <span class="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                ${new Date(c.created_at).toLocaleDateString()}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </td>
+
+            <!-- คอลัมน์ สถานะและความคืบหน้า -->
+            <td class="px-6 py-5">
+                <div class="flex flex-col gap-2 min-w-[140px]">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest">${c.status}</span>
+                        <span class="text-[10px] font-black text-slate-400">${Math.round(progressPct)}%</span>
+                    </div>
+                    <!-- Progress Bar -->
+                    <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                        <div class="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000" style="width: ${progressPct}%"></div>
+                    </div>
+                </div>
+            </td>
+
+            <td class="px-6 py-5 text-right">
+                <div class="flex justify-end gap-2">
+                    <button onclick="Wap8DSystem.openReport('${c.id}')" 
+                            class="h-9 px-5 bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-sm">
+                        OPEN REPORT
+                    </button>
+
+                    <button onclick="Wap8DSystem.deleteCase('${c.id}')" 
+                            class="h-9 w-9 flex items-center justify-center bg-white border-2 border-slate-200 text-slate-400 hover:border-rose-500 hover:text-rose-500 rounded-xl transition-all duration-200 active:scale-95 shadow-sm"
+                            title="Delete Report">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+/* ──────────────────────────────────────────
+       NEW: RENDER SLIDE (Standardized Layout Version)
+       ────────────────────────────────────────── */
+    function renderSlide() {
+        const container = document.getElementById('eight-d-slide-content');
+        const indexText = document.getElementById('slide-index-display');
+        indexText.textContent = `PAGE ${_currentSlide + 1} / 16`;
+        const c = _currentCase;
+        const d2 = c.d2_data || {};
+
+        // ล้างค่าเก่าและตั้งค่า Container หลักให้เป็น Flex Column ความสูงเต็ม
+        container.innerHTML = '';
+// ค้นหาบรรทัดนี้ในฟังก์ชัน renderSlide()
+        container.style.cssText = `
+            width: 960px;
+            height: 600px;
+            box-sizing: border-box; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 20px 30px 15px 30px; 
+            background: #fff;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: top left;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            border: 1px solid #cbd5e1;
+            overflow: hidden;
+            border-radius: 4px;
+        `;
+        container.className = 'slide-page-paper slide-fade-in';
+
+        // --- 1. Helper: Standard Header ---
+        const getHeader = (title, badge, color = "blue") => `
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                <h1 contenteditable="true" style="font-size: 28px; font-weight: 950; margin: 0; color: #000; border: none; letter-spacing: -0.5px; outline: none;">${title}</h1>
+                <div contenteditable="true" style="background: ${color}; color: ${color==='yellow'?'#000':'#fff'}; padding: 3px 12px; font-weight: 900; font-size: 11px; border: 1.2px solid #000; text-transform: uppercase; outline: none;">${badge}</div>
+            </div>
+            <div style="width: 100%; height: 4px; background: #003366; margin-bottom: 20px; flex-shrink: 0;"></div>
+        `;
+
+        // --- 2. Helper: Standard Footer (คงที่ทุกหน้า) ---
+        const getFooter = () => `
+            <div style="margin-top: auto; padding-top: 15px; border-top: 1.5px solid #f1f5f9; display: flex; align-items: center; width: 100%; flex-shrink: 0;">
+                <div style="width: 120px;">
+                    <svg viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="width:100px; display:block;">
+                        <ellipse cx="100" cy="40" rx="95" ry="38" fill="#003366" />
+                        <ellipse cx="100" cy="40" rx="88" ry="33" fill="none" stroke="white" stroke-width="1.5" />
+                        <text x="50%" y="58" text-anchor="middle" font-family="Times New Roman, serif" font-style="italic" font-weight="bold" font-size="44" fill="white">Carrier</text>
+                    </svg>
+                </div>
+                <div style="flex: 1; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">
+                    Proprietary and Confidential
+                </div>
+                <div style="width: 120px;"></div>
+            </div>
+        `;
+
+        let mainContent = '';
+
+ // ==========================================
+// แผ่นที่ 1: หน้าปก 8D Report (ปรับปรุงให้สัดส่วนเท่าหน้า D2 และพิมพ์กรอกข้อมูลได้ง่าย)
+// ==========================================
+if (_currentSlide === 0) {
+    const repInfo = _getCaseReportType(c);
+    const isRP = repInfo.isRP;
+    
+    const checkRP = isRP 
+        ? `<span style="background:#000; color:#fff; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border:2px solid #000; font-weight:bold; margin-right:8px; font-size:14px; box-sizing:border-box;">X</span>` 
+        : `<span style="width:22px; height:22px; display:inline-block; border:2px solid #000; background:#fff; margin-right:8px; box-sizing:border-box;"></span>`;
+
+    const checkVF = !isRP 
+        ? `<span style="background:#000; color:#fff; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border:2px solid #000; font-weight:bold; margin-right:8px; font-size:14px; box-sizing:border-box;">X</span>` 
+        : `<span style="width:22px; height:22px; display:inline-block; border:2px solid #000; background:#fff; margin-right:8px; box-sizing:border-box;"></span>`;
+    
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; box-sizing: border-box;">
+            <!-- 1. Header: หัวข้อใหญ่และกล่องแจ้งเตือนสีเหลือง -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 5px; flex-shrink: 0; box-sizing: border-box;">
+                    <h1 contenteditable="true" style="font-size: 42px; font-weight: 950; color: #000; margin: 0; outline: none; letter-spacing: -1.5px;">8D Report</h1>
+                    
+                    <div contenteditable="true" style="background:#ffff99; border:1.2px solid #ffcc00; padding:8px 15px; width:340px; color:red; font-size:10px; font-weight:900; border-radius:4px; line-height:1.2; outline: none; text-align:left; box-sizing: border-box;">
+                        Suppliers can use any format of the report as long as all mandatory information is present.
+                    </div>
+                </div>
+
+                <!-- เส้นแบ่งหนาสีน้ำเงินมาตรฐาน (ฟิคขนาดเท่าหน้า D2) -->
+                <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 15px; flex-shrink: 0; box-sizing: border-box;"></div>
+
+                <!-- 2. ส่วนเลือกประเภท (Checkboxes) -->
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 15px; flex-shrink: 0; width: 100%; box-sizing: border-box;">
+                    <div style="border: 2px solid #000; padding: 6px 18px; display: flex; gap: 30px; font-weight: 900; font-size: 14px; background:#fff; box-sizing: border-box;">
+                        <div onclick="Wap8DSystem.setReportType('RP')" style="display:flex; align-items:center; cursor:pointer; user-select:none;">
+                            ${checkRP} <span style="font-weight:900; color:#000;">[IQC Rejected, RP]</span>
+                        </div>
+                        <div onclick="Wap8DSystem.setReportType('VF')" style="display:flex; align-items:center; cursor:pointer; user-select:none;">
+                            ${checkVF} <span style="font-weight:900; color:#000;">[Line claim, VF]</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. ส่วนแสดงหัวข้อปัญหา (Problem Title) -->
+                <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: 5px 0;">
+                    <label style="font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">PROBLEM :</label>
+                    <div contenteditable="true" style="font-size: 24px; font-weight: 950; color: #000; line-height: 1.3; outline: none;">
+                        ${c.problem_title || ''}
+                    </div>
+                </div>
+
+                <!-- 4. Approve Table: ส่วนการยืนยันด้านล่าง -->
+                <div style="align-self: flex-end; width: 550px; margin-bottom: 10px; flex-shrink: 0;">
+                    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; text-align: center; font-size: 11px;">
+                        <tr style="background: #99badd; font-weight: 950;">
+                            <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">Suppliers submit</td>
+                            <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">CTC confirm</td>
+                        </tr>
+                        <tr style="font-weight: 800; background: #f8f9fa; height: 22px;">
+                            <td style="border: 1px solid #000; width: 25%;">Confirmed (PIC)</td>
+                            <td style="border: 1px solid #000; width: 25%;">Approved (QA Mgr)</td>
+                            <td style="border: 1px solid #000; width: 25%;">Confirmed (Eng)</td>
+                            <td style="border: 1px solid #000; width: 25%;">Approved (Spec)</td>
+                        </tr>
+                        <tr style="height: 55px; background:#fff;">
+                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                        </tr>
+                        <tr style="background: #fff; font-weight:800; height: 22px;">
+                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                        </tr>
+                    </table>
+                </div>
+        </div>`;
+}
+        // ==========================================
+        // แผ่นที่ 2: D1- Assign person in charge
+        // ==========================================
+        else if (_currentSlide === 1) {
+            const renderTable = (title, isSupplier = false) => `
+                <table style="width:100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; flex: 1;">
+                    <thead style="background: #99badd;">
+                        <tr>
+                            <th colspan="3" contenteditable="true" style="padding: 6px 5px; border: 1.2px solid #000; font-size: 13px; font-weight: 900; text-align: center; color: ${isSupplier ? 'red' : '#000'}; text-transform: uppercase; outline: none;">
+                                ${title}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${[1, 2, 3, 4, 5, 6].map(i => {
+                            let dummyName = "";
+                            let dummyRole = "";
+                            if (!isSupplier) {
+                                if (i === 1) { dummyName = "Ms.Nipawan J."; dummyRole = "Senior Specialist (QAP)"; }
+                                if (i === 2) { dummyName = "Mr.Komsan N."; dummyRole = "Senior Engineer (QAP)"; }
+                            }
+                            return `
+                            <tr style="height: 27px;">
+                                <td rowspan="2" contenteditable="true" style="width: 25%; text-align: center; font-weight: 950; border: 1.2px solid #000; font-size: 11px; background: #fff; color: #000; outline: none;">Person${i}</td>
+                                <td style="width: 15%; font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Name:</td>
+                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyName}</td>
+                            </tr>
+                            <tr style="height: 27px;">
+                                <td style="font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Role:</td>
+                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyRole}</td>
+                            </tr>
+                        `}).join('')}
+                    </tbody>
+                </table>`;
+
+            mainContent = `
+                <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-bottom: 5px; flex-shrink: 0; overflow: hidden;">
+                        <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
+                            D1- Assign person in charge
+                        </h1>
+                        <div contenteditable="true" style="background: blue; color: yellow; padding: 3px 12px; font-weight: 950; font-size: 11px; border: 1px solid #000; text-transform: uppercase; flex-shrink: 0; margin-left: 15px; outline: none;">
+                            &lt;Fill by CTC & Supplier&gt;
+                        </div>
+                    </div>
+                    <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
+
+                    <div style="flex: 1; min-height: 0; display: flex; gap: 25px; align-items: flex-start; justify-content: space-between; width: 100%; overflow: hidden;">
+                        <div style="flex: 1; min-width: 0;">
+                            ${renderTable('TCTC member', false)}
+                        </div>
+                        <div style="flex: 1; min-width: 0;">
+                            ${renderTable('Supplier name member', true)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+// ==========================================
+// แผ่นที่ 3: D2- Define the Problem (ฉบับ Responsive ป้องกันตารางล้น 100%)
+// ==========================================
+else if (_currentSlide === 2) {
+    const repInfo = _getCaseReportType(c);
+    const isRP = repInfo.isRP;
+    const rawTitle = c.problem_title || "";
+    
+    // --- 1. ระบบ AI Parsing แยกส่วนข้อมูล ---
+    let extPartName = c.part_name || "-";
+    let extDrawing = "-";
+    let extSupplier = "OSA"; 
+    let extDefect = rawTitle;
+
+    try {
+        const match = rawTitle.match(/Inform\s+(.*?)\s*\/\s*(\d+)\s+(.*?)\s+(.*)/i);
+        if (match) {
+            extPartName = match[1].replace(/quality problem about/i, '').trim(); 
+            extDrawing  = match[2].trim();     
+            extSupplier = match[3].trim();     
+            let defectPart = match[4].replace(/found defect/i, '').trim();
+            extDefect = defectPart.split(/[=:/]/)[0].trim(); 
+        }
+    } catch (e) { console.log("Parsing fallback"); }
+
+    // --- 2. ระบบคำนวณสถิติ ---
+    const ng = Number(c.ng_qty) || 0;
+    const ok = Number(c.ok_qty) || 0;
+    const total = ng + ok; 
+    const defectPct = total > 0 ? ((ng / total) * 100).toFixed(2) + " %" : "0.00 %";
+    const today = new Date().toISOString().split('T')[0];
+    const supportImage = c.report_data?.evidence_img || ""; 
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- Header Section (Fixed Height) -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000; outline: none; letter-spacing: -1.5px; line-height: 0.9;">
+                    D2-Define the Problem
+                </h1>
+                <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 2px 10px; font-weight: 950; font-size: 13px; border: 1.2px solid #000; text-transform: uppercase; outline: none; margin-bottom: 4px;">
+                    &lt;Fill by CTC &gt;
+                </div>
+            </div>
+            <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 10px; flex-shrink: 0;"></div>
+
+            <!-- Main Content Area (Flexible Height) -->
+            <div style="display: flex; gap: 20px; flex: 1; min-height: 0; overflow: hidden; margin-bottom: 10px; align-items: stretch;">
+                
+                <!-- ฝั่งซ้าย: ตาราง (บีบอัดความสูงให้พอดีพื้นที่) -->
+                <div style="flex: 0 0 45%; display: flex; flex-direction: column; min-height: 0;">
+                    <table style="width: 100%; height: 100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; font-size: 11px;">
+                        <tr style="background:#2563eb; color:#fff; font-weight:900; height: 8.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; width:40%;">${isRP ? 'RP No.' : 'VF No.'}</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-weight:950; font-family: monospace;">${c.id}</td>
+                        </tr>
+                        <tr style="height: 7.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Issue Date</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">${new Date(c.created_at).toLocaleDateString('en-GB')}</td>
+                        </tr>
+                        <tr style="height: 7.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Model</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">-</td>
+                        </tr>
+                        <tr style="height: 8%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Part Name</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; font-weight:950; outline: none;">${extPartName}</td>
+                        </tr>
+                        <tr style="height: 7.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Drawing No.</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-family: monospace;">${extDrawing}</td>
+                        </tr>
+                        <tr style="height: 7.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Part Group</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">${c.part_group || 'Steel'}</td>
+                        </tr>
+                        <tr style="height: 7.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Supplier</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; font-weight:950; color: #2563eb; outline: none;">${extSupplier}</td>
+                        </tr>
+                        <tr style="height: 9.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Defect name</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; color:red; font-weight:950; outline: none; line-height: 1;">${extDefect}</td>
+                        </tr>
+                        <tr style="height: 8%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Lot size/Used Q'ty</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-weight:900;">${ng} / ${total} Pcs.</td>
+                        </tr>
+                        <tr style="height: 8%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Defect Q'ty (%)</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; font-weight:950; outline: none;">${defectPct}</td>
+                        </tr>
+                        <tr style="height: 7.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Trouble Rank</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; font-weight:950; color:red; outline: none;">B</td>
+                        </tr>
+                        <tr style="height: 7.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Inspection Date</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">${today}</td>
+                        </tr>
+                        <tr style="height: 7.5%;">
+                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Defect Found Area</td>
+                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-weight:950;">${isRP ? 'IQC Rejected' : 'Line claim'}</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <!-- ฝั่งขวา: รูปภาพ (ยืดหดตามตาราง) -->
+                <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+                    <h3 contenteditable="true" style="font-size: 15px; font-weight: 950; margin: 0 0 5px 0; color: #000; outline: none; text-transform: uppercase;">
+                        Describe of Defect <span style="background: yellow; color: red; padding: 0 5px; font-style: italic; font-size: 11px; font-weight: 800;">(Picture and Judgement method)</span>
+                    </h3>
+                    <div style="flex: 1; border: 2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-image: url('${supportImage}'); background-size: contain; background-repeat: no-repeat; background-position: center; border-radius: 4px;">
+                        ${!supportImage ? '<span style="color:#eee; font-size:40px; font-weight:900;">PHOTO AREA</span>' : ''}
+                    </div>
+                </div>
+            </div>
+
+
+        </div>`;
+}
+// ==========================================
+// แผ่นที่ 4: D2- [Further Detail] (ฉบับสมบูรณ์: ดึงรูปภาพ + ดึง Remark อัตโนมัติ)
+// ==========================================
+else if (_currentSlide === 3) {
+    // 1. ดึงข้อมูลพื้นฐานจากเคส
+    const problemTitle = c.problem_title || "-";
+    const partName = c.part_name || "-";
+    const createDate = new Date(c.created_at).toLocaleDateString('en-GB', {
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric'
+    });
+    
+    // 2. ดึงรูปภาพจาก JSON (ที่เราย้ายมาเก็บไว้เพื่อประหยัดพื้นที่)
+    const supportImage = c.report_data?.evidence_img || ""; 
+
+    // 3. ดึงข้อมูลหมายเหตุ (Remark) มาทำเป็น Temporary Actions
+    // หากไม่มีหมายเหตุ ให้ใช้ข้อความ Default เป็นไกด์ไลน์
+    const rawRemark = c.report_data?.source_remark || "";
+    let tempActionContent = "";
+
+    if (rawRemark.trim() !== "") {
+        // แปลงข้อความหมายเหตุ โดยถ้ามีการขึ้นบรรทัดใหม่ ให้ใส่จุด Bullet (•) นำหน้าทุกบรรทัด
+        tempActionContent = rawRemark.split('\n')
+            .map(line => `• ${line.trim()}`)
+            .join('<br>');
+    } else {
+        // กรณีไม่มีข้อมูลหมายเหตุส่งมา (Fallback)
+        tempActionContent = `• Sorting 100% at line / WIP Stock<br>
+                             • Inform vendor for urgent root cause analysis<br>
+                             • Set point of control for next lot shipment`;
+    }
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            <!-- 1. Header: สไตล์ภาพที่ 2 (ตัวหนังสือใหญ่ แถบน้ำเงิน-เหลืองคมชัด) -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000; outline: none; letter-spacing: -1.5px; line-height: 1;">
+                        D2-Define the Problem <span style="color:#003366; font-size: 24px; font-weight: 700;">[Further Detail]</span>
+                    </h1>
+                    
+                    <!-- ✅ แถบสถานะน้ำเงิน-เหลือง Contrast สูง -->
+                    <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 3px 12px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1;">
+                        &lt;Fill by CTC &gt;
+                    </div>
+                </div>
+                
+                <!-- เส้นแบ่งหนาสีน้ำเงินมาตรฐาน (Thickness 6px) -->
+                <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
+
+                <!-- 2. ส่วนเนื้อหา (แบ่งซ้าย-ขวา) -->
+                <div style="display: flex; gap: 35px; flex: 1; min-height: 0; align-items: stretch; margin-bottom: 10px;">
+                    
+                    <!-- ฝั่งซ้าย: รูปภาพขนาดใหญ่ (Auto-Sync จากหน้า Support) -->
+                    <div style="flex: 0 0 55%; border: 2.5px solid #000; background: #f8fafc; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: 4px;">
+                        ${supportImage 
+                            ? `<img src="${supportImage}" style="max-width:98%; max-height:98%; object-fit:contain;">` 
+                            : '<span style="color:#cbd5e1; font-weight:900; font-size:24px; letter-spacing:1px;">NO EVIDENCE PHOTO</span>'
+                        }
+                    </div>
+
+                    <!-- ฝั่งขวา: รายละเอียดข้อความ -->
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; padding-top: 5px;">
+                        
+                        <!-- Block: Detail (ข้อมูลเบื้องต้น) -->
+                        <div>
+                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">DETAIL</h3>
+                            <p contenteditable="true" style="font-size: 15px; color: #000; line-height: 1.5; outline: none; margin: 0; font-weight: 600;">
+                                On <span style="color:#2563eb; font-weight: 900;">${createDate}</span> OSA inform quality problem about 
+                                <span style="color: #2563eb; font-weight: 900;">${partName}</span> 
+                                found defect <span style="color:red; font-weight:900;">${problemTitle}</span>
+                            </p>
+                        </div>
+
+                        <!-- ✅ Block: Temporary Actions (ดึงมาจากช่อง Remark อัตโนมัติ) -->
+                        <div>
+                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">Temporary actions</h3>
+                            <div contenteditable="true" style="font-size: 14px; color: #334155; line-height: 1.6; outline: none; font-weight: 600;">
+                                ${tempActionContent}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+        </div>
+    `;
+}
+// ==========================================
+        // แผ่นที่ 5: D3-Interim Containment Action (ICA) - ปรับปรุงหัวข้อแถวเดียว
+        // ==========================================
+        else if (_currentSlide === 4) {
+            const locations = ["CTC WIP", "CTC Stock", "Supplier Stock", "On the way", "", ""];
+            
+            mainContent = `
+                <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+                    <!-- Header: ปรับขนาด font และบังคับแถวเดียว -->
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-bottom: 5px; flex-shrink: 0; overflow: hidden;">
+                        <h1 contenteditable="true" style="font-size: 28px; font-weight: 950; margin: 0; color: #000; letter-spacing: -0.5px; outline: none; white-space: nowrap; flex: 1;">
+                            D3-Interim Containment Action (ICA)
+                        </h1>
+                        <div contenteditable="true" style="background: blue; color: yellow; padding: 3px 12px; font-weight: 950; font-size: 11px; border: 1.2px solid #000; outline: none; flex-shrink: 0; margin-left: 15px;">
+                            &lt;Fill by CTC & Supplier&gt;
+                        </div>
+                    </div>
+                    <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
+
+                    <!-- Main Table (ข้อมูลกึ่งกลาง) -->
+                    <div style="width: 100%; flex-shrink: 0;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1.2px solid #000; font-size: 11px; table-layout: fixed;">
+                            <thead style="background: #fff; font-weight: 900; text-align: center;">
+                                <tr style="height: 38px;">
+                                    <td style="border: 1px solid #000; width: 12%;">Location</td>
+                                    <td style="border: 1px solid #000; width: 6%;">Qty</td>
+                                    <td style="border: 1px solid #000; width: 15%;">Action<br><span style="font-size:9px; font-weight:500;">(Sorting, Rework, etc.)</span></td>
+                                    <td style="border: 1px solid #000; width: 9%;">Person in charge</td>
+                                    <td style="border: 1px solid #000; width: 9%;">Start date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
+                                    <td style="border: 1px solid #000; width: 9%;">Finished Date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
+                                    <td style="border: 1px solid #000; width: 8%;">Sorted Q'ty</td>
+                                    <td style="border: 1px solid #000; width: 8%;">NG Q'ty</td>
+                                    <td style="border: 1px solid #000; width: 12%;">Disposition</td>
+                                    <td style="border: 1px solid #000;">Remarks</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${locations.map(loc => `
+                                    <tr style="height: 24px;">
+                                        <td contenteditable="true" style="border: 1px solid #000; padding: 0 5px; font-weight: 800; background: #fff; outline: none; vertical-align: middle;">${loc}</td>
+                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;">${loc ? '0' : ''}</td>
+                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
+                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
+                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
+                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
+                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
+                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
+                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; color: red;"></td>
+                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Bottom Sections -->
+                    <div style="display: flex; gap: 0; margin-top: 10px; border: 1.2px solid #000; flex: 1; min-height: 0; background: #f1f5f9;">
+                        <div style="flex: 1.2; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
+                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Sort/Rework Method Used:</div>
+                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; line-height: 1.4; outline: none; background: #fff;">
+                                V.TKCP screw Sorting parts in stock<br>Stock : 0 Pcs.<br>OK : .... Pcs.<br>NG : .... Pcs.
+                            </div>
+                        </div>
+                        <div style="flex: 0.8; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
+                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Identify mark:</div>
+                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; outline: none; background: #fff;">
+                                Mark label ok control
+                            </div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column;">
+                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Sorting/Rework lot Ship Date</div>
+                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; line-height: 1.4; outline: none; background: #fff;">
+                                Sorting date : ....<br>Shipment replacement part date : ....
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instruction Footer -->
+                    <div style="background: #ffffcc; border: 1px solid #ffcc00; margin-top: 8px; padding: 5px 10px; font-size: 10px; line-height: 1.3; flex-shrink: 0;">
+                        <div style="color: red; font-weight: 900; font-style: italic;">3D - Interim Containment Action (ICA)</div>
+                        <div style="color: #000; font-style: italic;">
+                            Take action to ensure that the customer is protected and the problem does not get out of your area. Ensure all suspect parts of the manufacturing process, On-Hand stock, On the way has been quarantine.
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+// ==========================================
+// แผ่นที่ 6: D4-Identify Root cause and Escape cause (PROCESS FLOW - MATCH D4 WIDTH)
+// ปรับปรุง: ขยายความกว้างให้เท่าหน้าตาราง และปรับเส้นทางลูกศรแบบอ้อมกล่อง
+// ==========================================
+else if (_currentSlide === 5) {
+    // 1. ฟังก์ชันสร้างแถว (ปรับความกว้างกล่องให้สมดุลกับหน้ากระดาษที่กว้างขึ้น)
+    const createFlowRow = (text, isRed = false, isDiamond = false) => {
+        const boxStyle = isDiamond 
+            ? `position: relative; width: 190px; height: 50px; display: flex; align-items: center; justify-content: center;`
+            : `width: 190px; height: 38px; background: #d9d9d9; border: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; text-transform: uppercase; color: ${isRed ? 'red' : '#000'}; outline: none; box-shadow: 2px 2px 0px #000;`;
+
+        const leftContent = isDiamond ? `
+            <svg viewBox="0 0 100 45" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 0px #000);">
+                <polygon points="50,2 98,22.5 50,43 2,22.5" fill="#fff" stroke="#000" stroke-width="1.2"/>
+            </svg>
+            <div contenteditable="true" style="position: absolute; font-weight: 900; font-size: 10px; text-align: center; width: 75%; line-height: 1.1; text-transform: uppercase; outline: none;">${text}</div>
+        ` : `<div contenteditable="true" style="outline:none;">${text}</div>`;
+
+        return `
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 2px; width: 100%;">
+                <div style="flex-shrink: 0; ${boxStyle}">${leftContent}</div>
+                <div onclick="this.querySelector('input').click()" style="flex: 1; height: 62px; border: 1.2px solid #000; background: #fff; position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; background-size: contain; background-repeat: no-repeat; background-position: center;">
+                    <span style="font-size: 8px; color: #cbd5e1; font-weight: 800;">PHOTO AREA</span>
+                    <input type="file" accept="image/*" style="display:none" onchange="const reader = new FileReader(); reader.onload=(e)=>{this.parentElement.style.backgroundImage='url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none';}; reader.readAsDataURL(this.files[0]);">
+                </div>
+            </div>`;
+    };
+
+    const createArrow = () => `
+        <div style="width: 190px; height: 8px; display: flex; justify-content: center; margin: -2px 0;">
+            <svg width="10" height="10" viewBox="0 0 20 20"><line x1="10" y1="0" x2="10" y2="14" stroke="#000" stroke-width="2.5"/><polygon points="10,20 6,12 14,12" fill="#000"/></svg>
+        </div>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- HEADER -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
+                <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1.5px; outline: none; line-height: 1;">
+                    D4-Identify Root cause and Escape cause
+                </h1>
+                <div style="background: blue; color: white; padding: 2px 12px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px;">
+                    &lt;Fill by Supplier&gt;
+                </div>
+            </div>
+            <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 10px; flex-shrink: 0;"></div>
+
+            <!-- TITLE -->
+            <div style="margin-bottom: 8px; flex-shrink: 0;">
+                <span contenteditable="true" style="font-size: 18px; font-weight: 800; text-decoration: underline; outline: none;">Process Flow</span>
+                <span style="color: #f59e0b; font-size: 10px; font-weight: 800; float: right; margin-right: 30px;">Please fill photo</span>
+            </div>
+
+            <!-- MAIN CHART AREA (ขยับลงมาด้านล่างเล็กน้อยด้วย padding-top) -->
+            <div style="display: flex; gap: 0px; flex: 1; min-height: 0; position: relative; align-items: flex-start; justify-content: space-between; padding-top: 15px;">
+                
+                <!-- COLUMN LEFT (5 STEPS) -->
+                <div style="width: 390px; display: flex; flex-direction: column;">
+                    ${createFlowRow("DRAW")}
+                    ${createArrow()}
+                    ${createFlowRow("BEND 1")}
+                    ${createArrow()}
+                    ${createFlowRow("PIER+BURR", true)}
+                    ${createArrow()}
+                    ${createFlowRow("BEND 2")}
+                    ${createArrow()}
+                    ${createFlowRow("INSPECTION IN-PROCESS", false, true)}
+                </div>
+
+                <!-- ✅ CONNECTOR SVG: เส้นลากจากมุมล่างของข้าวหลามตัดซ้ายมือ ไปชี้ที่มุมซ้ายของข้าวหลามตัดฝั่งขวา -->
+                <div style="width: 60px; height: 100%; position: relative; flex-shrink: 0;">
+                    <svg width="60" height="380" style="position: absolute; top: 0; left: 0; overflow: visible;">
+                        <!-- เส้นเชื่อม: ลากออกจากมุมล่างของข้าวหลามตัดซ้าย (-295,326) -> ลงมา (345) -> หักขวา (30) -> ขึ้นไป (31) -> เข้ามุมซ้ายของข้าวหลามตัดขวา (63,31) -->
+                        <path d="M -295,326 L -295,345 L 30,345 L 30,31 L 63,31" fill="none" stroke="#000" stroke-width="2.5" />
+                        <!-- หัวลูกศรชี้เข้ามุมซ้ายของข้าวหลามตัดฝั่งขวา -->
+                        <polygon points="63,31 53,25 53,37" fill="#000" />
+                    </svg>
+                </div>
+
+                <!-- COLUMN RIGHT (3 STEPS) -->
+                <div style="width: 390px; display: flex; flex-direction: column;">
+                    ${createFlowRow("INSPECTION OUT-GOING CHECK", false, true)}
+                    ${createArrow()}
+                    ${createFlowRow("PACKING")}
+                    ${createArrow()}
+                    ${createFlowRow("SHIPMENT")}
+                </div>
+
+            </div>
+        </div>
+    `;
+}
+// ==========================================
+// แผ่นที่ 7: D4-Identify Root cause and Escape cause
+// ปรับขนาดให้พอดีหน้าจอ และรักษาเส้นแบ่งมาตรฐานเดียวกับหน้าอื่น
+// ==========================================
+else if (_currentSlide === 6) {
+    const whyRow = (label, content = "") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
+            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
+                ${label}
+            </div>
+            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
+                ${content}
+            </div>
+        </div>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- Header Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
+                        D4-Identify Root cause and Escape cause
+                    </h1>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
+                        &lt;Fill by Supplier&gt;
+                    </div>
+                </div>
+                
+                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น (Standard Blue Divider) -->
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+                
+                <!-- Sub-Header Area -->
+                <div style="margin-bottom: 6px; flex-shrink: 0;">
+                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; text-decoration: underline; outline: none;">ROOT CAUSE ANALYSIS</span>
+                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why problem happen ?)</span>
+                </div>
+
+                <!-- Table Content -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <!-- Question Header -->
+                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
+                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
+                            1
+                        </div>
+                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
+                            Why was the non conformity made?
+                        </div>
+                    </div>
+
+                    <!-- Why Rows -->
+                    <div>
+                        ${whyRow('Why1')}
+                        ${whyRow('Why2')}
+                        ${whyRow('Why3')}
+                        ${whyRow('Why4')}
+                        ${whyRow('Why5')}
+                    </div>
+                </div>
+
+                <!-- Instruction Box -->
+                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
+                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                </div>
+        </div>
+    `;
+}
+
+// ==========================================
+// แผ่นที่ 8: D4-Identify Escape cause (ESCAPE CAUSE ANALYSIS)
+// ==========================================
+else if (_currentSlide === 7) {
+    const whyRow = (label, content = "") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
+            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
+                ${label}
+            </div>
+            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
+                ${content}
+            </div>
+        </div>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- 1. Header Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
+                        D4-Identify Root cause and Escape cause
+                    </h1>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
+                        &lt;Fill by Supplier&gt;
+                    </div>
+                </div>
+                
+                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น -->
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+                
+                <!-- 2. Sub-Header Area (ESCAPE CAUSE) -->
+                <div style="margin-bottom: 6px; flex-shrink: 0;">
+                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; text-decoration: underline; outline: none; text-transform: uppercase;">ESCAPE CAUSE ANALYSIS</span>
+                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why not detected ?)</span>
+                </div>
+
+                <!-- 3. Table Content -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <!-- Question Header -->
+                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
+                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
+                            1
+                        </div>
+                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
+                            Why was the non conformity could not detect ?
+                        </div>
+                    </div>
+
+                    <!-- Why Rows -->
+                    <div>
+                        ${whyRow('Why1')}
+                        ${whyRow('Why2')}
+                        ${whyRow('Why3')}
+                        ${whyRow('Why4')}
+                        ${whyRow('Why5')}
+                    </div>
+                </div>
+
+                <!-- 4. Instruction Box -->
+                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
+                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                </div>
+        </div>
+    `;
+}
+
+// ==========================================
+// แผ่นที่ 9: D4-Identify System cause (SYSTEM CAUSE ANALYSIS)
+// ==========================================
+else if (_currentSlide === 8) {
+    const whyRow = (label, content = "") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
+            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
+                ${label}
+            </div>
+            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
+                ${content}
+            </div>
+        </div>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- 1. Header Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
+                        D4-Identify Root cause and Escape cause
+                    </h1>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
+                        &lt;Fill by Supplier&gt;
+                    </div>
+                </div>
+                
+                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น -->
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+                
+                <!-- 2. Sub-Header Area (SYSTEM CAUSE) -->
+                <div style="margin-bottom: 6px; flex-shrink: 0;">
+                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; text-decoration: underline; outline: none; text-transform: uppercase;">SYSTEM CAUSE ANALYSIS</span>
+                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why system failed ?)</span>
+                </div>
+
+                <!-- 3. Table Content -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <!-- Question Header -->
+                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
+                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
+                            1
+                        </div>
+                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
+                            Why was the process & system failed ?
+                        </div>
+                    </div>
+
+                    <!-- Why Rows -->
+                    <div>
+                        ${whyRow('Why1')}
+                        ${whyRow('Why2')}
+                        ${whyRow('Why3')}
+                        ${whyRow('Why4')}
+                        ${whyRow('Why5')}
+                    </div>
+                </div>
+
+                <!-- 4. Instruction Box -->
+                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
+                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                </div>
+        </div>
+    `;
+}
+
+// ==========================================
+// แผ่นที่ 10: D5-Developing permanent corrective action
+// ==========================================
+else if (_currentSlide === 9) {
+    const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
+            
+            <!-- Improvement Detail: Photo & File Attachment -->
+            <div style="width: 220px; border-right: 1.2px solid #000; padding: 3px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;">
+                <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
+                    <span style="font-size: 8px; color: #999;">Add Photo</span>
+                    <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
+                </div>
+                <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; border-top: 1px solid #eee; padding-top: 2px; width: 95%; justify-content: center;">
+                    <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px;">
+                    <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${improvementText}</span>
+                    <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
+                </div>
+            </div>
+
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
+        </div>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- 1. Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                        D5-Developing permanent corrective action
+                    </h1>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                        &lt;Fill by Supplier&gt;
+                    </div>
+                </div>
+                
+                <!-- เส้นแถบสีน้ำเงิน (Divider) -->
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+                
+                <!-- 2. Sub-Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
+                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">ROOT CAUSE ACTION</div>
+                    <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
+                </div>
+
+                <!-- 3. Table Structure -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
+                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
+                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
+                    </div>
+
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                </div>
+
+                <!-- 4. Instruction Box -->
+                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
+                    <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List corrective actions to permanently eliminate root cause.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE ACTIONS:</span> List corrective actions that eliminate escape root cause.</div>
+                </div>
+        </div>
+    `;
+}
+
+
+// ==========================================
+// แผ่นที่ 11: D5-Developing permanent corrective action (ESCAPE CAUSE ACTION)
+// ==========================================
+else if (_currentSlide === 10) {
+    const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
+            
+            <!-- Improvement Detail Column: Photo & File Attachment -->
+            <div style="width: 220px; border-right: 1.2px solid #000; padding: 3px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;">
+                <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
+                    <span style="font-size: 8px; color: #999;">Add Photo</span>
+                    <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
+                </div>
+                <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; border-top: 1px solid #eee; padding-top: 2px; width: 95%; justify-content: center;">
+                    <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px;">
+                    <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${improvementText}</span>
+                    <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
+                </div>
+            </div>
+
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
+        </div>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- 1. Header (Standard Style) -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                        D5-Developing permanent corrective action
+                    </h1>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                        &lt;Fill by Supplier&gt;
+                    </div>
+                </div>
+                
+                <!-- เส้นแถบสีน้ำเงิน (Divider) -->
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+                
+                <!-- 2. Sub-Header (เปลี่ยนเป็น ESCAPE CAUSE ACTION) -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
+                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">ESCAPE CAUSE ACTION</div>
+                    <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
+                </div>
+
+                <!-- 3. Table Structure -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
+                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
+                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
+                    </div>
+
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                </div>
+
+                <!-- 4. Instruction Box -->
+                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0; cursor: text;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
+                    <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List chosen corrective actions necessary to permanently eliminate root cause.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE ACTIONS:</span> List chosen corrective actions that eliminate escape root cause.</div>
+                </div>
+        </div>
+    `;
+}
+
+
+// ==========================================
+// แผ่นที่ 12: D5-Developing permanent corrective action (SYSTEM CAUSE ACTION)
+// ==========================================
+else if (_currentSlide === 11) {
+    const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
+            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
+            
+            <!-- Improvement Detail Column: Photo & File Attachment -->
+            <div style="width: 220px; border-right: 1.2px solid #000; padding: 3px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;">
+                <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative;">
+                    <span style="font-size: 8px; color: #999;">Add Photo</span>
+                    <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
+                </div>
+                <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; border-top: 1px solid #eee; padding-top: 2px; width: 95%; justify-content: center;">
+                    <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px;">
+                    <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${improvementText}</span>
+                    <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
+                </div>
+            </div>
+
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
+            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
+        </div>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- 1. Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                        D5-Developing permanent corrective action
+                    </h1>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                        &lt;Fill by Supplier&gt;
+                    </div>
+                </div>
+                
+                <!-- เส้นแถบสีน้ำเงิน (Divider) -->
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+                
+                <!-- 2. Sub-Header (เปลี่ยนเป็น SYSTEM CAUSE ACTION) -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
+                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">SYSTEM CAUSE ACTION</div>
+                    <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
+                </div>
+
+                <!-- 3. Table Structure (4 แถวตามภาพ) -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
+                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
+                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
+                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
+                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
+                    </div>
+
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                    ${createD5Row()}
+                </div>
+
+                <!-- 4. Instruction Box -->
+                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0; cursor: text;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
+                    <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List chosen corrective actions necessary to permanently eliminate root cause.</div>
+                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE ACTIONS:</span> List chosen corrective actions that eliminate escape root cause.</div>
+                </div>
+        </div>
+    `;
+}
+
+// ==========================================
+// แผ่นที่ 13: D6-Implement permanent corrective action
+// ==========================================
+else if (_currentSlide === 12) {
+    const createD6Row = (action = "", date = "", before = "", after = "", method = "", pic = "") => `
+        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 58px;">
+            <div contenteditable="true" style="width: 250px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2; display: flex; align-items: center;">${action}</div>
+            <div contenteditable="true" style="width: 100px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; text-align: center; display: flex; align-items: center; justify-content: center;">${date}</div>
+            <div contenteditable="true" style="width: 100px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; text-align: center; display: flex; align-items: center; justify-content: center;">${before}</div>
+            <div contenteditable="true" style="width: 100px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; text-align: center; display: flex; align-items: center; justify-content: center;">${after}</div>
+            <div contenteditable="true" style="width: 180px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; text-align: center; display: flex; align-items: center; justify-content: center;">${method}</div>
+            <div contenteditable="true" style="width: 80px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; text-align: center; display: flex; align-items: center; justify-content: center;">${pic}</div>
+            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none; text-align: center; display: flex; align-items: center; justify-content: center;"></div>
+        </div>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- 1. Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                        D6-Implement permanent corrective action
+                    </h1>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                        &lt;Fill by Supplier&gt;
+                    </div>
+                </div>
+                
+                <!-- เส้นแถบสีน้ำเงิน (Divider) -->
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
+
+                <!-- 2. Table Headers -->
+                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
+                    <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 38px; background: #b4c7e7; font-weight: bold; font-size: 11.5px; text-align: center;">
+                        <div style="width: 250px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center;">Corrective action</div>
+                        <div style="width: 100px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center;">Implement date</div>
+                        <div style="width: 100px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center;">Defect ratio<br>(Before action)</div>
+                        <div style="width: 100px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center;">Defect ratio<br>(After action)</div>
+                        <div style="width: 180px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center;">Verification method</div>
+                        <div style="width: 80px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center;">Person in charge</div>
+                        <div style="flex: 1; display: flex; align-items: center; justify-content: center;">Verify date</div>
+                    </div>
+
+                    <!-- 3. Table Rows -->
+                    ${createD6Row()}
+                    ${createD6Row()}
+                    ${createD6Row()}
+                    ${createD6Row()}
+                    ${createD6Row()}
+                </div>
+
+                <!-- 4. Instruction Box -->
+                <div contenteditable="true" style="margin-top: 8px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">6D - Implement Permanent Corrective Actions</div>
+                    <div style="color: #000;">Create a clear action plan to solve the problem by stating WHO will do WHAT and by WHEN. How to verify the corrective actions with before and after result.</div>
+                </div>
+        </div>
+    `;
+}
+
+// ==========================================
+// แผ่นที่ 14: D7-Preventive Recurrence
+// ==========================================
+else if (_currentSlide === 13) {
+    const createConsiderRow = (no, text, updated = "N") => `
+        <tr style="height: 20px;">
+            <td style="border: 1px solid #000; padding-left: 8px; font-size: 10px; font-weight: 500; background:#fff;">${no}. ${text}</td>
+            <td contenteditable="true" style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 10.5px; outline: none; background:#fff;">${updated}</td>
+            <td contenteditable="true" style="border: 1px solid #000; outline: none; background:#fff;"></td>
+            <td contenteditable="true" style="border: 1px solid #000; outline: none; background:#fff;"></td>
+            <td contenteditable="true" style="border: 1px solid #000; outline: none; background:#fff;"></td>
+        </tr>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- 1. Header (ชิดบน) -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 38px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                        D7-Preventive Recurrence
+                    </h1>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                        &lt;Fill by Supplier&gt;
+                    </div>
+                </div>
+                
+                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
+
+                <!-- 2. Top Split Section (How to avoid) -->
+                <div style="display: flex; gap: 0; border: 1.2px solid #000; margin-bottom: 6px; flex-shrink: 0;">
+                    <div style="flex: 1.2; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
+                        <div style="background: #b4c7e7; padding: 3px 8px; border-bottom: 1.2px solid #000; font-weight: 800; font-size: 10.5px;">
+                            How to avoid recurrence this problem in the future ?
+                        </div>
+                        <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 9.5px; line-height: 1.25; outline: none; background: #fff; min-height: 70px;">
+                            -Add rack packing std.<br>
+                            -Rev.WI-SP01-01 to prohibit use of temporary racks...<br>
+                            -Provide training WI-SP01-01 to the Production...<br>
+                            -Rev. WI-QC03-01 to prohibit use of temporary racks...<br>
+                            -Provide training WI-QC03-01 to the ipqc and oqc...
+                        </div>
+                    </div>
+                    <div style="flex: 1; display: flex; flex-direction: column;">
+                        <div style="background: #b4c7e7; padding: 3px 8px; border-bottom: 1.2px solid #000; font-weight: 800; font-size: 10px;">
+                            Risk part has similar structure/process and Action plan.
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; flex: 1; font-size: 10px; text-align: center;">
+                            <tr style="background: #d9e1f2; font-weight: bold; height: 20px;">
+                                <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; width: 20%;">TTL Q'ty</td>
+                                <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; width: 40%;">Action</td>
+                                <td style="border-bottom: 1px solid #000;">Plan</td>
+                            </tr>
+                            <tr style="height: 50px;">
+                                <td contenteditable="true" style="border-right: 1px solid #000; outline: none;"></td>
+                                <td contenteditable="true" style="border-right: 1px solid #000; outline: none;"></td>
+                                <td contenteditable="true" style="outline: none;"></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 3. Document Header -->
+                <div style="font-weight: 900; font-size: 12px; margin-bottom: 3px; color: #000; flex-shrink: 0;">
+                    Has the necessary document been revised/ updated ?
+                </div>
+
+                <!-- 4. Consideration Table -->
+                <table style="width: 100%; border-collapse: collapse; border: 1.2px solid #000; table-layout: fixed; font-size: 10px;">
+                    <thead style="background: #b4c7e7; font-weight: bold; text-align: center; height: 22px;">
+                        <tr>
+                            <td style="border: 1px solid #000; width: 35%;">Consider</td>
+                            <td style="border: 1px solid #000; width: 10%;">Updated?<br>(Y/N)</td>
+                            <td style="border: 1px solid #000; width: 30%;">Details</td>
+                            <td style="border: 1px solid #000; width: 15%;">Document no.</td>
+                            <td style="border: 1px solid #000; width: 10%;">Due date</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${createConsiderRow(1, 'Part Drawing / Specification', 'N')}
+                        ${createConsiderRow(2, 'Work Instruction', 'Y')}
+                        ${createConsiderRow(3, 'Inspection instruction / Q-Point', 'N')}
+                        ${createConsiderRow(4, 'Inspection check sheet', 'N')}
+                        ${createConsiderRow(5, 'Process Flow Chart / Control Plan', 'N')}
+                        ${createConsiderRow(6, 'P-FMEA', 'N')}
+                        ${createConsiderRow(7, 'Machine Parameter', 'N')}
+                        ${createConsiderRow(8, 'Supplier Process Characteristics', 'N')}
+                        ${createConsiderRow(9, 'PM Plan / Detail', 'N')}
+                        ${createConsiderRow(10, 'Others document', 'Y')}
+                    </tbody>
+                </table>
+
+                <!-- 5. Instruction Box -->
+                <div contenteditable="true" style="margin-top: 6px; padding: 5px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.25; outline: none; cursor: text; flex-shrink: 0;">
+                    <div style="color: red; font-weight: bold; font-style: italic;">7D - Prevent Recurrence</div>
+                    <div style="color: #000;">Ensure the problem does not happen again ANYWHERE by using Foolproof, POKAYOKE etc. Communicate your results to all areas including similar part. Submit revised all related documents to us to review. (if have)</div>
+                </div>
+        </div>
+    `;
+}
+
+// ==========================================
+// แผ่นที่ 15: D8-Team and Individual Recognition
+// ==========================================
+else if (_currentSlide === 14) {
+    const createTeamRow = (no = "", name = "", dept = "") => `
+        <tr style="height: 24px;">
+            <td contenteditable="true" style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 11px; outline: none; background:#fff; width: 50px;">${no}</td>
+            <td contenteditable="true" style="border: 1px solid #000; padding-left: 15px; font-size: 11px; font-weight: 700; outline: none; background:#fff;">${name}</td>
+            <td contenteditable="true" style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: 700; outline: none; background:#fff; width: 150px;">${dept}</td>
+        </tr>`;
+
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+                
+                <!-- Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
+                    <h1 contenteditable="true" style="font-size: 28px; font-weight: 800; margin: 0; color: #000; outline: none;">D8-Team and Individual Recognition</h1>
+                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">&lt;Fill by Supplier&gt;</div>
+                </div>
+                <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
+
+                <!-- Team Table -->
+                <div style="width: 100%; display: flex; justify-content: center; margin-bottom: 10px; flex-shrink: 0;">
+                    <table style="width: 80%; border-collapse: collapse; border: 1.5px solid #000;">
+                        <thead style="background: #b4c7e7; font-weight: 900; text-align: center;">
+                            <tr style="height: 28px;"><td colspan="3" style="border: 1px solid #000; font-size: 13px;">Team Members</td></tr>
+                            <tr style="height: 22px; background: #d9e1f2; font-size: 11px;">
+                                <td style="border: 1px solid #000; width: 50px;">No.</td>
+                                <td style="border: 1px solid #000;">Name</td>
+                                <td style="border: 1px solid #000; width: 150px;">Dept.</td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${createTeamRow()}
+                            ${createTeamRow()}
+                            ${createTeamRow()}
+                            ${createTeamRow()}${createTeamRow()}${createTeamRow()}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Thank You Text -->
+                <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
+                    <div contenteditable="true" style="font-size: 32px; font-weight: 900; color: #1e293b; text-align: center; outline: none;">“Thank you for all cooperation”</div>
+                </div>
+
+                <!-- Instruction Box -->
+                <div contenteditable="true" style="padding: 8px 12px; background: #fffde7; border: 2px solid #fbc02d; border-radius: 8px; font-size: 10px; outline: none; flex-shrink: 0;">
+                    <div style="color: #d32f2f; font-weight: 900; font-style: italic;">8D – Team and Individual Recognition</div>
+                    <div style="color: #333;">8D process is the time to recognize the team efforts and special team member contributions.</div>
+                </div>
+        </div>`;
+}
+
+// ==========================================
+// แผ่นที่ 16: หน้าจบ (THANK YOU)
+// ==========================================
+else if (_currentSlide === 15) {
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+            
+            <!-- 1. Top Thick Divider -->
+            <div style="width: 100%; height: 8px; background: #003366; margin-top: 30px; margin-bottom: 20px; flex-shrink: 0;"></div>
+
+            <!-- 2. Main Message -->
+            <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
+                <div contenteditable="true" style="font-size: 80px; font-weight: 950; color: #003366; text-align: center; letter-spacing: -3px; outline: none; text-transform: uppercase; line-height: 1;">
+                    Thank you.
+                </div>
+            </div>
+
+        </div>
+    `;
+}
+        container.innerHTML = mainContent + getFooter();
+        fitSlideToContainer();
+    }
+
+    function fitSlideToContainer() {
+        const container = document.getElementById('eight-d-presentation-container');
+        const wrapper = document.getElementById('eight-d-slide-wrapper');
+        const slide = document.getElementById('eight-d-slide-content');
+        if (!container || !wrapper || !slide) return;
+
+        const availW = Math.max(100, container.clientWidth - 32);
+        const availH = Math.max(100, container.clientHeight - 32);
+
+        const baseW = 960;
+        const baseH = 600;
+
+        const scaleX = availW / baseW;
+        const scaleY = availH / baseH;
+        const scale = Math.min(scaleX, scaleY);
+
+        wrapper.style.width = `${Math.round(baseW * scale)}px`;
+        wrapper.style.height = `${Math.round(baseH * scale)}px`;
+
+        slide.style.width = `${baseW}px`;
+        slide.style.height = `${baseH}px`;
+        slide.style.transform = `scale(${scale})`;
+        slide.style.transformOrigin = 'top left';
+    }
+
+
+
+    function getFooter() {
+        return `
+            <div style="flex-shrink: 0; height: 32px; border-top: 1.5px solid #003366; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; padding-top: 4px; margin-top: auto; font-family: system-ui, sans-serif;">
+                <div style="width: 100px; height: 26px; flex-shrink: 0; display: flex; align-items: center;">
+                    <svg viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg" style="width:85px; height:24px; display:block;">
+                        <ellipse cx="100" cy="40" rx="95" ry="38" fill="#003366" />
+                        <ellipse cx="100" cy="40" rx="88" ry="33" fill="none" stroke="white" stroke-width="1.5" />
+                        <text x="50%" y="58" text-anchor="middle" font-family="Times New Roman, serif" font-style="italic" font-weight="bold" font-size="44" fill="white">Carrier</text>
+                    </svg>
+                </div>
+                <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; text-align: center; flex: 1;">
+                    Proprietary and Confidential
+                </div>
+                <div style="font-size: 11px; font-weight: 800; color: #003366; min-width: 60px; text-align: right; flex-shrink: 0;">
+                    PAGE ${_currentSlide + 1} / 16
+                </div>
+            </div>
+        `;
+    }
+
+// --- บรรทัดสุดท้ายของโมดูล Wap8DSystem ---
+return { 
+    init, createNewCase, openReport, nextSlide, prevSlide, openHistoryPicker, pickRecord, deleteCase, exportToPPTX, filterByStat, setReportType,
+    showDashboard: () => {
+        saveCurrentProgress();
+        document.getElementById('eight-d-dashboard').classList.remove('hidden');
+        document.getElementById('eight-d-report-view').classList.add('hidden');
+    }
+};
+})();
 /* ============================================================
    EXPOSE ALL TOP-LEVEL FUNCTIONS AND MODULES TO WINDOW SCOPE
    (Required for inline HTML handlers in type="module")
@@ -13474,8 +15710,15 @@ if (typeof window !== 'undefined') {
         checkChangelog, closeUpdateModal, showPasswordResetUI, handlePasswordResetSubmit,
         openPersonalSettings, resetProfileToDefault, handleAvatarPreview, savePersonalProfile,
         
+        // --- ระบบ WAP Modules ---
         WapSupportLogs, Wap5SExcellence, WapSkillMatrix, WapOTManagement, WapSpecialJobs, WapAdminSystem,
-        updateAllModuleFilters, showPartAC, selectPartAC, calcNG
+        
+        // --- [เพิ่มส่วน 8D System ตรงนี้] ---
+        Wap8DSystem, 
+        openHistoryPicker: Wap8DSystem.openHistoryPicker, 
+        pickRecord: Wap8DSystem.pickRecord,
+
+        updateAllModuleFilters, showPartAC, selectPartAC, calcNG,
     });
 }
 // เพิ่มตัวแปรสำหรับ Analytics Charts
@@ -13655,6 +15898,8 @@ function simulateTrafficSpike() {
         }, 2000);
     }
 }
+
+
 
 // --- ส่วนเชื่อมต่อฟังก์ชันจากภายในสคริปต์ ออกไปให้ปุ่มใน HTML ใช้งานได้ ---
 

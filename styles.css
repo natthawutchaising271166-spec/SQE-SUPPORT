@@ -1265,7 +1265,7 @@
     line-height: 1.1;
 }
 
-.exec-card-premium p.text-[10px] {
+.exec-card-premium p[class*="text-[10px]"] {
     font-size: clamp(8px, 0.6vw, 10px) !important;
 }
 
@@ -5763,10 +5763,10 @@ body.dark-mode .dial-glass-overlay {
 body.dark-mode .card-base .border-t {
     border-top-color: #1e293b !important;
 }
-body.dark-mode .card-base p.text-[8px] {
+body.dark-mode .card-base p[class*="text-[8px]"] {
     color: #64748b !important; /* หัวข้อ Target */
 }
-body.dark-mode .card-base p.text-[11px], 
+body.dark-mode .card-base p[class*="text-[11px]"], 
 body.dark-mode #yield-status-text {
     color: #ffffff !important; /* ตัวเลข 95.0% ด้านล่าง */
 }
@@ -9185,7 +9185,7 @@ body.dark-mode .dock-item:hover .dock-label {
 }
 
 /* แถบ Progress Bar */
-.line-card .h-1.5 {
+.line-card [class*="h-1.5"] {
     height: 6px !important;
     background-color: #f1f5f9; /* สีพื้นหลังแถบ */
     border-radius: 10px;
@@ -13163,14 +13163,14 @@ header {
 }
 
 /* เอฟเฟกต์ Glass บนแถบพลัง */
-.h-2.5.w-full > div {
+[class*="h-2.5"].w-full > div {
     height: 100%;
     transition: width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
 }
 
 /* เพิ่มแสงเงาให้แถบดูเป็น 3D */
-.h-2.5.w-full > div::after {
+[class*="h-2.5"].w-full > div::after {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 50%;
