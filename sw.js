@@ -1,5 +1,5 @@
 // อัปเดตเวอร์ชันแคชใหม่เพื่อบังคับให้ทุกเครื่องดึงสคริปต์ล่าสุด
-const CACHE_NAME = 'sqe-portal-v1.0.0'; 
+const CACHE_NAME = 'sqe-portal-v2.1'; 
 
 const urlsToCache = [
   './',
