@@ -3550,10 +3550,9 @@ const defectDict = {
 document.addEventListener('contextmenu', e => e.preventDefault());
 const $id = id => document.getElementById(id);
 
-// เพิ่มฟังก์ชันนี้ไว้ใน Global Scope
 function hasWriteAccess() {
     if (S.userRole === 'supervisor') {
-        toast('⚠️ โหมดหัวหน้างาน: อ่านข้อมูลได้อย่างเดียวไม่สามารถแก้ไขได้', 'error');
+        toast('⚠️ โหมดหัวหน้างาน: อ่านข้อมูลได้อย่างเดียวไม่สามารถแก้ไขได้', 'error'); 
         return false;
     }
     return true;
@@ -13919,13 +13918,14 @@ async function savePersonalProfile() {
 }
 
 const canvas = document.getElementById('starfield');
-const ctx = canvas.getContext('2d');
+const ctx = canvas ? canvas.getContext('2d') : null;
 
 let stars = [];
 const numStars = 200;
 const speed = 2;
 
 function initStars() {
+    if (!canvas || !ctx) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     stars = [];
@@ -13940,32 +13940,37 @@ function initStars() {
 }
 
 function updateStars() {
-    ctx.fillStyle = '#020617';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!canvas || !ctx) return;
+    try {
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
 
-    for (let i = 0; i < numStars; i++) {
-        let s = stars[i];
-        s.z -= speed;
+        for (let i = 0; i < numStars; i++) {
+            let s = stars[i];
+            s.z -= speed;
 
-        if (s.z <= 0) {
-            s.z = canvas.width;
-            s.x = Math.random() * canvas.width - canvas.width / 2;
-            s.y = Math.random() * canvas.height - canvas.height / 2;
+            if (s.z <= 0) {
+                s.z = canvas.width;
+                s.x = Math.random() * canvas.width - canvas.width / 2;
+                s.y = Math.random() * canvas.height - canvas.height / 2;
+            }
+
+            const x = s.x * (canvas.width / s.z);
+            const y = s.y * (canvas.width / s.z);
+            const r = 1.5 * (canvas.width / s.z);
+
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(0, 242, 255, ${1 - s.z / canvas.width})`;
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
         }
-
-        const x = s.x * (canvas.width / s.z);
-        const y = s.y * (canvas.width / s.z);
-        const r = 1.5 * (canvas.width / s.z);
-
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(0, 242, 255, ${1 - s.z / canvas.width})`;
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.restore();
+    } catch (e) {
+        console.warn("Starfield render skipped due to context issue:", e);
     }
-    ctx.restore();
     requestAnimationFrame(updateStars);
 }
 
@@ -13986,6 +13991,36 @@ function getCleanProblemTitle(title) {
     return str;
 }
 
+function getDetailSentenceParts(c) {
+    if (!c) return { dateStr: "-", groupStr: "-", defectStr: "-" };
+    const rawTitle = c.problem_title || "-";
+    const cleanTitle = getCleanProblemTitle(rawTitle);
+    const createDate = new Date(c.created_at || Date.now()).toLocaleDateString('en-GB', {
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric'
+    });
+    const groupStr = c.part_group || c.part_name || "Steel";
+
+    if (/inform quality problem/i.test(cleanTitle)) {
+        let dateStr = createDate;
+        let pGroup = groupStr;
+        let defectStr = cleanTitle;
+
+        const dateMatch = cleanTitle.match(/^On\s+(.*?)\s+inform quality problem/i);
+        if (dateMatch) dateStr = dateMatch[1].trim();
+
+        const grpMatch = cleanTitle.match(/about\s+(.*?)\s+found defect/i);
+        if (grpMatch) pGroup = grpMatch[1].trim();
+
+        const defectMatch = cleanTitle.match(/found defect\s+(.*)$/i);
+        if (defectMatch) defectStr = defectMatch[1].trim();
+
+        return { dateStr, groupStr: pGroup, defectStr };
+    }
+    return { dateStr: createDate, groupStr: groupStr, defectStr: cleanTitle };
+}
+
 function formatDetailSentence(c) {
     if (!c) return "";
     const rawTitle = c.problem_title || "-";
@@ -13995,7 +14030,7 @@ function formatDetailSentence(c) {
         month: 'short', 
         year: 'numeric'
     });
-    const partName = c.part_name || "-";
+    const partName = c.part_group || c.part_name || "Steel";
 
     if (/inform quality problem/i.test(cleanTitle)) {
         let formatted = cleanTitle;
@@ -14038,19 +14073,32 @@ const Wap8DSystem = (function() {
         }
     }
 
-    async function fetchCases() {
-        try {
-            const { data, error } = await sqeClient
-                .from(TABLE)
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            _cases = data || [];
-            S.eightDCases = _cases;
-            invalidate8DCaseMap();
-            return _cases;
-        } catch (e) { console.error("8D Fetch Error:", e); return []; }
+    // ค้นหาฟังก์ชัน fetchCases ภายใน Wap8DSystem แล้วเปลี่ยนเป็นโค้ดนี้:
+async function fetchCases() {
+    // 1. กำหนดเป้าหมาย: ถ้าเป็นพนักงานให้ดูตัวเอง ถ้าเป็นหัวหน้าให้ดูคนที่เลือก (S.viewingUser)
+    const targetUser = (S.userRole === 'supervisor') ? S.viewingUser : S.currentUser;
+    
+    if (!targetUser) return [];
+
+    try {
+        // 2. เพิ่ม .eq('user_id', targetUser) เพื่อกรองเฉพาะเจ้าของงาน
+        const { data, error } = await sqeClient
+            .from(TABLE)
+            .select('*')
+            .eq('user_id', targetUser) // <--- บรรทัดสำคัญที่เพิ่มเข้าไป
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        _cases = data || [];
+        S.eightDCases = _cases;
+        invalidate8DCaseMap();
+        return _cases;
+    } catch (e) { 
+        console.error("8D Fetch Error:", e); 
+        return []; 
     }
+}
 
     // 2. ฟังก์ชันดูดข้อมูลจากช่อง ContentEditable
     function _collectDataFromUI() {
@@ -14091,9 +14139,17 @@ const Wap8DSystem = (function() {
 
         requestAnimationFrame(() => {
             const editables = document.querySelectorAll('#eight-d-slide-content [contenteditable="true"]');
+            const blacklist = ["D1-", "Assign person in charge", "Fill by CTC", "Supplier name member", "TCTC member", "Fill by Supplier", "Person1", "Person2", "Person3", "Person4", "Person5", "Person6"];
             editables.forEach((el, index) => {
                 if (savedData[`f_${index}`] !== undefined) {
-                    el.innerHTML = savedData[`f_${index}`];
+                    let val = savedData[`f_${index}`];
+                    if (_currentSlide === 1) {
+                        const cleanText = (val || "").replace(/<[^>]*>?/gm, '').trim();
+                        if (blacklist.some(b => cleanText.toLowerCase().includes(b.toLowerCase()))) {
+                            val = "";
+                        }
+                    }
+                    el.innerHTML = val;
                 }
             });
         });
@@ -14296,14 +14352,24 @@ async function _pptSvgToDataUrl(svgElement) {
         return new Promise((resolve) => {
             const img = new Image();
             img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const rect = svgElement.getBoundingClientRect();
-                canvas.width = Math.max(20, (rect.width || 100) * 2);
-                canvas.height = Math.max(20, (rect.height || 100) * 2);
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                try {
+                    const canvas = document.createElement('canvas');
+                    const rect = svgElement.getBoundingClientRect();
+                    canvas.width = Math.max(20, (rect.width || 100) * 2);
+                    canvas.height = Math.max(20, (rect.height || 100) * 2);
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const dataUrl = canvas.toDataURL('image/png');
+                        URL.revokeObjectURL(blobURL);
+                        resolve(dataUrl);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn("SVG canvas render fallback:", e);
+                }
                 URL.revokeObjectURL(blobURL);
-                resolve(canvas.toDataURL('image/png'));
+                resolve(null);
             };
             img.onerror = () => {
                 URL.revokeObjectURL(blobURL);
@@ -14314,412 +14380,1420 @@ async function _pptSvgToDataUrl(svgElement) {
     } catch (e) { return null; }
 }
 
-// ✅ ฟังก์ชันส่งออกรายงานเป็น PowerPoint (.pptx) ที่สร้างเป็น Native Objects 100% (Tables, Shapes, Textboxes, Images) แก้ไขได้ทุกจุด
+// ==========================================
+// 🛡️ PPTX EXPORT HELPERS (Fixed Version)
+// ==========================================
+const forceBase64Header = (str) => {
+    if (!str || typeof str !== 'string' || str.length < 50) return null;
+    let cleanStr = str.trim().replace(/\s/g, ''); 
+    if (cleanStr.startsWith('data:image')) return cleanStr;
+    return 'data:image/png;base64,' + cleanStr;
+};
+
+const addStandardFooter = (pptx, slide, slideNum) => {
+    try {
+        slide.addShape(pptx.ShapeType.ellipse, { x: 0.35, y: 6.85, w: 1.3, h: 0.5, fill: { color: '003366' } });
+        slide.addShape(pptx.ShapeType.ellipse, { x: 0.38, y: 6.88, w: 1.24, h: 0.44, line: { color: 'FFFFFF', width: 1.0 } });
+        slide.addText("Carrier", { x: 0.35, y: 6.85, w: 1.3, h: 0.5, fontSize: 18, fontFace: 'Times New Roman', fontItalic: true, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
+        slide.addText("PROPRIETARY AND CONFIDENTIAL", { x: 0, y: 7.05, w: 13.33, h: 0.3, fontSize: 10, color: '999999', align: 'center' });
+        slide.addText(`${slideNum}`, { x: 12.8, y: 6.85, w: 0.5, h: 0.3, fontSize: 11, bold: true, color: '333333', align: 'right' });
+    } catch (e) { console.error("Footer Error", e); }
+};
+
+// ==========================================
+// 📄 SLIDE GENERATION FUNCTIONS
+// ==========================================
+
+async function createSlide0_Cover(pptx, caseData) {
+    const slide = pptx.addSlide();
+    slide.addText("8D Report", { x: 0.3, y: 0.35, w: 7.8, h: 0.6, fontSize: 38, fontFace: 'Arial Black', color: '000000', wrap: false, valign: 'bottom' });
+    slide.addText("Suppliers can use any format of the report as long as all mandatory information is present.", { x: 8.2, y: 0.35, w: 4.8, h: 0.6, fontSize: 9, color: 'FF0000', fill: { color: 'FFFF99' }, align: 'center', border: { pt: 1, color: 'FFCC00' } });
+    slide.addShape(pptx.ShapeType.line, { x: 0.3, y: 1.0, w: 12.8, h: 0, line: { color: '003366', width: 6.0 } });
+    const isRP = caseData.report_data?.source_report_type === 'RP';
+    slide.addShape(pptx.ShapeType.rect, { x: 8.0, y: 1.45, w: 0.3, h: 0.3, fill: isRP ? { color: '000000' } : null, line: { color: '000000' } });
+    slide.addText("[IQC Rejected, RP]", { x: 8.4, y: 1.45, fontSize: 12, bold: true });
+    slide.addShape(pptx.ShapeType.rect, { x: 10.6, y: 1.45, w: 0.3, h: 0.3, fill: !isRP ? { color: '000000' } : null, line: { color: '000000' } });
+    slide.addText("[Line claim, VF]", { x: 11.0, y: 1.45, fontSize: 12, bold: true });
+    slide.addText("PROBLEM :", { x: 0.3, y: 2.1, fontSize: 11, color: '666666', bold: true });
+    slide.addText(caseData.problem_title || "", { x: 0.3, y: 2.4, w: 12.7, h: 1.2, fontSize: 22, bold: true, valign: 'top' });
+    addStandardFooter(pptx, slide, 1);
+}
+
 async function exportToPPTX(targetCaseId) {
-    if (targetCaseId) {
-        const found = _cases.find(x => x.id === targetCaseId);
-        if (found) _currentCase = found;
-    }
-    if (!_currentCase) return toast("No case selected", "error");
+    let caseData = _cases.find(x => x.id === targetCaseId) || _currentCase;
+    if (!caseData) return toast("❌ ไม่พบข้อมูลเคส", "error");
 
     const PptxConstructor = window.PptxGenJS || window.pptxgen;
-    if (!PptxConstructor) {
-        return toast("❌ ไม่พบไลบรารี PowerPoint Generation โปรดรีเฟรชหน้าเว็บแล้วลองอีกครั้ง", "error");
-    }
+    if (!PptxConstructor) return toast("❌ ไม่พบไลบรารี PptxGenJS", "error");
 
-    const dashboardEl = document.getElementById('eight-d-dashboard');
-    const reportViewEl = document.getElementById('eight-d-report-view');
-    const wasDashboardVisible = dashboardEl && !dashboardEl.classList.contains('hidden');
-
-    if (wasDashboardVisible) {
-        dashboardEl.classList.add('hidden');
-        reportViewEl.classList.remove('hidden');
-    }
-
-    toast("⏳ กำลังสร้างไฟล์ PowerPoint (16 หน้า) แบบ Native PowerPoint Objects แท้ 100%...", "info");
+    toast("⏳ กำลังจัดทำรายงาน D1-D8 รายละเอียดสูง...", "info");
 
     const pptx = new PptxConstructor();
-    pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches (16:9 Widescreen)
+    pptx.layout = 'LAYOUT_WIDE'; 
 
-    const originalSlideIndex = _currentSlide;
+    const addFooter = (slide, pageNum) => {
+        slide.addShape(pptx.ShapeType.ellipse, { x: 0.35, y: 6.85, w: 1.3, h: 0.5, fill: { color: '003366' } });
+        slide.addShape(pptx.ShapeType.ellipse, { x: 0.38, y: 6.88, w: 1.24, h: 0.44, line: { color: 'FFFFFF', width: 1.0 } });
+        slide.addText("Carrier", { x: 0.35, y: 6.85, w: 1.3, h: 0.5, fontSize: 18, fontFace: 'Times New Roman', fontItalic: true, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
+        slide.addText("PROPRIETARY AND CONFIDENTIAL", { x: 0, y: 7.05, w: 13.33, fontSize: 10, color: '999999', align: 'center' });
+        slide.addText(pageNum.toString(), { x: 12.8, y: 6.85, w: 0.5, fontSize: 11, bold: true, color: '333333', align: 'right' });
+    };
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 1: COVER PAGE
+    // ───────────────────────────────────────────────────────
+    const slide1 = pptx.addSlide();
+    slide1.addText("8D Report", { x: 0.3, y: 0.35, w: 7.8, h: 0.6, fontSize: 38, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom' });
+    slide1.addText("Suppliers can use any format of the report as long as all mandatory information is present.", {
+        x: 8.2, y: 0.35, w: 4.8, h: 0.6, fontSize: 9, color: 'FF0000', fill: { color: 'FFFF99' }, align: 'center', border: { pt: 1, color: 'FFCC00' }
+    });
+    slide1.addShape(pptx.ShapeType.line, { x: 0.3, y: 1.0, w: 12.8, h: 0, line: { color: '003366', width: 6.0 } });
+
+    const isRP = caseData.report_data?.source_report_type === 'RP';
+    slide1.addShape(pptx.ShapeType.rect, { x: 8.0, y: 1.45, w: 0.25, h: 0.25, fill: isRP ? { color: '000000' } : null, line: { color: '000000' } });
+    slide1.addText("[IQC Rejected, RP]", { x: 8.3, y: 1.45, fontSize: 11, bold: true });
+    slide1.addShape(pptx.ShapeType.rect, { x: 10.6, y: 1.45, w: 0.25, h: 0.25, fill: !isRP ? { color: '000000' } : null, line: { color: '000000' } });
+    slide1.addText("[Line claim, VF]", { x: 10.9, y: 1.45, fontSize: 11, bold: true });
+
+    slide1.addText("PROBLEM :", { x: 0.3, y: 2.1, fontSize: 11, color: '666666', bold: true });
+    slide1.addText(caseData.problem_title || "", { x: 0.3, y: 2.4, w: 12.7, h: 1.5, fontSize: 22, bold: true, color: '000000', valign: 'top' });
+
+    slide1.addTable([
+        [{ text: "SUPPLIERS SUBMIT", options: { colspan: 2, fill: 'A7C2DE', bold: true, align: 'center' } }, { text: "CTC CONFIRM", options: { colspan: 2, fill: 'A7C2DE', bold: true, align: 'center' } }],
+        ["Confirmed (PIC)", "Approved (QA Mgr)", "Confirmed (Eng)", "Approved (Spec)"],
+        [{ text: "", options: { h: 0.6 } }, "", "", ""],
+        ["Date:", "Date:", "Date:", "Date:"]
+    ], { x: 5.2, y: 5.3, w: 7.8, fontSize: 9, border: { pt: 1, color: '000000' }, align: 'center', valign: 'middle' });
+
+    addFooter(slide1, 1);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 2: D1 - ASSIGN PERSON IN CHARGE (CLEAN DATA ONLY)
+    // ───────────────────────────────────────────────────────
+    const slide2 = pptx.addSlide();
+    slide2.addText("D1- Assign person in charge", { x: 0.3, y: 0.35, w: 9.6, h: 0.6, fontSize: 28, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom' });
+    slide2.addText("<FILL BY CTC & SUPPLIER>", { x: 10.1, y: 0.45, w: 2.9, h: 0.3, fontSize: 10, bold: true, color: 'FFFF00', fill: { color: '0000FF' }, align: 'center', valign: 'middle' });
+    slide2.addShape(pptx.ShapeType.line, { x: 0.3, y: 1.0, w: 12.8, h: 0, line: { color: '003366', width: 6.0 } });
+
+    const s1Data = caseData.report_data?.slide_1 || {};
+
+    // First, scan DOM for D1 table data if present on the screen
+    const domD1Data = { tctc: [], supplier: [] };
+    try {
+        const tables = document.querySelectorAll('table');
+        tables.forEach(tbl => {
+            const th = tbl.querySelector('th');
+            if (!th) return;
+            const thText = (th.textContent || '').toUpperCase();
+            if (thText.includes('TCTC') || thText.includes('SUPPLIER')) {
+                const isSupp = thText.includes('SUPPLIER');
+                const targetArr = isSupp ? domD1Data.supplier : domD1Data.tctc;
+                const rows = tbl.querySelectorAll('tbody tr');
+                for (let i = 0; i < 6; i++) {
+                    const trName = rows[i * 2];
+                    const trRole = rows[i * 2 + 1];
+                    let name = "", role = "";
+                    if (trName) {
+                        const nameTd = trName.querySelector('td[contenteditable="true"]') || trName.querySelectorAll('td')[2];
+                        if (nameTd) name = (nameTd.textContent || '').replace(/<[^>]*>?/gm, '').trim();
+                    }
+                    if (trRole) {
+                        const roleTd = trRole.querySelector('td[contenteditable="true"]') || trRole.querySelectorAll('td')[1];
+                        if (roleTd) role = (roleTd.textContent || '').replace(/<[^>]*>?/gm, '').trim();
+                    }
+                    targetArr[i] = { name, role };
+                }
+            }
+        });
+    } catch (e) { console.error("DOM D1 Extract Error", e); }
+
+    const buildD1Rows = (isSupplier) => {
+        let rows = [[{ 
+            text: isSupplier ? "SUPPLIER NAME MEMBER" : "TCTC MEMBER", 
+            options: { colspan: 3, fill: 'A7C2DE', color: isSupplier ? 'FF0000' : '000000', bold: true, align: 'center', h: 0.4, border: { pt: 1, color: '000000' } } 
+        }]];
+
+        // รายการคำที่ไม่ต้องการให้โชว์ในไฟล์ (คำสั่ง/หัวข้อที่หลุดเข้าไปในช่องกรอก)
+        const blacklist = ["D1-", "Assign person in charge", "Fill by CTC", "Supplier name member", "TCTC member", "Fill by Supplier", "Person1", "Person2", "Person3", "Person4", "Person5", "Person6"];
+
+        const isCleanVal = (val) => {
+            if (!val) return false;
+            const lower = val.toLowerCase();
+            return !blacklist.some(word => lower.includes(word.toLowerCase()));
+        };
+
+        const domArr = isSupplier ? domD1Data.supplier : domD1Data.tctc;
+
+        for (let i = 1; i <= 6; i++) {
+            const baseIdx = isSupplier ? (i + 5) * 2 : (i - 1) * 2;
+            
+            // Default fallbacks for TCTC
+            let defaultName = "";
+            let defaultRole = "";
+            if (!isSupplier) {
+                if (i === 1) { defaultName = "Ms.Nipawan J."; defaultRole = "Senior Specialist (QAP)"; }
+                if (i === 2) { defaultName = "Mr.Komsan N."; defaultRole = "Senior Engineer (QAP)"; }
+            }
+
+            // 1. Try DOM
+            let nameVal = domArr[i - 1]?.name || "";
+            let roleVal = domArr[i - 1]?.role || "";
+
+            // 2. If DOM empty or invalid, try s1Data
+            if (!isCleanVal(nameVal)) {
+                let s1Name = (s1Data[`f_${baseIdx}`] || "").replace(/<[^>]*>?/gm, '').trim();
+                nameVal = isCleanVal(s1Name) ? s1Name : "";
+            }
+            if (!isCleanVal(roleVal)) {
+                let s1Role = (s1Data[`f_${baseIdx + 1}`] || "").replace(/<[^>]*>?/gm, '').trim();
+                roleVal = isCleanVal(s1Role) ? s1Role : "";
+            }
+
+            // 3. If still empty, fallback to defaultName / defaultRole
+            if (!nameVal) nameVal = defaultName;
+            if (!roleVal) roleVal = defaultRole;
+
+            rows.push([
+                { text: `Person${i}`, options: { rowspan: 2, bold: true, align: 'center', valign: 'middle', fill: 'F2F2F2', border: { pt: 1, color: '000000' } } },
+                { text: "Name:", options: { bold: true, fontSize: 10, border: { pt: 1, color: '000000' } } },
+                { text: nameVal, options: { color: '000000', fontSize: 10, border: { pt: 1, color: '000000' } } }
+            ]);
+            rows.push([
+                { text: "Role:", options: { bold: true, fontSize: 10, border: { pt: 1, color: '000000' } } },
+                { text: roleVal, options: { color: '444444', fontSize: 10, border: { pt: 1, color: '000000' } } }
+            ]);
+        }
+        return rows;
+    };
+
+    slide2.addTable(buildD1Rows(false), { x: 0.3, y: 1.5, w: 6.2, colW: [1.0, 0.8, 4.4] });
+    slide2.addTable(buildD1Rows(true), { x: 6.8, y: 1.5, w: 6.2, colW: [1.0, 0.8, 4.4] });
+
+    addFooter(slide2, 2);
+
+/// ───────────────────────────────────────────────────────
+    // SLIDE 3: D2 - DEFINE THE PROBLEM (ULTIMATE PIXEL PERFECT)
+    // ───────────────────────────────────────────────────────
+    const slide3 = pptx.addSlide();
+
+    // 1. ส่วนหัวสไลด์ (Header & Divider)
+    slide3.addText("D2-Define the Problem", { 
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6, fontSize: 28, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom' 
+    });
+
+    // Tag Box: พื้นหลังน้ำเงิน ตัวอักษรเหลืองสด มีขอบดำ 1pt
+    slide3.addText("<FILL BY CTC >", { 
+        x: 11.2, y: 0.45, w: 1.8, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFF00', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+
+    // เส้นคั่นสีน้ำเงินเข้ม หนา 6pt ยาวเกือบชิดขอบ (12.8 นิ้ว)
+    slide3.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    // --- LOGIC: SMART PARSING (แยกข้อมูลจากหัวข้อปัญหาหน้าแรก) ---
+    // ตัวอย่าง: V1_M2 Inform CABI-SIDE-OUT(01S1) / 1134212501 V.PARADISE Deformed problem
+    const rawTitle = caseData.problem_title || "";
+    let pName = "-", dNo = "-", supp = "-", dName = "-";
 
     try {
-        for (let slideIdx = 0; slideIdx < 16; slideIdx++) {
-            _currentSlide = slideIdx;
-            renderSlide();
-            _rehydrateUI();
+        if (rawTitle.includes("Inform")) {
+            const dataPart = rawTitle.split(/Inform/i)[1].trim(); // CABI-SIDE-OUT(01S1) / 1134212501 V.PARADISE Deformed problem
+            const segments = dataPart.split("/"); 
+            
+            if (segments.length > 1) {
+                pName = segments[0].trim(); // CABI-SIDE-OUT(01S1)
+                const rest = segments[1].trim(); // 1134212501 V.PARADISE Deformed problem
+                const parts = rest.split(/\s+/); // แยกด้วยช่องว่าง
+                
+                dNo = parts[0] || "-"; // 1134212501
+                supp = parts[1] || "-"; // V.PARADISE
+                dName = parts.slice(2).join(" ") || "-"; // Deformed problem
+            }
+        }
+    } catch (e) { console.error("Parsing Error", e); }
 
-            // รอให้ DOM และรูปภาพวาดบนหน้าจอสมบูรณ์
-            await new Promise(r => setTimeout(r, 200));
+    const exportDate = new Date().toISOString().split('T')[0]; 
+    const valStyle = (txt, color = '1e293b') => {
+        return { text: txt || "-", options: { bold: true, color: color, fontSize: 10.5 } };
+    };
 
-            const container = document.getElementById('eight-d-slide-content');
-            if (!container) continue;
+    // 2. การสร้างตารางข้อมูลด้านซ้าย (Left Table)
+    const d2Rows = [
+        [{ text: "VF/RP No.", options: { fill: '4169E1', color: 'FFFFFF', bold: true, fontSize: 12 } }, 
+         { text: caseData.id, options: { fill: '4169E1', color: 'FFFFFF', bold: true, fontSize: 12 } }],
+        ["Issue Date",         valStyle(new Date(caseData.created_at).toLocaleDateString('en-GB'))],
+        ["Model",              valStyle("-")],
+        ["Part Name",          valStyle(pName.toUpperCase())],
+        ["Drawing No.",        valStyle(dNo)],
+        ["Part Group",         valStyle(caseData.part_group || "Mold Part")],
+        ["Supplier",           valStyle(supp, '0000FF')], // สีน้ำเงินหนา
+        ["Defect name",        valStyle(dName, 'FF0000')], // สีแดงหนา
+        ["Lot size/Used Q'ty", valStyle(`${caseData.ng_qty} / ${caseData.lot_no} Pcs.`)],
+        ["Defect Q'ty (%)",    valStyle(((caseData.ng_qty/caseData.lot_no)*100 || 0).toFixed(2) + " %")],
+        ["Trouble Rank",       valStyle("B", 'FF0000')], // สีแดงหนา
+        ["Inspection Date",    valStyle(exportDate)], // วันที่กด Export
+        ["Defect Found Area",  valStyle("Line claim")]
+    ];
 
-            const slide = pptx.addSlide();
-            slide.background = { color: 'FFFFFF' };
+    slide3.addTable(d2Rows, { 
+        x: 0.3, y: 1.25, w: 4.3, colW: [1.6, 2.7],
+        fontSize: 10.5, border: { pt: 1, color: '000000' }, valign: 'middle'
+    });
 
-            const cRect = container.getBoundingClientRect();
-            if (!cRect.width || !cRect.height) continue;
+    // 3. ส่วนแสดงหัวข้อรูปภาพพร้อม "แถบไฮไลท์สีเหลือง"
+    // ส่วนที่ 1: ตัวหนังสือสีดำปกติ
+    slide3.addText("DESCRIBE OF DEFECT ", { 
+        x: 4.95, y: 1.3, fontSize: 16, bold: true, color: '000000' 
+    });
 
-            // คำนวณสเกลจาก พิกเซลเว็บ (960x600) -> นิ้ว PowerPoint (13.33 x 7.5 นิ้ว)
-            const scaleX = 13.33 / cRect.width;
-            const scaleY = 7.5 / cRect.height;
+    // ส่วนที่ 2: ตัวหนังสือแดง บนแถบสีเหลือง (Highlight)
+    slide3.addText("(PICTURE AND JUDGEMENT METHOD)", { 
+        x: 7.2, y: 1.3, w: 4.1, h: 0.35,
+        fontSize: 12, bold: true, italic: true, color: 'FF0000',
+        fill: { color: 'FFFF00' }, // ใส่สีเหลืองในกล่อง
+        valign: 'middle'
+    });
 
-            // ✅ บังคับขอบเขต x, y, w, h ไม่ให้เลยขอบสไลด์ฝั่งขวาและด้านล่าง (สูงสุด 13.33 นิ้วกว้าง, 7.5 นิ้วสูง)
-            const getPos = (el) => {
-                const r = el.getBoundingClientRect();
-                let x = (r.left - cRect.left) * scaleX;
-                let y = (r.top - cRect.top) * scaleY;
-                let w = r.width * scaleX;
-                let h = r.height * scaleY;
+    // 4. การจัดการรูปภาพ (High-Fidelity Auto Capture / Direct Image Support พร้อมรักษาสัดส่วนภาพไม่ให้ยืดเต็มกล่อง)
+    try {
+        let imageAdded = false;
+        const boxX = 4.95, boxY = 1.7, boxW = 8.05, boxH = 5.0;
 
-                x = Math.max(0, Math.min(13.33, x));
-                y = Math.max(0, Math.min(7.5, y));
-                if (x + w > 13.33) {
-                    w = Math.max(0.05, 13.33 - x);
-                }
-                if (y + h > 7.5) {
-                    h = Math.max(0.05, 7.5 - y);
-                }
+        // ฟังก์ชันช่วยคำนวณตำแหน่งและขนาดรูปภาพให้พอดีกับกรอบโดยรักษาสัดส่วน (Aspect Ratio)
+        const getFitPos = (imgW, imgH) => {
+            if (!imgW || !imgH) return { x: boxX, y: boxY, w: boxW, h: boxH };
+            const imgAR = imgW / imgH;
+            const boxAR = boxW / boxH;
+            let finalW, finalH, finalX, finalY;
+            if (imgAR > boxAR) {
+                finalW = boxW;
+                finalH = boxW / imgAR;
+                finalX = boxX;
+                finalY = boxY + (boxH - finalH) / 2;
+            } else {
+                finalH = boxH;
+                finalW = boxH * imgAR;
+                finalX = boxX + (boxW - finalW) / 2;
+                finalY = boxY;
+            }
+            return { x: finalX, y: finalY, w: finalW, h: finalH };
+        };
 
-                return {
-                    x: Number(x.toFixed(3)),
-                    y: Number(y.toFixed(3)),
-                    w: Number(Math.max(0.05, w).toFixed(3)),
-                    h: Number(Math.max(0.05, h).toFixed(3))
-                };
-            };
-
-            const rectShape = pptx.shapes?.RECTANGLE || pptx.ShapeType?.rect || 'rect';
-
-            // 1. คัดเลือก Native Text Candidates ไว้ล่วงหน้า
-            const rawCandidates = Array.from(container.querySelectorAll('h1, h2, h3, h4, label, [contenteditable="true"], input, textarea, span, p, div')).filter(el => {
-                if (el.closest('table')) return false;
-                if (el.offsetWidth === 0 || el.offsetHeight === 0) return false;
-
-                const isEditable = el.getAttribute('contenteditable') === 'true' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
-                const isHeading = ['H1','H2','H3','H4','LABEL','P'].includes(el.tagName);
-
-                let hasDirectText = false;
-                for (const child of el.childNodes) {
-                    if (child.nodeType === Node.TEXT_NODE && child.nodeValue.trim().length > 0) {
-                        hasDirectText = true;
-                        break;
-                    }
-                }
-
-                if (isEditable || isHeading || hasDirectText) return true;
-                return false;
+        const calcImageFit = (srcUrl) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(getFitPos(img.width, img.height));
+                img.onerror = () => resolve({ x: boxX, y: boxY, w: boxW, h: boxH });
+                img.src = srcUrl;
             });
+        };
 
-            // คัดเลือก Text Candidates โดยหากโหนดมี [contenteditable="true"] ให้ยึดเป็นกล่องข้อความหลักอันเดียว ไม่แตกโหนดย่อย
-            const leafTextCandidates = rawCandidates.filter(el => {
-                if (el.getAttribute('contenteditable') === 'true') {
-                    const hasEditableChild = el.querySelector('[contenteditable="true"]');
-                    return !hasEditableChild;
-                }
-                if (el.parentElement && el.parentElement.closest('[contenteditable="true"]')) {
-                    return false;
-                }
-                const hasCandidateChild = rawCandidates.some(other => other !== el && el.contains(other));
-                return !hasCandidateChild;
-            });
-
-            // 2. สร้างตาราง Native PPTX Tables แก้ไขเซลล์ได้ 100% พร้อมคำนวณสัดส่วนคอลัมน์ (colW)
-            const tables = Array.from(container.querySelectorAll('table'));
-            for (const table of tables) {
-                const pos = getPos(table);
-                const trs = Array.from(table.querySelectorAll('tr'));
-                const rows = [];
-
-                for (const tr of trs) {
-                    const rowCells = [];
-                    const cells = Array.from(tr.querySelectorAll('td, th'));
-
-                    for (const cell of cells) {
-                        const style = window.getComputedStyle(cell);
-
-                        let text = '';
-                        const inputs = cell.querySelectorAll('input, textarea, [contenteditable="true"]');
-                        if (inputs.length > 0) {
-                            const clone = cell.cloneNode(true);
-                            const cloneInputs = clone.querySelectorAll('input, textarea, [contenteditable="true"]');
-                            cloneInputs.forEach((inp, idx) => {
-                                const origVal = (inputs[idx].tagName === 'INPUT' || inputs[idx].tagName === 'TEXTAREA') ? inputs[idx].value : inputs[idx].innerText;
-                                inp.replaceWith(document.createTextNode(origVal || ''));
-                            });
-                            text = (clone.innerText || '').trim();
-                        } else {
-                            text = (cell.innerText || '').trim();
-                        }
-
-                        const bgHex = _pptRgbToHex(style.backgroundColor);
-                        const fgHex = _pptRgbToHex(style.color) || '000000';
-                        const fw = style.fontWeight;
-                        const isBold = fw === 'bold' || parseInt(fw) >= 700 || cell.tagName === 'TH';
-                        const ta = style.textAlign || 'left';
-                        const align = ta === 'center' ? 'center' : (ta === 'right' ? 'right' : 'left');
-                        const fSizePx = parseFloat(style.fontSize) || 11;
-                        const fSizePt = Math.max(7, Math.round(fSizePx * 0.72));
-
-                        const cellOpt = {
-                            text: text,
-                            options: {
-                                fontFace: 'Arial',
-                                color: fgHex,
-                                bold: isBold,
-                                align: align,
-                                valign: 'middle',
-                                fontSize: fSizePt,
-                                border: { type: 'solid', pt: 1, color: '000000' }
-                            }
-                        };
-
-                        if (bgHex && bgHex !== 'FFFFFF' && bgHex !== '00000000') {
-                            cellOpt.options.fill = { color: bgHex };
-                        }
-                        if (cell.colSpan > 1) cellOpt.options.colspan = cell.colSpan;
-                        if (cell.rowSpan > 1) cellOpt.options.rowspan = cell.rowSpan;
-
-                        rowCells.push(cellOpt);
-                    }
-                    if (rowCells.length > 0) rows.push(rowCells);
-                }
-
-                if (rows.length > 0) {
-                    let colW = [];
-                    let maxCellsRow = null;
-                    let maxCount = 0;
-                    for (const tr of trs) {
-                        const cells = Array.from(tr.querySelectorAll('td, th'));
-                        if (cells.length > maxCount) {
-                            maxCount = cells.length;
-                            maxCellsRow = tr;
-                        }
-                    }
-
-                    if (maxCellsRow) {
-                        const rowCells = Array.from(maxCellsRow.querySelectorAll('td, th'));
-                        const totalCellWidth = rowCells.reduce((sum, c) => sum + (c.getBoundingClientRect().width || 0), 0);
-                        if (totalCellWidth > 0) {
-                            colW = rowCells.map(c => {
-                                const cellW = c.getBoundingClientRect().width || 0;
-                                return Number(((cellW / totalCellWidth) * pos.w).toFixed(3));
-                            });
-                        }
-                    }
-
-                    const tableOpts = {
-                        x: pos.x,
-                        y: pos.y,
-                        w: pos.w,
-                        h: pos.h,
-                        border: { type: 'solid', pt: 1, color: '000000' }
-                    };
-                    if (colW.length > 0) {
-                        tableOpts.colW = colW;
-                    }
-
-                    slide.addTable(rows, tableOpts);
-                }
-            }
-
-            // 3. สร้างรูปทรงพื้นหลัง กล่อง กรอบ Banners (Native PPTX Shapes)
-            const boxElements = Array.from(container.querySelectorAll('div, section, header')).filter(el => {
-                if (el.closest('table')) return false;
-                if (leafTextCandidates.includes(el)) return false;
-                if (el.textContent && el.textContent.includes('Proprietary and Confidential')) return false;
-
-                const style = window.getComputedStyle(el);
-                const bg = _pptRgbToHex(style.backgroundColor);
-                const borderW = parseFloat(style.borderWidth) || 0;
-                const borderCol = _pptRgbToHex(style.borderColor);
-
-                const hasBg = bg && bg !== 'FFFFFF' && bg !== '00000000';
-                const hasBorder = borderW > 0 && style.borderStyle !== 'none' && borderCol && borderCol !== 'FFFFFF' && borderCol !== 'F1F5F9';
-
-                return (hasBg || hasBorder) && el.offsetWidth > 15 && el.offsetHeight > 3;
-            });
-
-            for (const box of boxElements) {
-                if (box.textContent && box.textContent.includes('Proprietary and Confidential')) continue;
-
-                const pos = getPos(box);
-                const style = window.getComputedStyle(box);
-                const bgHex = _pptRgbToHex(style.backgroundColor);
-                const borderCol = _pptRgbToHex(style.borderColor);
-
-                const bt = parseFloat(style.borderTopWidth) || 0;
-                const bb = parseFloat(style.borderBottomWidth) || 0;
-                const bl = parseFloat(style.borderLeftWidth) || 0;
-                const br = parseFloat(style.borderRightWidth) || 0;
-
-                const shapeOpts = {
-                    x: pos.x,
-                    y: pos.y,
-                    w: pos.w,
-                    h: pos.h
-                };
-
-                if (bgHex && bgHex !== 'FFFFFF' && bgHex !== '00000000') {
-                    shapeOpts.fill = { color: bgHex };
-                }
-
-                if (bt > 0 && bb > 0 && bl > 0 && br > 0 && borderCol && borderCol !== 'FFFFFF' && borderCol !== 'F1F5F9' && style.borderStyle !== 'none') {
-                    shapeOpts.line = { color: borderCol, width: Math.max(1, Math.round(parseFloat(style.borderWidth) || 1)) };
-                    slide.addShape(rectShape, shapeOpts);
-                } else if (bt > 0 && bb === 0 && bl === 0 && br === 0 && borderCol && borderCol !== 'FFFFFF' && borderCol !== 'F1F5F9' && style.borderStyle !== 'none') {
-                    const lineShape = pptx.shapes?.LINE || pptx.ShapeType?.line || 'line';
-                    slide.addShape(lineShape, {
-                        x: pos.x,
-                        y: pos.y,
-                        w: pos.w,
-                        h: 0,
-                        line: { color: borderCol, width: Math.max(1, Math.round(bt)) }
-                    });
-                } else if (bgHex && bgHex !== 'FFFFFF' && bgHex !== '00000000') {
-                    slide.addShape(rectShape, shapeOpts);
-                }
-            }
-
-            // 4. สร้างกล่องข้อความ Native Textboxes (นอกตาราง)
-            for (const el of leafTextCandidates) {
-                const val = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? el.value : el.innerText;
-                const txt = (val || '').trim();
-                if (!txt) continue;
-
-                const pos = getPos(el);
-                if (pos.w < 0.05 || pos.h < 0.05) continue;
-
-                const style = window.getComputedStyle(el);
-                const fgHex = _pptRgbToHex(style.color) || '000000';
-                const fSizePx = parseFloat(style.fontSize) || 12;
-                const fSizePt = Math.max(7, Math.round(fSizePx * 0.72));
-                const fw = style.fontWeight;
-                const isBold = fw === 'bold' || parseInt(fw) >= 700 || ['H1','H2','H3','H4','LABEL'].includes(el.tagName);
-                const isItalic = style.fontStyle === 'italic';
-                const ta = style.textAlign || 'left';
-                const align = ta === 'center' ? 'center' : (ta === 'right' ? 'right' : 'left');
-
-                const tbOpts = {
-                    x: pos.x,
-                    y: pos.y,
-                    w: pos.w,
-                    h: pos.h,
-                    fontFace: 'Arial',
-                    fontSize: fSizePt,
-                    color: fgHex,
-                    bold: isBold,
-                    italic: isItalic,
-                    align: align,
-                    valign: 'top',
-                    wrap: true,
-                    margin: 1
-                };
-
-                const bgHex = _pptRgbToHex(style.backgroundColor);
-                if (bgHex && bgHex !== 'FFFFFF' && bgHex !== '00000000') {
-                    tbOpts.fill = { color: bgHex };
-                }
-
-                slide.addText(txt, tbOpts);
-            }
-
-            // 5. Native Images (รูปภาพแนบ Uploaded Photos & Background Images)
-            const imgEls = Array.from(container.querySelectorAll('img')).concat(
-                Array.from(container.querySelectorAll('div, span')).filter(el => {
-                    const bg = window.getComputedStyle(el).backgroundImage;
-                    return bg && bg !== 'none' && bg.includes('url(');
-                })
-            );
-
-            for (const imgEl of imgEls) {
-                if (imgEl.closest && imgEl.closest('svg')) continue;
-                const pos = getPos(imgEl);
-                let src = '';
-                if (imgEl.tagName === 'IMG') {
-                    src = imgEl.src;
-                } else {
-                    const bg = window.getComputedStyle(imgEl).backgroundImage;
-                    const m = bg.match(/url\(['"]?(.*?)['"]?\)/);
-                    if (m) src = m[1];
-                }
-
-                if (src && !src.includes('data:image/svg+xml')) {
-                    const dataUrl = await _pptGetImageDataUrl(src);
-                    if (dataUrl) {
-                        slide.addImage({
-                            data: dataUrl,
-                            x: pos.x,
-                            y: pos.y,
-                            w: pos.w,
-                            h: pos.h,
-                            sizing: { type: 'contain', w: pos.w, h: pos.h }
-                        });
-                    }
-                }
-            }
-
-            // 6. Native SVGs (โลโก้, ไอคอน, ผังกระบวนการ)
-            const svgEls = Array.from(container.querySelectorAll('svg'));
-            for (const svg of svgEls) {
-                if (svg.offsetWidth === 0 || svg.offsetHeight === 0) continue;
-                const pos = getPos(svg);
-                const dataUrl = await _pptSvgToDataUrl(svg);
-                if (dataUrl) {
-                    slide.addImage({
-                        data: dataUrl,
-                        x: pos.x,
-                        y: pos.y,
-                        w: pos.w,
-                        h: pos.h
-                    });
-                }
+        // 4.1 พยายามดึงรูปภาพจาก caseData โดยตรง
+        const rawImgSrc = caseData.report_data?.evidence_img || caseData.evidence_img || caseData.image_url || "";
+        if (rawImgSrc) {
+            const base64Data = await _pptGetImageDataUrl(rawImgSrc);
+            if (base64Data) {
+                const pos = await calcImageFit(base64Data);
+                slide3.addImage({
+                    data: base64Data,
+                    x: pos.x, y: pos.y, w: pos.w, h: pos.h,
+                    sizing: { type: 'contain', w: pos.w, h: pos.h }
+                });
+                imageAdded = true;
             }
         }
 
-        const fileName = `8D_Report_${_currentCase.id}.pptx`;
-        pptx.writeFile({ fileName });
-        toast("✅ ส่งออก PowerPoint สำเร็จ! (สร้างเป็น Native PowerPoint Objects แท้ 100% แก้ไขตาราง ข้อความ และรูปภาพได้ทุกจุด)", "success");
-
-    } catch (err) {
-        console.error("PPTX Export Error:", err);
-        toast("❌ เกิดข้อผิดพลาดในการสร้างไฟล์ PPTX: " + (err.message || err), "error");
-    } finally {
-        _currentSlide = originalSlideIndex;
-        if (wasDashboardVisible && dashboardEl && reportViewEl) {
-            dashboardEl.classList.remove('hidden');
-            reportViewEl.classList.add('hidden');
-        } else {
-            renderSlide();
-            _rehydrateUI();
+        // 4.2 ถ้าใน caseData ไม่มี หรือแปลงไม่สำเร็จ ให้แคปเจอร์จากหน้าเว็บถ้าเปิดสไลด์อยู่
+        if (!imageAdded) {
+            const photoArea = document.querySelector('.slide-page-paper div[style*="border: 2.5px solid"]') || 
+                              document.querySelector('.slide-page-paper div[style*="border: 2px solid"]') ||
+                              document.querySelector('.slide-page-paper div[style*="background-image"]');
+            if (photoArea) {
+                const canvas = await html2canvas(photoArea, {
+                    useCORS: true, allowTaint: true, scale: 3, backgroundColor: "#ffffff"
+                });
+                const imgBase64 = canvas.toDataURL("image/png");
+                if (imgBase64) {
+                    const pos = await calcImageFit(imgBase64);
+                    slide3.addImage({
+                        data: imgBase64,
+                        x: pos.x, y: pos.y, w: pos.w, h: pos.h,
+                        sizing: { type: 'contain', w: pos.w, h: pos.h }
+                    });
+                    imageAdded = true;
+                }
+            }
         }
+    } catch (err) { console.error("Capture Error:", err); }
+
+    // วาดกรอบสี่เหลี่ยมสีดำล้อมรอบรูปภาพ
+    slide3.addShape(pptx.ShapeType.rect, { 
+        x: 4.95, y: 1.7, w: 8.05, h: 5.0, 
+        line: { color: '000000', width: 1.5 }, fill: null 
+    });
+
+    // 5. ส่วนท้าย (Standard Footer)
+    addFooter(slide3, 3);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 4: D2 - DEFINE THE PROBLEM [FURTHER DETAIL]
+    // ───────────────────────────────────────────────────────
+    const slide4 = pptx.addSlide();
+
+    // 1. Header & Tag & Line
+    slide4.addText([
+        { text: "D2-Define the Problem ", options: { fontSize: 26, fontFace: 'Arial Black', bold: true, color: '000000' } },
+        { text: "[Further Detail]", options: { fontSize: 20, fontFace: 'Arial Black', bold: true, color: '003366' } }
+    ], { x: 0.3, y: 0.35, w: 9.8, h: 0.6, wrap: false, valign: 'bottom' });
+
+    slide4.addText("<FILL BY CTC >", { 
+        x: 11.2, y: 0.45, w: 1.8, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFF00', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide4.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    // 2. Left Photo Box (High-Fidelity Auto Capture / Direct Image Support with Aspect Ratio Fit)
+    try {
+        let image4Added = false;
+        const boxX4 = 0.3, boxY4 = 1.3, boxW4 = 6.8, boxH4 = 5.2;
+
+        const getFitPos4 = (imgW, imgH) => {
+            if (!imgW || !imgH) return { x: boxX4, y: boxY4, w: boxW4, h: boxH4 };
+            const imgAR = imgW / imgH;
+            const boxAR = boxW4 / boxH4;
+            let finalW, finalH, finalX, finalY;
+            if (imgAR > boxAR) {
+                finalW = boxW4;
+                finalH = boxW4 / imgAR;
+                finalX = boxX4;
+                finalY = boxY4 + (boxH4 - finalH) / 2;
+            } else {
+                finalH = boxH4;
+                finalW = boxH4 * imgAR;
+                finalX = boxX4 + (boxW4 - finalW) / 2;
+                finalY = boxY4;
+            }
+            return { x: finalX, y: finalY, w: finalW, h: finalH };
+        };
+
+        const calcImageFit4 = (srcUrl) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(getFitPos4(img.width, img.height));
+                img.onerror = () => resolve({ x: boxX4, y: boxY4, w: boxW4, h: boxH4 });
+                img.src = srcUrl;
+            });
+        };
+
+        const rawImgSrc4 = caseData.report_data?.evidence_img || caseData.evidence_img || caseData.image_url || "";
+        if (rawImgSrc4) {
+            const base64Data4 = await _pptGetImageDataUrl(rawImgSrc4);
+            if (base64Data4) {
+                const pos4 = await calcImageFit4(base64Data4);
+                slide4.addImage({
+                    data: base64Data4,
+                    x: pos4.x, y: pos4.y, w: pos4.w, h: pos4.h,
+                    sizing: { type: 'contain', w: pos4.w, h: pos4.h }
+                });
+                image4Added = true;
+            }
+        }
+
+        if (!image4Added) {
+            const photoArea4 = document.querySelector('.slide-page-paper div[style*="flex: 0 0 55%"]') ||
+                               document.querySelector('.slide-page-paper div[style*="border: 2.5px solid"]') || 
+                               document.querySelector('.slide-page-paper div[style*="border: 2px solid"]');
+            if (photoArea4) {
+                const canvas = await html2canvas(photoArea4, {
+                    useCORS: true, allowTaint: true, scale: 3, backgroundColor: "#ffffff"
+                });
+                const imgBase64 = canvas.toDataURL("image/png");
+                if (imgBase64) {
+                    const pos4 = await calcImageFit4(imgBase64);
+                    slide4.addImage({
+                        data: imgBase64,
+                        x: pos4.x, y: pos4.y, w: pos4.w, h: pos4.h,
+                        sizing: { type: 'contain', w: pos4.w, h: pos4.h }
+                    });
+                    image4Added = true;
+                }
+            }
+        }
+    } catch (err) { console.error("Slide 4 Capture Error:", err); }
+
+    // Outer rectangle border for image area
+    slide4.addShape(pptx.ShapeType.rect, { 
+        x: 0.3, y: 1.3, w: 6.8, h: 5.2, 
+        line: { color: '000000', width: 2.0 }, fill: null 
+    });
+
+    // 3. Right Details & Temporary Actions
+    const dParts = getDetailSentenceParts(caseData);
+
+    // Section 1: DETAIL
+    slide4.addText("DETAIL", { 
+        x: 7.4, y: 1.3, w: 5.6, h: 0.35, 
+        fontSize: 16, bold: true, color: '000000' 
+    });
+    slide4.addShape(pptx.ShapeType.line, { 
+        x: 7.4, y: 1.7, w: 1.0, h: 0, 
+        line: { color: '003366', width: 3.0 } 
+    });
+
+    slide4.addText([
+        { text: "On ", options: { bold: true, color: '000000' } },
+        { text: `${dParts.dateStr} `, options: { bold: true, color: '0000FF' } },
+        { text: "OSA inform quality problem about ", options: { bold: true, color: '000000' } },
+        { text: `${dParts.groupStr} `, options: { bold: true, color: '0000FF' } },
+        { text: "found defect ", options: { bold: true, color: '000000' } },
+        { text: `${dParts.defectStr}`, options: { bold: true, color: 'FF0000' } }
+    ], { x: 7.4, y: 1.85, w: 5.6, h: 1.4, fontSize: 13, valign: 'top', wrap: true });
+
+    // Section 2: TEMPORARY ACTIONS
+    slide4.addText("TEMPORARY ACTIONS", { 
+        x: 7.4, y: 3.4, w: 5.6, h: 0.35, 
+        fontSize: 16, bold: true, color: '000000' 
+    });
+    slide4.addShape(pptx.ShapeType.line, { 
+        x: 7.4, y: 3.8, w: 2.3, h: 0, 
+        line: { color: '003366', width: 3.0 } 
+    });
+
+    const rawRemark4 = caseData.report_data?.source_remark || caseData.report_data?.temporary_actions || "";
+    let actionLines = [];
+    if (rawRemark4.trim() !== "") {
+        actionLines = rawRemark4.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    } else {
+        actionLines = [
+            "Sorting 100% at line / WIP Stock",
+            "Inform vendor for urgent root cause analysis",
+            "Set point of control for next lot shipment"
+        ];
     }
+
+    const bulletTextRuns = actionLines.map(line => {
+        const cleanLine = line.replace(/^[•\-\*]\s*/, '');
+        return { text: `• ${cleanLine}\n`, options: { bold: true, color: '333333', fontSize: 12 } };
+    });
+
+    slide4.addText(bulletTextRuns, { x: 7.4, y: 4.0, w: 5.6, h: 2.3, valign: 'top', wrap: true });
+
+    addFooter(slide4, 4);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 5: D3 - INTERIM CONTAINMENT ACTION (ICA)
+    // ───────────────────────────────────────────────────────
+    const slide5 = pptx.addSlide();
+
+    // 1. Header & Tag & Line
+    slide5.addText("D3-Interim Containment Action (ICA)", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 26, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+
+    slide5.addText("<Fill by CTC & Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFF00', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide5.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    // 2. Main Table
+    const tableHeader5 = [
+        { text: "Location", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "Qty", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "Action\n(Sorting, Rework, etc.)", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "Person in charge", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "Start date\n[YY.MM.DD]", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "Finished Date\n[YY.MM.DD]", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "Sorted Q'ty", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "NG Q'ty", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "Disposition", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "Remarks", options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } }
+    ];
+
+    const defaultLocations5 = ["CTC WIP", "CTC Stock", "Supplier Stock", "On the way", "", ""];
+    const defaultQtys5 = ["0", "0", "0", "0", "", ""];
+
+    const tableRows5 = [tableHeader5];
+    for (let i = 0; i < 6; i++) {
+        const loc = defaultLocations5[i];
+        const qty = defaultQtys5[i];
+        tableRows5.push([
+            { text: loc, options: { bold: true, align: 'left', valign: 'middle' } },
+            { text: qty, options: { align: 'center', valign: 'middle' } },
+            { text: "", options: { align: 'center', valign: 'middle' } },
+            { text: "", options: { align: 'center', valign: 'middle' } },
+            { text: "", options: { align: 'center', valign: 'middle' } },
+            { text: "", options: { align: 'center', valign: 'middle' } },
+            { text: "", options: { align: 'center', valign: 'middle' } },
+            { text: "", options: { align: 'center', valign: 'middle' } },
+            { text: "", options: { align: 'center', valign: 'middle', color: 'FF0000' } },
+            { text: "", options: { align: 'center', valign: 'middle' } }
+        ]);
+    }
+
+    slide5.addTable(tableRows5, {
+        x: 0.3, y: 1.1, w: 12.8,
+        colW: [1.4, 0.7, 1.9, 1.2, 1.2, 1.2, 1.1, 1.0, 1.4, 1.7],
+        rowH: [0.38, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24],
+        fontSize: 9,
+        fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    // 3. Middle 3 Boxes (Continuous Table matching 100%)
+    const bottomTableHeader5 = [
+        { text: "Sort/Rework Method Used:", options: { bold: true, underline: true, fill: '8CAED6', color: '000000', align: 'left', valign: 'middle' } },
+        { text: "Identify mark:", options: { bold: true, underline: true, fill: '8CAED6', color: '000000', align: 'left', valign: 'middle' } },
+        { text: "Sorting/Rework lot Ship Date", options: { bold: true, underline: true, fill: '8CAED6', color: '000000', align: 'left', valign: 'middle' } }
+    ];
+
+    const bottomTableContent5 = [
+        { text: "V.TKCP screw Sorting parts in stock\nStock : 0 Pcs.\nOK : .... Pcs.\nNG : .... Pcs.", options: { valign: 'top', align: 'left', fill: 'FFFFFF', color: '000000' } },
+        { text: "Mark label ok control", options: { valign: 'top', align: 'left', fill: 'FFFFFF', color: '000000' } },
+        { text: "Sorting date : ....\nShipment replacement part date : ....", options: { valign: 'top', align: 'left', fill: 'FFFFFF', color: '000000' } }
+    ];
+
+    slide5.addTable([bottomTableHeader5, bottomTableContent5], {
+        x: 0.3, y: 3.05, w: 12.8,
+        colW: [4.8, 3.8, 4.2],
+        rowH: [0.35, 2.1],
+        fontSize: 10,
+        fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    // 4. Yellow Instruction Box
+    slide5.addText([
+        { text: "3D - Interim Containment Action (ICA)\n", options: { bold: true, italic: true, color: 'FF0000', fontSize: 10 } },
+        { text: "Take action to ensure that the customer is protected and the problem does not get out of your area. Ensure all suspect parts of the manufacturing process, On-Hand stock, On the way has been quarantine.", options: { italic: true, color: '000000', fontSize: 9.5 } }
+    ], {
+        x: 0.3, y: 5.7, w: 12.8, h: 0.85,
+        fill: { color: 'FFFFCC' },
+        border: { pt: 1, color: 'FFCC00' },
+        margin: [6, 10, 6, 10],
+        valign: 'top',
+        wrap: true
+    });
+
+    // 5. Footer
+    addFooter(slide5, 5);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 6: D4 - IDENTIFY ROOT CAUSE AND ESCAPE CAUSE (PROCESS FLOW)
+    // ───────────────────────────────────────────────────────
+    const slide6 = pptx.addSlide();
+
+    // 1. Header & Tag & Line
+    slide6.addText("D4-Identify Root cause and Escape cause", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 24, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+
+    slide6.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide6.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    // 2. Subhead
+    slide6.addText("Process Flow", {
+        x: 0.3, y: 1.05, w: 3.0, h: 0.3,
+        fontSize: 14, bold: true, underline: true, color: '003366'
+    });
+    slide6.addText("Please fill photo", {
+        x: 10.0, y: 1.05, w: 3.0, h: 0.3,
+        fontSize: 10, bold: true, color: 'F59E0B', align: 'right'
+    });
+
+    // Helpers for Flow Steps
+    const addFlowStep6 = (slide, xBox, yBox, wBox, hBox, text, isRed = false, isDiamond = false) => {
+        if (isDiamond) {
+            slide.addShape(pptx.ShapeType.diamond, {
+                x: xBox, y: yBox, w: wBox, h: hBox,
+                fill: { color: 'FFFFFF' }, line: { color: '000000', width: 1.5 }
+            });
+            slide.addText(text, {
+                x: xBox, y: yBox, w: wBox, h: hBox,
+                fontSize: 8.5, bold: true, color: '000000', align: 'center', valign: 'middle'
+            });
+        } else {
+            slide.addShape(pptx.ShapeType.rect, {
+                x: xBox, y: yBox, w: wBox, h: hBox,
+                fill: { color: 'D9D9D9' }, line: { color: '000000', width: 1.5 }
+            });
+            slide.addText(text, {
+                x: xBox, y: yBox, w: wBox, h: hBox,
+                fontSize: 10, bold: true, color: isRed ? 'FF0000' : '000000', align: 'center', valign: 'middle'
+            });
+        }
+    };
+
+    const addPhotoBox6 = (slide, xBox, yBox, wBox, hBox) => {
+        slide.addShape(pptx.ShapeType.rect, {
+            x: xBox, y: yBox, w: wBox, h: hBox,
+            fill: { color: 'FFFFFF' }, line: { color: '000000', width: 1.5 }
+        });
+        slide.addText("PHOTO AREA", {
+            x: xBox, y: yBox, w: wBox, h: hBox,
+            fontSize: 8, bold: true, color: 'CBD5E1', align: 'center', valign: 'middle'
+        });
+    };
+
+    const addDownArrow6 = (slide, xBox, yBox) => {
+        slide.addShape(pptx.ShapeType.downArrow, {
+            x: xBox + 0.8, y: yBox, w: 0.2, h: 0.25,
+            fill: { color: '000000' }, line: null
+        });
+    };
+
+    // Column Left (5 Steps)
+    // Row 1: DRAW
+    addFlowStep6(slide6, 0.3, 1.45, 1.8, 0.45, "DRAW");
+    addPhotoBox6(slide6, 2.2, 1.45, 3.8, 0.65);
+    addDownArrow6(slide6, 0.3, 1.93);
+
+    // Row 2: BEND 1
+    addFlowStep6(slide6, 0.3, 2.22, 1.8, 0.45, "BEND 1");
+    addPhotoBox6(slide6, 2.2, 2.22, 3.8, 0.65);
+    addDownArrow6(slide6, 0.3, 2.70);
+
+    // Row 3: PIER+BURR (RED TEXT)
+    addFlowStep6(slide6, 0.3, 2.99, 1.8, 0.45, "PIER+BURR", true);
+    addPhotoBox6(slide6, 2.2, 2.99, 3.8, 0.65);
+    addDownArrow6(slide6, 0.3, 3.47);
+
+    // Row 4: BEND 2
+    addFlowStep6(slide6, 0.3, 3.76, 1.8, 0.45, "BEND 2");
+    addPhotoBox6(slide6, 2.2, 3.76, 3.8, 0.65);
+    addDownArrow6(slide6, 0.3, 4.24);
+
+    // Row 5: INSPECTION IN-PROCESS
+    addFlowStep6(slide6, 0.3, 4.53, 1.8, 0.65, "INSPECTION IN-PROCESS", false, true);
+    addPhotoBox6(slide6, 2.2, 4.53, 3.8, 0.65);
+
+    // Column Right (3 Steps)
+    // Row 6: INSPECTION OUT-GOING CHECK
+    addFlowStep6(slide6, 7.0, 1.45, 1.8, 0.65, "INSPECTION OUT-GOING CHECK", false, true);
+    addPhotoBox6(slide6, 8.9, 1.45, 3.8, 0.65);
+    addDownArrow6(slide6, 7.0, 2.13);
+
+    // Row 7: PACKING
+    addFlowStep6(slide6, 7.0, 2.42, 1.8, 0.45, "PACKING");
+    addPhotoBox6(slide6, 8.9, 2.42, 3.8, 0.65);
+    addDownArrow6(slide6, 7.0, 2.90);
+
+    // Row 8: SHIPMENT
+    addFlowStep6(slide6, 7.0, 3.19, 1.8, 0.45, "SHIPMENT");
+    addPhotoBox6(slide6, 8.9, 3.19, 3.8, 0.65);
+
+    // Connector Line from bottom of Diamond 5 to left tip of Diamond 6
+    slide6.addShape(pptx.ShapeType.line, { x: 1.2, y: 5.20, w: 0, h: 0.25, line: { color: '000000', width: 2.0 } });
+    slide6.addShape(pptx.ShapeType.line, { x: 1.2, y: 5.45, w: 5.2, h: 0, line: { color: '000000', width: 2.0 } });
+    slide6.addShape(pptx.ShapeType.line, { x: 6.4, y: 1.78, w: 0, h: 3.67, line: { color: '000000', width: 2.0 } });
+    slide6.addShape(pptx.ShapeType.rightArrow, { x: 6.4, y: 1.68, w: 0.6, h: 0.2, fill: { color: '000000' }, line: null });
+
+    addFooter(slide6, 6);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 7: D4 - ROOT CAUSE ANALYSIS
+    // ───────────────────────────────────────────────────────
+    const slide7 = pptx.addSlide();
+    slide7.addText("D4-Identify Root cause and Escape cause", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 24, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+    slide7.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+    slide7.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    slide7.addText([
+        { text: "ROOT CAUSE ANALYSIS ", options: { bold: true, underline: true, color: '003366', fontSize: 14 } },
+        { text: "(Why problem happen ?)", options: { bold: true, color: 'FF0000', fontSize: 14 } }
+    ], { x: 0.3, y: 1.1, w: 12.8, h: 0.35 });
+
+    const tableHeader7 = [
+        { text: "1", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Why was the non conformity made?", options: { bold: true, align: 'left', valign: 'middle', fill: 'D9E1F2', color: '000000' } }
+    ];
+    const tableRows7 = [tableHeader7];
+    for (let i = 1; i <= 5; i++) {
+        tableRows7.push([
+            { text: `Why${i}`, options: { bold: true, align: 'center', valign: 'middle', fill: 'D9D9D9', color: '000000' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } }
+        ]);
+    }
+    slide7.addTable(tableRows7, {
+        x: 0.3, y: 1.5, w: 12.8,
+        colW: [1.2, 11.6],
+        rowH: [0.42, 0.65, 0.65, 0.65, 0.65, 0.65],
+        fontSize: 11, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide7.addText([
+        { text: "D4 - Identify Root Cause and Escape Cause\n", options: { bold: true, italic: true, color: 'DC2626', fontSize: 10 } },
+        { text: "- Identify all potential reasons which could explain why the problem occurred.\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ROOT CAUSE: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "Explain what went wrong with the component, process, or system\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ESCAPE CAUSE: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "State how the problem got through the system without being detected and shipped before reaching the customer.", options: { color: '1E293B', fontSize: 9.5 } }
+    ], {
+        x: 0.3, y: 5.5, w: 12.8, h: 0.95,
+        fill: { color: 'FEFCE8' },
+        border: { pt: 1, color: 'EAB308' },
+        margin: [6, 10, 6, 10],
+        valign: 'top', wrap: true
+    });
+    addFooter(slide7, 7);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 8: D4 - ESCAPE CAUSE ANALYSIS
+    // ───────────────────────────────────────────────────────
+    const slide8 = pptx.addSlide();
+    slide8.addText("D4-Identify Root cause and Escape cause", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 24, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+    slide8.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+    slide8.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    slide8.addText([
+        { text: "ESCAPE CAUSE ANALYSIS ", options: { bold: true, underline: true, color: '003366', fontSize: 14 } },
+        { text: "(Why not detected ?)", options: { bold: true, color: 'FF0000', fontSize: 14 } }
+    ], { x: 0.3, y: 1.1, w: 12.8, h: 0.35 });
+
+    const tableHeader8 = [
+        { text: "1", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Why was the non conformity could not detect ?", options: { bold: true, align: 'left', valign: 'middle', fill: 'D9E1F2', color: '000000' } }
+    ];
+    const tableRows8 = [tableHeader8];
+    for (let i = 1; i <= 5; i++) {
+        tableRows8.push([
+            { text: `Why${i}`, options: { bold: true, align: 'center', valign: 'middle', fill: 'D9D9D9', color: '000000' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } }
+        ]);
+    }
+    slide8.addTable(tableRows8, {
+        x: 0.3, y: 1.5, w: 12.8,
+        colW: [1.2, 11.6],
+        rowH: [0.42, 0.65, 0.65, 0.65, 0.65, 0.65],
+        fontSize: 11, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide8.addText([
+        { text: "D4 - Identify Root Cause and Escape Cause\n", options: { bold: true, italic: true, color: 'DC2626', fontSize: 10 } },
+        { text: "- Identify all potential reasons which could explain why the problem occurred.\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ROOT CAUSE: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "Explain what went wrong with the component, process, or system\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ESCAPE CAUSE: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "State how the problem got through the system without being detected and shipped before reaching the customer.", options: { color: '1E293B', fontSize: 9.5 } }
+    ], {
+        x: 0.3, y: 5.5, w: 12.8, h: 0.95,
+        fill: { color: 'FEFCE8' },
+        border: { pt: 1, color: 'EAB308' },
+        margin: [6, 10, 6, 10],
+        valign: 'top', wrap: true
+    });
+    addFooter(slide8, 8);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 9: D4 - SYSTEM CAUSE ANALYSIS
+    // ───────────────────────────────────────────────────────
+    const slide9 = pptx.addSlide();
+    slide9.addText("D4-Identify Root cause and Escape cause", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 24, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+    slide9.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+    slide9.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    slide9.addText([
+        { text: "SYSTEM CAUSE ANALYSIS ", options: { bold: true, underline: true, color: '003366', fontSize: 14 } },
+        { text: "(Why system failed ?)", options: { bold: true, color: 'FF0000', fontSize: 14 } }
+    ], { x: 0.3, y: 1.1, w: 12.8, h: 0.35 });
+
+    const tableHeader9 = [
+        { text: "1", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Why was the process & system failed ?", options: { bold: true, align: 'left', valign: 'middle', fill: 'D9E1F2', color: '000000' } }
+    ];
+    const tableRows9 = [tableHeader9];
+    for (let i = 1; i <= 5; i++) {
+        tableRows9.push([
+            { text: `Why${i}`, options: { bold: true, align: 'center', valign: 'middle', fill: 'D9D9D9', color: '000000' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } }
+        ]);
+    }
+    slide9.addTable(tableRows9, {
+        x: 0.3, y: 1.5, w: 12.8,
+        colW: [1.2, 11.6],
+        rowH: [0.42, 0.65, 0.65, 0.65, 0.65, 0.65],
+        fontSize: 11, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide9.addText([
+        { text: "D4 - Identify Root Cause and Escape Cause\n", options: { bold: true, italic: true, color: 'DC2626', fontSize: 10 } },
+        { text: "- Identify all potential reasons which could explain why the problem occurred.\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ROOT CAUSE: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "Explain what went wrong with the component, process, or system\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ESCAPE CAUSE: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "State how the problem got through the system without being detected and shipped before reaching the customer.", options: { color: '1E293B', fontSize: 9.5 } }
+    ], {
+        x: 0.3, y: 5.5, w: 12.8, h: 0.95,
+        fill: { color: 'FEFCE8' },
+        border: { pt: 1, color: 'EAB308' },
+        margin: [6, 10, 6, 10],
+        valign: 'top', wrap: true
+    });
+    addFooter(slide9, 9);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 10: D5 - ROOT CAUSE ACTION
+    // ───────────────────────────────────────────────────────
+    const slide10 = pptx.addSlide();
+    slide10.addText("D5-Developing permanent corrective action", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 24, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+    slide10.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+    slide10.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    slide10.addText([
+        { text: "ROOT CAUSE ACTION ", options: { bold: true, underline: true, color: '003366', fontSize: 14 } },
+        { text: "   Please fill photo evidence Before & After.", options: { bold: true, color: 'FF6600', fontSize: 12 } }
+    ], { x: 0.3, y: 1.05, w: 12.8, h: 0.35 });
+
+    const tableHeader10 = [
+        { text: "Before", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "After", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Improvement Detail", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Effective lot", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Identify lot", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "MP Level", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } }
+    ];
+    const tableRows10 = [tableHeader10];
+    for (let i = 1; i <= 4; i++) {
+        tableRows10.push([
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } }
+        ]);
+    }
+    slide10.addTable(tableRows10, {
+        x: 0.3, y: 1.45, w: 12.8,
+        colW: [2.2, 2.2, 3.2, 1.7, 1.7, 1.8],
+        rowH: [0.42, 0.90, 0.90, 0.90, 0.90],
+        fontSize: 10, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide10.addText([
+        { text: "D5 - Developing permanent corrective action\n", options: { bold: true, italic: true, color: 'DC2626', fontSize: 10 } },
+        { text: "- Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be \"mistake proof\".\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ROOT CAUSE ACTIONS: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "List chosen corrective actions necessary to permanently eliminate root cause.\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ESCAPE CAUSE ACTIONS: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "List chosen corrective actions that eliminate escape root cause.", options: { color: '1E293B', fontSize: 9.5 } }
+    ], {
+        x: 0.3, y: 5.5, w: 12.8, h: 0.95,
+        fill: { color: 'FEFCE8' },
+        border: { pt: 1, color: 'EAB308' },
+        margin: [6, 10, 6, 10],
+        valign: 'top', wrap: true
+    });
+    addFooter(slide10, 10);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 11: D5 - ESCAPE CAUSE ACTION
+    // ───────────────────────────────────────────────────────
+    const slide11 = pptx.addSlide();
+    slide11.addText("D5-Developing permanent corrective action", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 24, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+    slide11.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+    slide11.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    slide11.addText([
+        { text: "ESCAPE CAUSE ACTION ", options: { bold: true, underline: true, color: '003366', fontSize: 14 } },
+        { text: "   Please fill photo evidence Before & After.", options: { bold: true, color: 'FF6600', fontSize: 12 } }
+    ], { x: 0.3, y: 1.05, w: 12.8, h: 0.35 });
+
+    const tableHeader11 = [
+        { text: "Before", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "After", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Improvement Detail", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Effective lot", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Identify lot", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "MP Level", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } }
+    ];
+    const tableRows11 = [tableHeader11];
+    for (let i = 1; i <= 4; i++) {
+        tableRows11.push([
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } }
+        ]);
+    }
+    slide11.addTable(tableRows11, {
+        x: 0.3, y: 1.45, w: 12.8,
+        colW: [2.2, 2.2, 3.2, 1.7, 1.7, 1.8],
+        rowH: [0.42, 0.90, 0.90, 0.90, 0.90],
+        fontSize: 10, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide11.addText([
+        { text: "D5 - Developing permanent corrective action\n", options: { bold: true, italic: true, color: 'DC2626', fontSize: 10 } },
+        { text: "- Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be \"mistake proof\".\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ROOT CAUSE ACTIONS: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "List chosen corrective actions necessary to permanently eliminate root cause.\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ESCAPE CAUSE ACTIONS: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "List chosen corrective actions that eliminate escape root cause.", options: { color: '1E293B', fontSize: 9.5 } }
+    ], {
+        x: 0.3, y: 5.5, w: 12.8, h: 0.95,
+        fill: { color: 'FEFCE8' },
+        border: { pt: 1, color: 'EAB308' },
+        margin: [6, 10, 6, 10],
+        valign: 'top', wrap: true
+    });
+    addFooter(slide11, 11);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 12: D5 - SYSTEM CAUSE ACTION
+    // ───────────────────────────────────────────────────────
+    const slide12 = pptx.addSlide();
+    slide12.addText("D5-Developing permanent corrective action", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 24, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+    slide12.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+    slide12.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    slide12.addText([
+        { text: "SYSTEM CAUSE ACTION ", options: { bold: true, underline: true, color: '003366', fontSize: 14 } },
+        { text: "   Please fill photo evidence Before & After.", options: { bold: true, color: 'FF6600', fontSize: 12 } }
+    ], { x: 0.3, y: 1.05, w: 12.8, h: 0.35 });
+
+    const tableHeader12 = [
+        { text: "Before", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "After", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Improvement Detail", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Effective lot", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Identify lot", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "MP Level", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } }
+    ];
+    const tableRows12 = [tableHeader12];
+    for (let i = 1; i <= 4; i++) {
+        tableRows12.push([
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } }
+        ]);
+    }
+    slide12.addTable(tableRows12, {
+        x: 0.3, y: 1.45, w: 12.8,
+        colW: [2.2, 2.2, 3.2, 1.7, 1.7, 1.8],
+        rowH: [0.42, 0.90, 0.90, 0.90, 0.90],
+        fontSize: 10, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide12.addText([
+        { text: "D5 - Developing permanent corrective action\n", options: { bold: true, italic: true, color: 'DC2626', fontSize: 10 } },
+        { text: "- Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be \"mistake proof\".\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ROOT CAUSE ACTIONS: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "List chosen corrective actions necessary to permanently eliminate root cause.\n", options: { color: '1E293B', fontSize: 9.5 } },
+        { text: "ESCAPE CAUSE ACTIONS: ", options: { bold: true, italic: true, color: 'DC2626', fontSize: 9.5 } },
+        { text: "List chosen corrective actions that eliminate escape root cause.", options: { color: '1E293B', fontSize: 9.5 } }
+    ], {
+        x: 0.3, y: 5.5, w: 12.8, h: 0.95,
+        fill: { color: 'FEFCE8' },
+        border: { pt: 1, color: 'EAB308' },
+        margin: [6, 10, 6, 10],
+        valign: 'top', wrap: true
+    });
+    addFooter(slide12, 12);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 13: D6 - IMPLEMENT PERMANENT CORRECTIVE ACTION
+    // ───────────────────────────────────────────────────────
+    const slide13 = pptx.addSlide();
+    slide13.addText("D6-Implement permanent corrective action", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 24, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+    slide13.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+    slide13.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    const tableHeader13 = [
+        { text: "Corrective action", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Implement date", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Defect ratio\n(Before action)", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Defect ratio\n(After action)", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Verification method", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Person in charge", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Verify date", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } }
+    ];
+    const tableRows13 = [tableHeader13];
+    for (let i = 1; i <= 5; i++) {
+        tableRows13.push([
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } }
+        ]);
+    }
+    slide13.addTable(tableRows13, {
+        x: 0.3, y: 1.15, w: 12.8,
+        colW: [3.3, 1.4, 1.4, 1.4, 2.3, 1.5, 1.5],
+        rowH: [0.42, 0.72, 0.72, 0.72, 0.72, 0.72],
+        fontSize: 10, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide13.addText([
+        { text: "6D - Implement Permanent Corrective Actions\n", options: { bold: true, italic: true, color: 'DC2626', fontSize: 10 } },
+        { text: "Create a clear action plan to solve the problem by stating WHO will do WHAT and by WHEN. How to verify the corrective actions with before and after result.", options: { color: '000000', fontSize: 9.5 } }
+    ], {
+        x: 0.3, y: 5.6, w: 12.8, h: 0.85,
+        fill: { color: 'FFFFCC' },
+        border: { pt: 1, color: 'CCCCCC' },
+        margin: [6, 10, 6, 10],
+        valign: 'top', wrap: true
+    });
+    addFooter(slide13, 13);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 14: D7 - PREVENTIVE RECURRENCE
+    // ───────────────────────────────────────────────────────
+    const slide14 = pptx.addSlide();
+    slide14.addText("D7-Preventive Recurrence", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 26, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+    slide14.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+    slide14.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    // Top Split Section (How to avoid)
+    slide14.addText("How to avoid recurrence this problem in the future ?", {
+        x: 0.3, y: 1.08, w: 6.3, h: 0.32,
+        fontSize: 10, bold: true, fill: { color: 'B4C7E7' }, color: '000000',
+        align: 'left', valign: 'middle', border: { pt: 1, color: '000000' }, margin: [0, 8, 0, 8]
+    });
+    const d7HowText = "-Add rack packing std.\n-Rev.WI-SP01-01 to prohibit use of temporary racks...\n-Provide training WI-SP01-01 to the Production...\n-Rev. WI-QC03-01 to prohibit use of temporary racks...\n-Provide training WI-QC03-01 to the ipqc and oqc...";
+    slide14.addText(d7HowText, {
+        x: 0.3, y: 1.40, w: 6.3, h: 0.95,
+        fontSize: 9, fontFace: 'Arial', color: '000000',
+        valign: 'top', border: { pt: 1, color: '000000' }, margin: [4, 8, 4, 8]
+    });
+
+    slide14.addText("Risk part has similar structure/process and Action plan.", {
+        x: 6.8, y: 1.08, w: 6.3, h: 0.32,
+        fontSize: 10, bold: true, fill: { color: 'B4C7E7' }, color: '000000',
+        align: 'left', valign: 'middle', border: { pt: 1, color: '000000' }, margin: [0, 8, 0, 8]
+    });
+    const rightRiskHeader14 = [
+        { text: "TTL Q'ty", options: { bold: true, align: 'center', valign: 'middle', fill: 'D9E1F2', color: '000000' } },
+        { text: "Action", options: { bold: true, align: 'center', valign: 'middle', fill: 'D9E1F2', color: '000000' } },
+        { text: "Plan", options: { bold: true, align: 'center', valign: 'middle', fill: 'D9E1F2', color: '000000' } }
+    ];
+    const rightRiskRow14 = [
+        { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+        { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } }
+    ];
+    slide14.addTable([rightRiskHeader14, rightRiskRow14], {
+        x: 6.8, y: 1.40, w: 6.3,
+        colW: [1.3, 3.2, 1.8],
+        rowH: [0.30, 0.65],
+        fontSize: 9.5, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide14.addText("Has the necessary document been revised/ updated ?", {
+        x: 0.3, y: 2.42, w: 12.8, h: 0.28,
+        fontSize: 11, bold: true, color: '000000', valign: 'middle'
+    });
+
+    const considerHeader14 = [
+        { text: "Consider", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Updated?\n(Y/N)", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Details", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Document no.", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } },
+        { text: "Due date", options: { bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } }
+    ];
+    const considerItems14 = [
+        ['1. Part Drawing / Specification', 'N'],
+        ['2. Work Instruction', 'Y'],
+        ['3. Inspection instruction / Q-Point', 'N'],
+        ['4. Inspection check sheet', 'N'],
+        ['5. Process Flow Chart / Control Plan', 'N'],
+        ['6. P-FMEA', 'N'],
+        ['7. Machine Parameter', 'N'],
+        ['8. Supplier Process Characteristics', 'N'],
+        ['9. PM Plan / Detail', 'N'],
+        ['10. Others document', 'Y']
+    ];
+    const considerRows14 = [considerHeader14];
+    considerItems14.forEach(item => {
+        considerRows14.push([
+            { text: item[0], options: { align: 'left', valign: 'middle', fill: 'FFFFFF', bold: false } },
+            { text: item[1], options: { align: 'center', valign: 'middle', fill: 'FFFFFF', bold: true } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } }
+        ]);
+    });
+
+    slide14.addTable(considerRows14, {
+        x: 0.3, y: 2.72, w: 12.8,
+        colW: [4.2, 1.2, 3.8, 2.1, 1.5],
+        rowH: [0.28, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22],
+        fontSize: 8.5, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide14.addText([
+        { text: "7D - Prevent Recurrence\n", options: { bold: true, italic: true, color: 'DC2626', fontSize: 10 } },
+        { text: "Ensure the problem does not happen again ANYWHERE by using Foolproof, POKAYOKE etc. Communicate your results to all areas including similar part. Submit revised all related documents to us to review. (if have)", options: { color: '000000', fontSize: 9.0 } }
+    ], {
+        x: 0.3, y: 5.65, w: 12.8, h: 0.80,
+        fill: { color: 'FFFFCC' },
+        border: { pt: 1, color: 'FFCC00' },
+        margin: [4, 8, 4, 8],
+        valign: 'top', wrap: true
+    });
+    addFooter(slide14, 14);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 15: D8 - TEAM AND INDIVIDUAL RECOGNITION
+    // ───────────────────────────────────────────────────────
+    const slide15 = pptx.addSlide();
+    slide15.addText("D8-Team and Individual Recognition", {
+        x: 0.3, y: 0.35, w: 9.6, h: 0.6,
+        fontSize: 26, fontFace: 'Arial Black', bold: true, color: '000000', wrap: false, valign: 'bottom'
+    });
+    slide15.addText("<Fill by Supplier>", { 
+        x: 10.0, y: 0.45, w: 3.0, h: 0.4, 
+        fontSize: 12, bold: true, color: 'FFFFFF', fill: { color: '0000FF' }, 
+        align: 'center', valign: 'middle',
+        border: { pt: 1, color: '000000' }
+    });
+    slide15.addShape(pptx.ShapeType.line, { 
+        x: 0.3, y: 1.0, w: 12.8, h: 0, 
+        line: { color: '003366', width: 6.0 } 
+    });
+
+    const teamTitleRow15 = [
+        { text: "Team Members", options: { colspan: 3, bold: true, align: 'center', valign: 'middle', fill: 'B4C7E7', color: '000000' } }
+    ];
+    const teamSubHeader15 = [
+        { text: "No.", options: { bold: true, align: 'center', valign: 'middle', fill: 'D9E1F2', color: '000000' } },
+        { text: "Name", options: { bold: true, align: 'center', valign: 'middle', fill: 'D9E1F2', color: '000000' } },
+        { text: "Dept.", options: { bold: true, align: 'center', valign: 'middle', fill: 'D9E1F2', color: '000000' } }
+    ];
+    const teamRows15 = [teamTitleRow15, teamSubHeader15];
+    for (let i = 1; i <= 6; i++) {
+        teamRows15.push([
+            { text: `${i}`, options: { bold: true, align: 'center', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'left', valign: 'middle', fill: 'FFFFFF' } },
+            { text: "", options: { align: 'center', valign: 'middle', fill: 'FFFFFF' } }
+        ]);
+    }
+
+    slide15.addTable(teamRows15, {
+        x: 1.8, y: 1.15, w: 9.8,
+        colW: [1.0, 6.0, 2.8],
+        rowH: [0.32, 0.28, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30],
+        fontSize: 10.5, fontFace: 'Arial',
+        border: { pt: 1, color: '000000' }
+    });
+
+    slide15.addText("“Thank you for all cooperation”", {
+        x: 0.3, y: 4.25, w: 12.8, h: 0.8,
+        fontSize: 26, fontFace: 'Arial Black', bold: true, color: '1E293B',
+        align: 'center', valign: 'middle'
+    });
+
+    slide15.addText([
+        { text: "8D – Team and Individual Recognition\n", options: { bold: true, italic: true, color: 'D32F2F', fontSize: 10 } },
+        { text: "8D process is the time to recognize the team efforts and special team member contributions.", options: { color: '333333', fontSize: 9.5 } }
+    ], {
+        x: 0.3, y: 5.6, w: 12.8, h: 0.85,
+        fill: { color: 'FFFDE7' },
+        border: { pt: 1, color: 'FBC02D' },
+        margin: [6, 10, 6, 10],
+        valign: 'top', wrap: true
+    });
+    addFooter(slide15, 15);
+
+    // ───────────────────────────────────────────────────────
+    // SLIDE 16: THANK YOU PAGE
+    // ───────────────────────────────────────────────────────
+    const slide16 = pptx.addSlide();
+    
+    slide16.addShape(pptx.ShapeType.rect, {
+        x: 0.3, y: 1.2, w: 12.8, h: 0.12,
+        fill: { color: '003366' }, line: null
+    });
+
+    slide16.addText("THANK YOU.", {
+        x: 0.3, y: 2.2, w: 12.8, h: 3.2,
+        fontSize: 64, fontFace: 'Arial Black', bold: true, color: '003366',
+        align: 'center', valign: 'middle'
+    });
+
+    addFooter(slide16, 16);
+
+    await pptx.writeFile({ fileName: `8D_Full_Report_${caseData.id}.pptx` });
+    toast("✅ ส่งออกรายงาน 8D สำเร็จ!", "success");
 }
+
+
 
 function renderDashboard() {
     const tbody = document.getElementById('eight-d-list-body');
     const statTotal = document.getElementById('stat-8d-total');
     const statPending = document.getElementById('stat-8d-pending');
+    const statOverdue = document.getElementById('stat-8d-overdue');
 
-    // 1. คำนวณตัวเลข Quick Stats (Total Cases และ D1-D3 Open)
+    const now = new Date();
+
+    // 1. คำนวณตัวเลข Quick Stats (Total Cases, D1-D3 Open และ Overdue >15d)
     const totalCount = _cases.length;
-    const d1ToD3Count = _cases.filter(c => {
+    let d1ToD3Count = 0;
+    let overdueCount = 0;
+
+    _cases.forEach(c => {
         const s = (c.status || '').toUpperCase();
+        const isClosed = s.includes('D8') || s.includes('CLOSED') || s.includes('COMPLETE');
+        const createdAt = c.created_at ? new Date(c.created_at) : now;
+        const openDays = Math.floor(Math.max(0, now - createdAt) / (1000 * 60 * 60 * 24));
+
         const stepMatch = s.match(/D(\d+)/);
+        let stepNum = 1;
         if (stepMatch) {
-            const num = parseInt(stepMatch[1], 10);
-            return num >= 1 && num <= 3;
+            stepNum = parseInt(stepMatch[1], 10);
         }
-        return true; // ค่าเริ่มต้นถ้าพึ่งสร้างเคส (D1_OPEN)
-    }).length;
+        
+        if (stepNum >= 1 && stepNum <= 3 && !isClosed) {
+            d1ToD3Count++;
+        }
+
+        if (!isClosed && openDays >= 15) {
+            overdueCount++;
+        }
+    });
 
     if (statTotal) statTotal.textContent = totalCount;
     if (statPending) statPending.textContent = d1ToD3Count;
+    if (statOverdue) statOverdue.textContent = overdueCount;
 
     // 2. ปรับแต่ง UI ของ Stat Cards ปุ่มที่เลือกอยู่
     const cardTotal = document.getElementById('card-stat-8d-total');
     const cardPending = document.getElementById('card-stat-8d-pending');
+    const cardOverdue = document.getElementById('card-stat-8d-overdue');
     if (cardTotal) {
         if (_statFilter === 'all') {
             cardTotal.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50/50');
@@ -14732,6 +15806,13 @@ function renderDashboard() {
             cardPending.classList.add('ring-2', 'ring-orange-500', 'bg-orange-50/50');
         } else {
             cardPending.classList.remove('ring-2', 'ring-orange-500', 'bg-orange-50/50');
+        }
+    }
+    if (cardOverdue) {
+        if (_statFilter === 'overdue') {
+            cardOverdue.classList.add('ring-2', 'ring-rose-500', 'bg-rose-50/50');
+        } else {
+            cardOverdue.classList.remove('ring-2', 'ring-rose-500', 'bg-rose-50/50');
         }
     }
 
@@ -14751,15 +15832,21 @@ function renderDashboard() {
 
     // 4. กรองรายการเคสตาม Filter และ Search Query
     const filteredCases = _cases.filter(c => {
+        const s = (c.status || '').toUpperCase();
+        const isClosed = s.includes('D8') || s.includes('CLOSED') || s.includes('COMPLETE');
+        const createdAt = c.created_at ? new Date(c.created_at) : now;
+        const openDays = Math.floor(Math.max(0, now - createdAt) / (1000 * 60 * 60 * 24));
+
         if (_statFilter === 'd1-d3') {
-            const s = (c.status || '').toUpperCase();
             const stepMatch = s.match(/D(\d+)/);
             let isD1D3 = true;
             if (stepMatch) {
                 const num = parseInt(stepMatch[1], 10);
                 isD1D3 = (num >= 1 && num <= 3);
             }
-            if (!isD1D3) return false;
+            if (!isD1D3 || isClosed) return false;
+        } else if (_statFilter === 'overdue') {
+            if (isClosed || openDays < 15) return false;
         }
 
         if (!query) return true;
@@ -14786,26 +15873,79 @@ function renderDashboard() {
     tbody.innerHTML = filteredCases.map(c => {
         // คำนวณเปอร์เซ็นต์ความคืบหน้าตาม Status
         // D1 = 12.5%, D2 = 25%, ..., D8 = 100%
-        const stepMatch = (c.status || '').match(/D(\d+)/);
+        const statusUpper = (c.status || '').toUpperCase();
+        const isD8Closed = statusUpper.includes('D8') || statusUpper.includes('CLOSED') || statusUpper.includes('COMPLETE');
+
+        const stepMatch = statusUpper.match(/D(\d+)/);
         const stepNum = stepMatch ? parseInt(stepMatch[1], 10) : 1;
         const progressPct = Math.min(100, Math.max(12.5, (stepNum / 8) * 100));
+
+        // ⏱️ คำนวณ Timeline & Aging (ความเร็วคือหัวใจของ 8D: 3D <= 24 ชม., 8D <= 15 วัน)
+        const createdAt = c.created_at ? new Date(c.created_at) : now;
+        const diffMs = Math.max(0, now - createdAt);
+        const openDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const openHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+        const isOverdue8D = !isD8Closed && openDays >= 15;
+        const isOverdue3D = !isD8Closed && stepNum <= 3 && (openDays >= 1 || openHours >= 24);
+        const isWarning10D = !isD8Closed && openDays >= 10 && openDays < 15;
+
+        // Conditional row background for Deadline Alerts
+        let rowClass = "group transition-all duration-300";
+        let barColor = "from-blue-400 to-blue-600";
+        let statusBadgeClass = "text-blue-600";
+
+        if (isD8Closed) {
+            barColor = "from-emerald-400 to-emerald-600";
+            statusBadgeClass = "text-emerald-600 font-extrabold";
+            rowClass += " hover:bg-slate-50/80";
+        } else if (isOverdue8D) {
+            barColor = "from-rose-500 to-red-600";
+            statusBadgeClass = "text-rose-600 font-black animate-pulse";
+            rowClass += " bg-rose-50/90 hover:bg-rose-100/90 border-l-4 border-l-rose-500 shadow-sm";
+        } else if (isOverdue3D) {
+            barColor = "from-amber-400 to-orange-500";
+            statusBadgeClass = "text-amber-600 font-extrabold";
+            rowClass += " bg-amber-50/80 hover:bg-amber-100/90 border-l-4 border-l-amber-500";
+        } else if (isWarning10D) {
+            barColor = "from-orange-400 to-amber-500";
+            statusBadgeClass = "text-orange-600 font-bold";
+            rowClass += " bg-orange-50/30 hover:bg-orange-100/60";
+        } else {
+            rowClass += " hover:bg-blue-50/40";
+        }
+
+        // Aging Badge HTML
+        let agingBadgeHtml = "";
+        if (isD8Closed) {
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Closed (${openDays}d)</span>`;
+        } else if (isOverdue8D) {
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-300 shadow-2xs animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span> 🚨 Open ${openDays} Days (Overdue >15d)</span>`;
+        } else if (isOverdue3D) {
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> ⏰ 3D Overdue (${openDays === 0 ? openHours + 'h' : openDays + 'd'})</span>`;
+        } else if (isWarning10D) {
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-black text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full border border-orange-300 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> ⚠️ Open ${openDays} Days</span>`;
+        } else {
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">⏱️ Open ${openDays > 0 ? openDays + ' Days' : openHours + ' Hours'}</span>`;
+        }
 
         const displayTitle = c.problem_title || 'Untitled Report';
         
         return `
-        <tr class="group hover:bg-blue-50/40 transition-all duration-300" data-rid="${c.id}">
-            <!-- คอลัมน์ ID & ประเภท -->
+        <tr class="${rowClass}" data-rid="${c.id}">
+            <!-- คอลัมน์ ID & ประเภท & Aging Badge -->
             <td class="px-6 py-5">
-                <div class="flex flex-col">
-                    <span class="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md w-fit mb-1 tracking-tighter">CASE ID</span>
-                    <span class="font-mono text-[11px] text-slate-400 font-bold">${c.id}</span>
+                <div class="flex flex-col gap-1.5">
+                    <span class="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md w-fit tracking-tighter">CASE ID</span>
+                    <span class="font-mono text-[11px] text-slate-500 font-bold">${c.id}</span>
+                    <div class="mt-0.5">${agingBadgeHtml}</div>
                 </div>
             </td>
 
             <!-- คอลัมน์ รายละเอียดปัญหา -->
             <td class="px-6 py-5">
                 <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm shrink-0">
                         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </div>
                     <div class="flex flex-col max-w-md">
@@ -14831,12 +15971,12 @@ function renderDashboard() {
             <td class="px-6 py-5">
                 <div class="flex flex-col gap-2 min-w-[140px]">
                     <div class="flex justify-between items-center">
-                        <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest">${c.status}</span>
+                        <span class="text-[10px] uppercase tracking-widest ${statusBadgeClass}">${c.status}</span>
                         <span class="text-[10px] font-black text-slate-400">${Math.round(progressPct)}%</span>
                     </div>
                     <!-- Progress Bar -->
                     <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                        <div class="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-1000" style="width: ${progressPct}%"></div>
+                        <div class="h-full bg-gradient-to-r ${barColor} rounded-full transition-all duration-1000" style="width: ${progressPct}%"></div>
                     </div>
                 </div>
             </td>
@@ -15003,32 +16143,50 @@ if (_currentSlide === 0) {
         // แผ่นที่ 2: D1- Assign person in charge
         // ==========================================
         else if (_currentSlide === 1) {
+            const s1Saved = c.report_data?.slide_1 || {};
+            const blacklist = ["D1-", "Assign person in charge", "Fill by CTC", "Supplier name member", "TCTC member", "Fill by Supplier", "Person1", "Person2", "Person3", "Person4", "Person5", "Person6"];
+            const getS1Val = (idx, defaultVal = "") => {
+                let raw = s1Saved[`f_${idx}`];
+                if (raw !== undefined && raw !== null) {
+                    const cleanText = raw.replace(/<[^>]*>?/gm, '').trim();
+                    if (blacklist.some(b => cleanText.toLowerCase().includes(b.toLowerCase()))) {
+                        return defaultVal;
+                    }
+                    return raw;
+                }
+                return defaultVal;
+            };
+
             const renderTable = (title, isSupplier = false) => `
                 <table style="width:100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; flex: 1;">
                     <thead style="background: #99badd;">
                         <tr>
-                            <th colspan="3" contenteditable="true" style="padding: 6px 5px; border: 1.2px solid #000; font-size: 13px; font-weight: 900; text-align: center; color: ${isSupplier ? 'red' : '#000'}; text-transform: uppercase; outline: none;">
+                            <th colspan="3" style="padding: 6px 5px; border: 1.2px solid #000; font-size: 13px; font-weight: 900; text-align: center; color: ${isSupplier ? '#FF0000' : '#000'}; text-transform: uppercase; outline: none;">
                                 ${title}
                             </th>
                         </tr>
                     </thead>
                     <tbody>
                         ${[1, 2, 3, 4, 5, 6].map(i => {
-                            let dummyName = "";
-                            let dummyRole = "";
+                            const baseIdx = isSupplier ? (i + 5) * 2 : (i - 1) * 2;
+                            let defaultName = "";
+                            let defaultRole = "";
                             if (!isSupplier) {
-                                if (i === 1) { dummyName = "Ms.Nipawan J."; dummyRole = "Senior Specialist (QAP)"; }
-                                if (i === 2) { dummyName = "Mr.Komsan N."; dummyRole = "Senior Engineer (QAP)"; }
+                                if (i === 1) { defaultName = "Ms.Nipawan J."; defaultRole = "Senior Specialist (QAP)"; }
+                                if (i === 2) { defaultName = "Mr.Komsan N."; defaultRole = "Senior Engineer (QAP)"; }
                             }
+                            const initialName = getS1Val(baseIdx, defaultName);
+                            const initialRole = getS1Val(baseIdx + 1, defaultRole);
+
                             return `
                             <tr style="height: 27px;">
-                                <td rowspan="2" contenteditable="true" style="width: 25%; text-align: center; font-weight: 950; border: 1.2px solid #000; font-size: 11px; background: #fff; color: #000; outline: none;">Person${i}</td>
+                                <td rowspan="2" style="width: 25%; text-align: center; font-weight: 950; border: 1.2px solid #000; font-size: 11px; background: #fff; color: #000; outline: none;">Person${i}</td>
                                 <td style="width: 15%; font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Name:</td>
-                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyName}</td>
+                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${initialName}</td>
                             </tr>
                             <tr style="height: 27px;">
                                 <td style="font-weight: 900; border: 1.2px solid #000; padding-left: 5px; font-size: 10px; background: #fff; color: #000;">Role:</td>
-                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${dummyRole}</td>
+                                <td contenteditable="true" style="border: 1.2px solid #000; padding-left: 8px; font-size: 11px; font-weight: 700; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none;">${initialRole}</td>
                             </tr>
                         `}).join('')}
                     </tbody>
@@ -15037,21 +16195,21 @@ if (_currentSlide === 0) {
             mainContent = `
                 <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
                     <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-bottom: 5px; flex-shrink: 0; overflow: hidden;">
-                        <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
-                            D1- Assign person in charge
+                        <h1 style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
+                            D1-Assign person in charge
                         </h1>
-                        <div contenteditable="true" style="background: blue; color: yellow; padding: 3px 12px; font-weight: 950; font-size: 11px; border: 1px solid #000; text-transform: uppercase; flex-shrink: 0; margin-left: 15px; outline: none;">
-                            &lt;Fill by CTC & Supplier&gt;
+                        <div style="background: #0000FF; color: #FFFF00; padding: 3px 12px; font-weight: 950; font-size: 11px; border: 1.2px solid #000; text-transform: uppercase; flex-shrink: 0; margin-left: 15px; outline: none; border-radius: 2px;">
+                            &lt;Fill by CTC &amp; Supplier&gt;
                         </div>
                     </div>
                     <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
 
                     <div style="flex: 1; min-height: 0; display: flex; gap: 25px; align-items: flex-start; justify-content: space-between; width: 100%; overflow: hidden;">
                         <div style="flex: 1; min-width: 0;">
-                            ${renderTable('TCTC member', false)}
+                            ${renderTable('TCTC MEMBER', false)}
                         </div>
                         <div style="flex: 1; min-width: 0;">
-                            ${renderTable('Supplier name member', true)}
+                            ${renderTable('SUPPLIER NAME MEMBER', true)}
                         </div>
                     </div>
                 </div>
@@ -15168,8 +16326,10 @@ else if (_currentSlide === 2) {
                     <h3 contenteditable="true" style="font-size: 15px; font-weight: 950; margin: 0 0 5px 0; color: #000; outline: none; text-transform: uppercase;">
                         Describe of Defect <span style="background: yellow; color: red; padding: 0 5px; font-style: italic; font-size: 11px; font-weight: 800;">(Picture and Judgement method)</span>
                     </h3>
-                    <div style="flex: 1; border: 2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-image: url('${supportImage}'); background-size: contain; background-repeat: no-repeat; background-position: center; border-radius: 4px;">
-                        ${!supportImage ? '<span style="color:#eee; font-size:40px; font-weight:900;">PHOTO AREA</span>' : ''}
+                    <div style="flex: 1; border: 2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; border-radius: 4px;">
+                        ${supportImage 
+                            ? `<img src="${supportImage}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto;">` 
+                            : '<span style="color:#eee; font-size:40px; font-weight:900;">PHOTO AREA</span>'}
                     </div>
                 </div>
             </div>
@@ -15190,18 +16350,22 @@ else if (_currentSlide === 3) {
         year: 'numeric'
     });
     
-    // 2. ดึงรูปภาพจาก JSON (ที่เราย้ายมาเก็บไว้เพื่อประหยัดพื้นที่)
-    const supportImage = c.report_data?.evidence_img || ""; 
+    // 2. ดึงรูปภาพจาก JSON
+    const supportImage = c.report_data?.evidence_img || c.evidence_img || c.image_url || ""; 
 
     // 3. ดึงข้อมูลหมายเหตุ (Remark) มาทำเป็น Temporary Actions
     // หากไม่มีหมายเหตุ ให้ใช้ข้อความ Default เป็นไกด์ไลน์
-    const rawRemark = c.report_data?.source_remark || "";
+    const rawRemark = c.report_data?.source_remark || c.report_data?.temporary_actions || "";
     let tempActionContent = "";
 
     if (rawRemark.trim() !== "") {
         // แปลงข้อความหมายเหตุ โดยถ้ามีการขึ้นบรรทัดใหม่ ให้ใส่จุด Bullet (•) นำหน้าทุกบรรทัด
         tempActionContent = rawRemark.split('\n')
-            .map(line => `• ${line.trim()}`)
+            .map(line => {
+                const cleanLine = line.trim().replace(/^[•\-\*]\s*/, '');
+                return cleanLine ? `• ${cleanLine}` : '';
+            })
+            .filter(Boolean)
             .join('<br>');
     } else {
         // กรณีไม่มีข้อมูลหมายเหตุส่งมา (Fallback)
@@ -15212,34 +16376,32 @@ else if (_currentSlide === 3) {
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
-            <!-- 1. Header: สไตล์ภาพที่ 2 (ตัวหนังสือใหญ่ แถบน้ำเงิน-เหลืองคมชัด) -->
+            <!-- 1. Header -->
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
                     <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000; outline: none; letter-spacing: -1.5px; line-height: 1;">
                         D2-Define the Problem <span style="color:#003366; font-size: 24px; font-weight: 700;">[Further Detail]</span>
                     </h1>
                     
-                    <!-- ✅ แถบสถานะน้ำเงิน-เหลือง Contrast สูง -->
                     <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 3px 12px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1;">
                         &lt;Fill by CTC &gt;
                     </div>
                 </div>
                 
-                <!-- เส้นแบ่งหนาสีน้ำเงินมาตรฐาน (Thickness 6px) -->
                 <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
 
                 <!-- 2. ส่วนเนื้อหา (แบ่งซ้าย-ขวา) -->
                 <div style="display: flex; gap: 35px; flex: 1; min-height: 0; align-items: stretch; margin-bottom: 10px;">
                     
-                    <!-- ฝั่งซ้าย: รูปภาพขนาดใหญ่ (Auto-Sync จากหน้า Support) -->
-                    <div style="flex: 0 0 55%; border: 2.5px solid #000; background: #f8fafc; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: 4px;">
+                    <!-- ฝั่งซ้าย: รูปภาพขนาดใหญ่ พร้อมรักษาสัดส่วนภาพ (Aspect Ratio) -->
+                    <div style="flex: 0 0 54%; border: 2.5px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: 4px;">
                         ${supportImage 
-                            ? `<img src="${supportImage}" style="max-width:98%; max-height:98%; object-fit:contain;">` 
+                            ? `<img src="${supportImage}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto;">` 
                             : '<span style="color:#cbd5e1; font-weight:900; font-size:24px; letter-spacing:1px;">NO EVIDENCE PHOTO</span>'
                         }
                     </div>
 
                     <!-- ฝั่งขวา: รายละเอียดข้อความ -->
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; padding-top: 5px;">
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; padding-top: 5px; min-width: 0;">
                         
                         <!-- Block: Detail (ข้อมูลเบื้องต้น) -->
                         <div>
@@ -15249,10 +16411,10 @@ else if (_currentSlide === 3) {
                             </p>
                         </div>
 
-                        <!-- ✅ Block: Temporary Actions (ดึงมาจากช่อง Remark อัตโนมัติ) -->
+                        <!-- Block: TEMPORARY ACTIONS -->
                         <div>
-                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">Temporary actions</h3>
-                            <div contenteditable="true" style="font-size: 14px; color: #334155; line-height: 1.6; outline: none; font-weight: 600;">
+                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">TEMPORARY ACTIONS</h3>
+                            <div contenteditable="true" style="font-size: 14px; color: #1e293b; line-height: 1.6; outline: none; font-weight: 600;">
                                 ${tempActionContent}
                             </div>
                         </div>
@@ -15262,46 +16424,46 @@ else if (_currentSlide === 3) {
         </div>
     `;
 }
-// ==========================================
-        // แผ่นที่ 5: D3-Interim Containment Action (ICA) - ปรับปรุงหัวข้อแถวเดียว
+        // ==========================================
+        // แผ่นที่ 5: D3-Interim Containment Action (ICA)
         // ==========================================
         else if (_currentSlide === 4) {
             const locations = ["CTC WIP", "CTC Stock", "Supplier Stock", "On the way", "", ""];
             
             mainContent = `
                 <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
-                    <!-- Header: ปรับขนาด font และบังคับแถวเดียว -->
-                    <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-bottom: 5px; flex-shrink: 0; overflow: hidden;">
-                        <h1 contenteditable="true" style="font-size: 28px; font-weight: 950; margin: 0; color: #000; letter-spacing: -0.5px; outline: none; white-space: nowrap; flex: 1;">
+                    <!-- Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                        <h1 contenteditable="true" style="font-size: 36px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1.5px; outline: none; line-height: 1;">
                             D3-Interim Containment Action (ICA)
                         </h1>
-                        <div contenteditable="true" style="background: blue; color: yellow; padding: 3px 12px; font-weight: 950; font-size: 11px; border: 1.2px solid #000; outline: none; flex-shrink: 0; margin-left: 15px;">
+                        <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 3px 12px; font-weight: 950; font-size: 13px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1; flex-shrink: 0;">
                             &lt;Fill by CTC & Supplier&gt;
                         </div>
                     </div>
-                    <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
+                    <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
 
-                    <!-- Main Table (ข้อมูลกึ่งกลาง) -->
+                    <!-- Main Table -->
                     <div style="width: 100%; flex-shrink: 0;">
-                        <table style="width: 100%; border-collapse: collapse; border: 1.2px solid #000; font-size: 11px; table-layout: fixed;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 11px; table-layout: fixed;">
                             <thead style="background: #fff; font-weight: 900; text-align: center;">
                                 <tr style="height: 38px;">
                                     <td style="border: 1px solid #000; width: 12%;">Location</td>
                                     <td style="border: 1px solid #000; width: 6%;">Qty</td>
                                     <td style="border: 1px solid #000; width: 15%;">Action<br><span style="font-size:9px; font-weight:500;">(Sorting, Rework, etc.)</span></td>
-                                    <td style="border: 1px solid #000; width: 9%;">Person in charge</td>
-                                    <td style="border: 1px solid #000; width: 9%;">Start date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
-                                    <td style="border: 1px solid #000; width: 9%;">Finished Date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
+                                    <td style="border: 1px solid #000; width: 10%;">Person in charge</td>
+                                    <td style="border: 1px solid #000; width: 10%;">Start date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
+                                    <td style="border: 1px solid #000; width: 10%;">Finished Date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
                                     <td style="border: 1px solid #000; width: 8%;">Sorted Q'ty</td>
                                     <td style="border: 1px solid #000; width: 8%;">NG Q'ty</td>
-                                    <td style="border: 1px solid #000; width: 12%;">Disposition</td>
-                                    <td style="border: 1px solid #000;">Remarks</td>
+                                    <td style="border: 1px solid #000; width: 11%;">Disposition</td>
+                                    <td style="border: 1px solid #000; width: 10%;">Remarks</td>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${locations.map(loc => `
-                                    <tr style="height: 24px;">
-                                        <td contenteditable="true" style="border: 1px solid #000; padding: 0 5px; font-weight: 800; background: #fff; outline: none; vertical-align: middle;">${loc}</td>
+                                    <tr style="height: 26px;">
+                                        <td contenteditable="true" style="border: 1px solid #000; padding: 0 6px; font-weight: 800; background: #fff; outline: none; vertical-align: middle;">${loc}</td>
                                         <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;">${loc ? '0' : ''}</td>
                                         <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
                                         <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
@@ -15317,30 +16479,34 @@ else if (_currentSlide === 3) {
                         </table>
                     </div>
 
-                    <!-- Bottom Sections -->
-                    <div style="display: flex; gap: 0; margin-top: 10px; border: 1.2px solid #000; flex: 1; min-height: 0; background: #f1f5f9;">
-                        <div style="flex: 1.2; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
-                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Sort/Rework Method Used:</div>
-                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; line-height: 1.4; outline: none; background: #fff;">
-                                V.TKCP screw Sorting parts in stock<br>Stock : 0 Pcs.<br>OK : .... Pcs.<br>NG : .... Pcs.
-                            </div>
-                        </div>
-                        <div style="flex: 0.8; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
-                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Identify mark:</div>
-                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; outline: none; background: #fff;">
-                                Mark label ok control
-                            </div>
-                        </div>
-                        <div style="flex: 1; display: flex; flex-direction: column;">
-                            <div style="background: #99badd; padding: 4px 10px; border-bottom: 1.2px solid #000; font-weight: 900; font-size: 13px; text-decoration: underline;">Sorting/Rework lot Ship Date</div>
-                            <div contenteditable="true" style="flex: 1; padding: 8px; font-size: 12px; line-height: 1.4; outline: none; background: #fff;">
-                                Sorting date : ....<br>Shipment replacement part date : ....
-                            </div>
-                        </div>
+                    <!-- Bottom Sections (3 Boxes) -->
+                    <div style="width: 100%; margin-top: 10px; flex: 1; min-height: 0; flex-shrink: 0; background: #fff;">
+                        <table style="width: 100%; height: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 12px; table-layout: fixed;">
+                            <thead>
+                                <tr style="height: 32px; background: #8caed6;">
+                                    <th style="border: 1.5px solid #000; width: 38%; text-align: left; padding: 5px 10px; font-weight: 900; color: #000; text-decoration: underline;">Sort/Rework Method Used:</th>
+                                    <th style="border: 1.5px solid #000; width: 30%; text-align: left; padding: 5px 10px; font-weight: 900; color: #000; text-decoration: underline;">Identify mark:</th>
+                                    <th style="border: 1.5px solid #000; width: 32%; text-align: left; padding: 5px 10px; font-weight: 900; color: #000; text-decoration: underline;">Sorting/Rework lot Ship Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="vertical-align: top; background: #fff;">
+                                    <td contenteditable="true" style="border: 1.5px solid #000; padding: 8px 10px; line-height: 1.5; font-weight: 500; color: #000; outline: none; background: #fff;">
+                                        V.TKCP screw Sorting parts in stock<br>Stock : 0 Pcs.<br>OK : .... Pcs.<br>NG : .... Pcs.
+                                    </td>
+                                    <td contenteditable="true" style="border: 1.5px solid #000; padding: 8px 10px; font-weight: 500; color: #000; outline: none; background: #fff;">
+                                        Mark label ok control
+                                    </td>
+                                    <td contenteditable="true" style="border: 1.5px solid #000; padding: 8px 10px; line-height: 1.5; font-weight: 500; color: #000; outline: none; background: #fff;">
+                                        Sorting date : ....<br>Shipment replacement part date : ....
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
                     <!-- Instruction Footer -->
-                    <div style="background: #ffffcc; border: 1px solid #ffcc00; margin-top: 8px; padding: 5px 10px; font-size: 10px; line-height: 1.3; flex-shrink: 0;">
+                    <div style="background: #ffffcc; border: 1.5px solid #ffcc00; margin-top: 10px; padding: 6px 12px; font-size: 11px; line-height: 1.4; flex-shrink: 0; border-radius: 2px;">
                         <div style="color: red; font-weight: 900; font-style: italic;">3D - Interim Containment Action (ICA)</div>
                         <div style="color: #000; font-style: italic;">
                             Take action to ensure that the customer is protected and the problem does not get out of your area. Ensure all suspect parts of the manufacturing process, On-Hand stock, On the way has been quarantine.
@@ -15351,35 +16517,38 @@ else if (_currentSlide === 3) {
         }
 // ==========================================
 // แผ่นที่ 6: D4-Identify Root cause and Escape cause (PROCESS FLOW - MATCH D4 WIDTH)
-// ปรับปรุง: ขยายความกว้างให้เท่าหน้าตาราง และปรับเส้นทางลูกศรแบบอ้อมกล่อง
 // ==========================================
 else if (_currentSlide === 5) {
-    // 1. ฟังก์ชันสร้างแถว (ปรับความกว้างกล่องให้สมดุลกับหน้ากระดาษที่กว้างขึ้น)
-    const createFlowRow = (text, isRed = false, isDiamond = false) => {
+    // 1. ฟังก์ชันสร้างแถว
+    const createFlowRow = (text, isRed = false, isDiamond = false, elementId = "") => {
+        const idAttr = elementId ? `id="${elementId}"` : '';
         const boxStyle = isDiamond 
-            ? `position: relative; width: 190px; height: 50px; display: flex; align-items: center; justify-content: center;`
-            : `width: 190px; height: 38px; background: #d9d9d9; border: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; text-transform: uppercase; color: ${isRed ? 'red' : '#000'}; outline: none; box-shadow: 2px 2px 0px #000;`;
+            ? `position: relative; width: 180px; height: 50px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;`
+            : `width: 180px; height: 38px; background: #d9d9d9; border: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; text-transform: uppercase; color: ${isRed ? 'red' : '#000'}; outline: none; box-shadow: 2px 2px 0px #000; flex-shrink: 0;`;
 
         const leftContent = isDiamond ? `
             <svg viewBox="0 0 100 45" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 0px #000);">
-                <polygon points="50,2 98,22.5 50,43 2,22.5" fill="#fff" stroke="#000" stroke-width="1.2"/>
+                <polygon points="50,2 98,22.5 50,43 2,22.5" fill="#fff" stroke="#000" stroke-width="1.5"/>
             </svg>
             <div contenteditable="true" style="position: absolute; font-weight: 900; font-size: 10px; text-align: center; width: 75%; line-height: 1.1; text-transform: uppercase; outline: none;">${text}</div>
         ` : `<div contenteditable="true" style="outline:none;">${text}</div>`;
 
         return `
-            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 2px; width: 100%;">
-                <div style="flex-shrink: 0; ${boxStyle}">${leftContent}</div>
-                <div onclick="this.querySelector('input').click()" style="flex: 1; height: 62px; border: 1.2px solid #000; background: #fff; position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; background-size: contain; background-repeat: no-repeat; background-position: center;">
-                    <span style="font-size: 8px; color: #cbd5e1; font-weight: 800;">PHOTO AREA</span>
-                    <input type="file" accept="image/*" style="display:none" onchange="const reader = new FileReader(); reader.onload=(e)=>{this.parentElement.style.backgroundImage='url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none';}; reader.readAsDataURL(this.files[0]);">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 2px; width: 100%;">
+                <div ${idAttr} style="flex-shrink: 0; ${boxStyle}">${leftContent}</div>
+                <div onclick="const inp=this.querySelector('input'); if(inp) inp.click();" style="flex: 1; height: 58px; border: 1.5px dashed #3b82f6; background: #f8fafc; position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; background-size: contain; background-repeat: no-repeat; background-position: center; border-radius: 4px;">
+                    <div class="photo-placeholder" style="display: flex; align-items: center; gap: 5px; color: #1e40af;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        <span style="font-size: 10px; color: #1e3a8a; font-weight: 800; letter-spacing: 0.2px;">+ Add Photo</span>
+                    </div>
+                    <input type="file" accept="image/*" style="display:none" onclick="event.stopPropagation()" onchange="if(this.files && this.files[0]){ const reader = new FileReader(); reader.onload=(e)=>{this.parentElement.style.backgroundImage='url('+e.target.result+')'; this.parentElement.style.backgroundSize='contain'; const ph=this.parentElement.querySelector('.photo-placeholder'); if(ph) ph.style.display='none';}; reader.readAsDataURL(this.files[0]); }">
                 </div>
             </div>`;
     };
 
     const createArrow = () => `
-        <div style="width: 190px; height: 8px; display: flex; justify-content: center; margin: -2px 0;">
-            <svg width="10" height="10" viewBox="0 0 20 20"><line x1="10" y1="0" x2="10" y2="14" stroke="#000" stroke-width="2.5"/><polygon points="10,20 6,12 14,12" fill="#000"/></svg>
+        <div style="width: 180px; height: 12px; display: flex; justify-content: center; align-items: center; margin: -2px 0;">
+            <svg width="12" height="12" viewBox="0 0 20 20"><line x1="10" y1="0" x2="10" y2="14" stroke="#000" stroke-width="3"/><polygon points="10,20 5,11 15,11" fill="#000"/></svg>
         </div>`;
 
     mainContent = `
@@ -15390,23 +16559,23 @@ else if (_currentSlide === 5) {
                 <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1.5px; outline: none; line-height: 1;">
                     D4-Identify Root cause and Escape cause
                 </h1>
-                <div style="background: blue; color: white; padding: 2px 12px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px;">
+                <div style="background: #0000FF; color: white; padding: 3px 14px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px; border-radius: 2px;">
                     &lt;Fill by Supplier&gt;
                 </div>
             </div>
             <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 10px; flex-shrink: 0;"></div>
 
             <!-- TITLE -->
-            <div style="margin-bottom: 8px; flex-shrink: 0;">
-                <span contenteditable="true" style="font-size: 18px; font-weight: 800; text-decoration: underline; outline: none;">Process Flow</span>
-                <span style="color: #f59e0b; font-size: 10px; font-weight: 800; float: right; margin-right: 30px;">Please fill photo</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0;">
+                <span contenteditable="true" style="font-size: 18px; font-weight: 900; text-decoration: underline; color: #003366; outline: none;">Process Flow</span>
+                <span style="color: #f59e0b; font-size: 11px; font-weight: 800; margin-right: 10px;">Please fill photo</span>
             </div>
 
-            <!-- MAIN CHART AREA (ขยับลงมาด้านล่างเล็กน้อยด้วย padding-top) -->
-            <div style="display: flex; gap: 0px; flex: 1; min-height: 0; position: relative; align-items: flex-start; justify-content: space-between; padding-top: 15px;">
+            <!-- MAIN CHART AREA -->
+            <div id="d4-chart-area" style="display: flex; gap: 40px; flex: 1; min-height: 0; position: relative; align-items: flex-start; justify-content: space-between; padding-top: 5px;">
                 
                 <!-- COLUMN LEFT (5 STEPS) -->
-                <div style="width: 390px; display: flex; flex-direction: column;">
+                <div id="d4-left-col" style="flex: 1; display: flex; flex-direction: column; max-width: 48%;">
                     ${createFlowRow("DRAW")}
                     ${createArrow()}
                     ${createFlowRow("BEND 1")}
@@ -15415,98 +16584,92 @@ else if (_currentSlide === 5) {
                     ${createArrow()}
                     ${createFlowRow("BEND 2")}
                     ${createArrow()}
-                    ${createFlowRow("INSPECTION IN-PROCESS", false, true)}
-                </div>
-
-                <!-- ✅ CONNECTOR SVG: เส้นลากจากมุมล่างของข้าวหลามตัดซ้ายมือ ไปชี้ที่มุมซ้ายของข้าวหลามตัดฝั่งขวา -->
-                <div style="width: 60px; height: 100%; position: relative; flex-shrink: 0;">
-                    <svg width="60" height="380" style="position: absolute; top: 0; left: 0; overflow: visible;">
-                        <!-- เส้นเชื่อม: ลากออกจากมุมล่างของข้าวหลามตัดซ้าย (-295,326) -> ลงมา (345) -> หักขวา (30) -> ขึ้นไป (31) -> เข้ามุมซ้ายของข้าวหลามตัดขวา (63,31) -->
-                        <path d="M -295,326 L -295,345 L 30,345 L 30,31 L 63,31" fill="none" stroke="#000" stroke-width="2.5" />
-                        <!-- หัวลูกศรชี้เข้ามุมซ้ายของข้าวหลามตัดฝั่งขวา -->
-                        <polygon points="63,31 53,25 53,37" fill="#000" />
-                    </svg>
+                    ${createFlowRow("INSPECTION IN-PROCESS", false, true, "d4-diamond-5")}
                 </div>
 
                 <!-- COLUMN RIGHT (3 STEPS) -->
-                <div style="width: 390px; display: flex; flex-direction: column;">
-                    ${createFlowRow("INSPECTION OUT-GOING CHECK", false, true)}
+                <div id="d4-right-col" style="flex: 1; display: flex; flex-direction: column; max-width: 48%;">
+                    ${createFlowRow("INSPECTION OUT-GOING CHECK", false, true, "d4-diamond-6")}
                     ${createArrow()}
                     ${createFlowRow("PACKING")}
                     ${createArrow()}
                     ${createFlowRow("SHIPMENT")}
                 </div>
 
+                <!-- OVERLAY CONNECTOR SVG -->
+                <svg id="d4-connector-svg" style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 10;">
+                    <path id="d4-connector-path" d="M 90,240 L 90,252 L 220,252 L 220,25 L 450,25" fill="none" stroke="#000" stroke-width="2.5" stroke-linejoin="miter" />
+                    <polygon id="d4-connector-arrow" points="458,25 448,19 448,31" fill="#000" />
+                </svg>
+
             </div>
         </div>
     `;
 }
 // ==========================================
-// แผ่นที่ 7: D4-Identify Root cause and Escape cause
-// ปรับขนาดให้พอดีหน้าจอ และรักษาเส้นแบ่งมาตรฐานเดียวกับหน้าอื่น
+// แผ่นที่ 7: D4-Identify Root cause and Escape cause (ROOT CAUSE ANALYSIS)
 // ==========================================
 else if (_currentSlide === 6) {
-    const whyRow = (label, content = "") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
-            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
+    const whyRow = (label, isLast = false) => `
+        <div style="display: flex; ${isLast ? '' : 'border-bottom: 1.5px solid #000;'} min-height: 52px;">
+            <div style="width: 75px; background: #d9d9d9; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; flex-shrink: 0;">
                 ${label}
             </div>
-            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
-                ${content}
+            <div contenteditable="true" style="flex: 1; padding: 8px 12px; font-size: 13.5px; font-weight: 700; color: #000; outline: none; background: #fff; line-height: 1.35; display: flex; align-items: center;">
             </div>
         </div>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
-            <!-- Header Section -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
-                        D4-Identify Root cause and Escape cause
-                    </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
-                        &lt;Fill by Supplier&gt;
-                    </div>
+            <!-- HEADER SECTION -->
+            <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                <h1 style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
+                    D4-Identify Root cause and Escape cause
+                </h1>
+                <div style="background: #0000FF; color: white; padding: 3px 14px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px; border-radius: 2px; flex-shrink: 0; margin-left: 15px;">
+                    &lt;Fill by Supplier&gt;
                 </div>
-                
-                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น (Standard Blue Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
-                
-                <!-- Sub-Header Area -->
-                <div style="margin-bottom: 6px; flex-shrink: 0;">
-                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; text-decoration: underline; outline: none;">ROOT CAUSE ANALYSIS</span>
-                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why problem happen ?)</span>
-                </div>
+            </div>
+            
+            <!-- BLUE DIVIDER -->
+            <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
+            
+            <!-- SUB-HEADER AREA -->
+            <div style="margin-bottom: 8px; flex-shrink: 0; display: flex; align-items: center;">
+                <span style="font-size: 17px; font-weight: 900; text-decoration: underline; color: #003366;">ROOT CAUSE ANALYSIS</span>
+                <span style="font-size: 17px; font-weight: 900; color: #FF0000; margin-left: 8px;">(Why problem happen ?)</span>
+            </div>
 
-                <!-- Table Content -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <!-- Question Header -->
-                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
-                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
-                            1
-                        </div>
-                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
-                            Why was the non conformity made?
-                        </div>
+            <!-- TABLE CONTENT -->
+            <div style="border: 1.5px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: 2px 2px 0px rgba(0,0,0,0.08); margin-bottom: 10px;">
+                <!-- Question Header -->
+                <div style="display: flex; border-bottom: 1.5px solid #000; background: #D9E1F2;">
+                    <div style="width: 75px; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 15px; padding: 8px 0; flex-shrink: 0; background: #B4C7E7; color: #000;">
+                        1
                     </div>
-
-                    <!-- Why Rows -->
-                    <div>
-                        ${whyRow('Why1')}
-                        ${whyRow('Why2')}
-                        ${whyRow('Why3')}
-                        ${whyRow('Why4')}
-                        ${whyRow('Why5')}
+                    <div contenteditable="true" style="flex: 1; padding: 8px 14px; font-weight: 900; font-size: 15px; color: #000; outline: none; display: flex; align-items: center;">
+                        Why was the non conformity made?
                     </div>
                 </div>
 
-                <!-- Instruction Box -->
-                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
-                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                <!-- Why Rows -->
+                <div>
+                    ${whyRow('Why1')}
+                    ${whyRow('Why2')}
+                    ${whyRow('Why3')}
+                    ${whyRow('Why4')}
+                    ${whyRow('Why5', true)}
                 </div>
+            </div>
+
+            <!-- INSTRUCTION BOX -->
+            <div contenteditable="true" style="margin-top: auto; padding: 8px 12px; background: #FEFCE8; border: 1.5px solid #EAB308; border-radius: 3px; font-size: 11px; line-height: 1.35; outline: none; cursor: text; flex-shrink: 0;">
+                <div style="color: #DC2626; font-weight: 900; font-style: italic; margin-bottom: 2px;">D4 - Identify Root Cause and Escape Cause</div>
+                <div style="color: #1E293B; font-weight: 600;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ROOT CAUSE:</span> <span style="color: #1E293B; font-weight: 600;">Explain what went wrong with the component, process, or system</span></div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ESCAPE CAUSE:</span> <span style="color: #1E293B; font-weight: 600;">State how the problem got through the system without being detected and shipped before reaching the customer.</span></div>
+            </div>
         </div>
     `;
 }
@@ -15515,67 +16678,66 @@ else if (_currentSlide === 6) {
 // แผ่นที่ 8: D4-Identify Escape cause (ESCAPE CAUSE ANALYSIS)
 // ==========================================
 else if (_currentSlide === 7) {
-    const whyRow = (label, content = "") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
-            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
+    const whyRow = (label, isLast = false) => `
+        <div style="display: flex; ${isLast ? '' : 'border-bottom: 1.5px solid #000;'} min-height: 52px;">
+            <div style="width: 75px; background: #d9d9d9; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; flex-shrink: 0;">
                 ${label}
             </div>
-            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
-                ${content}
+            <div contenteditable="true" style="flex: 1; padding: 8px 12px; font-size: 13.5px; font-weight: 700; color: #000; outline: none; background: #fff; line-height: 1.35; display: flex; align-items: center;">
             </div>
         </div>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
-            <!-- 1. Header Section -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
-                        D4-Identify Root cause and Escape cause
-                    </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
-                        &lt;Fill by Supplier&gt;
-                    </div>
+            <!-- HEADER SECTION -->
+            <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                <h1 style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
+                    D4-Identify Root cause and Escape cause
+                </h1>
+                <div style="background: #0000FF; color: white; padding: 3px 14px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px; border-radius: 2px; flex-shrink: 0; margin-left: 15px;">
+                    &lt;Fill by Supplier&gt;
                 </div>
-                
-                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
-                
-                <!-- 2. Sub-Header Area (ESCAPE CAUSE) -->
-                <div style="margin-bottom: 6px; flex-shrink: 0;">
-                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; text-decoration: underline; outline: none; text-transform: uppercase;">ESCAPE CAUSE ANALYSIS</span>
-                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why not detected ?)</span>
-                </div>
+            </div>
+            
+            <!-- BLUE DIVIDER -->
+            <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
+            
+            <!-- SUB-HEADER AREA -->
+            <div style="margin-bottom: 8px; flex-shrink: 0; display: flex; align-items: center;">
+                <span style="font-size: 17px; font-weight: 900; text-decoration: underline; color: #003366;">ESCAPE CAUSE ANALYSIS</span>
+                <span style="font-size: 17px; font-weight: 900; color: #FF0000; margin-left: 8px;">(Why not detected ?)</span>
+            </div>
 
-                <!-- 3. Table Content -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <!-- Question Header -->
-                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
-                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
-                            1
-                        </div>
-                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
-                            Why was the non conformity could not detect ?
-                        </div>
+            <!-- TABLE CONTENT -->
+            <div style="border: 1.5px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: 2px 2px 0px rgba(0,0,0,0.08); margin-bottom: 10px;">
+                <!-- Question Header -->
+                <div style="display: flex; border-bottom: 1.5px solid #000; background: #D9E1F2;">
+                    <div style="width: 75px; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 15px; padding: 8px 0; flex-shrink: 0; background: #B4C7E7; color: #000;">
+                        1
                     </div>
-
-                    <!-- Why Rows -->
-                    <div>
-                        ${whyRow('Why1')}
-                        ${whyRow('Why2')}
-                        ${whyRow('Why3')}
-                        ${whyRow('Why4')}
-                        ${whyRow('Why5')}
+                    <div contenteditable="true" style="flex: 1; padding: 8px 14px; font-weight: 900; font-size: 15px; color: #000; outline: none; display: flex; align-items: center;">
+                        Why was the non conformity could not detect ?
                     </div>
                 </div>
 
-                <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
-                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                <!-- Why Rows -->
+                <div>
+                    ${whyRow('Why1')}
+                    ${whyRow('Why2')}
+                    ${whyRow('Why3')}
+                    ${whyRow('Why4')}
+                    ${whyRow('Why5', true)}
                 </div>
+            </div>
+
+            <!-- INSTRUCTION BOX -->
+            <div contenteditable="true" style="margin-top: auto; padding: 8px 12px; background: #FEFCE8; border: 1.5px solid #EAB308; border-radius: 3px; font-size: 11px; line-height: 1.35; outline: none; cursor: text; flex-shrink: 0;">
+                <div style="color: #DC2626; font-weight: 900; font-style: italic; margin-bottom: 2px;">D4 - Identify Root Cause and Escape Cause</div>
+                <div style="color: #1E293B; font-weight: 600;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ROOT CAUSE:</span> <span style="color: #1E293B; font-weight: 600;">Explain what went wrong with the component, process, or system</span></div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ESCAPE CAUSE:</span> <span style="color: #1E293B; font-weight: 600;">State how the problem got through the system without being detected and shipped before reaching the customer.</span></div>
+            </div>
         </div>
     `;
 }
@@ -15584,148 +16746,130 @@ else if (_currentSlide === 7) {
 // แผ่นที่ 9: D4-Identify System cause (SYSTEM CAUSE ANALYSIS)
 // ==========================================
 else if (_currentSlide === 8) {
-    const whyRow = (label, content = "") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 52px;">
-            <div style="width: 70px; background: #fff; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">
+    const whyRow = (label, isLast = false) => `
+        <div style="display: flex; ${isLast ? '' : 'border-bottom: 1.5px solid #000;'} min-height: 52px;">
+            <div style="width: 75px; background: #d9d9d9; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; flex-shrink: 0;">
                 ${label}
             </div>
-            <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-size: 13px; outline: none; background: #fff; line-height: 1.3; display: flex; align-items: center;">
-                ${content}
+            <div contenteditable="true" style="flex: 1; padding: 8px 12px; font-size: 13.5px; font-weight: 700; color: #000; outline: none; background: #fff; line-height: 1.35; display: flex; align-items: center;">
             </div>
         </div>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
-            <!-- 1. Header Section -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none; letter-spacing: -0.5px;">
-                        D4-Identify Root cause and Escape cause
-                    </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000; white-space: nowrap;">
-                        &lt;Fill by Supplier&gt;
-                    </div>
+            <!-- HEADER SECTION -->
+            <div style="display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                <h1 style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
+                    D4-Identify Root cause and Escape cause
+                </h1>
+                <div style="background: #0000FF; color: white; padding: 3px 14px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px; border-radius: 2px; flex-shrink: 0; margin-left: 15px;">
+                    &lt;Fill by Supplier&gt;
                 </div>
-                
-                <!-- เส้นแบ่งมาตรฐานเดียวกับหน้าอื่น -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
-                
-                <!-- 2. Sub-Header Area (SYSTEM CAUSE) -->
-                <div style="margin-bottom: 6px; flex-shrink: 0;">
-                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; text-decoration: underline; outline: none; text-transform: uppercase;">SYSTEM CAUSE ANALYSIS</span>
-                    <span contenteditable="true" style="font-size: 16px; font-weight: bold; color: red; margin-left: 5px; outline: none;">(Why system failed ?)</span>
-                </div>
+            </div>
+            
+            <!-- BLUE DIVIDER -->
+            <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
+            
+            <!-- SUB-HEADER AREA -->
+            <div style="margin-bottom: 8px; flex-shrink: 0; display: flex; align-items: center;">
+                <span style="font-size: 17px; font-weight: 900; text-decoration: underline; color: #003366;">SYSTEM CAUSE ANALYSIS</span>
+                <span style="font-size: 17px; font-weight: 900; color: #FF0000; margin-left: 8px;">(Why system failed ?)</span>
+            </div>
 
-                <!-- 3. Table Content -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <!-- Question Header -->
-                    <div style="display: flex; border-bottom: 1.2px solid #000; background: #e6f0ff;">
-                        <div style="width: 70px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; padding: 6px 0; flex-shrink: 0;">
-                            1
-                        </div>
-                        <div contenteditable="true" style="flex: 1; padding: 6px 10px; font-weight: bold; font-size: 14px; outline: none;">
-                            Why was the process & system failed ?
-                        </div>
+            <!-- TABLE CONTENT -->
+            <div style="border: 1.5px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: 2px 2px 0px rgba(0,0,0,0.08); margin-bottom: 10px;">
+                <!-- Question Header -->
+                <div style="display: flex; border-bottom: 1.5px solid #000; background: #D9E1F2;">
+                    <div style="width: 75px; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 15px; padding: 8px 0; flex-shrink: 0; background: #B4C7E7; color: #000;">
+                        1
                     </div>
-
-                    <!-- Why Rows -->
-                    <div>
-                        ${whyRow('Why1')}
-                        ${whyRow('Why2')}
-                        ${whyRow('Why3')}
-                        ${whyRow('Why4')}
-                        ${whyRow('Why5')}
+                    <div contenteditable="true" style="flex: 1; padding: 8px 14px; font-weight: 900; font-size: 15px; color: #000; outline: none; display: flex; align-items: center;">
+                        Why was the process & system failed ?
                     </div>
                 </div>
 
-                <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 8px; padding: 6px 10px; background: #ffffcc; border: 1px solid #ccc; font-size: 10.5px; line-height: 1.3; outline: none; cursor: text; flex-shrink: 0;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">D4 - Identify Root Cause and Escape Cause</div>
-                    <div style="color: #333;">- Identify all potential reasons which could explain why the problem occurred.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE:</span> Explain what went wrong with the component, process, or system</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE:</span> State how the problem got through the system without being detected and shipped before reaching the customer.</div>
+                <!-- Why Rows -->
+                <div>
+                    ${whyRow('Why1')}
+                    ${whyRow('Why2')}
+                    ${whyRow('Why3')}
+                    ${whyRow('Why4')}
+                    ${whyRow('Why5', true)}
                 </div>
+            </div>
+
+            <!-- INSTRUCTION BOX -->
+            <div contenteditable="true" style="margin-top: auto; padding: 8px 12px; background: #FEFCE8; border: 1.5px solid #EAB308; border-radius: 3px; font-size: 11px; line-height: 1.35; outline: none; cursor: text; flex-shrink: 0;">
+                <div style="color: #DC2626; font-weight: 900; font-style: italic; margin-bottom: 2px;">D4 - Identify Root Cause and Escape Cause</div>
+                <div style="color: #1E293B; font-weight: 600;">- Identify all potential reasons which could explain why the problem occurred.</div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ROOT CAUSE:</span> <span style="color: #1E293B; font-weight: 600;">Explain what went wrong with the component, process, or system</span></div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ESCAPE CAUSE:</span> <span style="color: #1E293B; font-weight: 600;">State how the problem got through the system without being detected and shipped before reaching the customer.</span></div>
+            </div>
         </div>
     `;
 }
 
 // ==========================================
-// แผ่นที่ 10: D5-Developing permanent corrective action
+// แผ่นที่ 10: D5-Developing permanent corrective action (ROOT CAUSE ACTION)
 // ==========================================
 else if (_currentSlide === 9) {
-    const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
-            
-            <!-- Improvement Detail: Photo (Left) & File (Right) with vertical divider -->
-            <div style="width: 220px; border-right: 1.2px solid #000; padding: 2px 4px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 4px;">
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; border-right: 1px solid #cbd5e1; padding-right: 4px; height: 100%;">
-                    <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative; border-radius: 4px;">
-                        <span style="font-size: 8px; color: #999; text-align: center;">Add Photo</span>
-                        <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
-                    </div>
-                </div>
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; height: 100%; padding-left: 2px;">
-                    <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
-                        <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px; flex-shrink: 0;">
-                        <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">${improvementText}</span>
-                        <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
-                    </div>
-                </div>
-            </div>
-
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
+    const createD5Row = (isLast = false) => `
+        <div style="display: flex; ${isLast ? '' : 'border-bottom: 1.5px solid #000;'} min-height: 52px;">
+            <div contenteditable="true" style="width: 20%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; background: #fff; box-sizing: border-box;"></div>
+            <div contenteditable="true" style="width: 20%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; background: #fff; box-sizing: border-box;"></div>
+            <div contenteditable="true" style="width: 28%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; background: #fff; box-sizing: border-box;"></div>
+            <div contenteditable="true" style="width: 11%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center;"></div>
+            <div contenteditable="true" style="width: 11%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center;"></div>
+            <div contenteditable="true" style="width: 10%; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center;"></div>
         </div>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
-                        D5-Developing permanent corrective action
-                    </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
-                        &lt;Fill by Supplier&gt;
-                    </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 42px; flex-shrink: 0;">
+                <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
+                    D5-Developing permanent corrective action
+                </h1>
+                <div style="background: #0000FF; color: #fff; padding: 3px 14px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px; border-radius: 2px; flex-shrink: 0; margin-left: 15px;">
+                    &lt;Fill by Supplier&gt;
                 </div>
-                
-                <!-- เส้นแถบสีน้ำเงิน (Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
-                
-                <!-- 2. Sub-Header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
-                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">ROOT CAUSE ACTION</div>
-                    <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
+            </div>
+            
+            <!-- Divider -->
+            <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
+            
+            <!-- 2. Sub-Header -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px; flex-shrink: 0;">
+                <div contenteditable="true" style="font-size: 17px; font-weight: 950; text-decoration: underline; color: #000; outline: none;">ROOT CAUSE ACTION</div>
+                <div contenteditable="true" style="font-size: 13px; font-weight: 900; color: #FF6600; outline: none;">Please fill photo evidence Before & After.</div>
+            </div>
+
+            <!-- 3. Table Structure -->
+            <div style="border: 1.5px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: 2px 2px 0px rgba(0,0,0,0.08); margin-bottom: 8px;">
+                <div style="display: flex; border-bottom: 1.5px solid #000; height: 36px; background: #8ea9db;">
+                    <div style="width: 20%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; box-sizing: border-box;">Before</div>
+                    <div style="width: 20%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; box-sizing: border-box;">After</div>
+                    <div style="width: 28%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; box-sizing: border-box;">Improvement Detail</div>
+                    <div style="width: 11%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 12px; color: #000; box-sizing: border-box; text-align: center;">Effective lot</div>
+                    <div style="width: 11%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 11.5px; color: #000; text-align: center; box-sizing: border-box; line-height: 1.2;">Identify of<br>improved lot</div>
+                    <div style="width: 10%; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 12px; color: #000; box-sizing: border-box; text-align: center; line-height: 1.2;">MP<br>Level</div>
                 </div>
 
-                <!-- 3. Table Structure -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
-                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
-                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
-                    </div>
+                ${createD5Row(false)}
+                ${createD5Row(false)}
+                ${createD5Row(false)}
+                ${createD5Row(true)}
+            </div>
 
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                </div>
-
-                <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
-                    <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List corrective actions to permanently eliminate root cause.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE ACTIONS:</span> List corrective actions that eliminate escape root cause.</div>
-                </div>
+            <!-- 4. Instruction Box -->
+            <div contenteditable="true" style="margin-top: auto; padding: 6px 12px; background: #FEFCE8; border: 1.5px solid #EAB308; border-radius: 3px; font-size: 10.5px; line-height: 1.35; outline: none; cursor: text; flex-shrink: 0;">
+                <div style="color: #DC2626; font-weight: 900; font-style: italic; margin-bottom: 2px;">D5 - Developing permanent corrective action</div>
+                <div style="color: #1E293B; font-weight: 600; margin-bottom: 2px;">- Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ROOT CAUSE ACTIONS:</span> <span style="color: #1E293B; font-weight: 600;">List chosen corrective actions necessary to permanently eliminate root cause.</span></div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ESCAPE CAUSE ACTIONS:</span> <span style="color: #1E293B; font-weight: 600;">List chosen corrective actions that eliminate escape root cause.</span></div>
+            </div>
         </div>
     `;
 }
@@ -15735,79 +16879,62 @@ else if (_currentSlide === 9) {
 // แผ่นที่ 11: D5-Developing permanent corrective action (ESCAPE CAUSE ACTION)
 // ==========================================
 else if (_currentSlide === 10) {
-    const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
-            
-            <!-- Improvement Detail Column: Photo (Left) & File (Right) with vertical divider -->
-            <div style="width: 220px; border-right: 1.2px solid #000; padding: 2px 4px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 4px;">
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; border-right: 1px solid #cbd5e1; padding-right: 4px; height: 100%;">
-                    <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative; border-radius: 4px;">
-                        <span style="font-size: 8px; color: #999; text-align: center;">Add Photo</span>
-                        <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
-                    </div>
-                </div>
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; height: 100%; padding-left: 2px;">
-                    <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
-                        <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px; flex-shrink: 0;">
-                        <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">${improvementText}</span>
-                        <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
-                    </div>
-                </div>
-            </div>
-
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
+    const createD5Row = (isLast = false) => `
+        <div style="display: flex; ${isLast ? '' : 'border-bottom: 1.5px solid #000;'} min-height: 52px;">
+            <div contenteditable="true" style="width: 20%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; background: #fff; box-sizing: border-box;"></div>
+            <div contenteditable="true" style="width: 20%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; background: #fff; box-sizing: border-box;"></div>
+            <div contenteditable="true" style="width: 28%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; background: #fff; box-sizing: border-box;"></div>
+            <div contenteditable="true" style="width: 11%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center;"></div>
+            <div contenteditable="true" style="width: 11%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center;"></div>
+            <div contenteditable="true" style="width: 10%; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center;"></div>
         </div>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
-            <!-- 1. Header (Standard Style) -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
-                        D5-Developing permanent corrective action
-                    </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
-                        &lt;Fill by Supplier&gt;
-                    </div>
+            <!-- 1. Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 42px; flex-shrink: 0;">
+                <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
+                    D5-Developing permanent corrective action
+                </h1>
+                <div style="background: #0000FF; color: #fff; padding: 3px 14px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px; border-radius: 2px; flex-shrink: 0; margin-left: 15px;">
+                    &lt;Fill by Supplier&gt;
                 </div>
-                
-                <!-- เส้นแถบสีน้ำเงิน (Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
-                
-                <!-- 2. Sub-Header (เปลี่ยนเป็น ESCAPE CAUSE ACTION) -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
-                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">ESCAPE CAUSE ACTION</div>
-                    <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
+            </div>
+            
+            <!-- Divider -->
+            <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
+            
+            <!-- 2. Sub-Header (ESCAPE CAUSE ACTION) -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px; flex-shrink: 0;">
+                <div contenteditable="true" style="font-size: 17px; font-weight: 950; text-decoration: underline; color: #000; outline: none;">ESCAPE CAUSE ACTION</div>
+                <div contenteditable="true" style="font-size: 13px; font-weight: 900; color: #FF6600; outline: none;">Please fill photo evidence Before & After.</div>
+            </div>
+
+            <!-- 3. Table Structure -->
+            <div style="border: 1.5px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: 2px 2px 0px rgba(0,0,0,0.08); margin-bottom: 8px;">
+                <div style="display: flex; border-bottom: 1.5px solid #000; height: 36px; background: #8ea9db;">
+                    <div style="width: 20%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; box-sizing: border-box;">Before</div>
+                    <div style="width: 20%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; box-sizing: border-box;">After</div>
+                    <div style="width: 28%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; box-sizing: border-box;">Improvement Detail</div>
+                    <div style="width: 11%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 12px; color: #000; box-sizing: border-box; text-align: center;">Effective lot</div>
+                    <div style="width: 11%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 11.5px; color: #000; text-align: center; box-sizing: border-box; line-height: 1.2;">Identify of<br>improved lot</div>
+                    <div style="width: 10%; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 12px; color: #000; box-sizing: border-box; text-align: center; line-height: 1.2;">MP<br>Level</div>
                 </div>
 
-                <!-- 3. Table Structure -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
-                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
-                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
-                    </div>
+                ${createD5Row(false)}
+                ${createD5Row(false)}
+                ${createD5Row(false)}
+                ${createD5Row(true)}
+            </div>
 
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                </div>
-
-                <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0; cursor: text;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
-                    <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List chosen corrective actions necessary to permanently eliminate root cause.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE ACTIONS:</span> List chosen corrective actions that eliminate escape root cause.</div>
-                </div>
+            <!-- 4. Instruction Box -->
+            <div contenteditable="true" style="margin-top: auto; padding: 6px 12px; background: #FEFCE8; border: 1.5px solid #EAB308; border-radius: 3px; font-size: 10.5px; line-height: 1.35; outline: none; cursor: text; flex-shrink: 0;">
+                <div style="color: #DC2626; font-weight: 900; font-style: italic; margin-bottom: 2px;">D5 - Developing permanent corrective action</div>
+                <div style="color: #1E293B; font-weight: 600; margin-bottom: 2px;">- Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ROOT CAUSE ACTIONS:</span> <span style="color: #1E293B; font-weight: 600;">List chosen corrective actions necessary to permanently eliminate root cause.</span></div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ESCAPE CAUSE ACTIONS:</span> <span style="color: #1E293B; font-weight: 600;">List chosen corrective actions that eliminate escape root cause.</span></div>
+            </div>
         </div>
     `;
 }
@@ -15817,79 +16944,62 @@ else if (_currentSlide === 10) {
 // แผ่นที่ 12: D5-Developing permanent corrective action (SYSTEM CAUSE ACTION)
 // ==========================================
 else if (_currentSlide === 11) {
-    const createD5Row = (before = "", after = "", improvementText = "Attach File") => `
-        <div style="display: flex; border-bottom: 1.2px solid #000; min-height: 72px;">
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${before}</div>
-            <div contenteditable="true" style="width: 150px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none; line-height: 1.2;">${after}</div>
-            
-            <!-- Improvement Detail Column: Photo (Left) & File (Right) with vertical divider -->
-            <div style="width: 220px; border-right: 1.2px solid #000; padding: 2px 4px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 4px;">
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; border-right: 1px solid #cbd5e1; padding-right: 4px; height: 100%;">
-                    <div onclick="this.querySelector('.photo-in').click()" style="width: 65px; height: 42px; border: 1px dashed #999; background: #f9f9f9; display: flex; align-items: center; justify-content: center; cursor: pointer; background-size: contain; background-repeat: no-repeat; background-position: center; position: relative; border-radius: 4px;">
-                        <span style="font-size: 8px; color: #999; text-align: center;">Add Photo</span>
-                        <input type="file" class="photo-in" accept="image/*" style="display: none;" onchange="const reader = new FileReader(); reader.onload = (e) => { this.parentElement.style.backgroundImage = 'url('+e.target.result+')'; this.parentElement.querySelector('span').style.display='none'; }; reader.readAsDataURL(this.files[0]);">
-                    </div>
-                </div>
-                <div style="flex: 1; display: flex; align-items: center; justify-content: center; height: 100%; padding-left: 2px;">
-                    <div onclick="this.querySelector('.file-in').click()" style="display: flex; align-items: center; gap: 4px; cursor: pointer; justify-content: center; width: 100%;">
-                        <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" style="width: 12px; height: 12px; flex-shrink: 0;">
-                        <span class="fname" style="font-size: 9.5px; color: #003366; border-bottom: 1px solid #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">${improvementText}</span>
-                        <input type="file" class="file-in" style="display: none;" onchange="this.previousElementSibling.innerText = this.files[0].name;">
-                    </div>
-                </div>
-            </div>
-
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="width: 90px; border-right: 1.2px solid #000; padding: 5px; font-size: 11px; outline: none;"></div>
-            <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 11px; outline: none;"></div>
+    const createD5Row = (isLast = false) => `
+        <div style="display: flex; ${isLast ? '' : 'border-bottom: 1.5px solid #000;'} min-height: 52px;">
+            <div contenteditable="true" style="width: 20%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; background: #fff; box-sizing: border-box;"></div>
+            <div contenteditable="true" style="width: 20%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; background: #fff; box-sizing: border-box;"></div>
+            <div contenteditable="true" style="width: 28%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; background: #fff; box-sizing: border-box;"></div>
+            <div contenteditable="true" style="width: 11%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center;"></div>
+            <div contenteditable="true" style="width: 11%; border-right: 1.5px solid #000; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center;"></div>
+            <div contenteditable="true" style="width: 10%; padding: 6px; font-size: 11.5px; font-weight: 700; color: #000; outline: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center;"></div>
         </div>`;
 
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             
             <!-- 1. Header -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 40px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
-                        D5-Developing permanent corrective action
-                    </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
-                        &lt;Fill by Supplier&gt;
-                    </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 42px; flex-shrink: 0;">
+                <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1px; white-space: nowrap; flex: 1; outline: none;">
+                    D5-Developing permanent corrective action
+                </h1>
+                <div style="background: #0000FF; color: #fff; padding: 3px 14px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px; border-radius: 2px; flex-shrink: 0; margin-left: 15px;">
+                    &lt;Fill by Supplier&gt;
                 </div>
-                
-                <!-- เส้นแถบสีน้ำเงิน (Divider) -->
-                <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 8px; flex-shrink: 0;"></div>
-                
-                <!-- 2. Sub-Header (เปลี่ยนเป็น SYSTEM CAUSE ACTION) -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; flex-shrink: 0;">
-                    <div contenteditable="true" style="font-size: 15px; font-weight: bold; text-decoration: underline; outline: none;">SYSTEM CAUSE ACTION</div>
-                    <div contenteditable="true" style="font-size: 11px; font-weight: bold; color: #ff6600; outline: none;">Please fill photo evidence Before & After.</div>
+            </div>
+            
+            <!-- Divider -->
+            <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
+            
+            <!-- 2. Sub-Header (SYSTEM CAUSE ACTION) -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px; flex-shrink: 0;">
+                <div contenteditable="true" style="font-size: 17px; font-weight: 950; text-decoration: underline; color: #000; outline: none;">SYSTEM CAUSE ACTION</div>
+                <div contenteditable="true" style="font-size: 13px; font-weight: 900; color: #FF6600; outline: none;">Please fill photo evidence Before & After.</div>
+            </div>
+
+            <!-- 3. Table Structure -->
+            <div style="border: 1.5px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: 2px 2px 0px rgba(0,0,0,0.08); margin-bottom: 8px;">
+                <div style="display: flex; border-bottom: 1.5px solid #000; height: 36px; background: #8ea9db;">
+                    <div style="width: 20%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; box-sizing: border-box;">Before</div>
+                    <div style="width: 20%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; box-sizing: border-box;">After</div>
+                    <div style="width: 28%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 13px; color: #000; box-sizing: border-box;">Improvement Detail</div>
+                    <div style="width: 11%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 12px; color: #000; box-sizing: border-box; text-align: center;">Effective lot</div>
+                    <div style="width: 11%; border-right: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 11.5px; color: #000; text-align: center; box-sizing: border-box; line-height: 1.2;">Identify of<br>improved lot</div>
+                    <div style="width: 10%; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 12px; color: #000; box-sizing: border-box; text-align: center; line-height: 1.2;">MP<br>Level</div>
                 </div>
 
-                <!-- 3. Table Structure (4 แถวตามภาพ) -->
-                <div style="border: 1.2px solid #000; width: 100%; background: #fff; display: flex; flex-direction: column;">
-                    <div style="display: flex; border-bottom: 1.2px solid #000; height: 30px; background: #b4c7e7;">
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Before</div>
-                        <div style="width: 150px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">After</div>
-                        <div style="width: 220px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">Improvement Detail</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">Effective lot</div>
-                        <div style="width: 90px; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; text-align: center;">Identify lot</div>
-                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">MP Level</div>
-                    </div>
+                ${createD5Row(false)}
+                ${createD5Row(false)}
+                ${createD5Row(false)}
+                ${createD5Row(true)}
+            </div>
 
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                    ${createD5Row()}
-                </div>
-
-                <!-- 4. Instruction Box -->
-                <div contenteditable="true" style="margin-top: 6px; padding: 6px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 10px; line-height: 1.3; outline: none; flex-shrink: 0; cursor: text;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">D5-Developing permanent corrective action.</div>
-                    <div style="color: #333;">-Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ROOT CAUSE ACTIONS:</span> List chosen corrective actions necessary to permanently eliminate root cause.</div>
-                    <div><span style="color: red; font-style: italic; font-weight: bold;">ESCAPE CAUSE ACTIONS:</span> List chosen corrective actions that eliminate escape root cause.</div>
-                </div>
+            <!-- 4. Instruction Box -->
+            <div contenteditable="true" style="margin-top: auto; padding: 6px 12px; background: #FEFCE8; border: 1.5px solid #EAB308; border-radius: 3px; font-size: 10.5px; line-height: 1.35; outline: none; cursor: text; flex-shrink: 0;">
+                <div style="color: #DC2626; font-weight: 900; font-style: italic; margin-bottom: 2px;">D5 - Developing permanent corrective action</div>
+                <div style="color: #1E293B; font-weight: 600; margin-bottom: 2px;">- Select solution that will eliminate problem. Test solution to make sure it will work before you fully implement. Permanent solutions must be "mistake proof".</div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ROOT CAUSE ACTIONS:</span> <span style="color: #1E293B; font-weight: 600;">List chosen corrective actions necessary to permanently eliminate root cause.</span></div>
+                <div><span style="color: #DC2626; font-style: italic; font-weight: 900;">ESCAPE CAUSE ACTIONS:</span> <span style="color: #1E293B; font-weight: 600;">List chosen corrective actions that eliminate escape root cause.</span></div>
+            </div>
         </div>
     `;
 }
@@ -16130,6 +17240,46 @@ else if (_currentSlide === 15) {
 }
         container.innerHTML = mainContent + getFooter();
         fitSlideToContainer();
+        if (_currentSlide === 5) {
+            setTimeout(adjustD4ConnectorLine, 20);
+            setTimeout(adjustD4ConnectorLine, 100);
+        }
+    }
+
+    function adjustD4ConnectorLine() {
+        if (_currentSlide !== 5) return;
+        const chart = document.getElementById('d4-chart-area');
+        const d5 = document.getElementById('d4-diamond-5');
+        const d6 = document.getElementById('d4-diamond-6');
+        const path = document.getElementById('d4-connector-path');
+        const arrow = document.getElementById('d4-connector-arrow');
+        const leftCol = document.getElementById('d4-left-col');
+        const rightCol = document.getElementById('d4-right-col');
+
+        if (!chart || !d5 || !d6 || !path || !arrow || !leftCol || !rightCol) return;
+
+        const cRect = chart.getBoundingClientRect();
+        const d5Rect = d5.getBoundingClientRect();
+        const d6Rect = d6.getBoundingClientRect();
+        const lColRect = leftCol.getBoundingClientRect();
+        const rColRect = rightCol.getBoundingClientRect();
+
+        if (cRect.width === 0 || d5Rect.width === 0) return;
+
+        const currentScale = (chart.offsetWidth > 0 && cRect.width > 0) ? (cRect.width / chart.offsetWidth) : 1;
+
+        const startX = (((d5Rect.left + d5Rect.right) / 2) - cRect.left) / currentScale;
+        const startY = ((d5Rect.bottom - cRect.top) / currentScale) - 2;
+
+        const dropY = startY + 12;
+
+        const endX = (d6Rect.left - cRect.left) / currentScale;
+        const endY = (((d6Rect.top + d6Rect.bottom) / 2) - cRect.top) / currentScale;
+
+        const midX = (((lColRect.right + rColRect.left) / 2) - cRect.left) / currentScale;
+
+        path.setAttribute('d', `M ${startX},${startY} L ${startX},${dropY} L ${midX},${dropY} L ${midX},${endY} L ${endX - 8},${endY}`);
+        arrow.setAttribute('points', `${endX},${endY} ${endX - 10},${endY - 5} ${endX - 10},${endY + 5}`);
     }
 
     function fitSlideToContainer() {
@@ -16155,6 +17305,7 @@ else if (_currentSlide === 15) {
         slide.style.height = `${baseH}px`;
         slide.style.transform = `scale(${scale})`;
         slide.style.transformOrigin = 'top left';
+        if (_currentSlide === 5) adjustD4ConnectorLine();
     }
 
 
