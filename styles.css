@@ -15187,3 +15187,11 @@ body.dark-mode .table-kbd-key {
     background: #1e293b;
     border-color: #334155;
 }
+.table-card {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 400px; /* บังคับความสูงขั้นต่ำไว้ก่อน */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}

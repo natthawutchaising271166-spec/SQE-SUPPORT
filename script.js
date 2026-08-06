@@ -3487,15 +3487,50 @@ function isSystemOnline() {
     return navigator.onLine;
 }
 
-// 1. Configuration - แยกฐานข้อมูล SQE และ WAP ชัดเจน
+// 1. Configuration - เชื่อมต่อ Supabase พร้อม Header ที่สมบูรณ์
 const SQE_URL = 'https://xgkjxvljdhpniakgzatf.supabase.co';
 const SQE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhna2p4dmxqZGhwbmlha2d6YXRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDkxMjYsImV4cCI6MjA5MzAyNTEyNn0.os0bmAoR7CCefdsuQzGC9eLPnEJ64Ny8rxx0lFMXXAU';
 
 const WAP_URL = 'https://dyhpjyokvtwejayptwyk.supabase.co';
 const WAP_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5aHBqeW9rdnR3ZWpheXB0d3lrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNzE4MjcsImV4cCI6MjA5Mjg0NzgyN30.KSU9-0zZ3w7Z6wmOTqVvZZv4_Y0cMYOfp_ZyWWB7UCQ';
 
-let sqeClient = supabase.createClient(SQE_URL, SQE_KEY);
-let wapClient  = supabase.createClient(WAP_URL, WAP_KEY);
+// แก้ไข Headers ให้สมบูรณ์แบบ
+const authHeaders = {
+    apikey: SQE_KEY,
+    Authorization: `Bearer ${SQE_KEY}`
+};
+
+// 1. แก้จุดประกาศตัวแปรหลัก
+let sqeClient = window.supabase.createClient(SQE_URL, SQE_KEY, {
+    auth: { persistSession: false },
+    global: { headers: authHeaders }
+});
+
+let wapClient = window.supabase.createClient(WAP_URL, WAP_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: {
+        headers: {
+            apikey: WAP_KEY,
+            Authorization: `Bearer ${WAP_KEY}`
+        }
+    }
+});
+
+// ── แทนที่ 2 บรรทัดเดิมนี้ ──
+// let sqeClient = supabase.createClient(SQE_URL, SQE_KEY);
+// let wapClient  = supabase.createClient(WAP_URL, WAP_KEY);
+
+const SUPABASE_CLIENT_OPTS = {
+    auth: {
+        persistSession: false,   // ไม่ใช้ Supabase Auth (ระบบ login เป็น custom table 'users')
+        autoRefreshToken: false, // กันไม่ให้ GoTrueClient แอบ refresh token แล้วชน header apikey
+        detectSessionInUrl: false
+    },
+    global: {
+        headers: { apikey: SQE_KEY } // บังคับแนบ apikey ทุก request เผื่อ header หลุด
+    }
+};
+
 window.adminBypass = false; // ใช้ window เพื่อให้เรียกใช้ข้ามโมดูลได้แน่นอน
 // 2. Global State
 let S = {
@@ -3605,13 +3640,14 @@ function shake(el) {
     }
 }
 
+// 2. แก้ฟังก์ชัน getSupabase ให้ส่ง Headers ครบด้วย
 function getSupabase() {
-    try {
-        if (!sqeClient && window.supabase) sqeClient = window.supabase.createClient(SQE_URL, SQE_KEY);
-        return sqeClient;
-    } catch (err) {
-        return null;
+    if (!sqeClient) {
+        sqeClient = window.supabase.createClient(SQE_URL, SQE_KEY, {
+            global: { headers: authHeaders }
+        });
     }
+    return sqeClient;
 }
 
 function switchLoginTab(role) {
@@ -8876,33 +8912,28 @@ const WapSupportLogs = (function () {
        CORE LOGIC
        ────────────────────────────────────────── */
     async function _fetch() {
-        if (_fetching) return;
-        _fetching = true;
-        const myToken = ++_fetchToken;
-
-        try {
-            const { data, error } = await wapClient
-                .from(TABLE)
-                .select('*')
-                .eq('user_id', _user)
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-
-            // ถ้ามีรอบใหม่แซงเข้ามาระหว่างรอ หรือโมดูลถูก destroy ไปแล้ว ทิ้งผลลัพธ์รอบนี้
-            if (myToken !== _fetchToken || !_alive) return;
-
-            _records = (data || []).map(_fromDb);
-            applyDateFilter();
-        } catch (e) {
-            console.error('[WapSupport] Fetch error:', e);
-            if (myToken === _fetchToken && _alive) {
-                _records = [];
-                _render();
-            }
-        } finally {
-            if (myToken === _fetchToken) _fetching = false;
+    if (_fetching) return;
+    _fetching = true;
+    const myToken = ++_fetchToken;
+    try {
+        const { data, error } = await wapClient
+            .from(TABLE).select('*').eq('user_id', _user)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        if (myToken !== _fetchToken || !_alive) return;
+        _records = (data || []).map(_fromDb);
+        applyDateFilter();
+    } catch (e) {
+        console.error('[WapSupport] Fetch error:', e);
+        if (myToken === _fetchToken && _alive) {
+            toast('⚠️ โหลดข้อมูล Support ไม่สำเร็จ: ' + (e.message || ''), 'error'); // ★ เพิ่มบรรทัดนี้
+            _records = [];
+            _render();
         }
+    } finally {
+        if (myToken === _fetchToken) _fetching = false;
     }
+}
 
     function applyDateFilter() {
         if (!_alive) return;
@@ -9430,12 +9461,15 @@ function _openViewModal(id) {
        INIT / DESTROY — เหลือชุดเดียว ไม่มีของซ้ำ
        ────────────────────────────────────────── */
     function init(email) {
-        // กันเคส init ถูกเรียกซ้ำด้วย user คนเดิมติดๆ กัน (เช่นคลิกเมนูรัวๆ)
-        if (_alive && _user === email && _fetching) return;
-
-        _user = email;
+        _user = email || S.currentUser;
         _alive = true;
         _cacheDom();
+
+        // แสดง Skeleton / Loading ทันทีเพื่อไม่ให้ตารางว่างเปล่า
+        if ($.tbody) {
+            $.tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:#64748b;font-weight:700;">🔄 กำลังโหลดทะเบียนเคสและรายงานผลิต...</td></tr>`;
+        }
+
         _fetch();
 
         if ($.search) {
@@ -9450,7 +9484,7 @@ function _openViewModal(id) {
                 if (!btn) return;
                 $.filterGrp.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
                 btn.classList.add('active');
-                _filter = btn.getAttribute('data-filter');
+                _filter = btn.getAttribute('data-filter') || 'ALL';
                 applyDateFilter();
             };
         }
@@ -12572,17 +12606,6 @@ async function init() {
             toast(isActive ? "🚧 ระบบเข้าสู่โหมดปิดปรับปรุง" : "✅ เปิดระบบปกติแล้ว", "info");
             if (typeof syncMaintenanceStatus === 'function') syncMaintenanceStatus();
         } catch (e) { toast("Update Failed", "error"); }
-    }
-
-    async function writeAuditLog(action, details) {
-        try {
-            logToCyberTerminal(`[${action}] ${details}`, 'info');
-            await sqeClient.from('audit_logs').insert([{
-                user_email: S.currentUser,
-                action: action,
-                details: details
-            }]);
-        } catch (e) { console.error("Audit log failed", e); }
     }
 
     async function toggleUserStatus(userId, currentStatus) {
