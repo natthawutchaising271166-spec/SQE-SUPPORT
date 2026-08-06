@@ -15195,3 +15195,54 @@ body.dark-mode .table-kbd-key {
     flex-direction: column;
     overflow: hidden;
 }
+/* --- View Modal Theme Variables --- */
+:root {
+    --vm-bg: #ffffff;
+    --vm-header: #1e293b;
+    --vm-content-bg: #f8fafc;
+    --vm-banner-bg: #1e2235; /* สี Banner ยังคงเข้มตามแบบ */
+    --vm-text-main: #1e293b;
+    --vm-text-bright: #ffffff;
+    --vm-text-dim: #64748b;
+    --vm-border: #e2e8f0;
+    --vm-remark-bg: #fffbeb;
+    --vm-remark-border: #fde68a;
+    --vm-remark-text: #d97706;
+}
+
+/* เมื่อสลับเป็นโหมดมืด */
+body.dark-mode {
+    --vm-bg: #0f172a;
+    --vm-header: #020617;
+    --vm-content-bg: #0f172a;
+    --vm-banner-bg: #1e293b;
+    --vm-text-main: #f8fafc;
+    --vm-text-dim: #94a3b8;
+    --vm-border: #334155;
+    --vm-remark-bg: rgba(245, 158, 11, 0.05);
+    --vm-remark-border: #b45309;
+    --vm-remark-text: #ffedd5;
+}
+
+/* ตกแต่งโครงสร้าง Modal */
+.view-modal-card {
+    background: var(--vm-bg);
+    border: 1px solid var(--vm-border);
+    color: var(--vm-text-main);
+    transition: all 0.3s ease;
+}
+
+.view-modal-content-area {
+    background: var(--vm-content-bg);
+}
+
+.view-modal-banner {
+    background: var(--vm-banner-bg);
+    border: 1px solid var(--vm-border);
+}
+
+.view-modal-remark-box {
+    background: var(--vm-remark-bg);
+    border: 1px solid var(--vm-remark-border);
+    color: var(--vm-remark-text);
+}

@@ -9306,119 +9306,141 @@ formEl.onsubmit = async (e) => {
 };
     }
 
-
-    /* ──────────────────────────────────────────
-       VIEW MODAL
-       ────────────────────────────────────────── */
 function _openViewModal(id) {
     const item = _records.find(r => r.id === id);
     if (!item) return;
     _viewing = item;
 
+    // --- ตรวจสอบโหมดปัจจุบันและกำหนดชุดสี (เน้นสีน้ำเงินสว่างที่ Header ในโหมดมืด) ---
     const isDark = document.body.classList.contains('dark-mode');
     const theme = {
-        overlay: isDark ? 'rgba(2, 6, 23, 0.85)' : 'rgba(15, 23, 42, 0.5)',
         modalBg: isDark ? '#0f172a' : '#ffffff',
-        headerBg: 'linear-gradient(180deg, #001c3d 0%, #003366 100%)',
-        border: isDark ? '#1e293b' : '#e2e8f0',
-        mainText: isDark ? '#ffffff' : '#1e293b',
-        subText: isDark ? '#94a3b8' : '#64748b',
-        remarkBg: isDark ? '#020617' : '#f8fafc',
+        // ส่วนที่ปรับปรุง: สีน้ำเงินสว่าง (Bright Blue Gradient) สำหรับโหมดมืด
+        headerBg: isDark ? 'linear-gradient(90deg, #1e40af, #3b82f6)' : '#1e293b', 
+        contentBg: isDark ? '#0f172a' : '#f8fafc',
+        bannerBg: isDark ? '#1e293b' : '#1e2235',
+        border: isDark ? '#334155' : '#e2e8f0',
+        textMain: isDark ? '#f8fafc' : '#1e293b',
+        textDim: isDark ? '#94a3b8' : '#64748b',
+        remarkBg: isDark ? 'rgba(245, 158, 11, 0.05)' : '#fffbeb',
+        remarkBorder: isDark ? '#b45309' : '#fde68a',
+        remarkText: isDark ? '#ffedd5' : '#d97706',
+        imgBorder: isDark ? '#334155' : '#cbd5e1'
     };
 
-    const tc = item.report === 'RP' ? 'background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);'
-             : item.report === 'VF' ? 'background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2);'
-             : 'background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2);';
+    // --- 1. ดึงข้อมูลตัวเลขจริงและการคำนวณ ---
+    const okQty = Number(item.ok) || 0;
+    const ngQty = Number(item.ng) || 0;
+    const totalQty = okQty + ngQty; 
+    const ngRate = totalQty > 0 ? Math.round((ngQty / totalQty) * 100) : 0;
+    
+    const eventDate = item.eventDate || '-';
+    const inspector = item._user || 'Admin';
+    const actionTaken = item.action || '-';
+    const reportType = item.report || 'VF';
+
+    // --- 2. Smart Logic จัดการข้อความจริงจากฐานข้อมูล ---
+    let displaySentence = (item.problem || "").trim();
 
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    modal.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:${theme.overlay};backdrop-filter:blur(8px);`;
+    modal.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);padding:20px;`;
     
     modal.innerHTML = `
-    <div style="background:${theme.modalBg}; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,0.4); width:90%; max-width:850px; overflow:hidden; border:1px solid ${theme.border}; animation:modalPop .2s ease; display:flex; flex-direction:column;">
+    <div style="background:${theme.modalBg}; border:1px solid ${theme.border}; border-radius:12px; width:100%; max-width:880px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); font-family:'Inter', 'Kanit', sans-serif;">
         
-        <!-- 1. Compact Header -->
-        <div style="background:${theme.headerBg}; padding:8px 16px; display:flex; justify-content:space-between; align-items:center;">
+        <!-- 1. Header (ปรับเป็นสีน้ำเงินสว่างตามคำขอ) -->
+        <div style="background:${theme.headerBg}; padding:8px 20px; display:flex; justify-content:space-between; align-items:center; height:36px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:9px; font-weight:800; color:#fff; text-transform:uppercase; letter-spacing:1px;">🔍 CASE RECORD</span>
-                <span style="color:rgba(255,255,255,0.5); font-size:9px;">#${item.id}</span>
+                <!-- ปรับไอคอนให้สีขาวสว่าง -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <span style="color:#fff; font-size:13px; font-weight:900; text-transform:uppercase; letter-spacing:1px; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">Record Details</span>
             </div>
-            <button onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:#fff; cursor:pointer; font-size:16px;">✕</button>
+            <button onclick="this.closest('.modal-overlay').remove()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; width:26px; height:26px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:0.2s;">✕</button>
         </div>
 
-        <div style="overflow-y:auto; scrollbar-width: none;">
+        <div style="padding:12px; background:${theme.contentBg};">
             
-            <!-- 2. Summary Info (Reduced Spacing) -->
-            <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; padding:12px 16px;">
-                <div style="flex:1; min-width:250px;">
-                    <p style="font-size:12px; font-weight:600; color:${theme.mainText}; line-height:1.4; margin:0 0 6px 0;">
-                        ${(() => {
-                            const cleanProb = getCleanProblemTitle(item.problem || "");
-                            if (/inform quality problem/i.test(cleanProb)) {
-                                return cleanProb
-                                    .replace(/^On\s+(.*?)\s+inform quality problem/i, 'On <span style="color:#3b82f6">$1</span> inform quality problem')
-                                    .replace(/about\s+(.*?)\s+found defect/i, 'about <span style="color:#3b82f6">$1</span> found defect')
-                                    .replace(/found defect\s+(.*)$/i, 'found defect <span style="color:#ef4444">$1</span>');
-                            }
-                            return `On <span style="color:#3b82f6">${item.eventDate || '-'}</span> OSA inform quality problem about <span style="color:#3b82f6">${item.part || '-'}</span> found defect <span style="color:#ef4444">${cleanProb || '-'}</span>`;
-                        })()}
-                    </p>
-                    <div style="display:flex; gap:5px;">
-                        <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:2px 6px; font-size:8px; font-weight:700">📅 ${item.eventDate || '-'}</span>
-                        <span style="background:${isDark?'#1e293b':'#f1f5f9'}; color:${theme.subText}; border:1px solid ${theme.border}; border-radius:4px; padding:2px 6px; font-size:8px; font-weight:700">🔧 ${item.action}</span>
-                        <span style="border-radius:4px; padding:2px 6px; font-size:8px; font-weight:800; ${tc}">${item.report}</span>
+            <!-- 2. Dark Banner (Horizontal Streamlined) -->
+            <div style="background:${theme.bannerBg}; border:1px solid ${theme.border}; border-radius:8px; padding:15px 20px; display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:10px;">
+                
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+                        <span style="color:#f59e0b; font-size:8px; font-weight:950; text-transform:uppercase; letter-spacing:0.8px;">⚠️ PROBLEM</span>
+                        <span style="color:#94a3b8; font-size:9.5px; font-weight:700; display:flex; align-items:center; gap:4px;">
+                            <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M3 10h18"/></svg> ${eventDate}
+                        </span>
+                    </div>
+                    
+                    <h2 style="color:#fff; font-size:14px; font-weight:700; line-height:1.5; margin:0 0 10px 0; white-space: normal; word-wrap: break-word;">
+                        ${displaySentence}
+                    </h2>
+
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span style="background:rgba(124,58,237,0.15); color:#a78bfa; padding:1px 8px; border-radius:4px; font-size:9px; font-weight:800; border:1px solid rgba(124,58,237,0.2);">● ${item.part}</span>
+                        <span style="background:rgba(37,99,235,0.15); color:#60a5fa; padding:1px 8px; border-radius:4px; font-size:9px; font-weight:800; border:1px solid rgba(37,99,235,0.2);">🔧 ${actionTaken}</span>
+                        <span style="background:#fff; color:#1e40af; padding:1px 8px; border-radius:4px; font-size:9px; font-weight:950; text-transform:uppercase; border:1px solid #dbeafe;">${reportType}</span>
                     </div>
                 </div>
 
-                <!-- Small KPI Boxes -->
-                <div style="display:flex; gap:6px;">
-                    <div style="text-align:center; border:1px solid #10b981; border-radius:8px; padding:3px 8px; min-width:45px; background:rgba(16,185,129,0.02)">
-                        <div style="font-size:7px; font-weight:800; color:#10b981;">OK</div>
-                        <div style="font-size:14px; font-weight:900; color:#10b981;">${item.ok}</div>
+                <!-- KPI Side -->
+                <div style="display:flex; flex-direction:column; align-items:center; gap:6px; border-left:1px solid ${theme.border}; padding-left:20px; flex-shrink:0;">
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        <div style="text-align:center; min-width:38px;">
+                            <div style="font-size:16px; font-weight:950; color:#a78bfa; line-height:1;">${totalQty}</div>
+                            <div style="font-size:6.5px; font-weight:800; color:${theme.textDim}; margin-top:2px;">TOTAL</div>
+                        </div>
+                        <div style="text-align:center; border-left:1px solid ${theme.border}; padding-left:10px; min-width:38px;">
+                            <div style="font-size:16px; font-weight:950; color:#10b981; line-height:1;">${okQty}</div>
+                            <div style="font-size:6.5px; font-weight:800; color:${theme.textDim}; margin-top:2px;">PASS</div>
+                        </div>
+                        <div style="text-align:center; border-left:1px solid ${theme.border}; padding-left:10px; min-width:38px;">
+                            <div style="font-size:16px; font-weight:950; color:#ef4444; line-height:1;">${ngQty}</div>
+                            <div style="font-size:6.5px; font-weight:800; color:${theme.textDim}; margin-top:2px;">FAIL</div>
+                        </div>
                     </div>
-                    <div style="text-align:center; border:1px solid #ef4444; border-radius:8px; padding:3px 8px; min-width:45px; background:rgba(239,68,68,0.02)">
-                        <div style="font-size:7px; font-weight:800; color:#ef4444;">NG</div>
-                        <div style="font-size:14px; font-weight:900; color:#ef4444;">${item.ng}</div>
-                    </div>
-                    <div style="text-align:center; border:1px solid #3b82f6; border-radius:8px; padding:3px 8px; min-width:45px; background:rgba(59,130,246,0.02)">
-                        <div style="font-size:7px; font-weight:800; color:#3b82f6;">TOTAL</div>
-                        <div style="font-size:14px; font-weight:900; color:#3b82f6;">${item.ok + item.ng}</div>
+                    
+                    <div style="width:100%; margin-top:2px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                            <span style="color:${theme.textDim}; font-size:7px; font-weight:800; text-transform:uppercase;">Yield Status</span>
+                            <span style="color:${ngRate > 0 ? '#ef4444' : '#10b981'}; font-size:9px; font-weight:900;">${ngRate}% NG</span>
+                        </div>
+                        <div style="width:100%; height:4px; background:rgba(255,255,255,0.1); border-radius:10px; overflow:hidden;">
+                            <div style="width:${ngRate}%; height:100%; background:#ef4444; box-shadow:0 0 5px rgba(239, 68, 68, 0.4);"></div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-
-
-<div style="width:100%; background:${theme.modalBg}; border-top:1px solid ${theme.border}; border-bottom:1px solid ${theme.border}; display:flex; justify-content:center; align-items:center; padding:0;">
-    ${item.imageUrl 
-        ? `<img src="${item.imageUrl}" 
-                onclick="WapSupportLogs._openLightbox('${item.imageUrl}')"
-                style="max-width:100%; height:auto; max-height:500px; display:block; cursor:pointer; 
-                       image-rendering: -webkit-optimize-contrast; /* บังคับให้เบราว์เซอร์เรนเดอร์ภาพแบบคมชัด */
-                       image-rendering: crisp-edges;">` 
-        : '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:10px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>'
-    }
-</div>
-
-            <!-- 4. Remark Section (Reduced Padding) -->
-            <div style="padding:10px 16px;">
-                <div style="background:${theme.remarkBg}; border:1px solid ${theme.border}; border-left:3px solid #f59e0b; padding:8px 12px; border-radius:8px;">
-                    <span style="font-size:8px; font-weight:900; color:#f59e0b; text-transform:uppercase; display:block; margin-bottom:2px;">📝 REMARK / NOTE</span>
-                    <p style="font-size:11px; color:${theme.mainText}; margin:0; font-weight:500; font-style: italic;">
-                        "${item.remark || 'No additional remarks found.'}"
-                    </p>
-                </div>
+            <!-- Image Section -->
+            <div style="width:100%; background:${isDark ? theme.headerBg : '#fff'}; border:1px solid ${theme.imgBorder}; border-radius:6px; display:flex; justify-content:center; align-items:center; padding:0; overflow:hidden; margin-bottom:10px;">
+                ${item.imageUrl 
+                    ? `<img src="${item.imageUrl}" 
+                            onclick="WapSupportLogs._openLightbox('${item.imageUrl}')"
+                            style="max-width:100%; height:auto; max-height:380px; display:block; cursor:pointer; image-rendering: -webkit-optimize-contrast;">` 
+                    : `<div style="padding:40px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>`
+                }
             </div>
 
-            <!-- 5. Slim Footer -->
-            <div style="padding:6px 16px; border-top:1px solid ${theme.border}; background:${isDark?'#020617':'#f8fafc'}; display:flex; align-items:center; justify-content:space-between">
-                <span style="font-size:8px; font-weight:700; color:${theme.subText}; text-transform:uppercase">Record Initialized By</span>
-                <span style="font-size:9px; font-weight:800; color:${theme.mainText}">${(item._user || 'System').split('@')[0].toUpperCase()}</span>
+            <!-- Remark Section -->
+            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:6px; padding:10px 15px; display:flex; align-items:center; gap:10px;">
+                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:9px; font-weight:950; text-transform:uppercase; flex-shrink:0;">Note:</span>
+                <p style="color:${theme.remarkText}; font-size:12px; font-weight:600; margin:0; line-height:1.2;">
+                    ${item.remark || 'ไม่มีหมายเหตุเพิ่มเติม'}
+                </p>
             </div>
+
+            <!-- Footer -->
+            <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; padding:0 4px;">
+                <span style="font-size:8px; font-weight:800; color:${theme.textDim}; text-transform:uppercase;">Record Initialized By</span>
+                <span style="font-size:9px; font-weight:900; color:${isDark ? '#cbd5e1' : '#475569'}; text-transform:uppercase;">${inspector.split('@')[0]}</span>
+            </div>
+
         </div>
     </div>`;
     
     document.body.appendChild(modal);
+    gsap.fromTo(modal.firstChild, { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" });
 }
 
     function _confirmDelete(id) {
@@ -14229,9 +14251,9 @@ async function createNewCase(supportData) {
         ng_qty: ng,
         status: 'D1_OPEN',
         // ✅ เก็บข้อมูลรูปภาพและหมายเหตุไว้ใน JSON เพื่อนำไปใช้ในสไลด์อัตโนมัติ
-        report_data: {
-            evidence_img: evidenceImg,
-            source_remark: supportData.remark || "" // เพิ่มบรรทัดนี้เพื่อเก็บหมายเหตุ
+    report_data: {
+        source_report_type: supportData.report_type || supportData.report, // เก็บค่า 'RP', 'VF' หรือ 'RECORDS'
+        evidence_img: supportData.image_url || null,
         },
         created_at: new Date().toISOString()
     };
@@ -16098,68 +16120,79 @@ function renderDashboard() {
 // แผ่นที่ 1: หน้าปก 8D Report (ปรับปรุงให้สัดส่วนเท่าหน้า D2 และพิมพ์กรอกข้อมูลได้ง่าย)
 // ==========================================
 if (_currentSlide === 0) {
-    const isRP = c.report_data?.source_report_type === 'RP'; // เช็คประเภทจากข้อมูลตั้งต้น
+    // 1. ดึงประเภท Report จากฐานข้อมูล (ตรวจสอบค่า RP, VF หรือ RECORDS)
+    const reportType = c.report_data?.source_report_type || "";
+    const isRP = reportType === 'RP';
+    const isVF = reportType === 'VF' || reportType === 'RECORDS';
+
+    // 2. ฟังก์ชันสร้างกล่อง (เพิ่มกิมมิกให้ขนาดคงที่และจัดกึ่งกลางตัว X)
     const check = (active) => active 
-        ? `<span style="background:#000; color:#fff; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border:1.5px solid #000; font-weight:bold; margin-right:8px; font-size:14px;">X</span>` 
-        : `<span style="width:22px; height:22px; display:inline-block; border:1.5px solid #000; background:#fff; margin-right:8px;"></span>`;
+        ? `<span style="background:#000; color:#fff; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border:1.5px solid #000; font-weight:bold; font-size:16px; flex-shrink:0;">X</span>` 
+        : `<span style="width:24px; height:24px; display:inline-block; border:1.5px solid #000; background:#fff; flex-shrink:0;"></span>`;
     
     mainContent = `
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
             <!-- 1. Header: หัวข้อใหญ่และกล่องแจ้งเตือนสีเหลือง -->
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 42px; font-weight: 950; color: #000; margin: 0; outline: none; letter-spacing: -1.5px;">8D Report</h1>
-                    
-                    <div contenteditable="true" style="background:#ffff99; border:1.2px solid #ffcc00; padding:8px 15px; width:340px; color:red; font-size:10px; font-weight:900; border-radius:4px; line-height:1.2; outline: none; text-align:left;">
-                        Suppliers can use any format of the report as long as all mandatory information is present.
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                <h1 contenteditable="true" style="font-size: 42px; font-weight: 950; color: #000; margin: 0; outline: none; letter-spacing: -1.5px;">8D Report</h1>
+                
+                <div contenteditable="true" style="background:#ffff99; border:1.2px solid #ffcc00; padding:8px 15px; width:340px; color:red; font-size:10px; font-weight:900; border-radius:4px; line-height:1.2; outline: none; text-align:left;">
+                    Suppliers can use any format of the report as long as all mandatory information is present.
+                </div>
+            </div>
+
+            <!-- เส้นแบ่งหนาสีน้ำเงินมาตรฐาน -->
+            <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
+
+            <!-- 2. ส่วนเลือกประเภท (Checkboxes) - แก้ไข: เพิ่มกรอบดำและจัดระดับข้อความให้ตรงกล่อง -->
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 15px; flex-shrink: 0;">
+                <div style="border: 1.5px solid #000; padding: 8px 20px; display: flex; gap: 40px; font-weight: 900; font-size: 15px; background:#fff; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        ${check(isRP)}
+                        <span style="color:#000; line-height: 1;">[IQC Rejected, RP]</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        ${check(isVF)}
+                        <span style="color:#000; line-height: 1;">[Line claim, VF]</span>
                     </div>
                 </div>
+            </div>
 
-                <!-- เส้นแบ่งหนาสีน้ำเงินมาตรฐาน (ฟิคขนาดเท่าหน้า D2) -->
-                <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 15px; flex-shrink: 0;"></div>
-
-                <!-- 2. ส่วนเลือกประเภท (Checkboxes) -->
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 15px; flex-shrink: 0;">
-                    <div style="border: 2px solid #000; padding: 6px 18px; display: flex; gap: 30px; font-weight: 900; font-size: 14px; background:#fff;">
-                        <span style="display:flex; align-items:center;">${check(isRP)} [IQC Rejected, RP]</span>
-                        <span style="display:flex; align-items:center;">${check(!isRP)} [Line claim, VF]</span>
-                    </div>
+            <!-- 3. ส่วนแสดงหัวข้อปัญหา (Problem Title) -->
+            <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: 5px 0;">
+                <label style="font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">PROBLEM :</label>
+                <div contenteditable="true" style="font-size: 24px; font-weight: 950; color: #000; line-height: 1.3; outline: none;">
+                    ${getCleanProblemTitle(c.problem_title || '')}
                 </div>
+            </div>
 
-                <!-- 3. ส่วนแสดงหัวข้อปัญหา (Problem Title) -->
-                <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: 5px 0;">
-                    <label style="font-size: 13px; font-weight: 900; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">PROBLEM :</label>
-                    <div contenteditable="true" style="font-size: 24px; font-weight: 950; color: #000; line-height: 1.3; outline: none;">
-                        ${getCleanProblemTitle(c.problem_title || '')}
-                    </div>
-                </div>
-
-                <!-- 4. Approve Table: ส่วนการยืนยันด้านล่าง -->
-                <div style="align-self: flex-end; width: 550px; margin-bottom: 10px; flex-shrink: 0;">
-                    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; text-align: center; font-size: 11px;">
-                        <tr style="background: #99badd; font-weight: 950;">
-                            <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">Suppliers submit</td>
-                            <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">CTC confirm</td>
-                        </tr>
-                        <tr style="font-weight: 800; background: #f8f9fa; height: 22px;">
-                            <td style="border: 1px solid #000; width: 25%;">Confirmed (PIC)</td>
-                            <td style="border: 1px solid #000; width: 25%;">Approved (QA Mgr)</td>
-                            <td style="border: 1px solid #000; width: 25%;">Confirmed (Eng)</td>
-                            <td style="border: 1px solid #000; width: 25%;">Approved (Spec)</td>
-                        </tr>
-                        <tr style="height: 55px; background:#fff;">
-                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
-                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
-                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
-                            <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
-                        </tr>
-                        <tr style="background: #fff; font-weight:800; height: 22px;">
-                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                            <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
-                        </tr>
-                    </table>
-                </div>
+            <!-- 4. Approve Table: ส่วนการยืนยันด้านล่าง -->
+            <div style="align-self: flex-end; width: 550px; margin-bottom: 10px; flex-shrink: 0;">
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; text-align: center; font-size: 11px;">
+                    <tr style="background: #99badd; font-weight: 950;">
+                        <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">Suppliers submit</td>
+                        <td colspan="2" style="border: 1px solid #000; padding: 5px; text-transform: uppercase;">CTC confirm</td>
+                    </tr>
+                    <tr style="font-weight: 800; background: #f8f9fa; height: 22px;">
+                        <td style="border: 1px solid #000; width: 25%;">Confirmed (PIC)</td>
+                        <td style="border: 1px solid #000; width: 25%;">Approved (QA Mgr)</td>
+                        <td style="border: 1px solid #000; width: 25%;">Confirmed (Eng)</td>
+                        <td style="border: 1px solid #000; width: 25%;">Approved (Spec)</td>
+                    </tr>
+                    <tr style="height: 55px; background:#fff;">
+                        <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                        <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                        <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                        <td contenteditable="true" style="border:1px solid #000; outline: none;"></td>
+                    </tr>
+                    <tr style="background: #fff; font-weight:800; height: 22px;">
+                        <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                        <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                        <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                        <td style="border: 1px solid #000; text-align: left; padding-left: 5px;">Date: <span contenteditable="true" style="outline:none; font-weight:normal; display:inline-block; min-width:85px; min-height:16px; vertical-align:middle;"></span></td>
+                    </tr>
+                </table>
+            </div>
         </div>`;
 }
         // ==========================================
