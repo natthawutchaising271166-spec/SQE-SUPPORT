@@ -1,11 +1,9 @@
        
-        
-        
-        
-        
-        
-        
-        .scroll-invisible {
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.scroll-invisible {
     overflow:auto;scrollbar-width:none;-ms-overflow-style:none
 }
         .scroll-invisible::-webkit-scrollbar {
@@ -2400,9 +2398,8 @@
 
         /* --- Table Body Rows --- */
         .support-table tbody tr {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            animation: rowSlideIn 0.4s ease-out both;
-}
+            transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+        }
 
         .support-table tbody tr:nth-child(even) {
     background: #fafbfc;
@@ -5027,10 +5024,8 @@
 #table-container {
     overflow-x: auto;
     height: 100%;
-    /* บอก Browser ให้เตรียม GPU */
     position: relative;
     overflow-y: auto;
-    will-change: scroll-position;
 }
 
 /* กำหนดให้ table มีความสูงรวมตามจำนวน data ทั้งหมดเพื่อสร้าง scrollbar */
@@ -5043,7 +5038,6 @@
 
 /* tbody จะเป็นตัวที่ถูกเลื่อนตำแหน่งด้วย transform */
 #table-render-target {
-    will-change: transform;
     display: table-row-group; /* รักษาความเป็น table ไว้ */
 }
 
@@ -5114,8 +5108,8 @@
 /* กำหนดอนิเมชั่นการปรากฏของแถว */
 @keyframes row-reveal {
     0% { 
-        opacity: 0; 
-        transform: translateY(12px); 
+        opacity: 0.3; 
+        transform: translateY(6px); 
     }
     100% { 
         opacity: 1; 
@@ -5123,11 +5117,18 @@
     }
 }
 
-/* ตั้งค่ามาตรฐานให้แถวในตาราง Support Logs */
+/* ตั้งค่ามาตรฐานให้แถวในตาราง Support Logs ให้ GSAP เป็นตัวขับเคลื่อนอนิเมชั่น */
 #tableBody tr {
-    opacity: 0;
-    animation: row-reveal 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; /* ซ่อนไว้ก่อนเพื่อให้อนิเมชั่นทำงาน */
-    will-change: transform, opacity;
+    opacity: 1;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #tableBody tr, .data-table tbody tr, .ot-table-row, .sj-table-row, .s5-table-row {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
 }
 
 /* ปรับปรุงช่องรูปภาพให้นิ่งและนุ่มนวล */

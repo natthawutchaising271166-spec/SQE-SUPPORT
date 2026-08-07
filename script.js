@@ -42,6 +42,127 @@ window.unlockMaintenanceForAdmin = function() {
     if (typeof toast === 'function') toast("🔓 เข้าใช้งานโหมดผู้ดูแลระบบ", "info");
 };
 
+/* ============================================================
+   UNIVERSAL VIRTUAL SCROLLING ENGINE (V8.0)
+   High performance virtual renderer for large datasets
+   ============================================================ */
+window.VirtualTableScroller = class VirtualTableScroller {
+    constructor(options = {}) {
+        this.containerId = options.containerId;
+        this.tbodyId = options.tbodyId;
+        this.rowHeight = options.rowHeight || 52;
+        this.buffer = options.buffer || 8;
+        this.columnsCount = options.columnsCount || 10;
+        this.rowBuilder = options.rowBuilder;
+        this.emptyHtml = options.emptyHtml || '<tr><td colspan="100" style="text-align:center;padding:40px;color:#94a3b8;font-weight:700;">NO RECORDS FOUND</td></tr>';
+        this.onRenderComplete = options.onRenderComplete || null;
+
+        this.items = [];
+        this.prevStart = -1;
+        this.prevEnd = -1;
+        this.isFresh = true;
+        this.isTicking = false;
+
+        this._onScroll = this._onScroll.bind(this);
+    }
+
+    _getElements() {
+        const container = typeof this.containerId === 'string' ? document.getElementById(this.containerId) : this.containerId;
+        const tbody = typeof this.tbodyId === 'string' ? document.getElementById(this.tbodyId) : this.tbodyId;
+        return { container, tbody };
+    }
+
+    setItems(items, resetScroll = false) {
+        this.items = Array.isArray(items) ? items : [];
+        this.prevStart = -1;
+        this.prevEnd = -1;
+        this.isFresh = true;
+
+        const { container } = this._getElements();
+        if (container) {
+            container.removeEventListener('scroll', this._onScroll);
+            container.addEventListener('scroll', this._onScroll, { passive: true });
+            if (resetScroll) container.scrollTop = 0;
+        }
+
+        this.render();
+    }
+
+    _onScroll() {
+        if (!this.isTicking) {
+            this.isTicking = true;
+            requestAnimationFrame(() => {
+                this.render();
+                this.isTicking = false;
+            });
+        }
+    }
+
+    render() {
+        const { container, tbody } = this._getElements();
+        if (!tbody) return;
+
+        const total = this.items.length;
+        if (total === 0) {
+            tbody.innerHTML = typeof this.emptyHtml === 'function' ? this.emptyHtml() : this.emptyHtml;
+            this.prevStart = -1;
+            this.prevEnd = -1;
+            return;
+        }
+
+        const scrollTop = container ? container.scrollTop : 0;
+        const viewHeight = container ? Math.max(container.clientHeight || 0, window.innerHeight || 600) : 600;
+
+        let startIdx = Math.floor(scrollTop / this.rowHeight) - this.buffer;
+        let endIdx = Math.ceil((scrollTop + viewHeight) / this.rowHeight) + this.buffer;
+
+        startIdx = Math.max(0, startIdx);
+        endIdx = Math.min(total, endIdx);
+
+        if (startIdx === this.prevStart && endIdx === this.prevEnd) return;
+
+        this.prevStart = startIdx;
+        this.prevEnd = endIdx;
+
+        const topPadding = startIdx * this.rowHeight;
+        const bottomPadding = (total - endIdx) * this.rowHeight;
+
+        let rowsHtml = '';
+        if (topPadding > 0) {
+            rowsHtml += `<tr style="height:${topPadding}px; border:none; background:transparent; pointer-events:none;"><td colspan="${this.columnsCount}" style="padding:0; border:none; height:${topPadding}px;"></td></tr>`;
+        }
+
+        for (let i = startIdx; i < endIdx; i++) {
+            rowsHtml += this.rowBuilder(this.items[i], i);
+        }
+
+        if (bottomPadding > 0) {
+            rowsHtml += `<tr style="height:${bottomPadding}px; border:none; background:transparent; pointer-events:none;"><td colspan="${this.columnsCount}" style="padding:0; border:none; height:${bottomPadding}px;"></td></tr>`;
+        }
+
+        tbody.innerHTML = rowsHtml;
+
+        if (this.isFresh) {
+            this.isFresh = false;
+            if (typeof window.animateTableRows === 'function') {
+                window.animateTableRows(tbody, { y: 6, duration: 0.28, maxRows: 15, ease: 'power2.out' });
+            }
+        } else {
+            const trs = tbody.querySelectorAll('tr');
+            trs.forEach(tr => {
+                if (tr && tr.style && tr.style.opacity === '0') {
+                    tr.style.opacity = '1';
+                    tr.style.transform = 'none';
+                }
+            });
+        }
+
+        if (typeof this.onRenderComplete === 'function') {
+            this.onRenderComplete(startIdx, endIdx);
+        }
+    }
+};
+
 // ฟังก์ชันตรวจสอบอีเมล
 window.validateEmail = function(input) {
     if (!input) return;
@@ -63,6 +184,143 @@ window.checkCapsLock = function(e) {
         } else {
             warning.classList.add('hidden');
         }
+    }
+};
+
+/**
+ * Universal smooth GSAP entry animation for new or refreshed table rows
+ * Provides high-performance, polished visual feedback across all displays and specs.
+ */
+window.animateTableRows = function(target, options = {}) {
+    let rows = [];
+    if (typeof target === 'string') {
+        const el = document.getElementById(target) || document.querySelector(target);
+        if (el) {
+            rows = (el.tagName && (el.tagName.toLowerCase() === 'tbody' || el.tagName.toLowerCase() === 'table'))
+                ? Array.from(el.querySelectorAll('tr'))
+                : [el];
+        } else {
+            rows = Array.from(document.querySelectorAll(target));
+        }
+    } else if (target && target.nodeType === 1) {
+        if (target.tagName.toLowerCase() === 'tbody' || target.tagName.toLowerCase() === 'table') {
+            rows = Array.from(target.querySelectorAll('tr'));
+        } else if (target.tagName.toLowerCase() === 'tr') {
+            rows = [target];
+        }
+    } else if (target instanceof NodeList || Array.isArray(target)) {
+        rows = Array.from(target);
+    }
+
+    // Filter out loader/placeholder single-td rows
+    rows = rows.filter(tr => {
+        if (!tr || tr.nodeType !== 1) return false;
+        if (tr.children.length === 1 && tr.children[0].hasAttribute('colspan')) {
+            const txt = (tr.innerText || '').toLowerCase();
+            if (txt.includes('กำลัง') || txt.includes('no records') || txt.includes('ไม่พบ') || txt.includes('no matching') || txt.includes('no data')) {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    if (!rows.length) return;
+
+    // Safety check: if GSAP is unavailable or user/system prefers reduced motion, make rows visible immediately
+    const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof gsap === 'undefined' || reducedMotion) {
+        rows.forEach(tr => {
+            if (tr && tr.style) {
+                tr.style.opacity = '1';
+                tr.style.transform = 'none';
+            }
+            if (tr && tr.classList) tr.classList.remove('opacity-0');
+        });
+        return;
+    }
+
+    const maxRows = options.maxRows || 25;
+    const animateRows = rows.slice(0, maxRows);
+    const overflowRows = rows.slice(maxRows);
+
+    // Make overflow rows visible immediately
+    overflowRows.forEach(tr => {
+        if (tr && tr.style) {
+            tr.style.opacity = '1';
+            tr.style.transform = 'none';
+        }
+        if (tr && tr.classList) tr.classList.remove('opacity-0');
+    });
+
+    gsap.killTweensOf(animateRows);
+
+    // Ensure opacity-0 is removed immediately so rows stay visible after GSAP finishes or clears props
+    animateRows.forEach(tr => {
+        if (tr && tr.classList) tr.classList.remove('opacity-0');
+    });
+
+    const staggerTime = options.stagger !== undefined ? options.stagger : Math.min(0.02, 0.2 / Math.max(1, animateRows.length));
+    const duration = options.duration || 0.28;
+    const yOffset = options.y !== undefined ? options.y : (options.x ? 0 : 6);
+    const xOffset = options.x !== undefined ? options.x : 0;
+
+    // Fail-safe timer: Forces rows to be fully visible if GSAP or GPU process drops animation frame
+    const safetyTimer = setTimeout(() => {
+        animateRows.forEach(tr => {
+            if (tr && tr.style) {
+                tr.style.opacity = '1';
+                tr.style.transform = 'none';
+            }
+            if (tr && tr.classList) tr.classList.remove('opacity-0');
+        });
+    }, (duration + 0.15) * 1000);
+
+    try {
+        requestAnimationFrame(() => {
+            gsap.fromTo(animateRows,
+                {
+                    opacity: 0,
+                    x: xOffset,
+                    y: yOffset
+                },
+                {
+                    opacity: 1,
+                    x: 0,
+                    y: 0,
+                    duration: duration,
+                    stagger: staggerTime,
+                    ease: options.ease || 'power2.out',
+                    clearProps: 'transform,opacity',
+                    onComplete: () => {
+                        clearTimeout(safetyTimer);
+                        animateRows.forEach(tr => {
+                            if (tr && tr.style) {
+                                tr.style.opacity = '1';
+                                tr.style.transform = 'none';
+                            }
+                            if (tr && tr.classList) tr.classList.remove('opacity-0');
+                        });
+                    },
+                    onInterrupt: () => {
+                        clearTimeout(safetyTimer);
+                        animateRows.forEach(tr => {
+                            if (tr && tr.style) {
+                                tr.style.opacity = '1';
+                                tr.style.transform = 'none';
+                            }
+                        });
+                    }
+                }
+            );
+        });
+    } catch (e) {
+        clearTimeout(safetyTimer);
+        animateRows.forEach(tr => {
+            if (tr && tr.style) {
+                tr.style.opacity = '1';
+                tr.style.transform = 'none';
+            }
+        });
     }
 };
 
@@ -3557,7 +3815,7 @@ let S = {
 
 
 const ROW_HEIGHT = 56; 
-let virtualTableState = { allRows: [], prevStart: -1, prevEnd: -1 };
+let virtualTableState = { allRows: [], prevStart: -1, prevEnd: -1, isFreshRender: true };
 
 let smartMemory = {
     values: { partNo: new Set(), partName: new Set(), supplier: new Set(), line: new Set(), defect: new Set() },
@@ -4433,12 +4691,11 @@ function updateMainGauge(pct) {
     const statusText = document.getElementById('mainGaugeStatusText');
     const ticksGroup = document.getElementById('gaugeTicksGroup');
 
-    // ✅ 1. ประกาศค่ามุมไว้ที่นี่ เพื่อให้ใช้ได้ทั้งฟังก์ชัน (แก้ปัญหา ReferenceError)
     const minAngle = -120;
     const maxAngle = 120;
-    const angleRange = maxAngle - minAngle; // 240 องศา
+    const angleRange = maxAngle - minAngle; // 240 degrees
 
-    // 2. วาดขีด Ticks
+    // 2. วาดขีด Ticks (วาดครั้งเดียว)
     if (ticksGroup && ticksGroup.innerHTML === "") {
         let ticksHtml = "";
         for (let i = 0; i <= 50; i++) {
@@ -4457,19 +4714,15 @@ function updateMainGauge(pct) {
         ticksGroup.innerHTML = ticksHtml;
     }
 
-    // 3. Logic กำหนดสี
+    // 3. Logic กำหนดสีและ Label
+    const safePct = Math.max(0, Math.min(100, parseFloat(pct) || 0));
     let color = "#ef4444"; 
     let label = "CRITICAL";
-    if (pct >= 95) { color = "#10b981"; label = "PERFECT"; }
-    else if (pct >= 85) { color = "#3b82f6"; label = "GOOD"; }
-    else if (pct >= 70) { color = "#f59e0b"; label = "STABLE"; }
+    if (safePct >= 95) { color = "#10b981"; label = "PERFECT"; }
+    else if (safePct >= 85) { color = "#3b82f6"; label = "GOOD"; }
+    else if (safePct >= 70) { color = "#f59e0b"; label = "STABLE"; }
 
-    // 4. อัปเดต UI ตัวเลข
-    if (valText) {
-        valText.innerHTML = `${Math.round(pct)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
-    }
-    
-    // 5. อัปเดตสถานะ Badge
+    // 4. อัปเดตสถานะ Badge
     if (statusLabel) {
         if (statusText) statusText.textContent = label;
         statusLabel.style.color = color;
@@ -4478,26 +4731,91 @@ function updateMainGauge(pct) {
         if (dot) dot.style.background = color;
     }
 
-    // 6. อัปเดตเส้นสี (Progress Arc)
-    if (arc) {
-        const circumference = 2 * Math.PI * 75;
-        const totalArcLength = (angleRange / 360) * circumference;
-        const drawLength = (pct / 100) * totalArcLength;
-        arc.style.strokeDasharray = `${drawLength} ${circumference}`;
-        arc.style.stroke = color;
-    }
-
-    // 7. หมุนเข็ม (เรียกใช้ minAngle ได้แล้ว)
-    if (needle) {
-        const needleAngle = minAngle + (pct * (angleRange / 100));
-        needle.style.transform = `rotate(${needleAngle}deg)`;
-    }
-
-    // 8. อัปเดตข้อความ Footer
+    // 5. อัปเดตข้อความ Footer
     const footStatus = document.getElementById('yield-status-text');
-    if(footStatus) {
+    if (footStatus) {
         footStatus.textContent = label;
         footStatus.style.color = color;
+    }
+
+    if (arc) {
+        arc.style.stroke = color;
+        arc.style.transition = "none";
+    }
+    if (needle) {
+        needle.style.transition = "none";
+    }
+
+    const circumference = 2 * Math.PI * 75;
+    const totalArcLength = (angleRange / 360) * circumference;
+    const targetDrawLength = (safePct / 100) * totalArcLength;
+    const targetAngle = minAngle + (safePct * (angleRange / 100));
+
+    // 6. GSAP Sweep Animation: เข็มและแถบสีวิ่งตวัดไปขวาสุด (100%) แล้วค่อยๆ ไหลกลับมายังจุดจำนวนจริงพร้อมกัน
+    if (window.gsap) {
+        gsap.killTweensOf([needle, arc, valText]);
+
+        const animObj = {
+            angle: minAngle,
+            drawLen: 0,
+            val: 0
+        };
+
+        const tl = gsap.timeline();
+
+        // Step 1: วิ่งตวัดไปขวาสุดอย่างนุ่มนวล (100% / maxAngle)
+        tl.to(animObj, {
+            angle: maxAngle,
+            drawLen: totalArcLength,
+            val: 100,
+            duration: 0.95,
+            ease: "power2.inOut",
+            onUpdate: () => {
+                if (needle) {
+                    needle.style.transform = `rotate(${animObj.angle}deg)`;
+                    needle.style.transformOrigin = "100px 112px";
+                }
+                if (arc) {
+                    arc.style.strokeDasharray = `${animObj.drawLen} ${circumference}`;
+                }
+                if (valText) {
+                    valText.innerHTML = `${animObj.val.toFixed(1)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
+                }
+            }
+        });
+
+        // Step 2: ค่อยๆ ไหลกลับมายังจุดจำนวนจริงอย่างช้าๆ นุ่มนวล (ทั้งเข็ม แถบสี และตัวเลข)
+        tl.to(animObj, {
+            angle: targetAngle,
+            drawLen: targetDrawLength,
+            val: safePct,
+            duration: 2.2,
+            ease: "power2.out",
+            onUpdate: () => {
+                if (needle) {
+                    needle.style.transform = `rotate(${animObj.angle}deg)`;
+                    needle.style.transformOrigin = "100px 112px";
+                }
+                if (arc) {
+                    arc.style.strokeDasharray = `${animObj.drawLen} ${circumference}`;
+                }
+                if (valText) {
+                    valText.innerHTML = `${animObj.val.toFixed(1)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
+                }
+            }
+        });
+    } else {
+        // Fallback กรณีไม่มี GSAP
+        if (needle) {
+            needle.style.transform = `rotate(${targetAngle}deg)`;
+            needle.style.transformOrigin = "100px 112px";
+        }
+        if (arc) {
+            arc.style.strokeDasharray = `${targetDrawLength} ${circumference}`;
+        }
+        if (valText) {
+            valText.innerHTML = `${safePct.toFixed(1)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
+        }
     }
 }
 
@@ -4613,56 +4931,68 @@ async function create8DFromClaimRecord(recordId) {
         return;
     }
 
-    if (!confirm(`🤖 ต้องการสร้างรายงาน 8D Report จากเคส:\nRef: ${r.ref || '-'}\nPart: ${r.partName || r.partNo}\nDefect: ${r.defect || '-'} ใช่หรือไม่?`)) {
-        return;
-    }
+    showCustomConfirmDialog({
+        title: "ยืนยันสร้างรายงาน 8D Report",
+        subtitle: "ระบบจะสร้างใบงาน Corrective Action 8D จากเคสเคลมที่เลือก",
+        badge: "8D REPORT AUTOMATION",
+        type: "info",
+        details: [
+            { label: "เลขที่อ้างอิง Ref", value: r.ref || '-' },
+            { label: "ชิ้นส่วน / Part", value: r.partName || r.partNo || '-' },
+            { label: "อาการเสีย / Defect", value: r.defect || '-' },
+            { label: "จำนวนเสีย / Qty", value: `${r.qty || 0} ชิ้น` }
+        ],
+        confirmText: "🚀 สร้างรายงาน 8D ตอนนี้",
+        cancelText: "ยกเลิก",
+        onConfirm: async () => {
+            toast("⏳ กำลังสร้างเคส 8D อัตโนมัติ...", "info");
 
-    toast("⏳ กำลังสร้างเคส 8D อัตโนมัติ...", "info");
+            const newId = '8D-' + Date.now();
+            const payload = {
+                id: newId,
+                user_id: S.currentUser,
+                support_id: r.id || r.ref || newId,
+                problem_title: `${r.defect || 'Defect'} - ${r.partName || r.partNo || ''}`.trim(),
+                part_name: r.partName || '-',
+                part_group: r.partNo || '-',
+                lot_no: Number(r.qty) || 0,
+                ok_qty: 0,
+                ng_qty: Number(r.qty) || 0,
+                status: 'D1_OPEN',
+                report_data: {
+                    source_remark: r.remark || "",
+                    record_id: r.id,
+                    ref: r.ref || "",
+                    supplier: r.supplier || "",
+                    line: r.line || "",
+                    shift: r.shift || "",
+                    qty: r.qty || 0,
+                    unit: r.unit || 'PCS'
+                },
+                created_at: new Date().toISOString()
+            };
 
-    const newId = '8D-' + Date.now();
-    const payload = {
-        id: newId,
-        user_id: S.currentUser,
-        support_id: r.id || r.ref || newId,
-        problem_title: `${r.defect || 'Defect'} - ${r.partName || r.partNo || ''}`.trim(),
-        part_name: r.partName || '-',
-        part_group: r.partNo || '-',
-        lot_no: Number(r.qty) || 0,
-        ok_qty: 0,
-        ng_qty: Number(r.qty) || 0,
-        status: 'D1_OPEN',
-        report_data: {
-            source_remark: r.remark || "",
-            record_id: r.id,
-            ref: r.ref || "",
-            supplier: r.supplier || "",
-            line: r.line || "",
-            shift: r.shift || "",
-            qty: r.qty || 0,
-            unit: r.unit || 'PCS'
-        },
-        created_at: new Date().toISOString()
-    };
+            try {
+                const { error } = await sqeClient.from('eight_d_reports').insert([payload]);
+                if (error) throw error;
 
-    try {
-        const { error } = await sqeClient.from('eight_d_reports').insert([payload]);
-        if (error) throw error;
-
-        toast("✅ สร้างเคส 8D สำเร็จแล้ว!", "success");
-        if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
-            await Wap8DSystem.fetchCases();
+                toast("✅ สร้างเคส 8D สำเร็จแล้ว!", "success");
+                if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
+                    await Wap8DSystem.fetchCases();
+                }
+                renderTable();
+                
+                switchPage('8D REPORT');
+                setTimeout(() => {
+                    if (typeof Wap8DSystem !== 'undefined') Wap8DSystem.openReport(newId);
+                }, 200);
+            } catch (err) {
+                console.error("Auto 8D Error:", err);
+                toast("❌ สร้างเคส 8D ล้มเหลว: " + err.message, "error");
+            }
         }
-        renderTable();
-        
-        switchPage('8D REPORT');
-        setTimeout(() => {
-            if (typeof Wap8DSystem !== 'undefined') Wap8DSystem.openReport(newId);
-        }, 200);
-
-    } catch (e) {
-        console.error("8D Create Error:", e);
-        toast("❌ สร้างเคส 8D ไม่สำเร็จ: " + e.message, "error");
-    }
+    });
+    return;
 }
 
 function openReportFromRecord(caseId) {
@@ -4719,7 +5049,8 @@ function normalizeRecord(r) {
         id: r.id, date: r.date || '', shift: r.shift || 'SHIFT A', line: r.line || '', ref: r.ref || '',
         supplier: r.supplier || '', partNo: r.partNo || '', partName: r.partName || '',
         qty: r.qty || 0, unit: r.unit || 'PCS', defect: r.defect || '', remark: r.remark || '', judgment: r.judgment || '',
-        inspector: r.inspector || ''
+        inspector: r.inspector || '',
+        created_at: r.created_at || r.createdAt || r.full_timestamp || r.date || ''
     };
 }
 
@@ -5009,7 +5340,6 @@ function resetInputForm() {
     refreshNeonGlow();
 }
 
-function clearForm() { resetInputForm(); }
 
 async function submitEntry() {
     if (S.userRole === 'supervisor') { toast('Supervisor เป็นโหมดดูอย่างเดียว (Read-only)', 'info'); return; }
@@ -5341,28 +5671,302 @@ function cloneRecord(id) {
     refreshNeonGlow();
 }
 
-// ฟังก์ชัน 1: แสดงหน้าต่างยืนยันก่อนลบ
-function confirmDelete(id) {
-    // ใช้ Confirm Dialog มาตรฐานของ Browser เพื่อความรวดเร็วและแน่นอน
-    if (confirm("⚠️ ยืนยันการลบรายการนี้หรือไม่?\nการลบข้อมูลนี้จะไม่สามารถกู้คืนได้")) {
-        
-        // สั่งรันฟังก์ชันลบ และรอผลลัพธ์
-        deleteRecordFromCloud(id).then(success => {
-            if (success) {
-                // ถ้าลบสำเร็จ ให้สั่งวาดตารางใหม่ทันที
-                renderTable(); 
-                toast('🗑️ ลบข้อมูลเรียบร้อยแล้ว', 'success');
+// --- Custom Confirmation Dialog System ---
+function showCustomConfirmDialog(options = {}) {
+    const {
+        title = "ยืนยันการดำเนินการ",
+        subtitle = "คุณแน่ใจหรือไม่ที่จะดำเนินการนี้?",
+        badge = "CONFIRMATION",
+        type = "danger",
+        details = [],
+        requiresTextInput = null,
+        inputPlaceholder = "",
+        confirmText = "ยืนยัน",
+        cancelText = "ยกเลิก",
+        onConfirm = null,
+        onCancel = null
+    } = options;
+
+    const existing = document.getElementById('custom-confirm-modal');
+    if (existing) existing.remove();
+
+    const isDark = document.body.classList.contains('dark-mode') || document.documentElement.classList.contains('dark') || localStorage.getItem('carrier_theme') === 'dark';
+    const isDanger = type === 'danger';
+    const isWarning = type === 'warning';
+
+    const modal = document.createElement('div');
+    modal.id = 'custom-confirm-modal';
+    modal.className = `fixed inset-0 z-[11000] flex items-center justify-center p-4 ${isDark ? 'bg-slate-950/85' : 'bg-slate-900/60'} backdrop-blur-md transition-opacity duration-200`;
+
+    const iconSvg = isDanger ? `
+        <svg class="w-6 h-6 ${isDark ? 'text-rose-400' : 'text-rose-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+    ` : isWarning ? `
+        <svg class="w-6 h-6 ${isDark ? 'text-amber-400' : 'text-amber-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+    ` : `
+        <svg class="w-6 h-6 ${isDark ? 'text-blue-400' : 'text-blue-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+    `;
+
+    const badgeBg = isDark
+        ? (isDanger ? 'bg-rose-950/90 text-rose-300 border-rose-500/40' : isWarning ? 'bg-amber-950/90 text-amber-300 border-amber-500/40' : 'bg-blue-950/90 text-blue-300 border-blue-500/40')
+        : (isDanger ? 'bg-rose-100 text-rose-800 border-rose-300' : isWarning ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-300');
+
+    const iconBg = isDark
+        ? (isDanger ? 'bg-rose-950/90 border-rose-500/40 shadow-rose-950/50' : isWarning ? 'bg-amber-950/90 border-amber-500/40 shadow-amber-950/50' : 'bg-blue-950/90 border-blue-500/40 shadow-blue-950/50')
+        : (isDanger ? 'bg-rose-50 border-rose-200 shadow-rose-100' : isWarning ? 'bg-amber-50 border-amber-200 shadow-amber-100' : 'bg-blue-50 border-blue-200 shadow-blue-100');
+
+    const cardBg = isDark ? 'bg-slate-900 border-slate-700/80 text-slate-100 shadow-2xl shadow-black/90' : 'bg-white border-slate-200/90 text-slate-800 shadow-2xl shadow-slate-400/30';
+    const titleColor = isDark ? 'text-white' : 'text-slate-900';
+    const subColor = isDark ? 'text-slate-400' : 'text-slate-600';
+
+    const detailsBox = isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200/80';
+    const detailLabelColor = isDark ? 'text-slate-400' : 'text-slate-500';
+    const detailValueColor = isDark ? 'text-slate-100' : 'text-slate-900';
+    const detailBorder = isDark ? 'border-slate-800/60' : 'border-slate-200/70';
+
+    const barGradient = isDanger ? 'from-rose-500 via-red-500 to-amber-500' 
+                      : isWarning ? 'from-amber-500 via-orange-500 to-yellow-500' 
+                      : 'from-blue-500 via-cyan-500 to-indigo-500';
+
+    const confirmBtnBg = isDanger 
+        ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-lg shadow-rose-600/20 border-rose-400/30' 
+        : isWarning 
+        ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-lg shadow-amber-600/20 border-amber-400/30' 
+        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-600/20 border-blue-400/30';
+
+    const cancelBtnBg = isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border-slate-300';
+
+    const warningBoxBg = isDark ? 'text-amber-300/90 bg-amber-950/30 border-amber-500/20' : 'text-amber-800 bg-amber-50 border-amber-200';
+
+    const detailsHtml = details && details.length ? `
+        <div class="${detailsBox} border rounded-2xl p-3.5 space-y-2 text-xs font-mono">
+            ${details.map(d => `
+                <div class="flex justify-between items-center gap-2 border-b ${detailBorder} pb-1.5 last:border-0 last:pb-0">
+                    <span class="${detailLabelColor} font-medium">${escapeHtml(d.label)}:</span>
+                    <span class="${detailValueColor} font-bold truncate max-w-[220px] text-right">${escapeHtml(String(d.value))}</span>
+                </div>
+            `).join('')}
+        </div>
+    ` : '';
+
+    const inputBoxBg = isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200';
+    const inputFieldBg = isDark ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400';
+    const inputLabelColor = isDark ? 'text-slate-300' : 'text-slate-700';
+
+    const textInputHtml = requiresTextInput ? `
+        <div class="space-y-1.5 ${inputBoxBg} p-3 rounded-2xl border">
+            <label class="block text-[11px] font-mono font-bold ${inputLabelColor}">
+                กรุณาพิมพ์ <span class="text-rose-500 font-extrabold select-all">'${escapeHtml(requiresTextInput)}'</span> เพื่อยืนยัน:
+            </label>
+            <input type="text" id="confirm-verification-input" placeholder="${escapeHtml(inputPlaceholder || requiresTextInput)}" class="w-full h-10 px-3 ${inputFieldBg} focus:border-rose-500 rounded-xl text-xs font-mono tracking-widest outline-none transition-all uppercase" autocomplete="off" />
+        </div>
+    ` : '';
+
+    modal.innerHTML = `
+        <div id="custom-confirm-card" class="relative w-full max-w-md ${cardBg} border rounded-3xl overflow-hidden flex flex-col font-sans transform scale-95 opacity-0 transition-all duration-200">
+            <div class="h-1.5 w-full bg-gradient-to-r ${barGradient}"></div>
+
+            <div class="p-6 flex flex-col gap-4">
+                <div class="flex items-start gap-3.5">
+                    <div class="w-12 h-12 rounded-2xl border flex items-center justify-center flex-shrink-0 shadow-lg ${iconBg}">
+                        ${iconSvg}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider mb-1 border ${badgeBg}">
+                            ${escapeHtml(badge)}
+                        </div>
+                        <h3 class="text-base font-extrabold ${titleColor} leading-tight">${escapeHtml(title)}</h3>
+                        <p class="text-xs ${subColor} mt-1 leading-normal">${escapeHtml(subtitle)}</p>
+                    </div>
+                </div>
+
+                ${detailsHtml}
+                ${textInputHtml}
+
+                <div class="flex items-center gap-2 text-[10px] ${warningBoxBg} border px-3 py-2 rounded-xl font-mono">
+                    <svg class="w-4 h-4 flex-shrink-0 ${isDark ? 'text-amber-400' : 'text-amber-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <span>โปรดตรวจสอบข้อมูลให้แน่ใจก่อนกดยืนยันการทำงาน</span>
+                </div>
+
+                <div class="flex items-center gap-3 mt-1">
+                    <button id="btn-cancel-custom-modal" class="flex-1 h-11 ${cancelBtnBg} font-bold text-xs rounded-xl border transition-all active:scale-95 flex items-center justify-center">
+                        ${escapeHtml(cancelText)}
+                    </button>
+                    <button id="btn-confirm-custom-modal" ${requiresTextInput ? 'disabled' : ''} class="flex-[1.5] h-11 border ${confirmBtnBg} font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${requiresTextInput ? 'opacity-50 cursor-not-allowed' : ''}">
+                        ${escapeHtml(confirmText)}
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const card = modal.querySelector('#custom-confirm-card');
+    const cancelBtn = modal.querySelector('#btn-cancel-custom-modal');
+    const confirmBtn = modal.querySelector('#btn-confirm-custom-modal');
+    const inputEl = modal.querySelector('#confirm-verification-input');
+
+    requestAnimationFrame(() => {
+        card.classList.remove('scale-95', 'opacity-0');
+        card.classList.add('scale-100', 'opacity-100');
+        if (inputEl) inputEl.focus();
+        else confirmBtn.focus();
+    });
+
+    const closeDialog = (confirmed = false) => {
+        card.classList.remove('scale-100', 'opacity-100');
+        card.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.remove();
+            if (!confirmed && typeof onCancel === 'function') onCancel();
+        }, 180);
+    };
+
+    cancelBtn.onclick = () => closeDialog(false);
+
+    modal.onclick = (e) => {
+        if (e.target === modal) closeDialog(false);
+    };
+
+    if (requiresTextInput && inputEl) {
+        inputEl.addEventListener('input', () => {
+            const val = inputEl.value.trim();
+            if (val.toUpperCase() === requiresTextInput.trim().toUpperCase()) {
+                confirmBtn.removeAttribute('disabled');
+                confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                confirmBtn.setAttribute('disabled', 'true');
+                confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
             }
         });
     }
+
+    confirmBtn.onclick = async () => {
+        if (confirmBtn.hasAttribute('disabled')) return;
+        confirmBtn.setAttribute('disabled', 'true');
+        confirmBtn.innerHTML = `
+            <svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            กำลังดำเนินการ...
+        `;
+        try {
+            if (typeof onConfirm === 'function') {
+                await onConfirm();
+            }
+        } catch (err) {
+            console.error("Confirm Dialog Action Error:", err);
+            toast("❌ เกิดข้อผิดพลาดในการดำเนินการ", "error");
+        } finally {
+            closeDialog(true);
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+            document.removeEventListener('keydown', handleKeyDown);
+            closeDialog(false);
+        } else if (e.key === 'Enter' && !confirmBtn.hasAttribute('disabled')) {
+            document.removeEventListener('keydown', handleKeyDown);
+            confirmBtn.click();
+        }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+}
+
+// --- ยืนยันก่อนลบรายการเดี่ยวใน Part Line Claim ---
+function confirmDelete(id) {
+    if (S.userRole === 'supervisor') {
+        toast('Supervisor เป็นโหมดดูอย่างเดียว (Read-only)', 'info');
+        return;
+    }
+    const targetRecord = S.records.find(r => String(r.id) === String(id));
+    if (!targetRecord) {
+        toast('❌ ไม่พบรายการที่ต้องการลบ', 'error');
+        return;
+    }
+
+    showCustomConfirmDialog({
+        title: "ยืนยันการลบรายการเคลม",
+        subtitle: "รายการนี้จะถูกลบออกจากระบบ และไม่สามารถกู้คืนได้",
+        badge: "DELETE CLAIM RECORD",
+        type: "danger",
+        details: [
+            { label: "Ref No.", value: targetRecord.ref || '-' },
+            { label: "Part No.", value: `${targetRecord.partNo || '-'} (${targetRecord.partName || '-'})` },
+            { label: "ซัพพลายเออร์", value: targetRecord.supplier || '-' },
+            { label: "จำนวน / ไลน์", value: `${targetRecord.qty || 0} ${targetRecord.unit || 'PCS'} | Line: ${targetRecord.line || '-'}` },
+            { label: "อาการเสีย", value: targetRecord.defect || '-' }
+        ],
+        confirmText: "🗑️ ยืนยันการลบรายการ",
+        cancelText: "ยกเลิก",
+        onConfirm: async () => {
+            const success = await deleteRecordFromCloud(id);
+            if (success) {
+                renderTable(); 
+                toast('🗑️ ลบข้อมูลรายการเรียบร้อยแล้ว', 'success');
+            }
+        }
+    });
+}
+
+// --- ยืนยันก่อนล้างข้อมูลในฟอร์ม ---
+function confirmResetForm() {
+    const fields = ['f-part', 'f-partname', 'f-supplier', 'f-ref', 'f-line', 'f-qty', 'f-defect', 'f-remark'];
+    const filledFields = fields.filter(id => {
+        const el = $id(id);
+        return el && el.value && el.value.trim() !== '';
+    });
+
+    if (filledFields.length === 0) {
+        resetInputForm();
+        return;
+    }
+
+    const partVal = $id('f-part')?.value.trim();
+    const refVal = $id('f-ref')?.value.trim();
+
+    showCustomConfirmDialog({
+        title: "ยืนยันการล้างข้อมูลในฟอร์ม",
+        subtitle: "ข้อมูลที่คุณกำลังกรอกในฟอร์มยังไม่ได้ถูกบันทึก คุณต้องการล้างข้อมูลฟอร์มนี้ใช่หรือไม่?",
+        badge: "RESET FORM FIELDS",
+        type: "warning",
+        details: [
+            { label: "จำนวนช่องที่มีข้อมูล", value: `${filledFields.length} ช่อง` },
+            { label: "Part No.", value: partVal || '-' },
+            { label: "Ref No.", value: refVal || '-' }
+        ],
+        confirmText: "🧹 ยืนยันล้างข้อมูลฟอร์ม",
+        cancelText: "กลับไปแก้ไขต่อ",
+        onConfirm: () => {
+            resetInputForm();
+            toast('🧹 ล้างข้อมูลในฟอร์มเรียบร้อยแล้ว', 'info');
+        }
+    });
+}
+
+function clearForm() {
+    confirmResetForm();
 }
 
 function showModal(title, message, onConfirm) {
-    const root = $id('modal-root');
-    root.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box"><h3 class="text-lg font-bold text-slate-800 mb-2">${escapeHtml(title)}</h3><p class="text-sm text-slate-500 mb-6">${escapeHtml(message)}</p><div class="flex gap-3"><button onclick="closeModal()" class="flex-1 py-2.5 rounded-xl text-xs font-bold border border-slate-200 text-slate-500 bg-slate-50">ยกเลิก</button><button id="modal-confirm-btn" class="flex-1 py-2.5 rounded-xl text-xs font-bold bg-red-500 text-white">ยืนยัน</button></div></div></div>`;
+    let root = $id('modal-root');
+    if (!root) {
+        root = document.createElement('div');
+        root.id = 'modal-root';
+        document.body.appendChild(root);
+    }
+    root.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box"><h3 class="text-lg font-bold text-slate-800 mb-2">${escapeHtml(title)}</h3><p class="text-sm text-slate-500 mb-6">${escapeHtml(message)}</p><div class="flex gap-3"><button  onclick="closeModal()" class="flex-1 py-2.5 rounded-xl text-xs font-bold border border-slate-200 text-slate-500 bg-slate-50" title="Close Modal" aria-label="Close Modal">ยกเลิก</button><button  id="modal-confirm-btn" class="flex-1 py-2.5 rounded-xl text-xs font-bold bg-red-500 text-white" title="Modal Confirm Btn" aria-label="Modal Confirm Btn">ยืนยัน</button></div></div></div>`;
     $id('modal-confirm-btn').onclick = () => { closeModal(); onConfirm && onConfirm(); };
 }
-function closeModal() { $id('modal-root').innerHTML = ''; }
+function closeModal() {
+    const root = $id('modal-root');
+    if (root) root.innerHTML = '';
+}
 
 function getFilteredRecords() {
     let filtered = S.records;
@@ -5399,6 +6003,14 @@ function getFilteredRecords() {
                 eightDId.includes(kw);
         });
     }
+    // เรียงลำดับจากวันที่ที่บันทึกล่าสุดเรียงลงไปเสมอ
+    filtered.sort((a, b) => {
+        const timeA = new Date(a.created_at || a.date || 0).getTime() || 0;
+        const timeB = new Date(b.created_at || b.date || 0).getTime() || 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return String(b.id || '').localeCompare(String(a.id || ''));
+    });
+
     return filtered;
 }
 
@@ -5577,17 +6189,17 @@ function buildRow(r, i) {
     if (eightD) {
         const dStatus = (eightD.status || 'D1_OPEN').replace('D1_OPEN', 'D1').replace('_', ' ');
         eightDUI = `
-            <button onclick="event.stopPropagation(); openReportFromRecord('${eightD.id}')"
+            <button  onclick="event.stopPropagation(); openReportFromRecord('${eightD.id}')"
                     class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-emerald-50 text-emerald-600 border border-emerald-300 hover:bg-emerald-100 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                    title="คลิกเพื่อเปิดดู 8D Report #${eightD.id}">
+                    title="คลิกเพื่อเปิดดู 8D Report #${eightD.id}" aria-label="Event.Stop Propagation">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>8D: ${escapeHtml(dStatus)}</span>
             </button>`;
     } else {
         eightDUI = `
-            <button onclick="event.stopPropagation(); create8DFromClaimRecord('${r.id}')"
+            <button  onclick="event.stopPropagation(); create8DFromClaimRecord('${r.id}')"
                     class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-500 hover:bg-blue-600 hover:text-white border border-slate-200 hover:border-blue-600 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                    title="คลิกเพื่อสร้างรายงาน 8D จากเคสนี้ทันที">
+                    title="คลิกเพื่อสร้างรายงาน 8D จากเคสนี้ทันที" aria-label="Event.Stop Propagation">
                 <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <span>+ ออก 8D</span>
             </button>`;
@@ -5646,9 +6258,9 @@ function buildRow(r, i) {
         </td>
         <td class="col-actions">
             <div class="row-actions" style="display: flex; gap: 4px; justify-content: center;">
-                <button class="row-btn row-btn-clone" data-tip="คัดลอก" onclick="cloneRecord('${r.id}')"><svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
-                <button class="row-btn row-btn-edit" data-tip="แก้ไข" onclick="editRecord('${r.id}')"><svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
-                <button class="row-btn row-btn-del" data-tip="ลบ" onclick="confirmDelete('${r.id}')"><svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                <button  class="row-btn row-btn-clone" data-tip="คัดลอก" onclick="cloneRecord('${r.id}')" title="Clone Record" aria-label="Clone Record"><svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                <button  class="row-btn row-btn-edit" data-tip="แก้ไข" onclick="editRecord('${r.id}')" title="Edit Record" aria-label="Edit Record"><svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                <button  class="row-btn row-btn-del" data-tip="ลบ" onclick="confirmDelete('${r.id}')" title="Confirm Delete" aria-label="Confirm Delete"><svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
             </div>
         </td>
     </tr>`;
@@ -5688,6 +6300,7 @@ function renderTable() {
     virtualTableState.allRows = filtered;
     virtualTableState.prevStart = -1; 
     virtualTableState.prevEnd = -1;
+    virtualTableState.isFreshRender = true;
 
     /**
      * 4. สร้างโครงสร้างใหม่ (Virtual DOM Structure)
@@ -5695,7 +6308,7 @@ function renderTable() {
      */
     container.innerHTML = `
         <div id="table-runway" style="position: relative; width: 100%; height: ${total * FIXED_ROW_HEIGHT + HEADER_HEIGHT}px;">
-            <div id="table-content-wrapper" style="position: absolute; top: 0; left: 0; right: 0; will-change: transform;">
+            <div id="table-content-wrapper" style="position: absolute; top: 0; left: 0; right: 0;">
                 <table class="data-table" style="table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0;">
                     <colgroup>
                         <col style="width: 45px;">   <!-- # -->
@@ -5790,8 +6403,8 @@ function handleTableScroll() {
     // ดีดเฉพาะส่วนของ Tbody ลงมาให้ตรงกับตำแหน่งที่กำลัง Scroll
     const offsetY = startIdx * FIXED_ROW_HEIGHT;
     
-    // ใช้ translate3d เพื่อกระตุ้น Hardware GPU Acceleration ให้ลื่นไหล (60 FPS) บนทุกอุปกรณ์
-    tbody.style.transform = `translate3d(0, ${offsetY}px, 0)`;
+    // ใช้ translateY เพื่อรองรับทั้ง GPU และ Software Rendering
+    tbody.style.transform = `translateY(${offsetY}px)`;
 
     // 4. วนลูปสร้างเฉพาะ HTML ของแถวในช่วงที่คำนวณได้
     let loopHtml = '';
@@ -5801,6 +6414,20 @@ function handleTableScroll() {
 
     // 5. ฉีดข้อมูลเข้าสู่ Tbody
     tbody.innerHTML = loopHtml;
+    if (virtualTableState.isFreshRender) {
+        virtualTableState.isFreshRender = false;
+        if (typeof window.animateTableRows === 'function') {
+            window.animateTableRows(tbody, { y: 6, duration: 0.25, maxRows: 15, ease: 'power2.out' });
+        }
+    } else {
+        const trs = tbody.querySelectorAll('tr');
+        trs.forEach(tr => {
+            if (tr && tr.style) {
+                tr.style.opacity = '1';
+                tr.style.transform = 'none';
+            }
+        });
+    }
     if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
 }
 
@@ -6579,9 +7206,16 @@ function moveTableSelection(ctx, direction) {
             currentIdx = allData.findIndex(r => r.id === tableKbdNavState.selectedRowId);
         }
 
-        let newIdx = currentIdx + direction;
-        if (currentIdx === -1) {
-            newIdx = direction > 0 ? 0 : allData.length - 1;
+        let newIdx;
+        if (direction === 'FIRST') {
+            newIdx = 0;
+        } else if (direction === 'LAST') {
+            newIdx = allData.length - 1;
+        } else {
+            newIdx = currentIdx + direction;
+            if (currentIdx === -1) {
+                newIdx = direction > 0 ? 0 : allData.length - 1;
+            }
         }
         newIdx = Math.max(0, Math.min(allData.length - 1, newIdx));
 
@@ -6610,9 +7244,16 @@ function moveTableSelection(ctx, direction) {
         }
         if (currentIdx === -1) currentIdx = tableKbdNavState.selectedIndex;
 
-        let newIdx = currentIdx + direction;
-        if (currentIdx === -1) {
-            newIdx = direction > 0 ? 0 : rows.length - 1;
+        let newIdx;
+        if (direction === 'FIRST') {
+            newIdx = 0;
+        } else if (direction === 'LAST') {
+            newIdx = rows.length - 1;
+        } else {
+            newIdx = currentIdx + direction;
+            if (currentIdx === -1) {
+                newIdx = direction > 0 ? 0 : rows.length - 1;
+            }
         }
         newIdx = Math.max(0, Math.min(rows.length - 1, newIdx));
 
@@ -6702,6 +7343,97 @@ function triggerSelectedRowAction(ctx) {
     }
 }
 
+function toggleKbdShortcutModal(show) {
+    let modal = document.getElementById('kbd-shortcuts-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'kbd-shortcuts-modal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 hidden';
+        modal.innerHTML = `
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all duration-200 scale-95 opacity-0" id="kbd-shortcuts-card">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-blue-500/20">⌨️</div>
+                        <div>
+                            <h3 class="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide">Keyboard Shortcuts</h3>
+                            <p class="text-[10px] font-bold text-slate-400">Power-user navigation & controls</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleKbdShortcutModal(false)" class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center justify-center transition-colors">
+                        ✕
+                    </button>
+                </div>
+                <div class="p-6 space-y-2.5 max-h-[70vh] overflow-y-auto">
+                    <div class="grid grid-cols-2 gap-2.5 text-xs">
+                        <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Navigate Rows</span>
+                            <div class="flex items-center gap-1">
+                                <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">↓</kbd>
+                                <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">↑</kbd>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Quick Nav</span>
+                            <div class="flex items-center gap-1">
+                                <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">j</kbd>
+                                <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">k</kbd>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Select Row</span>
+                            <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">Enter</kbd>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Focus Search</span>
+                            <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">/</kbd>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Top / Bottom</span>
+                            <div class="flex items-center gap-1">
+                                <kbd class="px-1.5 py-0.5 text-[9px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">Home</kbd>
+                                <kbd class="px-1.5 py-0.5 text-[9px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">End</kbd>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Deselect / Close</span>
+                            <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">Esc</kbd>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Edit Selected</span>
+                            <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">E</kbd>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Refresh Data</span>
+                            <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">R</kbd>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) toggleKbdShortcutModal(false);
+        });
+    }
+
+    const card = modal.querySelector('#kbd-shortcuts-card');
+    const isHidden = modal.classList.contains('hidden');
+    const shouldShow = show !== undefined ? show : isHidden;
+
+    if (shouldShow) {
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => {
+            card.classList.remove('scale-95', 'opacity-0');
+            card.classList.add('scale-100', 'opacity-100');
+        });
+    } else {
+        card.classList.remove('scale-100', 'opacity-100');
+        card.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => modal.classList.add('hidden'), 150);
+    }
+}
+window.toggleKbdShortcutModal = toggleKbdShortcutModal;
+
 function handleGlobalTableKeydown(e) {
     const activeEl = document.activeElement;
     const isTyping = activeEl && (
@@ -6711,38 +7443,86 @@ function handleGlobalTableKeydown(e) {
         (activeEl.tagName === 'INPUT' && !['button', 'checkbox', 'radio', 'submit'].includes(activeEl.type))
     );
 
-    const ctx = getActiveTableContext();
-    if (!ctx) return;
-
-    if (isTyping && (e.key === 'ArrowDown' || e.key === 'Down')) {
-        const isSearchInput = activeEl.id === 'filter-search' || 
-                              activeEl.id === 'eightDSearch' || 
-                              activeEl.id === 'searchInput' || 
-                              activeEl.classList.contains('search-input') || 
-                              activeEl.type === 'search';
-        if (isSearchInput) {
+    if (isTyping) {
+        if (e.key === 'Escape') {
             activeEl.blur();
-            e.preventDefault();
-            moveTableSelection(ctx, 1);
+            clearTableSelection();
             return;
         }
+        if (e.key === 'ArrowDown' || e.key === 'Down') {
+            const isSearchInput = activeEl.id === 'filter-search' || 
+                                  activeEl.id === 'eightDSearch' || 
+                                  activeEl.id === 'searchInput' || 
+                                  activeEl.classList.contains('search-input') || 
+                                  activeEl.type === 'search';
+            if (isSearchInput) {
+                const ctx = getActiveTableContext();
+                if (ctx) {
+                    activeEl.blur();
+                    e.preventDefault();
+                    moveTableSelection(ctx, 1);
+                    return;
+                }
+            }
+        }
+        return;
     }
 
-    if (isTyping) return;
+    const ctx = getActiveTableContext();
 
     if (e.key === 'ArrowDown' || e.key === 'Down' || e.key === 'j') {
-        e.preventDefault();
-        moveTableSelection(ctx, 1);
+        if (ctx) {
+            e.preventDefault();
+            moveTableSelection(ctx, 1);
+        }
     } else if (e.key === 'ArrowUp' || e.key === 'Up' || e.key === 'k') {
-        e.preventDefault();
-        moveTableSelection(ctx, -1);
-    } else if (e.key === 'Enter') {
+        if (ctx) {
+            e.preventDefault();
+            moveTableSelection(ctx, -1);
+        }
+    } else if (e.key === 'Home') {
+        if (ctx) {
+            e.preventDefault();
+            moveTableSelection(ctx, 'FIRST');
+        }
+    } else if (e.key === 'End') {
+        if (ctx) {
+            e.preventDefault();
+            moveTableSelection(ctx, 'LAST');
+        }
+    } else if (e.key === 'Enter' || e.key === ' ') {
         if (tableKbdNavState.selectedIndex >= 0 || tableKbdNavState.selectedRowId) {
             e.preventDefault();
             triggerSelectedRowAction(ctx);
         }
     } else if (e.key === 'Escape') {
         clearTableSelection();
+        toggleKbdShortcutModal(false);
+    } else if (e.key === '/') {
+        e.preventDefault();
+        const searchInput = document.getElementById('eightDSearch') || 
+                            document.getElementById('filter-search') || 
+                            document.getElementById('searchInput') || 
+                            document.querySelector('input[type="search"]') ||
+                            document.querySelector('.search-input');
+        if (searchInput) {
+            searchInput.focus();
+            if (typeof searchInput.select === 'function') searchInput.select();
+        }
+    } else if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+        e.preventDefault();
+        toggleKbdShortcutModal();
+    } else if (e.key === 'e' || e.key === 'E') {
+        if (tableKbdNavState.selectedIndex >= 0 || tableKbdNavState.selectedRowId) {
+            e.preventDefault();
+            triggerSelectedRowAction(ctx);
+        }
+    } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        if (typeof triggerGlobalRefresh === 'function') {
+            triggerGlobalRefresh();
+            if (typeof toast === 'function') toast('🔄 Refreshed table data', 'info');
+        }
     }
 }
 
@@ -7036,7 +7816,14 @@ function refreshClaimDashboard() {
     
     // --- [2. Fault Cards (SF, CTC, OK, Vendor)] ---
     const updateFaultCard = (prefix, judgmentKey) => {
-        const subSet = filtered.filter(r => r.judgment === judgmentKey);
+        const subSet = filtered.filter(r => {
+            const j = (r.judgment || '').toUpperCase().trim();
+            if (prefix === 'ok') return j === 'CAN USE' || j === 'OK';
+            if (prefix === 'vendor') return j.includes('VENDOR');
+            if (prefix === 'sf') return j === 'SF';
+            if (prefix === 'ctc') return j === 'CTC';
+            return j === judgmentKey;
+        });
         const qty = getQty(subSet);
         const lots = getLots(subSet);
         const ppm = totalQty > 0 ? Math.round((qty / totalQty) * 1000000) : 0;
@@ -7055,16 +7842,16 @@ function refreshClaimDashboard() {
 
         if (footEl) {
             if (activeUnits.length === 0) {
-                footEl.innerHTML = '<span id="' + `kpi-${prefix}-footer-unit-0` + '">0</span> PCS';
+                footEl.innerHTML = `<span id="kpi-${prefix}-footer-unit-0">0</span> PCS`;
                 animateValue(`kpi-${prefix}-footer-unit-0`, 0, 0, 600);
             } else if (activeUnits.length === 1) {
                 const [unit, val] = activeUnits[0];
-                footEl.innerHTML = `<span id="kpi-${prefix}-footer-unit-0">0</span> ${escapeHtml(unit)}`;
-                animateValue(`kpi-${prefix}-footer-unit-0`, 0, val, 900);
+                footEl.innerHTML = `<span id="kpi-${prefix}-footer-unit-${prefix}">0</span> ${escapeHtml(unit)}`;
+                animateValue(`kpi-${prefix}-footer-unit-${prefix}`, 0, val, 900);
             } else {
-                footEl.innerHTML = activeUnits.map(([unit], idx) => `<span id="kpi-${prefix}-footer-unit-${idx}" style="font-weight:900">0</span> <span style="opacity:.7">${escapeHtml(unit)}</span>`).join(' | ');
+                footEl.innerHTML = activeUnits.map(([unit], idx) => `<span id="kpi-${prefix}-footer-unit-${prefix}-${idx}" style="font-weight:900">0</span> <span style="opacity:.7">${escapeHtml(unit)}</span>`).join(' | ');
                 activeUnits.forEach(([unit, val], idx) => {
-                    animateValue(`kpi-${prefix}-footer-unit-${idx}`, 0, val, 900);
+                    animateValue(`kpi-${prefix}-footer-unit-${prefix}-${idx}`, 0, val, 900);
                 });
             }
         }
@@ -7075,14 +7862,17 @@ function refreshClaimDashboard() {
     );
 
     // --- [3. Yield & Speedometer Calculation] ---
-    const okQty = getQty(filtered.filter(r => r.judgment === 'CAN USE'));
-    const yieldRate = totalQty > 0 ? Math.round((okQty / totalQty) * 100) : 0;
+    const okQty = getQty(filtered.filter(r => {
+        const j = (r.judgment || '').toUpperCase().trim();
+        return j === 'CAN USE' || j === 'OK';
+    }));
+    const yieldRate = totalQty > 0 ? (okQty / totalQty) * 100 : 0;
     
     // ✅ เรียกใช้ฟังก์ชันหน้าปัดตรงนี้!
     updateMainGauge(yieldRate); 
 
-    // อัปเดตตัวเลข Yield ใน Pill เล็ก (ถ้ามี)
-    animateValue('yield-pill', 0, yieldRate, 1200, 0, "%");
+    // อัปเดตตัวเลข Yield ใน Pill เล็ก
+    animateValue('yield-pill', 0, yieldRate, 1200, 1, "%");
 
     // --- [4. Trend Stats & Charts] ---
     const monthStats = new Array(12).fill(0);
@@ -7146,81 +7936,11 @@ function refreshDashboard() {
 }
 
 function renderDashboardCharts(yieldRate, filtered) {
-    const minAngle = -120; // ตำแหน่ง 0%
-    const maxAngle = 120;  // ตำแหน่ง 100%
-    const targetAngle = minAngle + (yieldRate / 100) * (maxAngle - minAngle);
-
-    // 1. อัปเดตตัวเลขเปอร์เซ็นต์ (ใช้วิ่งจากค่าเดิม)
-    animateValue('gauge-yield-text', 0, yieldRate, 1500);
-
-    // 2. หมุนเข็ม (Needle Animation) - ใช้ GSAP
-    gsap.to("#gauge-needle-group", {
-        rotation: targetAngle,
-        duration: 2,
-        ease: "elastic.out(1, 0.75)", // มีการดีดเบาๆ เหมือนเข็มจริง
-        transformOrigin: "100px 115px"
-    });
-
-    // 3. วาดเส้นสี (Progress Segment)
-    const progressPath = document.getElementById('gauge-progress-path');
-    if (progressPath) {
-        // คำนวณ arcLength (240 องศาคือความยาวเต็ม)
-        const radius = 75;
-        const totalArcLength = (240 / 360) * (2 * Math.PI * radius);
-        const currentLength = (yieldRate / 100) * totalArcLength;
-        
-        progressPath.style.transition = "stroke-dasharray 2s cubic-bezier(0.4, 0, 0.2, 1)";
-        progressPath.setAttribute('stroke-dasharray', `${currentLength}, 1000`);
-
-        // เปลี่ยนสีตามเกณฑ์
-        let color = "#ef4444"; 
-        let status = "CRITICAL";
-        let badgeCls = "border-rose-100 text-rose-500";
-
-        if (yieldRate >= 95) {
-            color = "#10b981"; status = "EXCELLENT"; badgeCls = "border-emerald-100 text-emerald-500";
-        } else if (yieldRate >= 85) {
-            color = "#f59e0b"; status = "STABLE"; badgeCls = "border-amber-100 text-amber-500";
-        }
-
-        progressPath.setAttribute('stroke', color);
-        const badge = document.getElementById('gauge-status-badge');
-        if (badge) {
-            badge.textContent = status;
-            badge.className = `mt-2 px-5 py-1 rounded-lg border-2 bg-white text-[11px] font-black uppercase tracking-widest shadow-sm ${badgeCls}`;
-        }
-        
-        // อัปเดตข้อความ Footer
-        safeSetText('yield-status-text', status);
-        const statusEl = document.getElementById('yield-status-text');
-        if (statusEl) statusEl.style.color = color;
-    }
-
-    // 4. วาดขีดสเกล (Ticks) ให้ทับซ้อนกับพื้นหลัง (วาดเพียงครั้งเดียว)
-    const ticksGroup = document.getElementById('gauge-ticks-group');
-    if (ticksGroup && ticksGroup.innerHTML === "") {
-        let ticksHtml = "";
-        for (let i = 0; i <= 50; i++) {
-            const angle = minAngle + (i / 50) * (maxAngle - minAngle);
-            const isMajor = i % 10 === 0;
-            const tickLen = isMajor ? 14 : 7;
-            const rOuter = 75 + (isMajor ? 4 : 0); //Major tick ยาวกว่าปกติ
-            const rInner = rOuter - tickLen;
-            
-            const rad = (angle - 90) * (Math.PI / 180);
-            const x1 = 100 + rOuter * Math.cos(rad);
-            const y1 = 115 + rOuter * Math.sin(rad);
-            const x2 = 100 + rInner * Math.cos(rad);
-            const y2 = 115 + rInner * Math.sin(rad);
-            
-            ticksHtml += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${isMajor ? '#cbd5e1' : '#e2e8f0'}" stroke-width="${isMajor ? 2 : 1}" />`;
-        }
-        ticksGroup.innerHTML = ticksHtml;
-    }
-
+    // 1. อัปเดต Speedometer / Main Gauge ด้วยค่า Yield Rate ล่าสุด
+    updateMainGauge(yieldRate);
 
     // ============================================================
-    // 2. MONTHLY TRENDS CHART (APEXCHARTS - เหมือนเดิมแต่สมบูรณ์ขึ้น)
+    // 2. MONTHLY TRENDS CHART (APEXCHARTS)
     // ============================================================
     
     // 2.1 เตรียมโครงสร้างข้อมูล 12 เดือน
@@ -7238,12 +7958,12 @@ function renderDashboardCharts(yieldRate, filtered) {
         if (!r.date) return;
         const d = new Date(r.date);
         const mIdx = d.getMonth();
-        const qty = parseInt(r.qty) || 0;
+        const qty = parseFloat(r.qty) || 0;
         const ref = r.ref || 'N/A';
-        const j = (r.judgment || '').toUpperCase();
+        const j = (r.judgment || '').toUpperCase().trim();
 
         if (mIdx >= 0 && mIdx < 12) {
-            if (j === 'CAN USE') { dataSet[mIdx].OK.pcs += qty; dataSet[mIdx].OK.lots.add(ref); }
+            if (j === 'CAN USE' || j === 'OK') { dataSet[mIdx].OK.pcs += qty; dataSet[mIdx].OK.lots.add(ref); }
             else if (j === 'SF') { dataSet[mIdx].SF.pcs += qty; dataSet[mIdx].SF.lots.add(ref); }
             else if (j === 'CTC') { dataSet[mIdx].CTC.pcs += qty; dataSet[mIdx].CTC.lots.add(ref); }
             else if (j.includes('VENDOR')) { dataSet[mIdx].VENDOR.pcs += qty; dataSet[mIdx].VENDOR.lots.add(ref); }
@@ -7252,14 +7972,18 @@ function renderDashboardCharts(yieldRate, filtered) {
         }
     });
 
-    // 2.3 อัปเดตตัวเลขสถิติประกอบกราฟ Trend
+    // 2.3 อัปเดตตัวเลขสถิติประกอบกราฟ Trend ด้วย animateValue
     const totalsArray = dataSet.map(d => d.TotalPcs);
     const activeData = totalsArray.filter(t => t > 0);
-    
-    safeSetText('trend-max', totalsArray.length ? Math.max(...totalsArray).toLocaleString() : 0);
-    safeSetText('trend-min', activeData.length ? Math.min(...activeData).toLocaleString() : 0);
-    safeSetText('trend-avg', activeData.length ? Math.round(activeData.reduce((a, b) => a + b, 0) / activeData.length).toLocaleString() : 0);
-    safeSetText('trend-total-pcs', `PCS ${totalsArray.reduce((a, b) => a + b, 0).toLocaleString()}`);
+    const maxVal = totalsArray.length ? Math.max(...totalsArray) : 0;
+    const minVal = activeData.length ? Math.min(...activeData) : 0;
+    const avgVal = activeData.length ? Math.round(activeData.reduce((a, b) => a + b, 0) / activeData.length) : 0;
+    const totalPcsVal = totalsArray.reduce((a, b) => a + b, 0);
+
+    animateValue('trend-max', 0, maxVal, 1000);
+    animateValue('trend-min', 0, minVal, 1000);
+    animateValue('trend-avg', 0, avgVal, 1000);
+    animateValue('trend-total-pcs', 0, totalPcsVal, 1000, 0, "", "PCS ");
 
     // 2.4 วาดกราฟ Area ด้วย ApexCharts
     const trendChartEl = $id("trend-chart");
@@ -7360,7 +8084,7 @@ function renderPareto(filtered) {
     container.innerHTML = top5.map(([name, qty], i) => {
         const color = colors[i] || '#94a3b8';
         return `
-            <div class="pareto-item opacity-0" style="margin-bottom: 14px; transform: translateY(10px);">
+            <div class="pareto-item" style="margin-bottom: 14px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                     <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; flex: 1;">
                         
@@ -7407,7 +8131,7 @@ function renderPareto(filtered) {
 
     // อนิเมชั่นให้แต่ละรายการค่อยๆ โผล่ขึ้นมาอย่างนุ่มนวล
     if (window.gsap) {
-        gsap.to(".pareto-item", { opacity: 1, y: 0, duration: 0.5, stagger: 0.1, ease: "power2.out" });
+        gsap.fromTo(".pareto-item", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.1, ease: "power2.out", clearProps: "transform,opacity" });
     }
 
     // อัปเดตข้อความแนะนำ (Strategy Insight)
@@ -7461,28 +8185,31 @@ function updateLiveFeed(records) {
         const line = (r.line || 'Unknown').trim().toUpperCase();
         if (!lineStats[line]) { lineStats[line] = { count: 0, totalQty: 0, latestPart: '', latestSupplier: '' }; }
         lineStats[line].count += 1;
-        lineStats[line].totalQty += (parseInt(r.qty) || 0);
-        lineStats[line].latestPart = r.partName;
-        lineStats[line].latestSupplier = r.supplier;
+        lineStats[line].totalQty += (parseFloat(r.qty) || 0);
+        lineStats[line].latestPart = r.partName || '-';
+        lineStats[line].latestSupplier = r.supplier || '-';
     });
 
     const sortedLines = Object.entries(lineStats).sort((a, b) => b[1].count - a[1].count).slice(0, 5);
-    if (sortedLines.length === 0) { feedContainer.innerHTML = `<p class="text-center py-10 text-slate-300 font-bold uppercase text-[10px]">No Data</p>`; return; }
+    if (sortedLines.length === 0) { 
+        feedContainer.innerHTML = `<p class="text-center py-10 text-slate-300 font-bold uppercase text-[10px]">No Data</p>`; 
+        return; 
+    }
 
-    const maxCase = sortedLines[0][1].count;
+    const maxCase = sortedLines[0][1].count || 1;
 
- feedContainer.innerHTML = sortedLines.map(([lineName, data], i) => `
+    feedContainer.innerHTML = sortedLines.map(([lineName, data], i) => `
         <div class="line-card">
             <div class="flex justify-between items-start">
                 <div class="flex items-center gap-3">
                     <div class="rank-badge">${i + 1}</div>
                     <div>
-                        <div class="text-[13px] font-black text-slate-800 uppercase">LINE: ${lineName}</div>
-                        <div class="text-[9px] font-bold text-blue-500 uppercase mt-0.5">LATEST: ${data.latestSupplier}</div>
+                        <div class="text-[13px] font-black text-slate-800 uppercase">LINE: ${escapeHtml(lineName)}</div>
+                        <div class="text-[9px] font-bold text-blue-500 uppercase mt-0.5">LATEST: ${escapeHtml(data.latestSupplier)}</div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <span class="text-[16px] font-black text-blue-700">${data.count.toLocaleString()}</span>
+                    <span id="line-case-val-${i}" class="text-[16px] font-black text-blue-700">0</span>
                     <span class="text-[9px] font-bold text-slate-400 uppercase ml-1">CASES</span>
                 </div>
             </div>
@@ -7493,10 +8220,10 @@ function updateLiveFeed(records) {
             </div>
 
             <div class="flex justify-between items-center mt-2">
-                <span class="text-[10px] text-slate-400 italic font-medium">"${data.latestPart}"</span>
+                <span class="text-[10px] text-slate-400 italic font-medium">"${escapeHtml(data.latestPart)}"</span>
                 <div class="pcs-summary-tag">
                     <span class="text-[9px] text-slate-400 mr-1">Σ</span>
-                    <span>${data.totalQty.toLocaleString()}</span>
+                    <span id="line-qty-val-${i}">0</span>
                     <span class="text-[8px] ml-0.5">PCS</span>
                 </div>
             </div>
@@ -7507,9 +8234,16 @@ function updateLiveFeed(records) {
     sortedLines.forEach(([name, data], i) => {
         animateValue(`line-case-val-${i}`, 0, data.count, 1500);
         animateValue(`line-qty-val-${i}`, 0, data.totalQty, 1500);
-        gsap.to(`#line-bar-${i}`, { width: `${(data.count / maxCase) * 100}%`, duration: 1.5, ease: "power2.out", delay: i * 0.1 });
+        if (window.gsap) {
+            gsap.to(`#line-bar-${i}`, { width: `${(data.count / maxCase) * 100}%`, duration: 1.5, ease: "power2.out", delay: i * 0.1 });
+        } else {
+            const bar = document.getElementById(`line-bar-${i}`);
+            if (bar) bar.style.width = `${(data.count / maxCase) * 100}%`;
+        }
     });
-    gsap.to(".line-card", { opacity: 1, y: 0, duration: 0.6, stagger: 0.12, ease: "back.out(1.7)" });
+    if (window.gsap) {
+        gsap.to(".line-card", { opacity: 1, y: 0, duration: 0.6, stagger: 0.12, ease: "back.out(1.7)" });
+    }
 }
 
 // 1. เปลี่ยนชื่อตัวแปร Global
@@ -7559,7 +8293,7 @@ function renderVendorRadar(filtered) {
         const riskClass = isCritical ? 'bg-rose-500' : (data.lots.size > 1 ? 'bg-amber-500' : 'bg-emerald-500');
 
         return `
-            <div class="risk-row mb-6 last:mb-0 opacity-0" style="transform: translateX(-10px)">
+            <div class="risk-row mb-6 last:mb-0">
                 <div class="flex justify-between items-start mb-2">
                     <div class="flex items-center gap-3 min-w-0">
                         <!-- อันดับพร้อม Badge สถานะความเสี่ยง -->
@@ -7602,7 +8336,9 @@ function renderVendorRadar(filtered) {
         }, 200 + (i * 100));
     });
 
-    gsap.to(".risk-row", { opacity: 1, x: 0, duration: 0.5, stagger: 0.1, ease: "power2.out" });
+    if (window.gsap) {
+        gsap.fromTo(".risk-row", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.5, stagger: 0.1, ease: "power2.out", clearProps: "transform,opacity" });
+    }
 }
 
 // 3. ตรวจสอบใน refreshClaimDashboard (ประมาณบรรทัด 980) 
@@ -8279,6 +9015,25 @@ async function initAttDashboard() {
     initAttMonthlyChart();
 }
 
+let _attScroller = null;
+
+function _buildAttRow(r) {
+    const t = attTypeMap[r.type] || attTypeMap.other;
+    const isEditing = (attEditingId === r.id);
+    return `
+        <tr class="${isEditing ? 'att-editing-row' : ''}" data-rid="${r.id}">
+            <td><span class="att-record-date">${formatDateTH(r.date)}</span></td>
+            <td><span class="att-type-tag ${t.cls}">${t.label}</span></td>
+            <td><span class="att-record-reason">${escapeHtml(r.note || '-')}</span></td>
+            <td>
+                <div class="att-row-actions">
+                    <button class="att-row-btn att-row-btn-edit" onclick="editAttRecord('${r.id}')" title="Edit Att Record" aria-label="Edit Att Record"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2"></path></svg></button>
+                    <button class="att-row-btn att-row-btn-del" onclick="deleteAttRecord('${r.id}')" title="Delete Att Record" aria-label="Delete Att Record"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2"></path></svg></button>
+                </div>
+            </td>
+        </tr>`;
+}
+
 /* 1. แก้ไขการ Render ตารางให้รองรับการกรองวันที่จาก Header */
 async function renderAttRecords() {
     const tbody = $id('att-records-tbody');
@@ -8289,8 +9044,6 @@ async function renderAttRecords() {
     const startFilter = $id('cd-start-date')?.value;
     const endFilter = $id('cd-end-date')?.value;
 
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:#94a3b8;font-size:11px;font-weight:700;">🔄 กำลังกรองข้อมูล...</td></tr>';
-
     await fetchAttendanceRecords(); 
     let records = S.attLeaveRecords || [];
 
@@ -8299,34 +9052,24 @@ async function renderAttRecords() {
         records = records.filter(r => r.date >= startFilter && r.date <= endFilter);
     }
 
-    if (records.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4"><div class="att-empty-state"><p>ไม่พบข้อมูลในช่วงเวลาที่เลือก</p></div></td></tr>`;
-        if (countEl) countEl.textContent = '0 รายการ';
-        return;
+    if (countEl) countEl.textContent = `${records.length} รายการ`;
+
+    if (!_attScroller) {
+        _attScroller = new window.VirtualTableScroller({
+            containerId: 'att-records-container',
+            tbodyId: 'att-records-tbody',
+            rowHeight: 48,
+            columnsCount: 4,
+            rowBuilder: _buildAttRow,
+            emptyHtml: `<tr><td colspan="4"><div class="att-empty-state"><p>ไม่พบข้อมูลในช่วงเวลาที่เลือก</p></div></td></tr>`,
+            onRenderComplete: () => {
+                if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
+            }
+        });
     }
 
-    let html = '';
-    records.forEach(r => {
-        const t = attTypeMap[r.type] || attTypeMap.other;
-        const isEditing = (attEditingId === r.id);
-        html += `
-            <tr class="${isEditing ? 'att-editing-row' : ''}" data-rid="${r.id}">
-                <td><span class="att-record-date">${formatDateTH(r.date)}</span></td>
-                <td><span class="att-type-tag ${t.cls}">${t.label}</span></td>
-                <td><span class="att-record-reason">${escapeHtml(r.note || '-')}</span></td>
-                <td>
-                    <div class="att-row-actions">
-                        <button class="att-row-btn att-row-btn-edit" onclick="editAttRecord('${r.id}')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2"></path></svg></button>
-                        <button class="att-row-btn att-row-btn-del" onclick="deleteAttRecord('${r.id}')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2"></path></svg></button>
-                    </div>
-                </td>
-            </tr>`;
-    });
-
-    tbody.innerHTML = html;
-    if (countEl) countEl.textContent = `${records.length} รายการ`;
+    _attScroller.setItems(records);
     renderDailySubmissionMatrix(); 
-    if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
 }
 
 function cancelEditAttRecord() {
@@ -8347,22 +9090,39 @@ function cancelEditAttRecord() {
 async function deleteAttRecord(id) {
     if (S.userRole === 'supervisor') { attToast('โหมดอ่านอย่างเดียว', 'info'); return; }
     if (!navigator.onLine) { attToast('📶 ออฟไลน์: ไม่สามารถลบข้อมูลได้', 'error'); return; }
-    if (!confirm('ต้องการลบรายการลานี้หรือไม่?')) return;
+    
+    const target = S.attLeaveRecords ? S.attLeaveRecords.find(r => String(r.id) === String(id)) : null;
 
-    try {
-        S.attLeaveRecords = S.attLeaveRecords.filter(r => String(r.id) !== String(id));
-        var res = await wapClient.from(ATT_LEAVE_TABLE).delete().eq('id', id);
-        if (res.error) throw res.error;
+    showCustomConfirmDialog({
+        title: "ยืนยันการลบข้อมูลการลา",
+        subtitle: "รายการนี้จะถูกลบออกจาก Attendance Logs และไม่สามารถกู้คืนได้",
+        badge: "ATTENDANCE LOGS",
+        type: "danger",
+        details: [
+            { label: "วันที่ขอลา", value: target ? formatDateTH(target.event_date) : '-' },
+            { label: "ประเภทการลา", value: target ? (target.leave_type || target.shift || '-') : '-' },
+            { label: "เหตุผล / หมายเหตุ", value: target ? (target.reason || target.remark || '-') : '-' },
+            { label: "ผู้ยื่นคำขอ", value: target ? (target.user_id || S.currentUser) : S.currentUser }
+        ],
+        confirmText: "🗑️ ยืนยันลบรายการลา",
+        cancelText: "ยกเลิก",
+        onConfirm: async () => {
+            try {
+                S.attLeaveRecords = S.attLeaveRecords.filter(r => String(r.id) !== String(id));
+                var res = await wapClient.from(ATT_LEAVE_TABLE).delete().eq('id', id);
+                if (res.error) throw res.error;
 
-        if (attEditingId === id) cancelEditAttRecord();
+                if (attEditingId === id) cancelEditAttRecord();
 
-        attToast('ลบรายการเรียบร้อย', 'success');
-        await initAttDashboard();
-    } catch (e) {
-        console.error('Delete daily_reports error:', e);
-        attToast('ลบไม่สำเร็จ: ' + (e.message || 'เกิดข้อผิดพลาด'), 'error');
-        await initAttDashboard();
-    }
+                attToast('ลบรายการเรียบร้อย', 'success');
+                await initAttDashboard();
+            } catch (e) {
+                console.error('Delete daily_reports error:', e);
+                attToast('ลบไม่สำเร็จ: ' + (e.message || 'เกิดข้อผิดพลาด'), 'error');
+                await initAttDashboard();
+            }
+        }
+    });
 }
 
 
@@ -8435,15 +9195,15 @@ async function submitLeaveRequest() {
         if (submitBtn) submitBtn.disabled = false;
     }
     await fetchAttendanceRecords(); // โหลดข้อมูลใหม่จากฐานข้อมูล
-renderDailySubmissionMatrix();  // สั่งวาดปฏิทินใหม่ทันที
+    renderDailySubmissionMatrix();  // สั่งวาดปฏิทินใหม่ทันที
 }
+
 // ฟังก์ชันคำนวณสถิติเข้างานแบบมาตรฐาน (นับเฉพาะ จันทร์-ศุกร์)
 function getGlobalAttendanceStats(startDate, endDate) {
     const allRecords = S.attLeaveRecords || [];
     const rangeStart = new Date(startDate);
     const rangeEnd = new Date(endDate);
 
-    // 1. กรองข้อมูลเฉพาะในวันที่เลือก และใช้ Set ป้องกันวันซ้ำ
     const leaveDates = new Set();
     const holidayDates = new Set();
 
@@ -8455,16 +9215,9 @@ function getGlobalAttendanceStats(startDate, endDate) {
         }
     });
 
-    // 2. คำนวณวันจันทร์-ศุกร์ทั้งหมดในช่วงเวลานั้น (Potential Weekdays)
     const totalWorkingDays = countWeekdaysInRange(rangeStart, rangeEnd);
-    
-    // 3. วันที่ต้องเข้างานจริง (วันทำการหักวันหยุดนักขัตฤกษ์)
     const scheduledDays = Math.max(0, totalWorkingDays - holidayDates.size);
-    
-    // 4. วันที่เข้างานจริง (วันที่ต้องเข้าหักวันลา)
     const actualWorked = Math.max(0, scheduledDays - leaveDates.size);
-
-    // 5. คำนวณอัตราส่วน (%)
     const rate = scheduledDays > 0 ? ((actualWorked / scheduledDays) * 100).toFixed(1) : "100.0";
 
     return {
@@ -8474,6 +9227,7 @@ function getGlobalAttendanceStats(startDate, endDate) {
         holiday: holidayDates.size
     };
 }
+
 function updateAttKPI() {
     const startFilter = $id('cd-start-date')?.value;
     const endFilter = $id('cd-end-date')?.value;
@@ -8489,15 +9243,12 @@ function updateAttKPI() {
         rangeEnd = (year === now.getFullYear()) ? now.toISOString().split('T')[0] : `${year}-12-31`;
     }
 
-    // เรียกใช้ Logic กลาง
     const stats = getUnifiedAttendanceStats(rangeStart, rangeEnd);
 
-    // อัปเดตตัวเลขบนหน้าจอสีม่วง
     animateValue('att-kpi-leave', 0, stats.leave, 800);
     animateValue('att-kpi-holiday', 0, stats.holiday, 800);
     animateValue('att-kpi-worked', 0, stats.worked, 1000); 
 
-    // แสดง Rate พร้อมทศนิยม 1 ตำแหน่ง (95.6%)
     const rateEl = $id('att-kpi-rate');
     if (rateEl) {
         animateValue('att-kpi-rate', 0, parseFloat(stats.rate), 1200, 1);
@@ -8509,7 +9260,6 @@ function getUnifiedAttendanceStats(startDate, endDate) {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // ✅ นับเฉพาะวันจันทร์-ศุกร์ ให้ตรงกับกราฟ
     const totalWorkableDays = countWeekdaysInRange(start, end);
 
     const leaveDates = new Set();
@@ -8534,7 +9284,6 @@ function getUnifiedAttendanceStats(startDate, endDate) {
     };
 }
 
-
 /* วาดกราฟสถิติรายเดือน - เวอร์ชั่น Hybrid เสถียรสูง */
 function initAttMonthlyChart() {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -8542,31 +9291,22 @@ function initAttMonthlyChart() {
     const now = new Date();
     const isCurrentYear = (year === now.getFullYear());
 
-    // 1. เตรียม Container
     const chartContainer = document.getElementById('att-monthly-chart');
     if (!chartContainer) return;
 
-    // ============================================================
-    // >>> [แก้ไข] ทำลายกราฟเดิมทิ้งอย่างเด็ดขาด (Anti-Overlap Logic) <<<
-    // ============================================================
     if (window.attMonthlyChart !== undefined && window.attMonthlyChart !== null) {
         try {
-            // ตรวจสอบว่าเป็น Instance ของ ApexCharts จริงหรือไม่ก่อนสั่ง destroy
             if (typeof window.attMonthlyChart.destroy === 'function') {
                 window.attMonthlyChart.destroy();
             }
         } catch (e) {
             console.warn("Could not destroy existing chart:", e);
         }
-        // ล้างค่าตัวแปรเป็น null เพื่อป้องกันการอ้างอิงค้าง
         window.attMonthlyChart = null; 
     }
 
-    // ล้าง HTML ภายในคอนเทนเนอร์ให้เกลี้ยง 100%
     chartContainer.innerHTML = ''; 
-    // ============================================================
 
-    // 2. เตรียมโครงสร้างข้อมูล (Logic เดิม)
     const leaveData = new Array(12).fill(0);
     const holidayData = new Array(12).fill(0);
     const workedData = new Array(12).fill(0);
@@ -8600,7 +9340,6 @@ function initAttMonthlyChart() {
         }
     }
 
-    // 3. ตั้งค่า Configuration ของกราฟ (คงความสวยงามเดิม)
     const options = {
         series: [
             { name: 'วันทำงานจริง', type: 'area', data: workedData },
@@ -8708,10 +9447,8 @@ function initAttMonthlyChart() {
         ]
     };
 
-    // 4. สั่งสร้าง Instance ใหม่เก็บไว้ใน window.attMonthlyChart เพื่อให้เรียกใช้ได้ทั่วถึง
     window.attMonthlyChart = new ApexCharts(chartContainer, options);
     
-    // ใช้ Delay เล็กน้อยเพื่อให้มั่นใจว่า DOM พร้อมทำงาน (ลดโอกาสเกิด overlap ในจังหวะสลับหน้าเร็วๆ)
     setTimeout(() => {
         if (window.attMonthlyChart) {
             window.attMonthlyChart.render();
@@ -8719,31 +9456,27 @@ function initAttMonthlyChart() {
     }, 50);
 }
 
-/* ฟังก์ชันช่วยคำนวณวันจันทร์-ศุกร์ (ต้องมีตัวนี้ กราฟถึงจะทำงานได้) */
 function countWeekdaysInRange(start, end) {
     let count = 0;
     let cur = new Date(start.getTime());
     while (cur <= end) {
         let day = cur.getDay();
-        if (day !== 0 && day !== 6) count++; // ไม่นับเสาร์-อาทิตย์
+        if (day !== 0 && day !== 6) count++;
         cur.setDate(cur.getDate() + 1);
     }
     return count;
 }
 
-
-
-// ค้นหาในส่วนสคริปต์ (ประมาณบรรทัด 5360)
 function attToast(msg, type = 'info') {
-    const colors = { success: '#059669', error: '#e11d48', info: '#1e293b' }; // ปรับสี info ให้เข้มตาม CSS
+    const colors = { success: '#059669', error: '#e11d48', info: '#1e293b' };
     const bg = colors[type] || colors.info;
     const t = document.createElement('div');
     
     t.innerHTML = msg;
     t.style.cssText = `
         position: fixed; 
-        bottom: 20px;     /* แก้จาก top เป็น bottom */
-        right: 20px;      /* แก้จาก 15px เป็น 20px */
+        bottom: 20px;
+        right: 20px;
         z-index: 9999;
         padding: 10px 18px; border-radius: 12px; font-size: 11px;
         font-weight: 700; color: white; background: ${bg};
@@ -8767,24 +9500,13 @@ function attToast(msg, type = 'info') {
     }, 2500);
 }
 
-/* Year Selector — ผูกกับ select ที่ id="att-year-select" */
 function onAttYearChange(val) {
     attSelectedYear = parseInt(val, 10);
-    // อัปเดตข้อความหัวข้อกราฟ
     const label = document.getElementById('att-chart-year-label');
     if (label) label.textContent = attSelectedYear;
-    
-    // สั่งโหลดข้อมูลและวาด KPI/กราฟ ใหม่ตามปีที่เลือก
     initAttDashboard(); 
 }
 
-/**
- * ═══════════════════════════════════════════════════════
- *  WAP Support Line — FULLY FIXED & EDITABLE (V5.9 - Clean)
- * ═══════════════════════════════════════════════════════
- */
-
-// 1. รายการหมวดหมู่พาร์ทที่กำหนดมา
 const SUPPORT_PART_CATEGORIES = [
     "insulation parts",
     "(Mold Part)",
@@ -8805,7 +9527,6 @@ const SUPPORT_PART_CATEGORIES = [
     "Printing part"
 ];
 
-// 2. ฟังก์ชันแสดง Dropdown เมื่อคลิกที่ช่องพาร์ท
 const showPartAC = (inputEl) => {
     const dropdown = document.getElementById('sup-part-ac');
     if (!dropdown) return;
@@ -8839,12 +9560,11 @@ const selectPartAC = (val) => {
     const input = document.getElementById('f-sup-part');
     if (input) {
         input.value = val;
-        input.classList.add('valid'); // ใส่สีเขียวเรืองแสงเมื่อเลือกแล้ว
+        input.classList.add('valid');
     }
     document.getElementById('sup-part-ac').style.display = 'none';
 };
 
-/* --- ฟังก์ชันคำนวณ NG อัตโนมัติ --- */
 const calcNG = () => {
     const lotInput = document.getElementById('f-sup-lot');
     const okInput = document.getElementById('f-sup-ok');
@@ -8855,13 +9575,10 @@ const calcNG = () => {
     const totalLot = parseInt(lotInput.value) || 0;
     const okQty = parseInt(okInput.value) || 0;
 
-    // คำนวณค่าที่เหลือ
     const result = totalLot - okQty;
 
-    // ใส่ค่าลงในช่อง NG (ถ้าผลลัพธ์น้อยกว่า 0 ให้แสดง 0)
     ngInput.value = result >= 0 ? result : 0;
 
-    // เพิ่มกิมมิก: ถ้ามีของเสีย (NG > 0) ให้ช่อง NG มีพื้นหลังสีแดงอ่อนๆ
     if (result > 0) {
         ngInput.style.backgroundColor = '#fff1f2';
         ngInput.style.color = '#ef4444';
@@ -8873,7 +9590,6 @@ const calcNG = () => {
     }
 };
 
-
 const WapSupportLogs = (function () {
 
     const TABLE = 'support_records';
@@ -8883,10 +9599,10 @@ const WapSupportLogs = (function () {
     let _search     = '';
     let _user       = '';
     let _alive      = false;
-    let _editingId  = null;   // แก้: ประกาศให้ถูกต้อง (เดิมเป็น implicit global)
-    let _viewing    = null;   // แก้: ประกาศให้ถูกต้อง (เดิมเป็น implicit global)
-    let _fetching   = false;  // กันยิง fetch ซ้อนกัน
-    let _fetchToken = 0;      // กัน fetch เก่าที่ resolve ช้ามาทับผลลัพธ์ใหม่กว่า
+    let _editingId  = null;
+    let _viewing    = null;
+    let _fetching   = false;
+    let _fetchToken = 0;
 
     let $ = {};
 
@@ -8908,32 +9624,29 @@ const WapSupportLogs = (function () {
         $.contentArea = document.getElementById('line-support-logs-content');
     }
 
-    /* ──────────────────────────────────────────
-       CORE LOGIC
-       ────────────────────────────────────────── */
     async function _fetch() {
-    if (_fetching) return;
-    _fetching = true;
-    const myToken = ++_fetchToken;
-    try {
-        const { data, error } = await wapClient
-            .from(TABLE).select('*').eq('user_id', _user)
-            .order('created_at', { ascending: false });
-        if (error) throw error;
-        if (myToken !== _fetchToken || !_alive) return;
-        _records = (data || []).map(_fromDb);
-        applyDateFilter();
-    } catch (e) {
-        console.error('[WapSupport] Fetch error:', e);
-        if (myToken === _fetchToken && _alive) {
-            toast('⚠️ โหลดข้อมูล Support ไม่สำเร็จ: ' + (e.message || ''), 'error'); // ★ เพิ่มบรรทัดนี้
-            _records = [];
-            _render();
+        if (_fetching) return;
+        _fetching = true;
+        const myToken = ++_fetchToken;
+        try {
+            const { data, error } = await wapClient
+                .from(TABLE).select('*').eq('user_id', _user)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            if (myToken !== _fetchToken || !_alive) return;
+            _records = (data || []).map(_fromDb);
+            applyDateFilter();
+        } catch (e) {
+            console.error('[WapSupport] Fetch error:', e);
+            if (myToken === _fetchToken && _alive) {
+                toast('⚠️ โหลดข้อมูล Support ไม่สำเร็จ: ' + (e.message || ''), 'error');
+                _records = [];
+                _render();
+            }
+        } finally {
+            if (myToken === _fetchToken) _fetching = false;
         }
-    } finally {
-        if (myToken === _fetchToken) _fetching = false;
     }
-}
 
     function applyDateFilter() {
         if (!_alive) return;
@@ -8961,6 +9674,14 @@ const WapSupportLogs = (function () {
                 return directMatch || (cleanKw.length > 3 && fuzzyMatch);
             });
         }
+        // เรียงข้อมูลตามวันที่บันทึกล่าสุดลงไปเสมอ
+        temp.sort((a, b) => {
+            const timeA = new Date(a.createdAt || a.eventDate || 0).getTime() || 0;
+            const timeB = new Date(b.createdAt || b.eventDate || 0).getTime() || 0;
+            if (timeA !== timeB) return timeB - timeA;
+            return String(b.id || '').localeCompare(String(a.id || ''));
+        });
+
         _filtered = temp;
         _render();
     }
@@ -9006,21 +9727,24 @@ const WapSupportLogs = (function () {
                     <td style="text-align:center;">
                         ${item.imageUrl ?
                             `<span class="img-thumb" onclick="WapSupportLogs._openViewModal('${item.id}')">
-                                <img src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover;">
+                                <img  src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover;" alt="Image" title="Image">
                              </span>` :
                             `<span style="color:#e2e8f0; font-size:10px; font-weight:700;">N/A</span>`}
                     </td>
                     <td>
                         <div class="action-btns">
-                            <button class="act-btn act-btn-view" onclick="WapSupportLogs._openViewModal('${item.id}')" data-tip="View"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                            <button class="act-btn act-btn-edit" onclick="WapSupportLogs._openFormModal('${item.id}')" data-tip="Edit"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                            <button class="act-btn act-btn-del" onclick="WapSupportLogs._confirmDelete('${item.id}')" data-tip="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                            <button  class="act-btn act-btn-view" onclick="WapSupportLogs._openViewModal('${item.id}')" data-tip="View" title="Wap Support Logs._open View Modal" aria-label="Wap Support Logs._open View Modal"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                            <button  class="act-btn act-btn-edit" onclick="WapSupportLogs._openFormModal('${item.id}')" data-tip="Edit" title="Wap Support Logs._open Form Modal" aria-label="Wap Support Logs._open Form Modal"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                            <button  class="act-btn act-btn-del" onclick="WapSupportLogs._confirmDelete('${item.id}')" data-tip="Delete" title="Wap Support Logs._confirm Delete" aria-label="Wap Support Logs._confirm Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                         </div>
                     </td>
                 </tr>`;
         }).join('');
 
         $.tbody.innerHTML = htmlRows;
+        if (typeof window.animateTableRows === 'function') {
+            window.animateTableRows($.tbody, { y: 6, duration: 0.28, stagger: 0.02, ease: 'power2.out' });
+        }
         if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
     }
 
@@ -9032,7 +9756,43 @@ const WapSupportLogs = (function () {
        ────────────────────────────────────────── */
     function _openFormModal(id) {
         _editingId = id || null;
-        const r = id ? (_records.find(x => x.id === id) || _blankRecord()) : _blankRecord();
+        const isEdit = Boolean(id);
+        const r = isEdit ? (_records.find(x => x.id === id) || _blankRecord()) : _blankRecord();
+        const isDark = document.body.classList.contains('dark-mode') || document.documentElement.classList.contains('dark') || localStorage.getItem('carrier_theme') === 'dark';
+
+        // Helper: Format Date string to "6 Aug'26" format
+        function _formatProblemDateStr(dateVal) {
+            if (!dateVal) dateVal = new Date().toISOString().split('T')[0];
+            const d = new Date(dateVal);
+            if (isNaN(d.getTime())) return "6 Aug'26";
+            const day = d.getDate();
+            const mNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const month = mNames[d.getMonth()];
+            const yr = d.getFullYear().toString().slice(-2);
+            return `${day} ${month}'${yr}`;
+        }
+
+        // Parse initial problem fields (Default to EMPTY if creating a new record)
+        let parsedUser = "";
+        let parsedPart = "";
+        let parsedPartNo = "";
+        let parsedSupplier = "";
+        let parsedDefect = "";
+        let parsedDateStr = _formatProblemDateStr(r.eventDate);
+
+        if (isEdit && r.problem) {
+            const match = r.problem.match(/^On\s+(.*?)\s+(.*?)\s+inform quality problem about\s+(.*?)\s+\/\s+(.*?)\s+(.*?)\s+found defect\s+(.*)$/i);
+            if (match) {
+                parsedDateStr = match[1] || parsedDateStr;
+                parsedUser = match[2] || "";
+                parsedPart = match[3] || "";
+                parsedPartNo = match[4] || "";
+                parsedSupplier = match[5] || "";
+                parsedDefect = match[6] || "";
+            } else {
+                parsedDefect = r.problem;
+            }
+        }
 
         // 1. รายการหมวดหมู่พาร์ท
         const partCategories = [
@@ -9048,155 +9808,526 @@ const WapSupportLogs = (function () {
 
         // 2. รายชื่อ Commander
         const existingCommanders = [...new Set((S.wapData.specialJobs || []).map(j => j.assigned_by).filter(Boolean))];
-        const commanderOptions = existingCommanders.map(name => `<option value="${name}">`).join('');
+        const commanderOptions = existingCommanders.map(name => `<option value="${_esc(name)}">`).join('');
+
+        // 3. --- Smart Part Master Map & Lookup ---
+        const partMapByNo = {};
+        const partMapByName = {};
+        const allPartNos = new Set();
+        const allPartNames = new Set();
+        const allSuppliers = new Set(["V.PARADISE"]);
+        const allDefects = new Set();
+
+        const processRecordForMap = (rec) => {
+            if (!rec) return;
+            let pNo = (rec.partNo || rec.part_no || '').trim();
+            let pName = (rec.partName || rec.part_name || '').trim();
+            let sup = (rec.supplier || '').trim();
+            let def = (rec.defect || rec.defect_detail || '').trim();
+            let rawGrp = (rec.partGroup || rec.part_group || rec.part || rec.category || '').trim();
+            let grp = (rawGrp === '-' || rawGrp === '--' || rawGrp.toLowerCase() === 'null' || rawGrp.toLowerCase() === 'undefined') ? '' : rawGrp;
+            let usr = (rec.user || rec.informer || rec.area || rec.dept || rec.line || '').trim();
+
+            if (rec.problem) {
+                const match = rec.problem.match(/^On\s+(.*?)\s+(.*?)\s+inform quality problem about\s+(.*?)\s+\/\s+(.*?)\s+(.*?)\s+found defect\s+(.*)$/i);
+                if (match) {
+                    if (!usr) usr = (match[2] || '').trim();
+                    if (!pName) pName = (match[3] || '').trim();
+                    if (!pNo) pNo = (match[4] || '').trim();
+                    if (!sup) sup = (match[5] || '').trim();
+                    if (!def) def = (match[6] || '').trim();
+                } else if (!def) {
+                    def = rec.problem.trim();
+                }
+            }
+
+            if (pNo) {
+                allPartNos.add(pNo);
+                const k = pNo.toLowerCase();
+                if (!partMapByNo[k]) {
+                    partMapByNo[k] = { partNo: pNo, partName: pName, supplier: sup, partGroup: grp, user: usr, defect: def };
+                } else {
+                    if (!partMapByNo[k].partName && pName) partMapByNo[k].partName = pName;
+                    if (!partMapByNo[k].supplier && sup) partMapByNo[k].supplier = sup;
+                    if ((!partMapByNo[k].partGroup || partMapByNo[k].partGroup === '-') && grp) partMapByNo[k].partGroup = grp;
+                    if (!partMapByNo[k].user && usr) partMapByNo[k].user = usr;
+                    if (!partMapByNo[k].defect && def) partMapByNo[k].defect = def;
+                }
+            }
+            if (pName) {
+                allPartNames.add(pName);
+                const k = pName.toLowerCase();
+                if (!partMapByName[k]) {
+                    partMapByName[k] = { partNo: pNo, partName: pName, supplier: sup, partGroup: grp, user: usr, defect: def };
+                } else {
+                    if (!partMapByName[k].partNo && pNo) partMapByName[k].partNo = pNo;
+                    if (!partMapByName[k].supplier && sup) partMapByName[k].supplier = sup;
+                    if ((!partMapByName[k].partGroup || partMapByName[k].partGroup === '-') && grp) partMapByName[k].partGroup = grp;
+                    if (!partMapByName[k].user && usr) partMapByName[k].user = usr;
+                    if (!partMapByName[k].defect && def) partMapByName[k].defect = def;
+                }
+            }
+            if (sup) allSuppliers.add(sup);
+            if (def) allDefects.add(def);
+        };
+
+        // Collect from _records & S.records
+        [...(_records || []), ...(S.records || [])].forEach(processRecordForMap);
+
+        // Collect from smartMemory
+        if (typeof smartMemory === 'object' && smartMemory && smartMemory.values) {
+            (smartMemory.values.partNo || []).forEach(pNo => allPartNos.add(pNo));
+            (smartMemory.values.partName || []).forEach(pName => allPartNames.add(pName));
+            (smartMemory.values.supplier || []).forEach(sup => allSuppliers.add(sup));
+            (smartMemory.values.defect || []).forEach(def => allDefects.add(def));
+
+            Object.keys(smartMemory.byPartNo || {}).forEach(k => {
+                const pack = typeof getMostFrequentPack === 'function' ? getMostFrequentPack(smartMemory.byPartNo[k]) : smartMemory.byPartNo[k][0];
+                if (pack && pack.partNo) {
+                    processRecordForMap({
+                        partNo: pack.partNo,
+                        partName: pack.partName,
+                        supplier: pack.supplier,
+                        defect: pack.defect,
+                        user: pack.line || pack.user || ''
+                    });
+                }
+            });
+            Object.keys(smartMemory.byPartName || {}).forEach(k => {
+                const pack = typeof getMostFrequentPack === 'function' ? getMostFrequentPack(smartMemory.byPartName[k]) : smartMemory.byPartName[k][0];
+                if (pack && pack.partName) {
+                    processRecordForMap({
+                        partNo: pack.partNo,
+                        partName: pack.partName,
+                        supplier: pack.supplier,
+                        defect: pack.defect,
+                        user: pack.line || pack.user || ''
+                    });
+                }
+            });
+        }
+
+        // Collect from VENDOR_MASTER & defectDict
+        if (typeof VENDOR_MASTER === 'object' && VENDOR_MASTER !== null) {
+            Object.values(VENDOR_MASTER).forEach(v => { if (v && typeof v === 'string') allSuppliers.add(v.trim()); });
+        }
+        if (typeof defectDict === 'object' && defectDict !== null) {
+            Object.keys(defectDict).forEach(k => allDefects.add(k.toUpperCase()));
+        }
+
+        const partnoDatalistOptions = Array.from(allPartNos).sort().map(p => `<option value="${_esc(p)}">`).join('');
+        const partnameDatalistOptions = Array.from(allPartNames).sort().map(p => `<option value="${_esc(p)}">`).join('');
+        const supplierDatalistOptions = Array.from(allSuppliers).sort().map(s => `<option value="${_esc(s)}">`).join('');
+        const defectDatalistOptions = Array.from(allDefects).sort().map(d => `<option value="${_esc(d)}">`).join('');
 
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
         modal.id = 'support-form-modal';
-        modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);padding:10px;';
 
         modal.innerHTML = `
-            <div style="background:#fff; border-radius:24px; width:95%; max-width:680px; overflow:hidden; display:flex; flex-direction:column; max-height:95vh; box-shadow:0 25px 50px rgba(0,0,0,0.2); animation:modalPop .25s ease;">
-                <div style="background:#161d2f; color:#fff; padding:18px 22px; display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em;">
-                        ${id ? '📝 แก้ไขรายงานเคลมผลิต' : '✨ บันทึกรายงานเคลมใหม่'}
+            <div style="background:#fff; border-radius:20px; width:100%; max-width:720px; overflow:hidden; display:flex; flex-direction:column; max-height:92vh; box-shadow:0 25px 50px rgba(0,0,0,0.25); animation:modalPop .2s ease;">
+                <!-- Header -->
+                <div style="background:#1e293b; color:#fff; padding:12px 18px; display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; display:flex; align-items:center; gap:8px; margin:0;">
+                        <span>${isEdit ? '📝 แก้ไขรายงานเคลมผลิต' : '✨ บันทึกรายงานเคลมใหม่'}</span>
                     </h3>
-                    <button type="button" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:#64748b; cursor:pointer; font-size:20px;">✕</button>
+                    <button type="button" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:18px; transition:color 0.2s;" title="Close" aria-label="Close">✕</button>
                 </div>
                 
-                <form id="sup-form" style="padding:22px; display:flex; flex-direction:column; gap:12px; overflow-y:auto;">
-                    <!-- แถวที่ 1: วันที่ และ การแก้ไข -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-                        <div>
-                            <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📅 วันที่รายงาน</label>
-                            <input type="date" name="date" value="${r.eventDate}" class="form-input" style="width:100%;" required>
+                <form id="sup-form" style="padding:14px 18px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; flex:1;">
+                    <!-- Offline Draft Status & Restore Indicator Banner -->
+                    <div id="offline-draft-banner" style="display:none; padding:10px 14px; border-radius:12px; font-size:11px; font-weight:700; align-items:center; justify-content:space-between; gap:10px; transition:all 0.3s ease;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span id="offline-indicator-icon" style="font-size:14px;">📶</span>
+                            <span id="offline-indicator-text"></span>
                         </div>
-                        <div>
-                            <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">🔧 การแก้ไข (ACTION)</label>
-                            <select id="f-sup-action" name="action" class="form-input" style="width:100%;">
-                                <option value="Rework" ${r.action==='Rework'?'selected':''}>Rework</option>
-                                <option value="Replace" ${r.action==='Replace'?'selected':''}>Replace</option>
-                                <option value="Sorting 100%" ${r.action==='Sorting 100%'?'selected':''}>Sorting 100%</option>
-                                <option value="Use as is" ${r.action==='Use as is'?'selected':''}>Use as is</option>
-                                <option value="Scrap" ${r.action==='Scrap'?'selected':''}>Scrap</option>
-                                <option value="Return to Vendor" ${r.action==='Return to Vendor'?'selected':''}>RTV</option>
-                            </select>
-                        </div>
+                        <div id="offline-indicator-actions" style="display:flex; align-items:center; gap:6px;"></div>
                     </div>
 
-                    <!-- แถวที่ 2: รายละเอียดปัญหา -->
-                    <div>
-                        <label style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; display:block; margin-bottom:5px;">📝 รายละเอียดปัญหาที่พบ</label>
-                        <textarea id="f-sup-problem" name="problem" class="form-textarea" style="height:70px; width:100%;" required placeholder="ระบุอาการเสียและจุดที่พบ...">${r.problem || ''}</textarea>
+                    <!-- ==========================================================
+                         หมวดหมู่ 1: ชิ้นส่วน & รายละเอียดปัญหา (Smart Lookup)
+                         ========================================================== -->
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
+                            <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
+                                <svg width="14" height="14" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 0-2-2V5a2 2 0 0 0 2-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                🧩 1. ชิ้นส่วน & รายละเอียดปัญหา (Smart Auto-Complete)
+                            </label>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span id="smart-match-notice" style="display:none; font-size:9.5px; font-weight:800; color:#059669; background:#d1fae5; padding:2px 8px; border-radius:6px; border:1px solid #6ee7b7;"></span>
+                                <span style="font-size:9.5px; font-weight:800; color:#0284c7; background:#e0f2fe; padding:2px 8px; border-radius:6px; border:1px solid #bae6fd; font-family:monospace;">
+                                    <span id="prob-date-badge">${parsedDateStr}</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Grid 3 คอลัมน์สำหรับข้อมูลพาร์ท -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔢 รหัสพาร์ท (Part No.) *</label>
+                                <input type="text" id="prob-partno" list="partno-datalist" value="${parsedPartNo}" placeholder="พิมพ์รหัสพาร์ท..." class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" title="Part No" aria-label="Part No" autocomplete="off">
+                                <datalist id="partno-datalist">${partnoDatalistOptions}</datalist>
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🧩 ชื่อพาร์ท (Part Name) *</label>
+                                <input type="text" id="prob-part" list="partname-datalist" value="${parsedPart}" placeholder="พิมพ์ชื่อพาร์ท..." class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700;" title="Part Name" aria-label="Part Name" autocomplete="off">
+                                <datalist id="partname-datalist">${partnameDatalistOptions}</datalist>
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🏭 ผู้จำหน่าย (Supplier)</label>
+                                <input type="text" id="prob-supplier" list="supplier-datalist" value="${parsedSupplier}" placeholder="พิมพ์ชื่อผู้จำหน่าย..." class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700; color:#0284c7;" title="Supplier Name" aria-label="Supplier Name" autocomplete="off">
+                                <datalist id="supplier-datalist">${supplierDatalistOptions}</datalist>
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📦 หมวดหมู่พาร์ท</label>
+                                <select id="f-sup-part-cat" name="part" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:600;" required title="Part Category" aria-label="Part Category">
+                                    <option value="" ${!r.part ? 'selected' : ''}>-- เลือกหมวดหมู่ --</option>
+                                    ${partOptions}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📍 ผู้แจ้ง / พื้นที่ (Area/Dept)</label>
+                                <input type="text" id="prob-user" value="${parsedUser}" placeholder="เช่น OSA-A1" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:600;" title="User/Area" aria-label="User/Area">
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#e11d48; margin-bottom:2px; display:block;">⚠️ อาการเสีย (Defect Detail)</label>
+                                <input type="text" id="prob-defect" list="defect-datalist" value="${parsedDefect}" placeholder="ระบุอาการเสีย..." class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700; color:#e11d48;" title="Defect" aria-label="Defect" autocomplete="off">
+                                <datalist id="defect-datalist">${defectDatalistOptions}</datalist>
+                            </div>
+                        </div>
+
+                        <!-- Live Preview Banner -->
+                        <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:10.5px; color:#334155; display:flex; align-items:flex-start; gap:8px;">
+                            <span style="font-size:9px; font-weight:800; color:#64748b; text-transform:uppercase; flex-shrink:0; padding-top:1px;">PREVIEW:</span>
+                            <span id="prob-preview-text" style="color:#0f172a; font-weight:700; font-family:monospace; word-break:break-word; white-space:pre-wrap; flex:1; line-height:1.45;"></span>
+                        </div>
+                        <input type="hidden" id="f-sup-problem" name="problem" value="">
                     </div>
 
-                    <!-- แถวที่ 3: พาร์ท และ LOT -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-                        <div>
-                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📦 พาร์ทชิ้นส่วน</label>
-                            <select name="part" class="form-input" style="width:100%; cursor:pointer;" required>
-                                <option value="">-- เลือกหมวดหมู่พาร์ท --</option>
-                                ${partOptions}
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">LOT NO. (QTY)</label>
-                            <input type="number" id="f-sup-lot" name="lot" value="${r.lot}" class="form-input" style="width:100%;" placeholder="จำนวนทั้งหมด" oninput="WapSupportLogs.calcNG()">
-                        </div>
-                    </div>
+                    <!-- ==========================================================
+                         หมวดหมู่ 2: ข้อมูลการแก้ไข & จำนวน (Action & Quantities)
+                         ========================================================== -->
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;">
+                        <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
+                            ⚙️ 2. วันที่ การแก้ไข & จำนวนชิ้นงาน
+                        </label>
 
-                    <!-- แถวที่ 4: OK / NG / ประเภท -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px;">
-                        <div>
-                            <label style="font-size:10px; font-weight:800; color:#059669; display:block; margin-bottom:5px;">✅ OK</label>
-                            <input type="number" id="f-sup-ok" name="ok" value="${r.ok}" class="form-input" style="width:100%;" oninput="WapSupportLogs.calcNG()">
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📅 วันที่รายงาน</label>
+                                <input type="date" id="f-sup-date" name="date" value="${r.eventDate || new Date().toISOString().split('T')[0]}" class="form-input" style="width:100%; height:32px; font-size:11px;" required title="Date" aria-label="Date">
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔧 การแก้ไข (ACTION)</label>
+                                <select id="f-sup-action" name="action" class="form-input" style="width:100%; height:32px; font-size:11px;" title="Action" aria-label="Action">
+                                    <option value="" ${!r.action ? 'selected' : ''}>-- เลือก ACTION --</option>
+                                    <option value="Rework" ${r.action==='Rework'?'selected':''}>Rework (แก้ไขงานซ่อม)</option>
+                                    <option value="Repair" ${r.action==='Repair'?'selected':''}>Repair (ซ่อมแซมตามเงื่อนไข)</option>
+                                    <option value="Replace" ${r.action==='Replace'?'selected':''}>Replace (เปลี่ยนชิ้นส่วนใหม่)</option>
+                                    <option value="Sorting 100%" ${r.action==='Sorting 100%'?'selected':''}>Sorting 100% (คัดแยกชิ้นงาน 100%)</option>
+                                    <option value="Screening & Re-inspection" ${r.action==='Screening & Re-inspection'?'selected':''}>Screening & Re-inspection (คัดกรองตรวจซ้ำ)</option>
+                                    <option value="Use as is" ${r.action==='Use as is'||r.action==='Use as is / Concession'?'selected':''}>Use as is / Concession (อนุโลมใช้ตามสภาพ)</option>
+                                    <option value="Scrap" ${r.action==='Scrap'?'selected':''}>Scrap (ทำลายชิ้นงาน NG)</option>
+                                    <option value="Return to Vendor" ${r.action==='Return to Vendor'||r.action==='RTV'?'selected':''}>RTV (ส่งคืนผู้ขาย/ซัพพลายเออร์)</option>
+                                    <option value="Containment / Quarantine" ${r.action==='Containment / Quarantine'?'selected':''}>Containment / Hold (กักกันชิ้นงานเสี่ยง)</option>
+                                    <option value="Engineering Change (EC/ECN)" ${r.action==='Engineering Change (EC/ECN)'?'selected':''}>Engineering Change (EC/ECN)</option>
+                                    <option value="Poka-Yoke / Error Proofing" ${r.action==='Poka-Yoke / Error Proofing'?'selected':''}>Poka-Yoke / Jig Adjustment</option>
+                                    <option value="Line Stop & Purge" ${r.action==='Line Stop & Purge'?'selected':''}>Line Purge & Clean (เคลียร์สายการผลิต)</option>
+                                    <option value="Supplier On-site Sorting" ${r.action==='Supplier On-site Sorting'?'selected':''}>Supplier On-site Sorting</option>
+                                    <option value="Process Parameter Adjustment" ${r.action==='Process Parameter Adjustment'?'selected':''}>Process Parameter Adjustment</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📋 ประเภทรายงาน</label>
+                                <select name="report" class="form-input" style="width:100%; height:32px; font-size:11px;" title="Report" aria-label="Report">
+                                    <option value="VF" ${r.report==='VF'?'selected':''}>VF Report</option>
+                                    <option value="RP" ${r.report==='RP'?'selected':''}>RP Report</option>
+                                    <option value="RECORDS" ${r.report==='RECORDS'?'selected':''}>Records</option> 
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label style="font-size:10px; font-weight:800; color:#ef4444; display:block; margin-bottom:5px;">❌ NG</label>
-                            <input type="number" id="f-sup-ng" name="ng" value="${r.ng}" class="form-input" style="width:100%; background:#f8fafc;" readonly>
-                        </div>
-                        <div>
-                            <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">📋 ประเภทรายงาน</label>
-                            <select name="report" class="form-input" style="width:100%;">
-                                <option value="VF" ${r.report==='VF'?'selected':''}>VF Report</option>
-                                <option value="RP" ${r.report==='RP'?'selected':''}>RP Report</option>
-                                <option value="RECORDS" ${r.report==='RECORDS'?'selected':''}>Records</option> 
-                            </select>
-                        </div>
-                    </div>
 
-                    <!-- แถวที่ 5: Remark -->
-                    <div>
-                        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:5px;">💬 หมายเหตุ (Remark)</label>
-                        <input type="text" name="remark" value="${r.remark || ''}" class="form-input" style="width:100%;" placeholder="ข้อมูลเพิ่มเติมสำหรับอ้างอิง...">
-                    </div>
-                    
-                    <!-- แถวที่ 6: รูปภาพ -->
-                    <div>
-                        <label style="font-size:10px; font-weight:800; color:#64748b; display:block; margin-bottom:8px;">📸 รูปภาพหลักฐาน (Evidence)</label>
-                        <div style="border:2px dashed #cbd5e1; border-radius:16px; background:#f8fafc; position:relative; min-height:90px; display:flex; align-items:center; justify-content:center;">
-                            <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;">
-                            <div id="img-preview-area" style="text-align:center;">
-                                ${r.imageUrl ? `<img src="${r.imageUrl}" style="max-height:80px; border-radius:8px;">` : `<p style="font-size:11px; color:#94a3b8;">คลิกเพื่ออัปโหลดรูปภาพ</p>`}
+                        <!-- Quantities row -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                            <div>
+                                <label style="font-size:10px; font-weight:800; color:#475569; margin-bottom:2px; display:block;">📦 LOT NO. (QTY รวม)</label>
+                                <input type="number" id="f-sup-lot" name="lot" value="${r.lot || ''}" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700;" placeholder="0" oninput="WapSupportLogs.calcNG()" title="จำนวนทั้งหมด" aria-label="จำนวนทั้งหมด">
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:800; color:#059669; margin-bottom:2px; display:block;">✅ OK QTY</label>
+                                <input type="number" id="f-sup-ok" name="ok" value="${r.ok || ''}" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700;" placeholder="0" oninput="WapSupportLogs.calcNG()" title="OK Qty" aria-label="OK Qty">
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:800; color:#ef4444; margin-bottom:2px; display:block;">❌ NG QTY (Auto)</label>
+                                <input type="number" id="f-sup-ng" name="ng" value="${r.ng || ''}" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:800; background:#fff1f2; color:#e11d48;" readonly placeholder="0" title="NG Qty" aria-label="NG Qty">
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Integrated Toggles Side-by-Side right after Quantities -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:2px;">
+                            <!-- 1. Toggle: Special Jobs (Blue Theme) -->
+                            <div style="padding:8px 12px; background:rgba(59, 130, 246, 0.04); border:1px dashed rgba(59, 130, 246, 0.3); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;" id="sync-container">
+                                <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                                    <div style="width:28px; height:28px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#3b82f6; flex-shrink:0;">
+                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                    </div>
+                                    <div style="flex:1;">
+                                        <p style="font-size:10.5px; font-weight:800; color:#1e293b; margin:0; text-transform:uppercase;">บันทึกเป็นภารกิจพิเศษ</p>
+                                        <div style="margin-top:3px; display:none;" id="commander-input-wrap">
+                                            <input type="text" id="sync-commander-name" list="commander-list" 
+                                                   placeholder="ชื่อผู้สั่งงาน (Commander)..."
+                                                   style="width:100%; height:26px; font-size:10px; border:1px solid #dbeafe; border-radius:6px; padding:0 8px; outline:none; background:#fff; font-weight:600; color:#2563eb;" title="Commander" aria-label="Commander">
+                                            <datalist id="commander-list">${commanderOptions}</datalist>
+                                        </div>
+                                    </div>
+                                </div>
+                                <label class="premium-toggle">
+                                    <input type="checkbox" id="sync-to-special" title="Sync To Special" aria-label="Sync To Special">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+
+                            <!-- 2. Toggle: 8D Report (Red Theme) -->
+                            <div style="padding:8px 12px; background:rgba(225, 29, 72, 0.04); border:1px dashed rgba(225, 29, 72, 0.3); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;" id="8d-container">
+                                <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                                    <div style="width:28px; height:28px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#e11d48; flex-shrink:0; font-weight:950; font-size:12px;">
+                                        8D
+                                    </div>
+                                    <div style="flex:1;">
+                                        <p style="font-size:10.5px; font-weight:800; color:#1e293b; margin:0; text-transform:uppercase;">เปิดเคสวิเคราะห์ 8D Report</p>
+                                    </div>
+                                </div>
+                                <label class="premium-toggle">
+                                    <input type="checkbox" id="trigger-8d-report" title="Trigger 8d Report" aria-label="Trigger 8d Report">
+                                    <span class="toggle-slider" style="background-color:#fca5a5;"></span>
+                                </label>
                             </div>
                         </div>
                     </div>
 
                     <!-- ==========================================================
-                         INTEGRATED TOGGLES (Special Jobs & 8D Report)
+                         หมวดหมู่ 3: รูปภาพหลักฐาน (Evidence Image Upload Wide Bar)
                          ========================================================== -->
-                    <div style="display:flex; flex-direction:column; gap:8px; margin-top:5px;">
-                        
-                        <!-- 1. Toggle: Special Jobs (Blue Theme) -->
-                        <div style="padding: 14px; background: rgba(59, 130, 246, 0.04); border: 1.5px dashed rgba(59, 130, 246, 0.25); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; gap: 15px;" id="sync-container">
-                            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                                <div style="width: 34px; height: 34px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #3b82f6; flex-shrink: 0;">
-                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                                </div>
-                                <div style="flex: 1;">
-                                    <p style="font-size: 11px; font-weight: 900; color: #1e293b; margin: 0; text-transform: uppercase;">บันทึกเป็นภารกิจพิเศษ</p>
-                                    <div style="margin-top: 6px;" id="commander-input-wrap">
-                                        <input type="text" id="sync-commander-name" list="commander-list" 
-                                               placeholder="ระบุชื่อผู้สั่งงาน (Commander)..."
-                                               style="width: 100%; height: 28px; font-size: 11px; border: 1px solid #dbeafe; border-radius: 8px; padding: 0 10px; outline: none; background: rgba(255,255,255,0.7); font-weight: 600; color: #2563eb;">
-                                        <datalist id="commander-list">${commanderOptions}</datalist>
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
+                        <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
+                            📸 3. รูปภาพหลักฐาน (Evidence)
+                        </label>
+                        <div style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:10px; min-height:60px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease;">
+                            <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;" title="Img Input" aria-label="Img Input">
+                            <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
+                                ${r.imageUrl ? `<img src="${r.imageUrl}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">` : `
+                                    <div style="display:flex; align-items:center; gap:8px; color:#64748b;">
+                                        <svg width="20" height="20" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                        <span style="font-size:11px; font-weight:700;">📷 คลิกหรือลากวางรูปภาพหลักฐานเพิ่มเติมได้ที่นี่</span>
                                     </div>
-                                </div>
+                                `}
                             </div>
-                            <label class="premium-toggle">
-                                <input type="checkbox" id="sync-to-special">
-                                <span class="toggle-slider"></span>
-                            </label>
                         </div>
+                    </div>
 
-                        <!-- 2. Toggle: 8D Report (Red/Rose Theme) -->
-                        <div style="padding: 14px; background: rgba(225, 29, 72, 0.04); border: 1.5px dashed rgba(225, 29, 72, 0.25); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; gap: 15px;" id="8d-container">
-                            <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                                <div style="width: 34px; height: 34px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #e11d48; flex-shrink: 0;">
-                                    <span style="font-weight:950; font-size:14px;">8D</span>
-                                </div>
-                                <div style="flex: 1;">
-                                    <p style="font-size: 11px; font-weight: 900; color: #1e293b; margin: 0; text-transform: uppercase;">เปิดเคสวิเคราะห์ 8D Report</p>
-                                    <p style="font-size: 9px; color: #64748b; margin: 0; font-weight: 600;">สร้างใบงาน Corrective Action อัตโนมัติ</p>
-                                </div>
-                            </div>
-                            <label class="premium-toggle">
-                                <input type="checkbox" id="trigger-8d-report">
-                                <span class="toggle-slider" style="background-color:#fca5a5;"></span>
-                            </label>
-                        </div>
-
+                    <!-- ==========================================================
+                         หมวดหมู่ 4: หมายเหตุ (Remark - Auto Expand Textarea)
+                         ========================================================== -->
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
+                        <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
+                            💬 4. หมายเหตุเพิ่มเติม (Remark)
+                        </label>
+                        <textarea name="remark" class="form-input" 
+                                  style="width:100%; min-height:38px; max-height:140px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.4; outline:none; resize:none; overflow-y:auto;" 
+                                  placeholder="พิมพ์รายละเอียดหรือหมายเหตุเพิ่มเติม (กล่องย่อ-ขยายความสูงอัตโนมัติตามข้อความ)..." 
+                                  title="Remark" 
+                                  aria-label="Remark"
+                                  oninput="this.style.height='38px'; this.style.height=(this.scrollHeight)+'px';">${_esc(r.remark || '')}</textarea>
                     </div>
 
                     <!-- ปุ่มดำเนินการ -->
-                    <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:15px; border-top:1px solid #f1f5f9; margin-top:5px;">
-                        <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding:10px 25px; border-radius:12px; border:1.5px solid #e2e8f0; background:#fff; font-weight:700; color:#64748b; cursor:pointer;">ยกเลิก</button>
-                        <button type="submit" id="sup-form-submit-btn" style="padding:10px 35px; border-radius:12px; border:none; background:linear-gradient(135deg,#161d2f,#2563eb); color:#fff; font-weight:900; cursor:pointer; text-transform:uppercase; letter-spacing:0.05em;">บันทึกรายงาน</button>
+                    <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:8px; border-top:1px solid #f1f5f9; margin-top:2px;">
+                        <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding:8px 20px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; font-weight:700; color:#64748b; font-size:12px; cursor:pointer;" title="Cancel" aria-label="Cancel">ยกเลิก</button>
+                        <button type="submit" id="sup-form-submit-btn" style="padding:8px 28px; border-radius:10px; border:none; background:linear-gradient(135deg,#1e293b,#2563eb); color:#fff; font-weight:900; font-size:12px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em;" title="Save Report" aria-label="Save Report">บันทึกรายงาน</button>
                     </div>
                 </form>
             </div>`;
 
         document.body.appendChild(modal);
+
+        // --- Smart Lookup & Auto-fill Handler ---
+        function handleSmartPartLookup(triggeredBy) {
+            const partNoInput = modal.querySelector('#prob-partno');
+            const partNameInput = modal.querySelector('#prob-part');
+            const supplierInput = modal.querySelector('#prob-supplier');
+            const categorySelect = modal.querySelector('#f-sup-part-cat');
+            const userInput = modal.querySelector('#prob-user');
+            const defectInput = modal.querySelector('#prob-defect');
+            const matchNotice = modal.querySelector('#smart-match-notice');
+
+            let pNoVal = (partNoInput?.value || '').trim().toLowerCase().replace(/^["'\s]+|["'\s]+$/g, '');
+            let pNameVal = (partNameInput?.value || '').trim().toLowerCase().replace(/^["'\s]+|["'\s]+$/g, '');
+
+            let matchedPack = null;
+            if ((triggeredBy === 'partno' || !triggeredBy) && pNoVal) {
+                matchedPack = partMapByNo[pNoVal];
+                if (!matchedPack) {
+                    const normNo = pNoVal.replace(/[\s\-_]/g, '');
+                    if (normNo) {
+                        const matchedKey = Object.keys(partMapByNo).find(k => k.replace(/[\s\-_]/g, '') === normNo);
+                        if (matchedKey) matchedPack = partMapByNo[matchedKey];
+                    }
+                }
+                if (matchedPack && matchedPack.partName && partNameInput && !partNameInput.value) {
+                    partNameInput.value = matchedPack.partName;
+                }
+            }
+            if (!matchedPack && (triggeredBy === 'partname' || !triggeredBy || !pNoVal) && pNameVal) {
+                matchedPack = partMapByName[pNameVal];
+                if (!matchedPack) {
+                    const normName = pNameVal.replace(/[\s\-_]/g, '');
+                    if (normName) {
+                        const matchedKey = Object.keys(partMapByName).find(k => k.replace(/[\s\-_]/g, '') === normName);
+                        if (matchedKey) matchedPack = partMapByName[matchedKey];
+                    }
+                }
+                if (matchedPack && matchedPack.partNo && partNoInput && !partNoInput.value) {
+                    partNoInput.value = matchedPack.partNo;
+                }
+            }
+
+            if (matchedPack) {
+                if (matchedPack.supplier && supplierInput && !supplierInput.value) {
+                    supplierInput.value = matchedPack.supplier;
+                } else if (matchedPack.supplier && supplierInput && supplierInput.value !== matchedPack.supplier) {
+                    supplierInput.value = matchedPack.supplier;
+                }
+                if (matchedPack.partGroup && categorySelect) {
+                    const rawGrp = matchedPack.partGroup.trim();
+                    if (rawGrp && rawGrp !== '-' && rawGrp !== '--') {
+                        const grpLower = rawGrp.toLowerCase();
+                        let matchedOpt = Array.from(categorySelect.options).find(opt => opt.value.trim().toLowerCase() === grpLower);
+                        if (!matchedOpt) {
+                            const normGrp = grpLower.replace(/[^a-z0-9]/g, '');
+                            if (normGrp) {
+                                matchedOpt = Array.from(categorySelect.options).find(opt => {
+                                    const normOpt = opt.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                                    return normOpt && (normOpt === normGrp || normOpt.includes(normGrp) || normGrp.includes(normOpt));
+                                });
+                            }
+                        }
+                        if (matchedOpt) {
+                            categorySelect.value = matchedOpt.value;
+                        }
+                    }
+                }
+                if (matchedPack.user && userInput && !userInput.value) {
+                    userInput.value = matchedPack.user;
+                }
+                if (matchedPack.defect && defectInput && !defectInput.value) {
+                    defectInput.value = matchedPack.defect;
+                }
+
+                if (matchNotice) {
+                    const infoParts = [];
+                    if (matchedPack.partGroup) infoParts.push(`หมวดหมู่: ${matchedPack.partGroup}`);
+                    if (matchedPack.user) infoParts.push(`ผู้แจ้ง: ${matchedPack.user}`);
+                    if (matchedPack.defect) infoParts.push(`อาการ: ${matchedPack.defect}`);
+                    const summary = infoParts.length ? ` (${infoParts.join(' | ')})` : '';
+                    matchNotice.innerHTML = `✨ <strong>Auto-fill จากประวัติ:</strong> ${matchedPack.partNo || matchedPack.partName || ''}${summary}`;
+                    matchNotice.style.display = 'inline-flex';
+                }
+            } else if (matchNotice && !pNoVal && !pNameVal) {
+                matchNotice.style.display = 'none';
+            }
+
+            syncProblemSentence();
+        }
+
+        const partNoEl = modal.querySelector('#prob-partno');
+        if (partNoEl) {
+            ['input', 'change', 'keyup', 'blur', 'focus', 'paste'].forEach(evtType => {
+                partNoEl.addEventListener(evtType, (e) => {
+                    if (evtType === 'paste') {
+                        let pastedText = '';
+                        if (e.clipboardData && e.clipboardData.getData) {
+                            pastedText = e.clipboardData.getData('text/plain') || '';
+                        }
+                        if (pastedText) {
+                            const cleaned = pastedText.trim().replace(/[\r\n\t]/g, '');
+                            if (cleaned) {
+                                setTimeout(() => {
+                                    partNoEl.value = cleaned;
+                                    handleSmartPartLookup('partno');
+                                }, 0);
+                            }
+                        }
+                    }
+                    handleSmartPartLookup('partno');
+                    setTimeout(() => handleSmartPartLookup('partno'), 30);
+                });
+            });
+        }
+
+        const partNameEl = modal.querySelector('#prob-part');
+        if (partNameEl) {
+            ['input', 'change', 'keyup', 'blur', 'focus', 'paste'].forEach(evtType => {
+                partNameEl.addEventListener(evtType, (e) => {
+                    if (evtType === 'paste') {
+                        let pastedText = '';
+                        if (e.clipboardData && e.clipboardData.getData) {
+                            pastedText = e.clipboardData.getData('text/plain') || '';
+                        }
+                        if (pastedText) {
+                            const cleaned = pastedText.trim().replace(/[\r\n\t]/g, '');
+                            if (cleaned) {
+                                setTimeout(() => {
+                                    partNameEl.value = cleaned;
+                                    handleSmartPartLookup('partname');
+                                }, 0);
+                            }
+                        }
+                    }
+                    handleSmartPartLookup('partname');
+                    setTimeout(() => handleSmartPartLookup('partname'), 30);
+                });
+            });
+        }
+
+        // --- Synchronize Problem Statement Builder ---
+        function syncProblemSentence() {
+            const dateInputVal = modal.querySelector('#f-sup-date')?.value || r.eventDate;
+            const dateStr = _formatProblemDateStr(dateInputVal);
+            const userVal = (modal.querySelector('#prob-user')?.value || '').trim();
+            const partVal = (modal.querySelector('#prob-part')?.value || '').trim();
+            const partNoVal = (modal.querySelector('#prob-partno')?.value || '').trim();
+            const supplierVal = (modal.querySelector('#prob-supplier')?.value || '').trim();
+            const defectVal = (modal.querySelector('#prob-defect')?.value || '').trim();
+
+            const dateBadge = modal.querySelector('#prob-date-badge');
+            if (dateBadge) dateBadge.textContent = dateStr;
+
+            let fullSentence = '';
+            if (userVal || partVal || partNoVal || supplierVal || defectVal) {
+                fullSentence = `On ${dateStr} ${userVal} inform quality problem about ${partVal} / ${partNoVal} ${supplierVal} found defect ${defectVal}`;
+            }
+
+            const hiddenProb = modal.querySelector('#f-sup-problem');
+            if (hiddenProb) hiddenProb.value = fullSentence;
+
+            const previewText = modal.querySelector('#prob-preview-text');
+            if (previewText) {
+                previewText.textContent = fullSentence || 'ระบุรายละเอียดปัญหาเพื่อสร้าง Problem Statement';
+                previewText.style.color = fullSentence ? (isDark ? '#f8fafc' : '#0f172a') : (isDark ? '#64748b' : '#94a3b8');
+            }
+        }
+
+        ['prob-user', 'prob-supplier', 'prob-defect'].forEach(fieldId => {
+            const el = modal.querySelector('#' + fieldId);
+            if (el) el.addEventListener('input', syncProblemSentence);
+        });
+        const dateEl = modal.querySelector('#f-sup-date');
+        if (dateEl) dateEl.addEventListener('change', syncProblemSentence);
+        syncProblemSentence();
 
         // --- Logic: Special Job Toggle Interaction ---
         const syncCheck = document.getElementById('sync-to-special');
@@ -9206,8 +10337,8 @@ const WapSupportLogs = (function () {
 
         syncCheck.onchange = (e) => {
             const isActive = e.target.checked;
-            syncCont.style.borderColor = isActive ? '#3b82f6' : 'rgba(59, 130, 246, 0.25)';
-            syncCont.style.background = isActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.04)';
+            syncCont.style.borderColor = isActive ? '#3b82f6' : (isDark ? 'rgba(59, 130, 246, 0.45)' : 'rgba(59, 130, 246, 0.3)');
+            syncCont.style.background = isActive ? (isDark ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.08)') : (isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.04)');
             commanderWrap.style.display = isActive ? 'block' : 'none';
         };
         commanderWrap.style.display = 'none';
@@ -9217,93 +10348,260 @@ const WapSupportLogs = (function () {
         const d8Cont = document.getElementById('8d-container');
         d8Check.onchange = (e) => {
             const isActive = e.target.checked;
-            d8Cont.style.borderColor = isActive ? '#e11d48' : 'rgba(225, 29, 72, 0.25)';
-            d8Cont.style.background = isActive ? 'rgba(225, 29, 72, 0.08)' : 'rgba(225, 29, 72, 0.04)';
+            d8Cont.style.borderColor = isActive ? '#e11d48' : (isDark ? 'rgba(225, 29, 72, 0.45)' : 'rgba(225, 29, 72, 0.3)');
+            d8Cont.style.background = isActive ? (isDark ? 'rgba(225, 29, 72, 0.22)' : 'rgba(225, 29, 72, 0.08)') : (isDark ? 'rgba(225, 29, 72, 0.12)' : 'rgba(225, 29, 72, 0.04)');
         };
 
         // --- Logic: Image Upload ---
         let currentImage = r.imageUrl || null;
         const imgInput = document.getElementById('img-input');
-        imgInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                currentImage = ev.target.result;
-                document.getElementById('img-preview-area').innerHTML = `<img src="${ev.target.result}" style="max-height:80px; border-radius:8px;">`;
+        if (imgInput) {
+            imgInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    currentImage = ev.target.result;
+                    document.getElementById('img-preview-area').innerHTML = `<img src="${ev.target.result}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">`;
+                    saveDraftData();
+                };
+                reader.readAsDataURL(file);
             };
-            reader.readAsDataURL(file);
-        };
+        }
 
-        // --- Logic: Submit Form ---
+        // --- Offline Draft Management & Auto-Save ---
+        const DRAFT_KEY = 'wap_sup_form_draft';
         const formEl = document.getElementById('sup-form');
         const submitBtn = document.getElementById('sup-form-submit-btn');
+        const offlineBanner = modal.querySelector('#offline-draft-banner');
+        const offlineText = modal.querySelector('#offline-indicator-text');
+        const offlineIcon = modal.querySelector('#offline-indicator-icon');
+        const offlineActions = modal.querySelector('#offline-indicator-actions');
 
-        // --- แก้ไขส่วนบันทึกข้อมูลใน Support Form ---
-formEl.onsubmit = async (e) => {
-    e.preventDefault();
-    if (submitBtn.disabled) return;
-    
-    const fd = new FormData(e.target);
-    const isSyncActive = syncCheck.checked;
-    const is8DActive = d8Check.checked; // สวิตช์เปิดเคส 8D
-    const commanderName = commanderInput.value.trim() || 'SQE EN';
+        function updateOfflineStatusUI() {
+            if (!offlineBanner) return;
+            const isOffline = !navigator.onLine;
+            const savedRaw = localStorage.getItem(DRAFT_KEY);
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'กำลังประมวลผล...';
+            if (isOffline) {
+                offlineBanner.style.display = 'flex';
+                offlineBanner.style.background = isDark ? 'rgba(217, 119, 6, 0.22)' : '#fffbe2';
+                offlineBanner.style.border = isDark ? '1px solid #b45309' : '1px solid #fcd34d';
+                offlineBanner.style.color = isDark ? '#fef08a' : '#92400e';
+                if (offlineIcon) offlineIcon.textContent = '📶';
+                
+                let timeStr = 'บันทึกอัตโนมัติ';
+                if (savedRaw) {
+                    try {
+                        const d = JSON.parse(savedRaw);
+                        if (d.savedAt) timeStr = `บันทึกล่าสุด ${d.savedAt}`;
+                    } catch(e){}
+                }
+                if (offlineText) offlineText.innerHTML = `<strong>โหมดออฟไลน์ (Offline Mode):</strong> บันทึกความคืบหน้าแบบร่างลง LocalStorage อัตโนมัติ (${timeStr})`;
+                if (offlineActions) offlineActions.innerHTML = `<span style="font-size:9.5px; background:${isDark ? '#78350f' : '#fef3c7'}; padding:3px 8px; border-radius:6px; font-weight:800; text-transform:uppercase;">OFFLINE DATA HELD</span>`;
+            } else if (savedRaw) {
+                offlineBanner.style.display = 'flex';
+                offlineBanner.style.background = isDark ? 'rgba(30, 58, 138, 0.35)' : '#eff6ff';
+                offlineBanner.style.border = isDark ? '1px solid #1d4ed8' : '1px solid #bfdbfe';
+                offlineBanner.style.color = isDark ? '#93c5fd' : '#1e40af';
+                if (offlineIcon) offlineIcon.textContent = '💾';
 
-    // เตรียมข้อมูล Payload หลัก
-    const payload = {
-        id: _editingId || 'SUP-' + Date.now(),
-        user_id: S.currentUser,
-        problem: fd.get('problem'),
-        action: fd.get('action'),
-        part: fd.get('part'),
-        lot: Number(fd.get('lot')) || 0,
-        ok_qty: Number(fd.get('ok')) || 0,
-        ng_qty: Number(fd.get('ng')) || 0,
-        report_type: fd.get('report'),
-        remark: fd.get('remark'),
-        event_date: fd.get('date'),
-        image_url: currentImage,
-        created_at: new Date().toISOString()
-    };
+                let timeStr = 'ก่อนหน้า';
+                try {
+                    const d = JSON.parse(savedRaw);
+                    if (d.savedAt) timeStr = d.savedAt;
+                } catch(e){}
 
-    try {
-        // STEP 1: บันทึกลงตาราง Support (WAP DB)
-        const { error: errorSup } = await wapClient.from('support_records').upsert([payload]);
-        if (errorSup) throw errorSup;
+                if (offlineText) offlineText.innerHTML = `<strong>พบแบบร่างออฟไลน์ที่ถูกบันทึกไว้:</strong> (บันทึกเมื่อ ${timeStr})`;
+                if (offlineActions) {
+                    offlineActions.innerHTML = `
+                        <button type="button" id="btn-restore-draft" style="background:#2563eb; color:#fff; border:none; padding:3px 10px; border-radius:6px; font-size:10px; font-weight:800; cursor:pointer; transition:background 0.2s;">เรียกคืนข้อมูล</button>
+                        <button type="button" id="btn-discard-draft" style="background:transparent; color:${isDark ? '#cbd5e1' : '#64748b'}; border:1px solid ${isDark ? '#475569' : '#cbd5e1'}; padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; cursor:pointer;">ลบแบบร่าง</button>
+                    `;
 
-        // STEP 2: บันทึกลงตาราง Special Jobs (ถ้าเลือก)
-        if (isSyncActive) {
-            await wapClient.from('special_jobs').insert([{
-                id: 'SJ-SYNC-' + Date.now(),
+                    const restoreBtn = offlineActions.querySelector('#btn-restore-draft');
+                    if (restoreBtn) {
+                        restoreBtn.onclick = () => {
+                            restoreDraftData();
+                            toast('✨ เรียกคืนข้อมูลแบบร่างสำเร็จ', 'success');
+                        };
+                    }
+                    const discardBtn = offlineActions.querySelector('#btn-discard-draft');
+                    if (discardBtn) {
+                        discardBtn.onclick = () => {
+                            localStorage.removeItem(DRAFT_KEY);
+                            offlineBanner.style.display = 'none';
+                            toast('🗑️ ลบแบบร่างออฟไลน์เรียบร้อย', 'info');
+                        };
+                    }
+                }
+            } else {
+                offlineBanner.style.display = 'none';
+            }
+        }
+
+        function saveDraftData() {
+            try {
+                const draft = {
+                    user: (modal.querySelector('#prob-user')?.value || '').trim(),
+                    part: (modal.querySelector('#prob-part')?.value || '').trim(),
+                    partNo: (modal.querySelector('#prob-partno')?.value || '').trim(),
+                    supplier: (modal.querySelector('#prob-supplier')?.value || '').trim(),
+                    defect: (modal.querySelector('#prob-defect')?.value || '').trim(),
+                    category: modal.querySelector('#f-sup-part-cat')?.value || '',
+                    eventDate: modal.querySelector('#f-sup-date')?.value || '',
+                    action: modal.querySelector('#f-sup-action')?.value || '',
+                    report: modal.querySelector('select[name="report"]')?.value || '',
+                    lot: modal.querySelector('#f-sup-lot')?.value || '',
+                    ok: modal.querySelector('#f-sup-ok')?.value || '',
+                    ng: modal.querySelector('#f-sup-ng')?.value || '',
+                    remark: modal.querySelector('textarea[name="remark"]')?.value || '',
+                    isSyncSpecial: syncCheck ? syncCheck.checked : false,
+                    commander: commanderInput ? commanderInput.value : '',
+                    is8d: d8Check ? d8Check.checked : false,
+                    image: currentImage || null,
+                    savedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                    savedTimestamp: Date.now()
+                };
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+                updateOfflineStatusUI();
+            } catch(e) {
+                console.warn('Draft save error:', e);
+            }
+        }
+
+        function restoreDraftData() {
+            try {
+                const raw = localStorage.getItem(DRAFT_KEY);
+                if (!raw) return;
+                const d = JSON.parse(raw);
+                if (d.user !== undefined && modal.querySelector('#prob-user')) modal.querySelector('#prob-user').value = d.user;
+                if (d.part !== undefined && modal.querySelector('#prob-part')) modal.querySelector('#prob-part').value = d.part;
+                if (d.partNo !== undefined && modal.querySelector('#prob-partno')) modal.querySelector('#prob-partno').value = d.partNo;
+                if (d.supplier !== undefined && modal.querySelector('#prob-supplier')) modal.querySelector('#prob-supplier').value = d.supplier;
+                if (d.defect !== undefined && modal.querySelector('#prob-defect')) modal.querySelector('#prob-defect').value = d.defect;
+                if (d.category !== undefined && modal.querySelector('#f-sup-part-cat')) modal.querySelector('#f-sup-part-cat').value = d.category;
+                if (d.eventDate !== undefined && modal.querySelector('#f-sup-date')) modal.querySelector('#f-sup-date').value = d.eventDate;
+                if (d.action !== undefined && modal.querySelector('#f-sup-action')) modal.querySelector('#f-sup-action').value = d.action;
+                if (d.report !== undefined && modal.querySelector('select[name="report"]')) modal.querySelector('select[name="report"]').value = d.report;
+                if (d.lot !== undefined && modal.querySelector('#f-sup-lot')) modal.querySelector('#f-sup-lot').value = d.lot;
+                if (d.ok !== undefined && modal.querySelector('#f-sup-ok')) modal.querySelector('#f-sup-ok').value = d.ok;
+                if (d.ng !== undefined && modal.querySelector('#f-sup-ng')) modal.querySelector('#f-sup-ng').value = d.ng;
+                if (d.remark !== undefined && modal.querySelector('textarea[name="remark"]')) modal.querySelector('textarea[name="remark"]').value = d.remark;
+                
+                if (d.isSyncSpecial !== undefined && syncCheck) {
+                    syncCheck.checked = Boolean(d.isSyncSpecial);
+                    syncCheck.dispatchEvent(new Event('change'));
+                }
+                if (d.commander !== undefined && commanderInput) commanderInput.value = d.commander;
+                if (d.is8d !== undefined && d8Check) {
+                    d8Check.checked = Boolean(d.is8d);
+                    d8Check.dispatchEvent(new Event('change'));
+                }
+                if (d.image) {
+                    currentImage = d.image;
+                    const area = document.getElementById('img-preview-area');
+                    if (area) area.innerHTML = `<img src="${d.image}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">`;
+                }
+                syncProblemSentence();
+            } catch(e) {
+                console.warn('Draft restore error:', e);
+            }
+        }
+
+        if (formEl) {
+            formEl.addEventListener('input', saveDraftData);
+            formEl.addEventListener('change', saveDraftData);
+        }
+
+        const handleOnlineOfflineState = () => {
+            updateOfflineStatusUI();
+            if (!navigator.onLine) {
+                saveDraftData();
+            }
+        };
+        window.addEventListener('online', handleOnlineOfflineState);
+        window.addEventListener('offline', handleOnlineOfflineState);
+
+        updateOfflineStatusUI();
+
+        // --- Save Support Form ---
+        formEl.onsubmit = async (e) => {
+            e.preventDefault();
+            if (submitBtn.disabled) return;
+            
+            saveDraftData();
+
+            if (!navigator.onLine) {
+                toast('📶 ขณะนี้คุณอยู่ออฟไลน์: ระบบได้บันทึกข้อมูลแบบร่างลง LocalStorage เรียบร้อยแล้ว', 'info');
+                return;
+            }
+
+            const fd = new FormData(e.target);
+            const isSyncActive = syncCheck.checked;
+            const is8DActive = d8Check.checked;
+            const commanderName = commanderInput.value.trim() || 'SQE EN';
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'กำลังประมวลผล...';
+
+            // Ensure problem string is set
+            syncProblemSentence();
+
+            const payload = {
+                id: _editingId || 'SUP-' + Date.now(),
                 user_id: S.currentUser,
-                project: `[SUPPORT] ${payload.problem}`, 
-                date: payload.event_date,
-                assigned_by: commanderName,
-                result: 'Done', 
-                full_timestamp: new Date().toISOString()
-            }]);
-        }
+                problem: fd.get('problem') || '',
+                action: fd.get('action') || 'Rework',
+                part: fd.get('part') || '',
+                lot: Number(fd.get('lot')) || 0,
+                ok_qty: Number(fd.get('ok')) || 0,
+                ng_qty: Number(fd.get('ng')) || 0,
+                report_type: fd.get('report') || 'VF',
+                remark: fd.get('remark') || '',
+                event_date: fd.get('date'),
+                image_url: currentImage,
+                created_at: new Date().toISOString()
+            };
 
-        // STEP 3: ✅ สร้างเคส 8D อัตโนมัติ (SQE DB)
-        if (is8DActive) {
-            // เรียกใช้ฟังก์ชันสร้างเคส 8D และส่งข้อมูลไปทั้งหมด
-            await Wap8DSystem.createNewCase(payload);
-        }
+            try {
+                // STEP 1: บันทึกลงตาราง Support (WAP DB)
+                const { error: errorSup } = await wapClient.from('support_records').upsert([payload]);
+                if (errorSup) throw errorSup;
 
-        toast('✨ บันทึกข้อมูลและวิเคราะห์ผลสำเร็จ', 'success');
-        modal.remove();
-        await _fetch(); // รีเฟรชตารางหน้า Support
+                // STEP 2: บันทึกลงตาราง Special Jobs (ถ้าเลือก)
+                if (isSyncActive) {
+                    await wapClient.from('special_jobs').insert([{
+                        id: 'SJ-SYNC-' + Date.now(),
+                        user_id: S.currentUser,
+                        project: `[SUPPORT] ${payload.problem}`, 
+                        date: payload.event_date,
+                        assigned_by: commanderName,
+                        result: 'Done', 
+                        full_timestamp: new Date().toISOString()
+                    }]);
+                }
 
-    } catch (err) {
-        console.error('[System Error]:', err);
-        toast('❌ เกิดข้อผิดพลาด: ' + err.message, 'error');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'บันทึกรายงาน';
-    }
-};
+                // STEP 3: ✅ สร้างเคส 8D อัตโนมัติ (SQE DB)
+                if (is8DActive) {
+                    await Wap8DSystem.createNewCase(payload);
+                }
+
+                localStorage.removeItem(DRAFT_KEY);
+                window.removeEventListener('online', handleOnlineOfflineState);
+                window.removeEventListener('offline', handleOnlineOfflineState);
+
+                toast('✨ บันทึกข้อมูลและวิเคราะห์ผลสำเร็จ', 'success');
+                modal.remove();
+                await _fetch();
+
+            } catch (err) {
+                console.error('[System Error]:', err);
+                toast('❌ เกิดข้อผิดพลาด: ' + err.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'บันทึกรายงาน';
+            }
+        };
     }
 
 function _openViewModal(id) {
@@ -9356,7 +10654,7 @@ function _openViewModal(id) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 <span style="color:#fff; font-size:13px; font-weight:900; text-transform:uppercase; letter-spacing:1px; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">Record Details</span>
             </div>
-            <button onclick="this.closest('.modal-overlay').remove()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; width:26px; height:26px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:0.2s;">✕</button>
+            <button  onclick="this.closest('.modal-overlay').remove()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; width:26px; height:26px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:0.2s;" title="This.Closest" aria-label="This.Closest">✕</button>
         </div>
 
         <div style="padding:12px; background:${theme.contentBg};">
@@ -9415,9 +10713,9 @@ function _openViewModal(id) {
             <!-- Image Section -->
             <div style="width:100%; background:${isDark ? theme.headerBg : '#fff'}; border:1px solid ${theme.imgBorder}; border-radius:6px; display:flex; justify-content:center; align-items:center; padding:0; overflow:hidden; margin-bottom:10px;">
                 ${item.imageUrl 
-                    ? `<img src="${item.imageUrl}" 
+                    ? `<img  src="${item.imageUrl}" 
                             onclick="WapSupportLogs._openLightbox('${item.imageUrl}')"
-                            style="max-width:100%; height:auto; max-height:380px; display:block; cursor:pointer; image-rendering: -webkit-optimize-contrast;">` 
+                            style="max-width:100%; height:auto; max-height:380px; display:block; cursor:pointer; image-rendering: -webkit-optimize-contrast;" alt="Image" title="Image">` 
                     : `<div style="padding:40px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>`
                 }
             </div>
@@ -9445,7 +10743,24 @@ function _openViewModal(id) {
 
     function _confirmDelete(id) {
         if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        if (confirm("ยืนยันการลบรายการนี้หรือไม่?")) _doDelete(id);
+        
+        const target = _records ? _records.find(r => String(r.id) === String(id)) : null;
+
+        showCustomConfirmDialog({
+            title: "ยืนยันการลบ Support Log",
+            subtitle: "รายการบันทึกผลการซัพพอร์ตนี้จะถูกลบออกจากระบบถาวร",
+            badge: "LINE SUPPORT LOGS",
+            type: "danger",
+            details: [
+                { label: "ปัญหา / อาการ", value: target ? (target.problem || target.defect || '-') : '-' },
+                { label: "การแก้ไข / การดำเนินการ", value: target ? (target.action || target.action_taken || '-') : '-' },
+                { label: "ไลน์ผลิต / กลุ่มงาน", value: target ? (target.line || target.part_group || '-') : '-' },
+                { label: "ผู้บันทึก (Inspector)", value: target ? (target.user_id || S.currentUser) : S.currentUser }
+            ],
+            confirmText: "🗑️ ยืนยันลบ Support Log",
+            cancelText: "ยกเลิก",
+            onConfirm: () => _doDelete(id)
+        });
     }
 
     async function _doDelete(id) {
@@ -9469,7 +10784,8 @@ function _openViewModal(id) {
             id: r.id, problem: r.problem || '', action: r.action || 'Rework',
             part: r.part || '-', lot: r.lot || '-', ok: Number(r.ok_qty) || 0,
             ng: Number(r.ng_qty) || 0, report: r.report_type || 'VF',
-            remark: r.remark || '', eventDate: r.event_date || '', imageUrl: r.image_url || null, _user: r.user_id
+            remark: r.remark || '', eventDate: r.event_date || '', imageUrl: r.image_url || null, _user: r.user_id,
+            createdAt: r.created_at || r.createdAt || r.event_date || ''
         };
     }
 
@@ -9522,8 +10838,8 @@ function _openViewModal(id) {
         lightbox.className = 'lightbox-overlay';
         lightbox.innerHTML = `
             <div class="lightbox-content">
-                <button class="lightbox-close">✕</button>
-                <img src="${url}" class="lightbox-img">
+                <button  class="lightbox-close" title="Lightbox Close" aria-label="Lightbox Close">✕</button>
+                <img  src="${url}" class="lightbox-img" alt="Image" title="Image">
                 <div style="text-align:center; color:white; margin-top:15px;">
                     <p style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; opacity:0.8;">Case Image Preview</p>
                     <p style="font-size:10px; opacity:0.5;">Click anywhere to close</p>
@@ -9841,9 +11157,9 @@ function renderTable() {
             return;
         }
 
-        // 2. วาด HTML โดยกำหนดให้แถวเริ่มต้นที่สถานะซ่อน (Opacity 0 และเลื่อนไปทางซ้ายเล็กน้อย)
+        // 2. วาด HTML โดยใช้คลาส s5-table-row
         tbody.innerHTML = _filteredRecords.map(r => `
-            <tr class="s5-table-row border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors opacity-0" data-rid="${r.id}" style="transform: translateX(-10px)">
+            <tr class="s5-table-row border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors" data-rid="${r.id}">
                 <td class="py-3 px-3">
                     <div class="text-[11px] font-black text-slate-700 leading-tight uppercase tracking-tight">${r.area}</div>
                 </td>
@@ -9865,7 +11181,7 @@ function renderTable() {
                     <span class="font-mono text-[9px] text-slate-400 font-bold">${r.month}</span>
                 </td>
                 <td class="py-3 px-3 text-right">
-                    <button onclick="Wap5SExcellence.remove('${r.id}')" class="text-slate-200 hover:text-rose-500 transition-all p-1">
+                    <button  onclick="Wap5SExcellence.remove('${r.id}')" class="text-slate-200 hover:text-rose-500 transition-all p-1" title="Wap5 S Excellence.Remove" aria-label="Wap5 S Excellence.Remove">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
                 </td>
@@ -9873,19 +11189,10 @@ function renderTable() {
         `).join('');
 
         // 3. รันอนิเมชั่น GSAP ให้แถวทยอยเลื่อนเข้ามา (Stagger)
-        requestAnimationFrame(() => {
-            gsap.killTweensOf(".s5-table-row"); // ล้างอนิเมชั่นเก่าก่อน
-            
-            gsap.to(".s5-table-row", {
-                opacity: 1,
-                x: 0,
-                duration: 0.4,
-                stagger: 0.04, // ทยอยโผล่มาทีละ 0.04 วินาที
-                ease: "power2.out",
-                clearProps: "transform" // ล้าง transform ทิ้งหลังจบเพื่อให้ hover ทำงานปกติ
-            });
-            if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
-        });
+        if (typeof window.animateTableRows === 'function') {
+            window.animateTableRows('.s5-table-row', { y: 6, duration: 0.28, stagger: 0.025, ease: 'power2.out' });
+        }
+        if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
     }
 
 /**
@@ -9981,19 +11288,37 @@ async function submit() {
 
    async function remove(id) {
         if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        if (!confirm('ยืนยันการลบรายการ 5S นี้หรือไม่?')) return;
-        try {
-            _allRecords = _allRecords.filter(r => String(r.id) !== String(id));
-            applyDateFilter();
-            const { error } = await wapClient.from(TABLE).delete().eq('id', id);
-            if (error) throw error;
-            toast('ลบเรียบร้อย', 'success');
-            await fetchRecords();
-        } catch (e) {
-            console.error('[5S Delete Error]:', e);
-            toast('ลบไม่สำเร็จ: ' + (e.message || ''), 'error');
-            await fetchRecords();
-        }
+        
+        const target = _allRecords ? _allRecords.find(r => String(r.id) === String(id)) : null;
+
+        showCustomConfirmDialog({
+            title: "ยืนยันการลบผลการประเมิน 5S",
+            subtitle: "รายการตรวจประเมิน 5S Excellence นี้จะถูกลบออกจากระบบถาวร",
+            badge: "5S EXCELLENCE",
+            type: "danger",
+            details: [
+                { label: "พื้นที่ / โซนตรวจ", value: target ? (target.area || target.location || '-') : '-' },
+                { label: "คะแนน / ผลตรวจ", value: target ? `${target.score || target.points || 0} คะแนน` : '-' },
+                { label: "รายละเอียดข้อพบเห็น", value: target ? (target.detail || target.remark || '-') : '-' },
+                { label: "ผู้ประเมิน", value: target ? (target.user_id || S.currentUser) : S.currentUser }
+            ],
+            confirmText: "🗑️ ยืนยันลบรายการ 5S",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    _allRecords = _allRecords.filter(r => String(r.id) !== String(id));
+                    applyDateFilter();
+                    const { error } = await wapClient.from(TABLE).delete().eq('id', id);
+                    if (error) throw error;
+                    toast('ลบเรียบร้อย', 'success');
+                    await fetchRecords();
+                } catch (e) {
+                    console.error('[5S Delete Error]:', e);
+                    toast('ลบไม่สำเร็จ: ' + (e.message || ''), 'error');
+                    await fetchRecords();
+                }
+            }
+        });
     }
 
     return { init, fetchRecords, remove, applyDateFilter,submit  };
@@ -10203,8 +11528,8 @@ function updateKPIs() {
                             <span class="neon-bar-val" style="color:${colorHex}">${val}%</span>
                             
                             <!-- ปุ่มลบทักษะที่จะโผล่มาเมื่อเอาเมาส์ไปวาง (Hover) -->
-                            <button onclick="WapSkillMatrix.remove('${r.skill_name}')" 
-                                    class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all duration-200">
+                            <button  onclick="WapSkillMatrix.remove('${r.skill_name}')" 
+                                    class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all duration-200" title="Wap Skill Matrix.Remove" aria-label="Wap Skill Matrix.Remove">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M18 6L6 18M6 6l12 12"/>
                                 </svg>
@@ -10315,38 +11640,72 @@ function renderDonut() {
 
     async function remove(skillName) {
         if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        if (!confirm('ลบทักษะนี้หรือไม่?')) return;
-        try {
-            const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-            _records = _records.filter(r => r.skill_name !== skillName);
-            renderAll();
-            const { error } = await wapClient.from(TABLE).delete().eq('user_id', targetUser).eq('skill_name', skillName);
-            if (error) throw error;
-            toast('ลบทักษะเรียบร้อย', 'success');
-            await fetchRecords();
-        } catch (e) {
-            console.error('[SkillMatrix Delete Error]:', e);
-            toast('ลบไม่สำเร็จ: ' + (e.message || ''), 'error');
-            await fetchRecords();
-        }
+        
+        const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
+        const targetSkill = _records ? _records.find(r => r.skill_name === skillName) : null;
+
+        showCustomConfirmDialog({
+            title: "ยืนยันการลบทักษะ Skill Matrix",
+            subtitle: "ทักษะนี้จะถูกลบออกจากตาราง Skill Matrix ของผู้ใช้",
+            badge: "SKILL MATRIX",
+            type: "danger",
+            details: [
+                { label: "ชื่อทักษะ (Skill Name)", value: skillName || '-' },
+                { label: "ระดับความสามารถ", value: targetSkill ? (targetSkill.level || targetSkill.score || '-') : '-' },
+                { label: "ผู้ครอบครองทักษะ", value: targetUser }
+            ],
+            confirmText: "🗑️ ยืนยันลบทักษะนี้",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    _records = _records.filter(r => r.skill_name !== skillName);
+                    renderAll();
+                    const { error } = await wapClient.from(TABLE).delete().eq('user_id', targetUser).eq('skill_name', skillName);
+                    if (error) throw error;
+                    toast('ลบทักษะเรียบร้อย', 'success');
+                    await fetchRecords();
+                } catch (e) {
+                    console.error('[SkillMatrix Delete Error]:', e);
+                    toast('ลบไม่สำเร็จ: ' + (e.message || ''), 'error');
+                    await fetchRecords();
+                }
+            }
+        });
     }
 
     async function clearAll() {
         if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        if (!confirm('ยืนยันล้างข้อมูลทั้งหมดหรือไม่?')) return;
-        try {
-            const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-            _records = [];
-            renderAll();
-            const { error } = await wapClient.from(TABLE).delete().eq('user_id', targetUser);
-            if (error) throw error;
-            toast('ล้างข้อมูลเรียบร้อย', 'success');
-            await fetchRecords();
-        } catch (e) {
-            console.error('[SkillMatrix Clear Error]:', e);
-            toast('ล้างข้อมูลไม่สำเร็จ: ' + (e.message || ''), 'error');
-            await fetchRecords();
-        }
+        
+        const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
+
+        showCustomConfirmDialog({
+            title: "⚠️ ยืนยันล้างข้อมูลทักษะทั้งหมด",
+            subtitle: "ทักษะทั้งหมดใน Skill Matrix ของผู้ใช้นี้จะถูกลบถาวร ไม่สามารถกู้คืนได้",
+            badge: "SKILL MATRIX",
+            type: "danger",
+            requiresTextInput: "CLEAR",
+            inputPlaceholder: "พิมพ์ 'CLEAR' เพื่อยืนยัน",
+            details: [
+                { label: "ผู้ใช้งาน", value: targetUser },
+                { label: "จำนวนทักษะที่จะลบ", value: `${_records ? _records.length : 0} รายการ` }
+            ],
+            confirmText: "🔥 ยืนยันล้างทักษะทั้งหมด",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    _records = [];
+                    renderAll();
+                    const { error } = await wapClient.from(TABLE).delete().eq('user_id', targetUser);
+                    if (error) throw error;
+                    toast('ล้างข้อมูลเรียบร้อย', 'success');
+                    await fetchRecords();
+                } catch (e) {
+                    console.error('[SkillMatrix Clear Error]:', e);
+                    toast('ล้างข้อมูลไม่สำเร็จ: ' + (e.message || ''), 'error');
+                    await fetchRecords();
+                }
+            }
+        });
     }
 
     return { init, submit, remove, clearAll };
@@ -11254,14 +12613,14 @@ function renderTable() {
     
     $id('ot-hist-count').textContent = `${_filteredRecords.length} รายการ`;
     
-    // วาด HTML โดยตั้งค่าเริ่มต้นให้ซ่อนและเลื่อนลงล่างเล็กน้อย
+    // วาด HTML สำหรับตารางกิจกรรมล่าสุด
     tbody.innerHTML = _filteredRecords.slice(0, 15).map(r => `
-        <tr class="ot-table-row border-b border-slate-50 opacity-0" data-rid="${r.id}" style="transform: translateY(10px)">
+        <tr class="ot-table-row border-b border-slate-50" data-rid="${r.id}">
             <td class="py-2 px-2 font-mono text-[9px] text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis">${r.date}</td>
             <td class="py-2 px-2 font-bold text-slate-700 uppercase truncate" style="font-size:10px;" title="${r.job_name}">${r.job_name}</td>
             <td class="py-2 px-1 text-center text-blue-600 font-black whitespace-nowrap" style="font-size:12px;">${parseFloat(r.actual_hours).toFixed(2)}</td>
             <td class="py-2 px-2 text-right">
-                <button onclick="WapOTManagement.remove('${r.id}')" class="text-slate-200 hover:text-rose-500 transition-all">
+                <button  onclick="WapOTManagement.remove('${r.id}')" class="text-slate-200 hover:text-rose-500 transition-all" title="Wap O T Management.Remove" aria-label="Wap O T Management.Remove">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
             </td>
@@ -11269,17 +12628,10 @@ function renderTable() {
     `).join('');
 
     // สั่งให้แถวทยอยเลื่อนขึ้น (Stagger)
-    requestAnimationFrame(() => {
-        gsap.to(".ot-table-row", {
-            opacity: 1,
-            y: 0,
-            duration: 0.4,
-            stagger: 0.03,
-            ease: "power2.out",
-            clearProps: "transform"
-        });
-        if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
-    });
+    if (typeof window.animateTableRows === 'function') {
+        window.animateTableRows('.ot-table-row', { y: 6, duration: 0.28, stagger: 0.025, ease: 'power2.out' });
+    }
+    if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
 }
 
 // ฟังก์ชันนี้จะถูกเรียกจาก oninput ใน HTML
@@ -11310,19 +12662,37 @@ function updateTarget(val) {
 
 async function remove(id) {
         if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        if (!confirm('ลบข้อมูล OT นี้หรือไม่?')) return;
-        try {
-            _allRecords = _allRecords.filter(r => String(r.id) !== String(id));
-            applyDateFilter();
-            const { error } = await wapClient.from(TABLE).delete().eq('id', id);
-            if (error) throw error;
-            toast('ลบเรียบร้อย', 'success');
-            await fetchRecords();
-        } catch (e) {
-            console.error('[OT Delete Error]:', e);
-            toast('ลบไม่สำเร็จ: ' + (e.message || ''), 'error');
-            await fetchRecords();
-        }
+        
+        const target = _allRecords ? _allRecords.find(r => String(r.id) === String(id)) : null;
+
+        showCustomConfirmDialog({
+            title: "ยืนยันการลบข้อมูล OT",
+            subtitle: "รายการล่วงเวลา (Overtime) นี้จะถูกลบออกจากระบบถาวร",
+            badge: "OT MANAGEMENT",
+            type: "danger",
+            details: [
+                { label: "ชื่องาน / ภารกิจ OT", value: target ? (target.job_name || target.work_description || '-') : '-' },
+                { label: "จำนวนชั่วโมง OT", value: target ? `${parseFloat(target.actual_hours || target.hours || 0).toFixed(2)} ชม.` : '-' },
+                { label: "วันที่ปฏิบัติงาน", value: target ? (target.date || target.ot_date || '-') : '-' },
+                { label: "ผู้ปฏิบัติงาน", value: target ? (target.user_id || S.currentUser) : S.currentUser }
+            ],
+            confirmText: "🗑️ ยืนยันลบรายการ OT",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    _allRecords = _allRecords.filter(r => String(r.id) !== String(id));
+                    applyDateFilter();
+                    const { error } = await wapClient.from(TABLE).delete().eq('id', id);
+                    if (error) throw error;
+                    toast('ลบเรียบร้อย', 'success');
+                    await fetchRecords();
+                } catch (e) {
+                    console.error('[OT Delete Error]:', e);
+                    toast('ลบไม่สำเร็จ: ' + (e.message || ''), 'error');
+                    await fetchRecords();
+                }
+            }
+        });
     }
 
     function updateTarget(val) {
@@ -11460,7 +12830,7 @@ function renderTable() {
     tbody.innerHTML = _filteredRecords.map((r, i) => {
         const hasResult = r.result && r.result !== '-' && r.result !== '';
         return `
-        <tr class="sj-table-row border-b border-slate-50 opacity-0" data-rid="${r.id}"> <!-- เพิ่มคลาส sj-table-row และ opacity-0 -->
+        <tr class="sj-table-row border-b border-slate-50" data-rid="${r.id}">
             <td class="text-center font-bold text-slate-300">${i+1}</td>
             <td style="max-width: 0; width: 40%;"> <!-- บังคับให้ cell คำนวณความกว้างใหม่เพื่อทำ Ellipsis -->
                 <div class="flex flex-col">
@@ -11484,24 +12854,17 @@ function renderTable() {
                 </span>
             </td>
             <td class="text-right">
-                <button onclick="WapSpecialJobs.remove('${r.id}')" class="text-slate-200 hover:text-rose-500 transition-colors">
+                <button  onclick="WapSpecialJobs.remove('${r.id}')" class="text-slate-200 hover:text-rose-500 transition-colors" title="Wap Special Jobs.Remove" aria-label="Wap Special Jobs.Remove">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
             </td>
         </tr>
     `}).join('');
 
-    requestAnimationFrame(() => {
-        gsap.to(".sj-table-row", {
-            opacity: 1,
-            x: 0,
-            duration: 0.4,
-            stagger: 0.03,
-            ease: "power2.out",
-            clearProps: "transform"
-        });
-        if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
-    });
+    if (typeof window.animateTableRows === 'function') {
+        window.animateTableRows('.sj-table-row', { y: 6, duration: 0.28, stagger: 0.025, ease: 'power2.out' });
+    }
+    if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
 }
     function renderCharts() {
     // ==========================================
@@ -11704,19 +13067,37 @@ function renderTable() {
     // 8. ฟังก์ชันลบข้อมูล
     async function remove(id) {
         if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        if (!confirm('ยืนยันการลบข้อมูลภารกิจนี้?')) return;
-        try {
-            _allRecords = _allRecords.filter(r => String(r.id) !== String(id));
-            applyDateFilter();
-            const { error } = await wapClient.from(TABLE).delete().eq('id', id);
-            if (error) throw error;
-            if (typeof toast === 'function') toast('ลบข้อมูลเรียบร้อย', 'info');
-            await fetchRecords();
-        } catch (e) { 
-            console.error('[SpecialJobs Delete Error]:', e);
-            if (typeof toast === 'function') toast('ลบไม่สำเร็จ: ' + (e.message || ''), 'error'); 
-            await fetchRecords();
-        }
+        
+        const target = _allRecords ? _allRecords.find(r => String(r.id) === String(id)) : null;
+
+        showCustomConfirmDialog({
+            title: "ยืนยันการลบภารกิจพิเศษ",
+            subtitle: "รายการภารกิจพิเศษ (Special Jobs) นี้จะถูกลบออกจากระบบถาวร",
+            badge: "SPECIAL JOBS",
+            type: "danger",
+            details: [
+                { label: "ชื่อโครงการ / ภารกิจ", value: target ? (target.project || target.job_name || '-') : '-' },
+                { label: "ผู้มอบหมายงาน", value: target ? (target.assigned_by || target.assignor || '-') : '-' },
+                { label: "ผลการดำเนินงาน", value: target ? (target.result || '-') : '-' },
+                { label: "วันที่ปฏิบัติงาน", value: target ? (target.date || '-') : '-' }
+            ],
+            confirmText: "🗑️ ยืนยันลบภารกิจนี้",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    _allRecords = _allRecords.filter(r => String(r.id) !== String(id));
+                    applyDateFilter();
+                    const { error } = await wapClient.from(TABLE).delete().eq('id', id);
+                    if (error) throw error;
+                    if (typeof toast === 'function') toast('ลบข้อมูลเรียบร้อย', 'info');
+                    await fetchRecords();
+                } catch (e) { 
+                    console.error('[SpecialJobs Delete Error]:', e);
+                    if (typeof toast === 'function') toast('ลบไม่สำเร็จ: ' + (e.message || ''), 'error'); 
+                    await fetchRecords();
+                }
+            }
+        });
     }
 
     // ส่งออกฟังก์ชันให้ภายนอกเรียกใช้
@@ -11869,7 +13250,7 @@ function updateVendorFaultFeed(records) {
         const displayUnit = (r.unit || 'PCS').toUpperCase();
 
         return `
-        <div class="vf-feed-card relative bg-white border border-slate-100 rounded-xl p-4 shadow-sm mb-3 opacity-0" style="transform: translateY(20px)">
+        <div class="vf-feed-card relative bg-white border border-slate-100 rounded-xl p-4 shadow-sm mb-3">
             <!-- ขีดแดงด้านข้าง -->
             <div style="position:absolute; left:0; top:12px; bottom:12px; width:4px; border-radius:0 4px 4px 0; background:#ef4444; box-shadow: 2px 0 10px rgba(239, 68, 68, 0.3);"></div>
 
@@ -11899,9 +13280,9 @@ function updateVendorFaultFeed(records) {
 
             <!-- ข้อมูล วันที่/กะ/ไลน์ -->
             <div class="flex justify-between border-y border-slate-50 py-2 text-[9px] font-bold text-slate-400 mb-3 bg-slate-50/30 px-1 rounded">
-                <span>📅 ${r.date}</span>
-                <span>🕒 ${r.shift.replace('SHIFT ', '')}</span>
-                <span>📍 L:${escapeHtml(r.line)}</span>
+                <span>📅 ${r.date || '-'}</span>
+                <span>🕒 ${(r.shift || '').replace('SHIFT ', '') || '-'}</span>
+                <span>📍 L:${escapeHtml(r.line || '-')}</span>
             </div>
 
             <div class="space-y-2">
@@ -11925,13 +13306,16 @@ function updateVendorFaultFeed(records) {
     });
 
     // 3. รันอนิเมชั่นเลื่อนขึ้นทีละใบ
-    gsap.to(".vf-feed-card", {
-        opacity: 1,
-        y: 0,
-        duration: 0.6,
-        stagger: 0.1,
-        ease: "power2.out"
-    });
+    if (window.gsap) {
+        gsap.fromTo(".vf-feed-card", { opacity: 0, y: 20 }, {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            stagger: 0.1,
+            ease: "power2.out",
+            clearProps: "transform,opacity"
+        });
+    }
 }
 
 // --- Export ข้อมูลเป็น CSV ---
@@ -11959,20 +13343,37 @@ function triggerImport() {
 
 // --- ล้างข้อมูลทั้งหมด ---
 async function confirmClearAll() {
-    if (S.userRole === 'supervisor') return toast("ไม่มีสิทธิ์ลบข้อมูล", "error");
-    if (S.records.length === 0) return toast("ไม่มีข้อมูลให้ลบ", "info");
-    if (confirm("⚠️ ต้องการลบข้อมูล 'ทั้งหมด' ของคุณหรือไม่?")) {
-        const check = prompt("พิมพ์ 'DELETE' เพื่อยืนยันการลบถาวร:");
-        if (check === 'DELETE') {
+    if (S.userRole === 'supervisor') return toast("Supervisor ไม่มีสิทธิ์ลบข้อมูล", "error");
+    if (!S.records || S.records.length === 0) return toast("ไม่มีข้อมูลให้ลบ", "info");
+
+    showCustomConfirmDialog({
+        title: "⚠️ ยืนยันการล้างข้อมูลเคลมทั้งหมด",
+        subtitle: "การดำเนินการนี้จะลบรายการเคลมทั้งหมดของคุณแบบถาวร ไม่สามารถย้อนกลับได้",
+        badge: "CLEAR ALL DATA",
+        type: "danger",
+        requiresTextInput: "DELETE",
+        inputPlaceholder: "พิมพ์ 'DELETE' เพื่อยืนยันการลบถาวร",
+        details: [
+            { label: "ผู้ใช้งาน (Inspector)", value: S.currentUser || 'Current User' },
+            { label: "จำนวนรายการที่จะถูกลบ", value: `${S.records.length} รายการ` }
+        ],
+        confirmText: "🔥 ยืนยันล้างข้อมูลทั้งหมด",
+        cancelText: "ยกเลิก",
+        onConfirm: async () => {
             const sb = getSupabase();
             const { error } = await sb.from('records').delete().eq('inspector', S.currentUser);
             if (!error) {
+                if (typeof writeAuditLog === 'function') {
+                    writeAuditLog('CLEAR_ALL', `ล้างข้อมูลเคลมทั้งหมดของผู้ใช้: ${S.currentUser} (${S.records.length} รายการ)`);
+                }
                 S.records = [];
                 renderTable();
-                toast("ล้างข้อมูลสำเร็จ", "success");
+                toast("🗑️ ล้างข้อมูลเคลมทั้งหมดเรียบร้อยแล้ว", "success");
+            } else {
+                toast("❌ เกิดข้อผิดพลาดในการลบข้อมูล: " + error.message, "error");
             }
         }
-    }
+    });
 }
 
 /**
@@ -12092,14 +13493,31 @@ async function handleImport(event) {
             // --- STEP 3: ยืนยันและบันทึกลง Cloud ---
             if (formattedData.length === 0) return toast("❌ ไม่พบข้อมูลสำหรับนำเข้า", "error");
 
-            const confirmMsg = `AI ตรวจพบข้อมูลที่ถูกต้อง ${formattedData.length} รายการ\nต้องการนำเข้าสู่ระบบใช่หรือไม่?`;
-            if (confirm(confirmMsg)) {
-                const { error } = await sqeClient.from('records').insert(formattedData);
-                if (error) throw error;
-                
-                await loadRecords(); // รีเฟรชตารางหน้าจอ
-                toast(`✅ นำเข้าข้อมูลสำเร็จ ${formattedData.length} รายการ`, "success");
-            }
+            showCustomConfirmDialog({
+                title: "ยืนยันนำเข้าข้อมูล Excel",
+                subtitle: `AI ตรวจสอบและแปลงรูปแบบข้อมูลเรียบร้อยแล้ว พร้อมนำเข้าสู่ระบบ`,
+                badge: "EXCEL SMART IMPORT",
+                type: "info",
+                details: [
+                    { label: "จำนวนรายการ", value: `${formattedData.length} รายการ` },
+                    { label: "ชื่อไฟล์", value: file.name },
+                    { label: "ผู้ดำเนินการ", value: S.currentUser }
+                ],
+                confirmText: "📥 ยืนยันนำเข้าข้อมูล",
+                cancelText: "ยกเลิก",
+                onConfirm: async () => {
+                    try {
+                        const { error } = await sqeClient.from('records').insert(formattedData);
+                        if (error) throw error;
+                        
+                        await loadRecords(); // รีเฟรชตารางหน้าจอ
+                        toast(`✅ นำเข้าข้อมูลสำเร็จ ${formattedData.length} รายการ`, "success");
+                    } catch (err) {
+                        console.error("Critical Import Error:", err);
+                        toast("❌ การนำเข้าขัดข้อง: " + err.message, "error");
+                    }
+                }
+            });
 
         } catch (err) {
             console.error("Critical Import Error:", err);
@@ -12613,21 +14031,31 @@ async function init() {
 
     async function toggleMaintenance(isActive) {
         if (S.currentUser.toLowerCase() !== masterAdminEmail.toLowerCase()) return;
-        if (!confirm(isActive ? "⚠️ ยืนยันปิดระบบ (เข้าสู่ Emergency Maintenance Lock)?" : "เปิดระบบตามปกติ?")) {
-            const el = $id('admin-mtx-toggle');
-            if (el) el.checked = !isActive;
-            return;
-        }
-        try {
-            await sqeClient.from('system_settings')
-                .update({ is_maintenance_active: isActive, updated_at: new Date() })
-                .eq('id', 'global_config');
+        
+        showCustomConfirmDialog({
+            title: isActive ? "⚠️ ยืนยันปิดระบบ Maintenance Lock" : "เปิดระบบตามปกติ",
+            subtitle: isActive ? "ผู้ใช้งานทั่วไปจะไม่สามารถเข้าใช้งานระบบได้ชั่วคราว" : "อนุญาตให้พนักงานทุกคนเข้าใช้งานระบบตามปกติ",
+            badge: "EMERGENCY CONTROL",
+            type: isActive ? "danger" : "info",
+            confirmText: isActive ? "🚨 บังคับปิดระบบ" : "✅ เปิดระบบปกติ",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    await sqeClient.from('system_settings')
+                        .update({ is_maintenance_active: isActive, updated_at: new Date() })
+                        .eq('id', 'global_config');
 
-            const status = isActive ? 'เปิดโหมดปิดปรับปรุง' : 'ปิดโหมดปิดปรับปรุง (เปิดระบบปกติ)';
-            writeAuditLog('MAINTENANCE', `Admin ได้ทำการ ${status}`);
-            toast(isActive ? "🚧 ระบบเข้าสู่โหมดปิดปรับปรุง" : "✅ เปิดระบบปกติแล้ว", "info");
-            if (typeof syncMaintenanceStatus === 'function') syncMaintenanceStatus();
-        } catch (e) { toast("Update Failed", "error"); }
+                    const status = isActive ? 'เปิดโหมดปิดปรับปรุง' : 'ปิดโหมดปิดปรับปรุง (เปิดระบบปกติ)';
+                    writeAuditLog('MAINTENANCE', `Admin ได้ทำการ ${status}`);
+                    toast(isActive ? "🚧 ระบบเข้าสู่โหมดปิดปรับปรุง" : "✅ เปิดระบบปกติแล้ว", "info");
+                    if (typeof syncMaintenanceStatus === 'function') syncMaintenanceStatus();
+                } catch (e) { toast("Update Failed", "error"); }
+            },
+            onCancel: () => {
+                const el = $id('admin-mtx-toggle');
+                if (el) el.checked = !isActive;
+            }
+        });
     }
 
     async function toggleUserStatus(userId, currentStatus) {
@@ -12642,14 +14070,27 @@ async function init() {
     }
 
     async function setForceReset(userId, email) {
-        if (!confirm(`พนักงาน (${email}) จะต้องตั้งค่ารหัสผ่านใหม่ในการเข้าใช้งานครั้งหน้า ยืนยัน?`)) return;
-        try {
-            const { error } = await sqeClient.from('users').update({ force_reset: true }).eq('id', userId);
-            if (error) throw error;
-            writeAuditLog('USER_FORCE_RESET', `บังคับ Reset Key ให้กับ: ${email}`);
-            toast("ตั้งค่าบังคับเปลี่ยนรหัสผ่านแล้ว", "success");
-            loadData();
-        } catch (e) { toast("ดำเนินการไม่สำเร็จ", "error"); }
+        showCustomConfirmDialog({
+            title: "บังคับรีเซ็ตรหัสผ่าน",
+            subtitle: `พนักงาน (${email}) จะต้องตั้งค่ารหัสผ่านใหม่ในการเข้าใช้งานครั้งหน้า`,
+            badge: "USER SECURITY",
+            type: "warning",
+            details: [
+                { label: "User Email", value: email },
+                { label: "User ID", value: userId }
+            ],
+            confirmText: "🔑 ยืนยันบังคับ Reset",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    const { error } = await sqeClient.from('users').update({ force_reset: true }).eq('id', userId);
+                    if (error) throw error;
+                    writeAuditLog('USER_FORCE_RESET', `บังคับ Reset Key ให้กับ: ${email}`);
+                    toast("ตั้งค่าบังคับเปลี่ยนรหัสผ่านแล้ว", "success");
+                    loadData();
+                } catch (e) { toast("ดำเนินการไม่สำเร็จ", "error"); }
+            }
+        });
     }
 
     async function switchTab(tab) {
@@ -12723,6 +14164,57 @@ async function init() {
             if (_currentTab === 'users') {
                 const { data } = await sb.from('users').select('*').order('email');
                 _data.users = data || [];
+
+                // ดึงข้อมูลประมวลผลการใช้งานจริงจากตารางทั้งหมดแบบขนาน (Parallel Fetch)
+                try {
+                    const [resRecords, resSupport, resS5, resJobs, resOT, resAudit] = await Promise.all([
+                        sqeClient.from('records').select('inspector, created_at, date'),
+                        wapClient.from('support_records').select('user_id, event_date'),
+                        wapClient.from('s5_records').select('user_id, created_at'),
+                        wapClient.from('special_jobs').select('user_id, date'),
+                        wapClient.from('ot_records').select('user_id, date'),
+                        sqeClient.from('audit_logs').select('user_email, created_at').limit(500)
+                    ]);
+
+                    const usageMap = {};
+                    const trackUsage = (userKey, type, ts) => {
+                        if (!userKey) return;
+                        const key = String(userKey).trim().toLowerCase();
+                        if (!usageMap[key]) {
+                            usageMap[key] = { claims: 0, support: 0, s5: 0, jobs: 0, ot: 0, audit: 0, total: 0, lastActive: null };
+                        }
+                        usageMap[key][type] = (usageMap[key][type] || 0) + 1;
+                        usageMap[key].total += 1;
+                        
+                        if (ts) {
+                            const t = new Date(ts).getTime();
+                            if (!isNaN(t) && (!usageMap[key].lastActive || t > usageMap[key].lastActive)) {
+                                usageMap[key].lastActive = t;
+                            }
+                        }
+                    };
+
+                    (resRecords.data || []).forEach(r => trackUsage(r.inspector, 'claims', r.created_at || r.date));
+                    (resSupport.data || []).forEach(s => trackUsage(s.user_id, 'support', s.event_date));
+                    (resS5.data || []).forEach(s => trackUsage(s.user_id, 's5', s.created_at));
+                    (resJobs.data || []).forEach(j => trackUsage(j.user_id, 'jobs', j.date));
+                    (resOT.data || []).forEach(o => trackUsage(o.user_id, 'ot', o.date));
+                    (resAudit.data || []).forEach(a => trackUsage(a.user_email, 'audit', a.created_at));
+
+                    _data.users = _data.users.map(u => {
+                        const emailKey = (u.email || '').trim().toLowerCase();
+                        const prefixKey = emailKey.split('@')[0];
+                        const stats = usageMap[emailKey] || usageMap[prefixKey] || {
+                            claims: 0, support: 0, s5: 0, jobs: 0, ot: 0, audit: 0, total: 0, lastActive: null
+                        };
+                        return {
+                            ...u,
+                            realUsage: stats
+                        };
+                    });
+                } catch (errUsage) {
+                    console.warn("Could not load full real usage metrics:", errUsage);
+                }
             } 
             else if (_currentTab === 'logs') {
                 const { data, count } = await sb
@@ -12785,8 +14277,8 @@ async function init() {
         thead.innerHTML = '';
 
         const btnDel = (table, id) => `
-            <button onclick="WapAdminSystem.deleteEntry('${table}', '${id}')" 
-                    class="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-600/80 transition-all border border-rose-500/20 active:scale-95" title="ลบข้อมูลถาวร">
+            <button  onclick="WapAdminSystem.deleteEntry('${table}', '${id}')" 
+                    class="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-600/80 transition-all border border-rose-500/20 active:scale-95" title="ลบข้อมูลถาวร" aria-label="Wap Admin System.Delete Entry">
                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                     <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                 </svg>
@@ -12801,8 +14293,8 @@ async function init() {
                             <div class="flex flex-col md:flex-row gap-6 relative z-10">
                                 <div class="flex-shrink-0 w-full md:w-48">
                                     <label class="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-2 block">System Version</label>
-                                    <input type="text" id="admin-version-input" placeholder="e.g. 1.0.5" 
-                                           class="w-full h-12 bg-black border border-slate-800 rounded-xl text-center text-lg font-black text-emerald-400 outline-none focus:border-emerald-500">
+                                    <input  type="text" id="admin-version-input" placeholder="e.g. 1.0.5" 
+                                           class="w-full h-12 bg-black border border-slate-800 rounded-xl text-center text-lg font-black text-emerald-400 outline-none focus:border-emerald-500" title="E.G. 1.0.5" aria-label="E.G. 1.0.5">
                                 </div>
 
                                 <div class="flex-1">
@@ -12812,13 +14304,13 @@ async function init() {
                                 </div>
 
                                 <div class="flex flex-col justify-end gap-2">
-                                    <button onclick="WapAdminSystem.deployNewVersion()" 
-                                            class="h-12 px-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 border border-emerald-400/30">
+                                    <button  onclick="WapAdminSystem.deployNewVersion()" 
+                                            class="h-12 px-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 border border-emerald-400/30" title="Wap Admin System.Deploy New Version" aria-label="Wap Admin System.Deploy New Version">
                                         <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
                                         Deploy & Notify
                                     </button>
-                                    <button onclick="WapAdminSystem.triggerForceUpdate()" 
-                                            class="h-10 px-6 border border-rose-500/40 text-rose-400 hover:bg-rose-950 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2">
+                                    <button  onclick="WapAdminSystem.triggerForceUpdate()" 
+                                            class="h-10 px-6 border border-rose-500/40 text-rose-400 hover:bg-rose-950 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2" title="Wap Admin System.Trigger Force Update" aria-label="Wap Admin System.Trigger Force Update">
                                         ⚠️ Force Global Refresh
                                     </button>
                                 </div>
@@ -12837,25 +14329,33 @@ async function init() {
         if (_currentTab === 'users') {
             thead.innerHTML = `
                 <tr class="text-[10px] text-slate-400 uppercase tracking-widest border-b border-slate-800">
-                    <th class="px-6 py-3 text-left">Identity & Session</th>
+                    <th class="px-6 py-3 text-left">Agent Identity & Role</th>
+                    <th class="px-6 py-3 text-center">Real System Usage</th>
                     <th class="px-6 py-3 text-center">Status</th>
                     <th class="px-6 py-3 text-center">Security Key</th>
                     <th class="px-6 py-3 text-right">Control</th>
                 </tr>`;
 
             tbody.innerHTML = _data.users
-                .filter(u => (u.email || '').toLowerCase().includes(_query))
+                .filter(u => {
+                    const q = (_query || '').toLowerCase();
+                    const email = (u.email || '').toLowerCase();
+                    const role = (u.role || '').toLowerCase();
+                    return email.includes(q) || role.includes(q);
+                })
                 .map(u => {
                     const isOnline = u.last_seen && (new Date() - new Date(u.last_seen)) / 1000 / 60 < 10;
                     const safeEmail = u.email || 'unknown@carrier.com';
                     const isReset = !!u.force_reset;
+                    const usage = u.realUsage || { claims: 0, support: 0, s5: 0, jobs: 0, ot: 0, audit: 0, total: 0 };
+
                     return `
-                    <tr class="cyber-table-row border-b border-slate-800/40" data-rid="${u.id}">
+                    <tr class="cyber-table-row border-b border-slate-800/40 hover:bg-slate-800/20 transition-all" data-rid="${u.id}">
                         <td class="px-6 py-3">
                             <div class="flex items-center gap-3">
-                                <div class="relative">
+                                <div class="relative flex-shrink-0">
                                     <div class="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center font-black text-emerald-400">${safeEmail[0].toUpperCase()}</div>
-                                    <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}"></span>
+                                    <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}" title="${isOnline ? 'Online now' : 'Offline'}"></span>
                                 </div>
                                 <div>
                                     <p class="font-bold text-slate-100 leading-none">${safeEmail.split('@')[0]}</p>
@@ -12864,8 +14364,26 @@ async function init() {
                             </div>
                         </td>
                         <td class="px-6 py-3 text-center">
-                            <button onclick="WapAdminSystem.toggleUserStatus('${u.id}', '${u.status || 'active'}')" 
-                                    class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all ${u.status === 'active' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40' : 'bg-rose-950 text-rose-400 border border-rose-500/40'}">
+                            <div class="flex flex-col items-center justify-center gap-1">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 font-mono">
+                                    ⚡ ${usage.total} REAL OPS
+                                </span>
+                                <div class="flex items-center gap-1.5 text-[9px] font-mono text-slate-400">
+                                    <span class="text-blue-400" title="Claim Records">${usage.claims}C</span>
+                                    <span class="text-slate-500">•</span>
+                                    <span class="text-cyan-400" title="Support Logs">${usage.support}S</span>
+                                    <span class="text-slate-500">•</span>
+                                    <span class="text-emerald-400" title="5S Audits">${usage.s5}5S</span>
+                                    <span class="text-slate-500">•</span>
+                                    <span class="text-amber-400" title="Missions">${usage.jobs}J</span>
+                                    <span class="text-slate-500">•</span>
+                                    <span class="text-purple-400" title="Audit Logs">${usage.audit}A</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-3 text-center">
+                            <button  onclick="WapAdminSystem.toggleUserStatus('${u.id}', '${u.status || 'active'}')" 
+                                    class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all ${u.status === 'active' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-900' : 'bg-rose-950 text-rose-400 border border-rose-500/40 hover:bg-rose-900'}" title="Toggle Account Status" aria-label="Toggle Status">
                                 ${(u.status || 'ACTIVE').toUpperCase()}
                             </button>
                         </td>
@@ -12874,21 +14392,21 @@ async function init() {
                         </td>
                         <td class="px-6 py-3 text-right">
                             <div class="flex justify-end gap-1.5">
-                                <button onclick="WapAdminSystem.setForceReset('${u.id}', '${safeEmail}')" 
+                                <button  onclick="WapAdminSystem.setForceReset('${u.id}', '${safeEmail}')" 
                                         class="p-1.5 rounded-lg text-amber-400 hover:text-white hover:bg-amber-900/60 border border-amber-500/30 transition-all active:scale-95" 
-                                        title="${isReset ? 'Reset Key Pending' : 'Force Key Reset'}">
+                                        title="${isReset ? 'Reset Key Pending' : 'Force Key Reset'}" aria-label="Force Reset">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M15 7a2 2 0 012 2m-2-2a2 2 0 00-2 2m2-2V5a2 2 0 10-4 0v2m4 0h-4m-1 0h-1a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1"/></svg>
                                 </button>
-                                <button onclick="WapAdminSystem.openEditUserModal('${u.id}')" 
+                                <button  onclick="WapAdminSystem.openEditUserModal('${u.id}')" 
                                         class="p-1.5 rounded-lg text-cyan-400 hover:text-white hover:bg-cyan-600/80 transition-all border border-cyan-500/30 active:scale-95" 
-                                        title="Edit Agent Account">
+                                        title="Edit Agent Account" aria-label="Edit User">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                         <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
                                 </button>
-                                <button onclick="WapAdminSystem.openDeleteUserModal('${u.id}')" 
+                                <button  onclick="WapAdminSystem.openDeleteUserModal('${u.id}')" 
                                         class="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-600/80 transition-all border border-rose-500/30 active:scale-95" 
-                                        title="Delete Agent Account">
+                                        title="Delete Agent Account" aria-label="Delete User">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                         <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                     </svg>
@@ -12954,6 +14472,9 @@ async function init() {
         }
 
         document.getElementById('admin-record-count').textContent = `${tbody.rows.length} RECORDS`;
+        if (typeof window.animateTableRows === 'function') {
+            window.animateTableRows(tbody, { y: 6, duration: 0.28, stagger: 0.02, ease: 'power2.out' });
+        }
         if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
     }
 
@@ -12971,14 +14492,15 @@ async function init() {
                 return (now - lastSeen) / 1000 / 60 < 10;
             }).length;
 
-            const forceResetCount = _data.users.filter(u => u.force_reset).length;
+            const totalSystemOps = _data.users.reduce((sum, u) => sum + (u.realUsage?.total || 0), 0);
+            const activeProducers = _data.users.filter(u => (u.realUsage?.total || 0) > 0).length;
 
             kpis = [
                 { t: "TOTAL AGENTS", v: _data.users.length, c: "emerald", icon: "🛡️" },
                 { t: "ONLINE ACTIVE", v: onlineCount, c: "cyan", icon: "⚡" },
-                { t: "RESET REQUIRED", v: forceResetCount, c: "amber", icon: "🔑" },
-                { t: "INACTIVE ACCESS", v: _data.users.filter(u => u.status === 'inactive').length, c: "rose", icon: "🚫" },
-                { t: "CLEARANCE LEVEL", v: "LV.5 MASTER", c: "blue", icon: "👑" }
+                { t: "REAL SYSTEM OPS", v: totalSystemOps, c: "emerald", icon: "📊" },
+                { t: "ACTIVE PRODUCERS", v: activeProducers, c: "blue", icon: "🎯" },
+                { t: "CLEARANCE LEVEL", v: "LV.5 MASTER", c: "amber", icon: "👑" }
             ];
 
         } else if (_currentTab === 'logs') {
@@ -13037,43 +14559,61 @@ async function init() {
     }
 
     async function harvestFromHistory() {
-        if (!confirm("ระบบจะสแกนประวัติการบันทึกทั้งหมดเพื่อสร้างฐานข้อมูล Master อัตโนมัติ ต้องการเริ่มหรือไม่?")) return;
-        showLoader(true);
-        try {
-            const { data: allLogs } = await sqeClient.from('records').select('supplier, partNo, partName, defect');
-            if (allLogs) {
-                const suppliers = [...new Set(allLogs.map(r => r.supplier))].filter(Boolean).map(n => ({ name: n }));
-                await sqeClient.from('master_suppliers').upsert(suppliers, { onConflict: 'name' });
-                
-                const parts = []; const seen = new Set();
-                allLogs.forEach(r => {
-                    if(r.partNo && !seen.has(r.partNo)) {
-                        seen.add(r.partNo); parts.push({ part_no: r.partNo, part_name: r.partName || '-' });
-                    }
-                });
-                await sqeClient.from('master_parts').upsert(parts, { onConflict: 'part_no' });
+        showCustomConfirmDialog({
+            title: "สแกนสร้างฐานข้อมูล Master อัตโนมัติ",
+            subtitle: "ระบบจะสแกนประวัติการบันทึกทั้งหมดเพื่อรวบรวมรายชื่อ Supplier, Part และ Defect เข้าสู่ Master Database",
+            badge: "DATA HARVESTING",
+            type: "info",
+            confirmText: "🔍 เริ่มสแกนและสร้าง Master Data",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                showLoader(true);
+                try {
+                    const { data: allLogs } = await sqeClient.from('records').select('supplier, partNo, partName, defect');
+                    if (allLogs) {
+                        const suppliers = [...new Set(allLogs.map(r => r.supplier))].filter(Boolean).map(n => ({ name: n }));
+                        await sqeClient.from('master_suppliers').upsert(suppliers, { onConflict: 'name' });
+                        
+                        const parts = []; const seen = new Set();
+                        allLogs.forEach(r => {
+                            if(r.partNo && !seen.has(r.partNo)) {
+                                seen.add(r.partNo); parts.push({ part_no: r.partNo, part_name: r.partName || '-' });
+                            }
+                        });
+                        await sqeClient.from('master_parts').upsert(parts, { onConflict: 'part_no' });
 
-                const defects = [...new Set(allLogs.map(r => r.defect))].filter(Boolean).map(d => ({ defect_name: d.toUpperCase() }));
-                await sqeClient.from('master_defects').upsert(defects, { onConflict: 'defect_name' });
-                
-                writeAuditLog('HARVEST_MASTER', 'ทำการสแกนประวัติและปรับปรุง Master Data ทั้งหมด');
-                toast("✅ วิเคราะห์และอัปเดต Master Data เรียบร้อย", "success");
-                await loadData();
+                        const defects = [...new Set(allLogs.map(r => r.defect))].filter(Boolean).map(d => ({ defect_name: d.toUpperCase() }));
+                        await sqeClient.from('master_defects').upsert(defects, { onConflict: 'defect_name' });
+                        
+                        writeAuditLog('HARVEST_MASTER', 'ทำการสแกนประวัติและปรับปรุง Master Data ทั้งหมด');
+                        toast("✅ วิเคราะห์และอัปเดต Master Data เรียบร้อย", "success");
+                        await loadData();
+                    }
+                } catch (e) { toast("Harvest Failed", "error"); }
+                showLoader(false);
             }
-        } catch (e) { toast("Harvest Failed", "error"); }
-        showLoader(false);
+        });
     }
 
     async function triggerForceUpdate() {
-        if(!confirm("⚠️ บังคับพนักงานทุกคนรีโหลดหน้าจอ?")) return;
-        try {
-            await sqeClient.from('system_settings').update({
-                force_update_trigger: new Date().toISOString()
-            }).eq('id', 'global_config');
-            
-            toast("⚡ ส่งสัญญาณบังคับรีเฟรชสำเร็จ", "success");
-            writeAuditLog('FORCE_REFRESH', 'สั่งรีโหลดเครื่องพนักงานทั้งหมด');
-        } catch (e) { toast("ดำเนินการล้มเหลว", "error"); }
+        showCustomConfirmDialog({
+            title: "บังคับรีโหลดหน้าจอพนักงานทุกคน",
+            subtitle: "ผู้ใช้งานทุกคนที่กำลังเปิดระบบอยู่จะได้รับการแจ้งเตือนรีโหลดหน้าจอทันที",
+            badge: "SYSTEM BROADCAST",
+            type: "warning",
+            confirmText: "🔄 ยืนยันสั่ง Force Reload",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    await sqeClient.from('system_settings').update({
+                        force_reload_trigger: new Date().toISOString(),
+                        force_update_trigger: new Date().toISOString()
+                    }).eq('id', 'global_config');
+                    writeAuditLog('FORCE_RELOAD', 'ส่งสัญญาณบังคับ Reload หน้าจอ');
+                    toast("🚀 ส่งคำสั่ง Force Reload สำเร็จ", "success");
+                } catch(e) { toast("Trigger Failed", "error"); }
+            }
+        });
     }
 
     function handleAddNew() {
@@ -13094,23 +14634,23 @@ async function init() {
                 <div class="space-y-3 text-left">
                     <div>
                         <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Carrier Email</label>
-                        <input type="email" id="adm-u-email" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none" placeholder="name@carrier.com">
+                        <input  type="email" id="adm-u-email" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none" placeholder="name@carrier.com" title="Name@Carrier.Com" aria-label="Name@Carrier.Com">
                     </div>
                     <div>
                         <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Security Key (Password)</label>
-                        <input type="text" id="adm-u-pass" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none" placeholder="รหัสผ่านเข้าเครื่อง">
+                        <input  type="text" id="adm-u-pass" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none" placeholder="รหัสผ่านเข้าเครื่อง" title="รหัสผ่านเข้าเครื่อง" aria-label="รหัสผ่านเข้าเครื่อง">
                     </div>
                     <div>
                         <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Clearance Role</label>
-                        <select id="adm-u-role" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none">
+                        <select  id="adm-u-role" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none" title="Adm U Role" aria-label="Adm U Role">
                             <option value="staff">Staff (บันทึกข้อมูล)</option>
                             <option value="supervisor">Supervisor (ดูรายงาน)</option>
                         </select>
                     </div>
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs">Cancel</button>
-                    <button onclick="WapAdminSystem.saveUser()" class="flex-[2] h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/20 border border-emerald-400/30">Deploy Account</button>
+                    <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Wap Admin System.Close Master Modal" aria-label="Wap Admin System.Close Master Modal">Cancel</button>
+                    <button  onclick="WapAdminSystem.saveUser()" class="flex-[2] h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/20 border border-emerald-400/30" title="Wap Admin System.Save User" aria-label="Wap Admin System.Save User">Deploy Account</button>
                 </div>`;
         } else if (_currentTab === 'suppliers') {
             html = `
@@ -13119,12 +14659,12 @@ async function init() {
                 </h3>
                 <div class="text-left">
                     <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Verified Company Name</label>
-                    <input type="text" id="m-input-name" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="ชื่อบริษัทซัพพลายเออร์...">
+                    <input  type="text" id="m-input-name" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="ชื่อบริษัทซัพพลายเออร์..." title="ชื่อบริษัทซัพพลายเออร์..." aria-label="ชื่อบริษัทซัพพลายเออร์...">
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs">Cancel</button>
-                    <button onclick="WapAdminSystem.saveMaster('master_suppliers', {name: document.getElementById('m-input-name').value})" 
-                            class="flex-[2] h-10 bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-cyan-500/20 border border-cyan-400/30">Authorize Supplier</button>
+                    <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Wap Admin System.Close Master Modal" aria-label="Wap Admin System.Close Master Modal">Cancel</button>
+                    <button  onclick="WapAdminSystem.saveMaster('master_suppliers', {name: document.getElementById('m-input-name').value})" 
+                            class="flex-[2] h-10 bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-cyan-500/20 border border-cyan-400/30" title="Wap Admin System.Save Master" aria-label="Wap Admin System.Save Master">Authorize Supplier</button>
                 </div>`;
         } else if (_currentTab === 'parts') {
             html = `
@@ -13134,17 +14674,17 @@ async function init() {
                 <div class="space-y-3 text-left">
                     <div>
                         <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Part Number (P/N)</label>
-                        <input type="text" id="m-input-pn" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none uppercase" placeholder="เช่น 1204X...">
+                        <input  type="text" id="m-input-pn" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none uppercase" placeholder="เช่น 1204X..." title="เช่น 1204X..." aria-label="เช่น 1204X...">
                     </div>
                     <div>
                         <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Description (Part Name)</label>
-                        <input type="text" id="m-input-desc" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none" placeholder="ชื่อชิ้นส่วน...">
+                        <input  type="text" id="m-input-desc" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-emerald-500 rounded-xl text-xs text-emerald-300 font-mono outline-none" placeholder="ชื่อชิ้นส่วน..." title="ชื่อชิ้นส่วน..." aria-label="ชื่อชิ้นส่วน...">
                     </div>
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs">Cancel</button>
-                    <button onclick="WapAdminSystem.saveMaster('master_parts', {part_no: document.getElementById('m-input-pn').value, part_name: document.getElementById('m-input-desc').value})" 
-                            class="flex-[2] h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/20 border border-emerald-400/30">Commit Part</button>
+                    <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Wap Admin System.Close Master Modal" aria-label="Wap Admin System.Close Master Modal">Cancel</button>
+                    <button  onclick="WapAdminSystem.saveMaster('master_parts', {part_no: document.getElementById('m-input-pn').value, part_name: document.getElementById('m-input-desc').value})" 
+                            class="flex-[2] h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-emerald-500/20 border border-emerald-400/30" title="Wap Admin System.Save Master" aria-label="Wap Admin System.Save Master">Commit Part</button>
                 </div>`;
         } else if (_currentTab === 'defects') {
             html = `
@@ -13153,12 +14693,12 @@ async function init() {
                 </h3>
                 <div class="text-left">
                     <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Defect Description</label>
-                    <input type="text" id="m-input-defect" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-amber-500 rounded-xl text-xs text-amber-300 font-mono outline-none uppercase" placeholder="เช่น CRACK, DENT, STAIN...">
+                    <input  type="text" id="m-input-defect" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-amber-500 rounded-xl text-xs text-amber-300 font-mono outline-none uppercase" placeholder="เช่น CRACK, DENT, STAIN..." title="เช่น CRACK, DENT, STAIN..." aria-label="เช่น CRACK, DENT, STAIN...">
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs">Cancel</button>
-                    <button onclick="WapAdminSystem.saveMaster('master_defects', {defect_name: document.getElementById('m-input-defect').value.toUpperCase()})" 
-                            class="flex-[2] h-10 bg-amber-600 hover:bg-amber-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-amber-500/20 border border-amber-400/30">Register Taxonomy</button>
+                    <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Wap Admin System.Close Master Modal" aria-label="Wap Admin System.Close Master Modal">Cancel</button>
+                    <button  onclick="WapAdminSystem.saveMaster('master_defects', {defect_name: document.getElementById('m-input-defect').value.toUpperCase()})" 
+                            class="flex-[2] h-10 bg-amber-600 hover:bg-amber-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-amber-500/20 border border-amber-400/30" title="Wap Admin System.Save Master" aria-label="Wap Admin System.Save Master">Register Taxonomy</button>
                 </div>`;
         }
         content.innerHTML = html;
@@ -13238,18 +14778,31 @@ async function init() {
     }
 
     async function deleteEntry(t, id) {
-        if (!confirm("Confirm Permanent Delete?")) return;
-        try {
-            const client = (t === 'users' || t === 'records') ? sqeClient : wapClient;
-            const { error } = await client.from(t).delete().eq('id', id);
-            if (error) throw error;
-            writeAuditLog('MASTER_DELETE', `ลบข้อมูลจากตาราง ${t} (ID: ${id})`);
-            toast("ลบข้อมูลสำเร็จ", "success");
-            await loadData();
-        } catch (e) {
-            console.error('[Admin Delete Entry Error]:', e);
-            toast("ลบไม่สำเร็จ: " + (e.message || ''), "error");
-        }
+        showCustomConfirmDialog({
+            title: "ยืนยันการลบข้อมูล Admin Master",
+            subtitle: `ข้อมูลในตาราง ${t} จะถูกลบถาวรออกจากระบบ`,
+            badge: "ADMIN MASTER CONTROL",
+            type: "danger",
+            details: [
+                { label: "Target Table", value: t },
+                { label: "Record ID", value: id }
+            ],
+            confirmText: "🗑️ ยืนยันลบถาวร",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    const client = (t === 'users' || t === 'records') ? sqeClient : wapClient;
+                    const { error } = await client.from(t).delete().eq('id', id);
+                    if (error) throw error;
+                    writeAuditLog('MASTER_DELETE', `ลบข้อมูลจากตาราง ${t} (ID: ${id})`);
+                    toast("ลบข้อมูลสำเร็จ", "success");
+                    await loadData();
+                } catch (e) {
+                    console.error('[Admin Delete Entry Error]:', e);
+                    toast("ลบไม่สำเร็จ: " + (e.message || ''), "error");
+                }
+            }
+        });
     }
 
     function openEditUserModal(userId) {
@@ -13273,23 +14826,23 @@ async function init() {
             <div class="space-y-3 text-left">
                 <div>
                     <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Carrier Email</label>
-                    <input type="email" id="adm-edit-email" value="${safeEmail}" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="name@carrier.com">
+                    <input  type="email" id="adm-edit-email" value="${safeEmail}" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="name@carrier.com" title="Name@Carrier.Com" aria-label="Name@Carrier.Com">
                 </div>
                 <div>
                     <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Security Key (Password)</label>
-                    <input type="text" id="adm-edit-pass" value="${safePass}" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="รหัสผ่านเข้าเครื่อง">
+                    <input  type="text" id="adm-edit-pass" value="${safePass}" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="รหัสผ่านเข้าเครื่อง" title="รหัสผ่านเข้าเครื่อง" aria-label="รหัสผ่านเข้าเครื่อง">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Clearance Role</label>
-                        <select id="adm-edit-role" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none">
+                        <select  id="adm-edit-role" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" title="Adm Edit Role" aria-label="Adm Edit Role">
                             <option value="staff" ${currentRole === 'staff' ? 'selected' : ''}>Staff (บันทึกข้อมูล)</option>
                             <option value="supervisor" ${currentRole === 'supervisor' ? 'selected' : ''}>Supervisor (ดูรายงาน)</option>
                         </select>
                     </div>
                     <div>
                         <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Account Status</label>
-                        <select id="adm-edit-status" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none">
+                        <select  id="adm-edit-status" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" title="Adm Edit Status" aria-label="Adm Edit Status">
                             <option value="active" ${currentStatus === 'active' ? 'selected' : ''}>ACTIVE</option>
                             <option value="inactive" ${currentStatus === 'inactive' ? 'selected' : ''}>INACTIVE</option>
                         </select>
@@ -13297,8 +14850,8 @@ async function init() {
                 </div>
             </div>
             <div class="flex gap-3 mt-6">
-                <button onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs">Cancel</button>
-                <button onclick="WapAdminSystem.updateUser('${user.id}')" class="flex-[2] h-10 bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-cyan-500/20 border border-cyan-400/30">Save Changes</button>
+                <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Wap Admin System.Close Master Modal" aria-label="Wap Admin System.Close Master Modal">Cancel</button>
+                <button  onclick="WapAdminSystem.updateUser('${user.id}')" class="flex-[2] h-10 bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-cyan-500/20 border border-cyan-400/30" title="Wap Admin System.Update User" aria-label="Wap Admin System.Update User">Save Changes</button>
             </div>`;
     }
 
@@ -13374,8 +14927,8 @@ async function init() {
                     </div>
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs">Cancel</button>
-                    <button onclick="WapAdminSystem.confirmDeleteUser('${user.id}', '${safeEmail}')" class="flex-[2] h-10 bg-rose-600 hover:bg-rose-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-rose-500/20 border border-rose-400/30">Delete Agent Account</button>
+                    <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Wap Admin System.Close Master Modal" aria-label="Wap Admin System.Close Master Modal">Cancel</button>
+                    <button  onclick="WapAdminSystem.confirmDeleteUser('${user.id}', '${safeEmail}')" class="flex-[2] h-10 bg-rose-600 hover:bg-rose-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-rose-500/20 border border-rose-400/30" title="Wap Admin System.Confirm Delete User" aria-label="Wap Admin System.Confirm Delete User">Delete Agent Account</button>
                 </div>
             </div>`;
     }
@@ -13626,11 +15179,22 @@ async function performFullBackup() {
 async function performArchive() {
     const year = document.getElementById('archive-year').value;
     if (!year || year.length < 4) return toast("กรุณาระบุปีที่ถูกต้อง", "error");
-    if (!confirm(`ยืนยันการ Archive ข้อมูลปี ${year}? ข้อมูลจะถูกย้ายเข้าสู่คลังสำรอง`)) return;
-
-    toast("📦 กำลังดำเนินการ Archive...", "info");
-    // หมายเหตุ: Logic การย้ายข้อมูลจริงต้องสอดคล้องกับตาราง archive ในฐานข้อมูลของคุณ
-    setTimeout(() => toast("✅ ดำเนินการสำเร็จ (Demo)", "success"), 2000);
+    
+    showCustomConfirmDialog({
+        title: "ยืนยันการ Archive ข้อมูลประจำปี",
+        subtitle: `ข้อมูลรายการบันทึกของปี ${year} จะถูกย้ายเข้าสู่คลังสำรองข้อมูล`,
+        badge: "SYSTEM ARCHIVE",
+        type: "warning",
+        details: [
+            { label: "Target Year", value: `ปี ${year}` }
+        ],
+        confirmText: "📦 ยืนยันเริ่ม Archive ข้อมูล",
+        cancelText: "ยกเลิก",
+        onConfirm: () => {
+            toast("📦 กำลังดำเนินการ Archive...", "info");
+            setTimeout(() => toast("✅ ดำเนินการสำเร็จ (Demo)", "success"), 2000);
+        }
+    });
 }
 
 // ฟังก์ชันส่งสัญญาณบอกระบบว่า User ยังใช้งานอยู่
@@ -13690,7 +15254,7 @@ async function checkChangelog() {
                     <div class="text-5xl mb-4">✨</div>
                     <h2 class="text-2xl font-black text-slate-800 mb-2">Version ${data.app_version}</h2>
                     <p class="text-slate-500 text-sm mb-6 leading-relaxed">${data.update_details || 'มีการปรับปรุงประสิทธิภาพระบบ'}</p>
-                    <button onclick="closeUpdateModal('${data.app_version}')" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest">รับทราบ</button>
+                    <button  onclick="closeUpdateModal('${data.app_version}')" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest" title="Close Update Modal" aria-label="Close Update Modal">รับทราบ</button>
                 </div>
             </div>
         `;
@@ -13720,21 +15284,21 @@ function showPasswordResetUI(email) {
             <div class="input-group">
                 <label class="input-tiny-label">New Security Key</label>
                 <!-- ต้องมี id="new-pass" -->
-                <input type="password" id="new-pass" class="premium-input" placeholder="••••••••">
+                <input  type="password" id="new-pass" class="premium-input" placeholder="••••••••" title="••••••••" aria-label="••••••••">
             </div>
 
             <div class="input-group">
                 <label class="input-tiny-label">Confirm New Key</label>
                 <!-- ต้องมี id="confirm-new-pass" -->
-                <input type="password" id="confirm-new-pass" class="premium-input" placeholder="••••••••">
+                <input  type="password" id="confirm-new-pass" class="premium-input" placeholder="••••••••" title="••••••••" aria-label="••••••••">
             </div>
 
-            <button onclick="handlePasswordResetSubmit('${email}')" class="btn-initialize-session">
+            <button  onclick="handlePasswordResetSubmit('${email}')" class="btn-initialize-session" title="Handle Password Reset Submit" aria-label="Handle Password Reset Submit">
                 <div class="btn-shimmer"></div>
                 <span class="btn-text">SAVE & LOGIN</span>
             </button>
             
-            <button onclick="window.location.reload()" class="w-full text-[9px] font-black text-slate-500 uppercase mt-2">Cancel</button>
+            <button  onclick="window.location.reload()" class="w-full text-[9px] font-black text-slate-500 uppercase mt-2" title="Window.Location.Reload" aria-label="Window.Location.Reload">Cancel</button>
         </div>
     `;
 }
@@ -13814,7 +15378,7 @@ async function openPersonalSettings() {
         // เตรียมข้อมูลแสดงผล
         const displayName = user.display_name || S.currentUser.split('@')[0].replace(/\./g, ' ').toUpperCase();
         const avatarHtml = user.avatar_url 
-            ? `<img src="${user.avatar_url}" class="w-full h-full object-cover">` 
+            ? `<img  src="${user.avatar_url}" class="w-full h-full object-cover" alt="Image" title="Image">` 
             : `<span class="text-3xl font-black text-blue-600">${displayName[0]}</span>`;
 
         // สร้าง Modal
@@ -13824,7 +15388,7 @@ const modalHtml = `
         <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[32px] p-8 shadow-2xl animate-pop-in border border-slate-100 dark:border-slate-800">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Profile Settings</h3>
-                <button onclick="document.getElementById('settings-modal').remove()" class="text-slate-400 hover:text-rose-500 transition-colors">✕</button>
+                <button  onclick="document.getElementById('settings-modal').remove()" class="text-slate-400 hover:text-rose-500 transition-colors" title="Document.Get Element By Id" aria-label="Document.Get Element By Id">✕</button>
             </div>
 
             <!-- ส่วนจัดการรูปภาพ -->
@@ -13837,12 +15401,12 @@ const modalHtml = `
                         <svg class="text-white w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 0 1 2-2h.93a2 2 0 0 0 1.664-.89l.812-1.22A2 2 0 0 1 10.07 4h3.86a2 2 0 0 1 1.664.89l.812 1.22A2 2 0 0 0 18.07 7H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3"/></svg>
                     </div>
                 </div>
-                <input type="file" id="avatar-input" class="hidden" accept="image/*" onchange="handleAvatarPreview(this)">
+                <input  type="file" id="avatar-input" class="hidden" accept="image/*" onchange="handleAvatarPreview(this)" title="Avatar Input" aria-label="Avatar Input">
                 
                 <!-- เพิ่มปุ่มคืนค่าเริ่มต้นตรงนี้ -->
                 <div class="flex gap-4 mt-3">
                     <p class="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em]">Change Photo</p>
-                    <button onclick="resetProfileToDefault()" class="text-[9px] text-rose-500 font-black uppercase tracking-[0.2em] hover:underline">Restore Default</button>
+                    <button  onclick="resetProfileToDefault()" class="text-[9px] text-rose-500 font-black uppercase tracking-[0.2em] hover:underline" title="Reset Profile To Default" aria-label="Reset Profile To Default">Restore Default</button>
                 </div>
             </div>
 
@@ -13850,14 +15414,14 @@ const modalHtml = `
             <div class="space-y-5">
                 <div class="input-group">
                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Display Name</label>
-                    <input type="text" id="set-display-name" class="premium-input !h-12 !rounded-2xl dark:bg-slate-800" value="${displayName}">
+                    <input  type="text" id="set-display-name" class="premium-input !h-12 !rounded-2xl dark:bg-slate-800" value="${displayName}" title="Set Display Name" aria-label="Set Display Name">
                 </div>
             </div>
 
             <!-- ปุ่มดำเนินการ -->
             <div class="flex gap-3 mt-10">
-                <button onclick="document.getElementById('settings-modal').remove()" class="flex-1 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cancel</button>
-                <button onclick="savePersonalProfile()" class="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-blue-500/30 active:scale-95 transition-all">Save Changes</button>
+                <button  onclick="document.getElementById('settings-modal').remove()" class="flex-1 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest" title="Document.Get Element By Id" aria-label="Document.Get Element By Id">Cancel</button>
+                <button  onclick="savePersonalProfile()" class="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-blue-500/30 active:scale-95 transition-all" title="Save Personal Profile" aria-label="Save Personal Profile">Save Changes</button>
             </div>
         </div>
     </div>
@@ -13869,47 +15433,54 @@ const modalHtml = `
     }
 }
 async function resetProfileToDefault() {
-    if (!confirm("⚠️ คุณต้องการคืนค่ารูปโปรไฟล์และชื่อเป็นค่าเริ่มต้นใช่หรือไม่?")) return;
+    showCustomConfirmDialog({
+        title: "คืนค่าโปรไฟล์เป็นค่าเริ่มต้น",
+        subtitle: "รูปโปรไฟล์และชื่อแสดงผล (Display Name) จะถูกตั้งค่ากลับเป็นค่าเริ่มต้นของระบบ",
+        badge: "USER PROFILE",
+        type: "warning",
+        confirmText: "🔄 คืนค่าโปรไฟล์เริ่มต้น",
+        cancelText: "ยกเลิก",
+        onConfirm: async () => {
+            try {
+                toast("⌛ กำลังคืนค่าเริ่มต้น...", "info");
 
-    try {
-        toast("⌛ กำลังคืนค่าเริ่มต้น...", "info");
+                // ค่าเริ่มต้น: ชื่อดึงจากอีเมล, รูปเป็น null
+                const defaultName = S.currentUser.split('@')[0].replace(/\./g, ' ').toUpperCase();
+                
+                const payload = { 
+                    display_name: defaultName, 
+                    avatar_url: null, // ล้างรูปออก
+                    updated_at: new Date().toISOString() 
+                };
 
-        // ค่าเริ่มต้น: ชื่อดึงจากอีเมล, รูปเป็น null
-        const defaultName = S.currentUser.split('@')[0].replace(/\./g, ' ').toUpperCase();
-        
-        const payload = { 
-            display_name: defaultName, 
-            avatar_url: null, // ล้างรูปออก
-            updated_at: new Date().toISOString() 
-        };
+                const { error } = await sqeClient
+                    .from('users')
+                    .update(payload)
+                    .eq('email', S.currentUser);
 
-        const { error } = await sqeClient
-            .from('users')
-            .update(payload)
-            .eq('email', S.currentUser);
+                if (error) throw error;
 
-        if (error) throw error;
+                // 1. อัปเดต UI ที่ Sidebar ทันที
+                const nameEl = document.getElementById('user-display-name');
+                const avatarEl = document.getElementById('user-avatar');
+                
+                if (nameEl) nameEl.textContent = defaultName;
+                if (avatarEl) {
+                    avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(defaultName)}&background=random&color=fff`;
+                }
 
-        // 1. อัปเดต UI ที่ Sidebar ทันที
-        const nameEl = document.getElementById('user-display-name');
-        const avatarEl = document.getElementById('user-avatar');
-        
-        if (nameEl) nameEl.textContent = defaultName;
-        if (avatarEl) {
-            avatarEl.innerHTML = `<span class="text-xl font-black text-white">${defaultName[0]}</span>`;
+                // 2. ปิด Modal
+                const modal = document.getElementById('settings-modal');
+                if (modal) modal.remove();
+
+                toast("✅ คืนค่ารูปโปรไฟล์และชื่อสำเร็จแล้ว", "success");
+
+            } catch (err) {
+                console.error("Reset profile error:", err);
+                toast("❌ เกิดข้อผิดพลาดในการคืนค่า", "error");
+            }
         }
-
-        // 2. ปิด Modal
-        const modal = document.getElementById('settings-modal');
-        if (modal) modal.remove();
-
-        toast("✅ คืนค่าเริ่มต้นเรียบร้อยแล้ว", "success");
-        tempAvatarBase64 = null;
-
-    } catch (e) {
-        console.error(e);
-        toast("คืนค่าล้มเหลว: " + e.message, "error");
-    }
+    });
 }
 // 2. จัดการรูปภาพแบบ Real-time Preview
 function handleAvatarPreview(input) {
@@ -13920,7 +15491,7 @@ function handleAvatarPreview(input) {
             tempAvatarBase64 = e.target.result;
             const previewBox = document.getElementById('settings-avatar-preview');
             // ล้างค่าเก่า (ไอคอนหรือตัวอักษร) แล้วใส่ img อย่างเดียว
-            previewBox.innerHTML = `<img src="${tempAvatarBase64}" alt="profile">`;
+            previewBox.innerHTML = `<img  src="${tempAvatarBase64}" alt="profile" title="Profile">`;
         };
         reader.readAsDataURL(file);
     }
@@ -13950,7 +15521,7 @@ async function savePersonalProfile() {
         
         if (nameEl) nameEl.textContent = newName.toUpperCase();
         if (tempAvatarBase64 && avatarEl) {
-            avatarEl.innerHTML = `<img src="${tempAvatarBase64}" class="w-full h-full object-cover rounded-full">`;
+            avatarEl.innerHTML = `<img  src="${tempAvatarBase64}" class="w-full h-full object-cover rounded-full" alt="Image" title="Image">`;
         }
 
         toast("อัปเดตโปรไฟล์สำเร็จ!", "success");
@@ -14104,6 +15675,15 @@ const Wap8DSystem = (function() {
 
     // 1. โหลดเคสจาก Cloud (ใช้ sqeClient)
     async function init() {
+        if (_currentCase) {
+            try { await saveCurrentProgress(); } catch (e) {}
+            _currentCase = null;
+        }
+        const dash = document.getElementById('eight-d-dashboard');
+        const rptView = document.getElementById('eight-d-report-view');
+        if (dash) dash.classList.remove('hidden');
+        if (rptView) rptView.classList.add('hidden');
+
         await fetchCases();
         renderDashboard();
         window.addEventListener('resize', fitSlideToContainer);
@@ -14288,7 +15868,7 @@ async function createNewCase(supportData) {
                 <div style="background:#fff; border-radius:24px; width:90%; max-width:600px; max-height:80vh; overflow:hidden; display:flex; flex-direction:column;">
                     <div style="padding:20px; background:#1e293b; color:#fff; display:flex; justify-content:space-between;">
                         <h3 style="font-weight:900; font-size:12px;">SELECT RECORD FOR 8D</h3>
-                        <button onclick="this.closest('.modal-overlay').remove()">✕</button>
+                        <button  onclick="this.closest('.modal-overlay').remove()" title="This.Closest" aria-label="This.Closest">✕</button>
                     </div>
                     <div style="overflow-y:auto; flex:1; padding:10px;">
                         ${data.map(r => `<div onclick="Wap8DSystem.pickRecord('${r.id}')" style="padding:15px; border-bottom:1px solid #f1f5f9; cursor:pointer;">${r.problem}</div>`).join('')}
@@ -14309,35 +15889,45 @@ async function createNewCase(supportData) {
 
 // --- เพิ่มใน Wap8DSystem ---
 async function deleteCase(id) {
-    // 1. ตรวจสอบสิทธิ์ (ป้องกัน Supervisor ลบ)
     if (S.userRole === 'supervisor') { 
         toast('⚠️ Supervisor Mode: Read-only access', 'error'); 
         return; 
     }
 
-    // 2. แสดงหน้าต่างยืนยัน
-    if (!confirm("⚠️ Confirm Delete 8D Report?\nคุณแน่ใจหรือไม่ที่จะลบรายงานนี้ถาวร? ข้อมูลจะไม่สามารถกู้คืนได้")) return;
+    const target = _cases ? _cases.find(c => String(c.id) === String(id)) : null;
 
-    try {
-        // 3. ส่งคำสั่งลบไปยังฐานข้อมูล SQE (ที่เก็บตาราง eight_d_reports)
-        const { error } = await sqeClient
-            .from(TABLE)
-            .delete()
-            .eq('id', id);
+    showCustomConfirmDialog({
+        title: "ยืนยันการลบรายงาน 8D Report",
+        subtitle: "รายงานวิเคราะห์ปัญหานี้จะถูกลบออกจากฐานข้อมูล SQE ถาวร ไม่สามารถกู้คืนได้",
+        badge: "8D REPORT SYSTEM",
+        type: "danger",
+        details: [
+            { label: "รหัสรายงาน 8D", value: id },
+            { label: "หัวข้อ / อาการปัญหา", value: target ? (target.problem_title || '-') : '-' },
+            { label: "ชื่อพาร์ท / กลุ่มพาร์ท", value: target ? `${target.part_name || '-'} (${target.part_group || '-'})` : '-' },
+            { label: "สถานะรายงาน", value: target ? (target.status || '-') : '-' }
+        ],
+        confirmText: "🗑️ ยืนยันลบรายงาน 8D",
+        cancelText: "ยกเลิก",
+        onConfirm: async () => {
+            try {
+                const { error } = await sqeClient
+                    .from(TABLE)
+                    .delete()
+                    .eq('id', id);
 
-        if (error) throw error;
+                if (error) throw error;
 
-        // 4. แจ้งเตือนและอัปเดตหน้าจอ
-        toast("🗑️ Report deleted successfully", "success");
-        
-        // กรองข้อมูลใน Memory ออก และวาดตารางใหม่
-        _cases = _cases.filter(c => c.id !== id);
-        renderDashboard();
+                toast("🗑️ ลบรายงาน 8D เรียบร้อยแล้ว", "success");
+                _cases = _cases.filter(c => c.id !== id);
+                renderDashboard();
 
-    } catch (e) {
-        console.error("8D Delete Error:", e);
-        toast("❌ Failed to delete report", "error");
-    }
+            } catch (e) {
+                console.error("8D Delete Error:", e);
+                toast("❌ เกิดข้อผิดพลาดในการลบรายงาน 8D", "error");
+            }
+        }
+    });
 }
 
 // ✅ Helper: แปลง rgb(...) หรือ hex ให้เป็น Hex 6 หลักสำหรับ PptxGenJS (ไม่มี #)
@@ -15797,6 +17387,8 @@ async function exportToPPTX(targetCaseId) {
 
 
 
+let _eightDScroller = null;
+
 function renderDashboard() {
     const tbody = document.getElementById('eight-d-list-body');
     const statTotal = document.getElementById('stat-8d-total');
@@ -15902,22 +17494,8 @@ function renderDashboard() {
         return idStr.includes(query) || titleStr.includes(query) || partStr.includes(query) || statusStr.includes(query);
     });
 
-    if (!tbody) return;
-
-    if (filteredCases.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="4" class="py-20 text-center text-slate-400">
-                    <div class="text-4xl mb-3 opacity-20">📂</div>
-                    <p class="text-[11px] font-black uppercase tracking-widest italic">${_cases.length === 0 ? 'No 8D Reports Found' : 'No Matching 8D Reports'}</p>
-                </td>
-            </tr>`;
-        return;
-    }
-
-    tbody.innerHTML = filteredCases.map(c => {
-        // คำนวณเปอร์เซ็นต์ความคืบหน้าตาม Status
-        // D1 = 12.5%, D2 = 25%, ..., D8 = 100%
+    function _build8DRow(c) {
+        const now = new Date();
         const statusUpper = (c.status || '').toUpperCase();
         const isD8Closed = statusUpper.includes('D8') || statusUpper.includes('CLOSED') || statusUpper.includes('COMPLETE');
 
@@ -15925,7 +17503,6 @@ function renderDashboard() {
         const stepNum = stepMatch ? parseInt(stepMatch[1], 10) : 1;
         const progressPct = Math.min(100, Math.max(12.5, (stepNum / 8) * 100));
 
-        // ⏱️ คำนวณ Timeline & Aging (ความเร็วคือหัวใจของ 8D: 3D <= 24 ชม., 8D <= 15 วัน)
         const createdAt = c.created_at ? new Date(c.created_at) : now;
         const diffMs = Math.max(0, now - createdAt);
         const openDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -15935,7 +17512,6 @@ function renderDashboard() {
         const isOverdue3D = !isD8Closed && stepNum <= 3 && (openDays >= 1 || openHours >= 24);
         const isWarning10D = !isD8Closed && openDays >= 10 && openDays < 15;
 
-        // Conditional row background for Deadline Alerts
         let rowClass = "group transition-all duration-300";
         let barColor = "from-blue-400 to-blue-600";
         let statusBadgeClass = "text-blue-600";
@@ -15960,7 +17536,6 @@ function renderDashboard() {
             rowClass += " hover:bg-blue-50/40";
         }
 
-        // Aging Badge HTML
         let agingBadgeHtml = "";
         if (isD8Closed) {
             agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Closed (${openDays}d)</span>`;
@@ -15978,7 +17553,6 @@ function renderDashboard() {
         
         return `
         <tr class="${rowClass}" data-rid="${c.id}">
-            <!-- คอลัมน์ ID & ประเภท & Aging Badge -->
             <td class="px-6 py-5">
                 <div class="flex flex-col gap-1.5">
                     <span class="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md w-fit tracking-tighter">CASE ID</span>
@@ -15987,7 +17561,6 @@ function renderDashboard() {
                 </div>
             </td>
 
-            <!-- คอลัมน์ รายละเอียดปัญหา -->
             <td class="px-6 py-5">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm shrink-0">
@@ -16012,14 +17585,12 @@ function renderDashboard() {
                 </div>
             </td>
 
-            <!-- คอลัมน์ สถานะและความคืบหน้า -->
             <td class="px-6 py-5">
                 <div class="flex flex-col gap-2 min-w-[140px]">
                     <div class="flex justify-between items-center">
                         <span class="text-[10px] uppercase tracking-widest ${statusBadgeClass}">${c.status}</span>
                         <span class="text-[10px] font-black text-slate-400">${Math.round(progressPct)}%</span>
                     </div>
-                    <!-- Progress Bar -->
                     <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
                         <div class="h-full bg-gradient-to-r ${barColor} rounded-full transition-all duration-1000" style="width: ${progressPct}%"></div>
                     </div>
@@ -16028,23 +17599,23 @@ function renderDashboard() {
 
             <td class="px-6 py-5 text-right">
                 <div class="flex justify-end gap-2">
-                    <button onclick="Wap8DSystem.openReport('${c.id}')" 
-                            class="h-9 px-4 bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-sm">
+                    <button  onclick="Wap8DSystem.openReport('${c.id}')" 
+                            class="h-9 px-4 bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-sm" title="Wap8 D System.Open Report" aria-label="Wap8 D System.Open Report">
                         OPEN REPORT
                     </button>
 
-                    <button onclick="Wap8DSystem.exportToPPTX('${c.id}')" 
+                    <button  onclick="Wap8DSystem.exportToPPTX('${c.id}')" 
                             class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-md shadow-emerald-100 flex items-center gap-1.5"
-                            title="Export 8D PowerPoint 100%">
+                            title="Export 8D PowerPoint 100%" aria-label="Wap8 D System.Export To P P T X">
                         <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                             <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                         <span>EXPORT PPTX</span>
                     </button>
 
-                    <button onclick="Wap8DSystem.deleteCase('${c.id}')" 
+                    <button  onclick="Wap8DSystem.deleteCase('${c.id}')" 
                             class="h-9 w-9 flex items-center justify-center bg-white border-2 border-slate-200 text-slate-400 hover:border-rose-500 hover:text-rose-500 rounded-xl transition-all duration-200 active:scale-95 shadow-sm"
-                            title="Delete Report">
+                            title="Delete Report" aria-label="Wap8 D System.Delete Case">
                         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                             <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
@@ -16052,8 +17623,25 @@ function renderDashboard() {
                 </div>
             </td>
         </tr>`;
-    }).join('');
-    if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
+    }
+
+    if (!tbody) return;
+
+    if (!_eightDScroller) {
+        _eightDScroller = new window.VirtualTableScroller({
+            containerId: 'eight-d-table-container',
+            tbodyId: 'eight-d-list-body',
+            rowHeight: 88,
+            columnsCount: 4,
+            rowBuilder: _build8DRow,
+            emptyHtml: `<tr><td colspan="4" class="py-20 text-center text-slate-400"><div class="text-4xl mb-3 opacity-20">📂</div><p class="text-[11px] font-black uppercase tracking-widest italic">${_cases.length === 0 ? 'No 8D Reports Found' : 'No Matching 8D Reports'}</p></td></tr>`,
+            onRenderComplete: () => {
+                if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
+            }
+        });
+    }
+
+    _eightDScroller.setItems(filteredCases);
 }
 
 /* ──────────────────────────────────────────
@@ -16384,7 +17972,7 @@ else if (_currentSlide === 2) {
                     </h3>
                     <div style="flex: 1; border: 2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; border-radius: 4px;">
                         ${supportImage 
-                            ? `<img src="${supportImage}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto;">` 
+                            ? `<img  src="${supportImage}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto;" alt="Image" title="Image">` 
                             : '<span style="color:#eee; font-size:40px; font-weight:900;">PHOTO AREA</span>'}
                     </div>
                 </div>
@@ -16451,7 +18039,7 @@ else if (_currentSlide === 3) {
                     <!-- ฝั่งซ้าย: รูปภาพขนาดใหญ่ พร้อมรักษาสัดส่วนภาพ (Aspect Ratio) -->
                     <div style="flex: 0 0 54%; border: 2.5px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: 4px;">
                         ${supportImage 
-                            ? `<img src="${supportImage}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto;">` 
+                            ? `<img  src="${supportImage}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto;" alt="Image" title="Image">` 
                             : '<span style="color:#cbd5e1; font-weight:900; font-size:24px; letter-spacing:1px;">NO EVIDENCE PHOTO</span>'
                         }
                     </div>
@@ -17406,8 +18994,8 @@ if (typeof window !== 'undefined') {
         updateMainGauge, updateOnlineBadge, loadStaffList, loadRecords, normalizeRecord,
         formToSupabase, writeAuditLog, deleteRecordFromCloud, cloudSyncAll, selectShift,
         isDuplicate, validateRef, handleJudgment, quickPickJudgment, refreshNeonGlow,
-        checkAnomaly, updateInputResetButton, resetInputForm, clearForm, submitEntry,
-        backgroundSync, syncAllPendingData, editRecord, cloneRecord, confirmDelete,
+        checkAnomaly, updateInputResetButton, resetInputForm, clearForm, confirmResetForm, submitEntry,
+        backgroundSync, syncAllPendingData, editRecord, cloneRecord, confirmDelete, showCustomConfirmDialog,
         showModal, closeModal, getFilteredRecords, filterTable, debounceSearch,
         get8DCaseForRecord, create8DFromClaimRecord, openReportFromRecord,
         clearFilterSearch, executeGlobalSearch, searchTable, buildRow, renderTable,
