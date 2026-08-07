@@ -143,20 +143,19 @@
 
             <div class="login-input-area">
     <div class="space-y-5">
-<!-- Email Input -->
-<div class="input-group">
-    <label class="input-tiny-label" for="login-email">Access Email</label>
-    <input type="email" id="login-email" class="premium-input" placeholder="name@carrier.com" oninput="validateEmail(this)" title="Name@Carrier.Com" aria-label="Name@Carrier.Com">
-</div>
-
-<!-- Password Input -->
-<div id="password-field" class="input-group relative">
-    <label class="input-tiny-label" for="login-pass">Security Key</label> 
-    <input type="password" id="login-pass" class="premium-input pr-12" placeholder="••••••••" onkeyup="checkCapsLock(event)" title="••••••••" aria-label="••••••••">
-</div>
-
-<!-- Remember Me Checkbox -->
-<input type="checkbox" id="remember-me" class="hidden" title="Remember Me" aria-label="Remember Me">
+        <!-- 1. Email Input พร้อม Real-time Validation -->
+        <div class="input-group">
+            <label class="input-tiny-label">Access Email</label>
+            <input  type="email" id="login-email" class="premium-input" placeholder="name@carrier.com" oninput="validateEmail(this)" title="Name@Carrier.Com" aria-label="Name@Carrier.Com">
+            <p id="email-hint" class="hidden text-[8px] mt-1 font-bold text-rose-400 uppercase tracking-tighter">โปรดระบุอีเมลองค์กรที่ถูกต้อง</p>
+        </div>
+        
+        <!-- 2. Password Input พร้อม Toggle & Caps Lock Detection -->
+        <div id="password-field" class="input-group relative">
+    <label class="input-tiny-label">Security Key</label>
+    <div class="relative">
+        <!-- ช่องกรอกรหัสผ่าน -->
+        <input  type="password" id="login-pass" class="premium-input pr-12" placeholder="••••••••" onkeyup="checkCapsLock(event)" title="••••••••" aria-label="••••••••">
         
         <!-- ปุ่มดวงตา (ใช้ SVG เพื่อความชัวร์) -->
         <button  type="button" onclick="togglePassVisibility()" class="absolute right-4 top-1/2 -translate-y-1/2 z-50 text-slate-400 hover:text-white transition-all" title="Toggle Password Visibility" aria-label="Toggle Password Visibility">
@@ -206,11 +205,9 @@
     <div id="dashboard-view" class="hidden-view flex h-screen overflow-hidden">
         <aside id="sidebar" class="bg-white relative">
     <!-- ปุ่ม Toggle ลอย -->
-<button class="float-toggle" onclick="toggleSidebar()" title="ย่อ/ขยาย" aria-label="Toggle Sidebar Menu">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path>
-    </svg>
-</button>
+    <button  class="float-toggle" onclick="toggleSidebar()" title="ย่อ/ขยาย" aria-label="Toggle Sidebar">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+    </button>
 
     <!-- Header -->
 <div class="sidebar-header-futuristic">
