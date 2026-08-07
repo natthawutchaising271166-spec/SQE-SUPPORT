@@ -1,13 +1,8 @@
-       
 html {
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-.scroll-invisible {
-    overflow:auto;scrollbar-width:none;-ms-overflow-style:none
-}
-        .scroll-invisible::-webkit-scrollbar {
-    display:none
+  -webkit-text-size-adjust: 100%; /* สำหรับ Safari และเบราว์เซอร์ตระกูล iOS */
+  -moz-text-size-adjust: 100%;    /* สำหรับ Firefox */
+  -ms-text-size-adjust: 100%;     /* สำหรับ Internet Explorer เก่า */
+  text-size-adjust: 100%;         /* มาตรฐานกลางสำหรับ Chrome, Edge และเบราว์เซอร์สมัยใหม่ */
 }
 
         
@@ -268,7 +263,7 @@ html {
 }
 
         .modal-overlay {
-    position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);animation:fadeIn .2s ease
+    position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);animation:fadeIn .2s ease
 }
         .modal-box {
     background:white;border-radius:16px;padding:28px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.15);animation:modalPop .25s ease;text-align:center
@@ -294,6 +289,7 @@ html {
     left: auto; /* ระยะห่างจากขอบขวา */
     transform: translateX(20px); /* ยกเลิกการตั้งค่ากึ่งกลางเดิม */
     background: rgba(37, 99, 235, 0.95);
+    -webkit-backdrop-filter: blur(4px); /* สีน้ำเงินโปร่งแสงนิดๆ */
     backdrop-filter: blur(4px); /* สีน้ำเงินโปร่งแสงนิดๆ */
     display: flex; /* จำกัดความกว้าง */
     align-items: center;
@@ -1237,6 +1233,7 @@ html {
     padding: clamp(6px, 0.8vh, 12px) clamp(10px, 1vw, 20px) !important;
     border-radius: clamp(10px, 1vh, 16px) !important;
     background: rgba(255, 255, 255, 0.75) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
     backdrop-filter: blur(12px) saturate(180%) !important;
     border: 1px solid rgba(255, 255, 255, 0.8) !important;
     box-shadow: 0 8px 32px rgba(31, 38, 135, 0.04) !important;
@@ -2120,8 +2117,8 @@ html {
            ========================================== */
         .support-toolbar {
             background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(12px) saturate(180%);
             -webkit-backdrop-filter: blur(12px) saturate(180%);
+            backdrop-filter: blur(12px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.9);
             border-radius: 14px;
             padding: 8px 12px;
@@ -2900,6 +2897,7 @@ html {
    ============================================================ */
 .glass-card {
     background: rgba(255, 255, 255, 0.8);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.5);
     box-shadow: 0 8px 32px rgba(31, 38, 135, 0.05);
@@ -3190,6 +3188,7 @@ html {
 /* Glass Card สำหรับ Legend */
 .legend-pill-cyber {
     background: rgba(255, 255, 255, 0.7);
+    -webkit-backdrop-filter: blur(5px);
     backdrop-filter: blur(5px);
     border: 1px solid rgba(226, 232, 240, 0.8);
     transition: all 0.3s ease;
@@ -4373,6 +4372,7 @@ html {
 /* --- ปรับปรุง User Panel ให้ดูพรีเมียมและมีมิติ --- */
 .user-panel-integrated {
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(241, 245, 249, 0.8) 100%); /* พื้นหลังแบบไล่เฉดสีน้ำเงินจางๆ พร้อมเอฟเฟกต์กระจก */
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.6); /* เพิ่มความฟุ้งแบบกระจกฝ้า */
     border-radius: 22px;
@@ -4886,6 +4886,7 @@ html {
     font-weight: 900;
     letter-spacing: 1px;
     background: rgba(255, 255, 255, 0.9);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     transition: all 0.4s ease;
@@ -5361,6 +5362,7 @@ body.dark-mode .user-panel-integrated {
     border-color: var(--dark-border);
     background: linear-gradient(145deg, #0f172a 0%, #020617 100%) !important;
     border: 1px solid #1e293b !important;
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 
                 inset 0 0 20px rgba(255, 255, 255, 0.02) !important;
@@ -6125,6 +6127,7 @@ body.dark-mode #line-support-logs-content {
 body.dark-mode .support-toolbar {
     background: rgba(15, 23, 42, 0.8) !important;
     border-color: #1e293b !important;
+    -webkit-backdrop-filter: blur(12px) !important;
     backdrop-filter: blur(12px) !important;
 }
 
@@ -6965,6 +6968,7 @@ body.dark-mode .apexcharts-text.apexcharts-datalabel {
 /* 1. พื้นหลัง Overlay (ฉากหลังฟุ้ง) */
 body.dark-mode .modal-overlay {
     background: rgba(2, 6, 23, 0.85) !important; /* ดำลึกโปร่งแสง */
+    -webkit-backdrop-filter: blur(10px) !important;
     backdrop-filter: blur(10px) !important;
 }
 
@@ -7390,8 +7394,8 @@ body {
 /* ปรับปรุง Glass Card ไม่ให้มี Margin ภายในที่ทำให้ดูห่างเกินไป */
 .glass-login-card {
     background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(35px) saturate(160%);
     -webkit-backdrop-filter: blur(35px) saturate(160%);
+    backdrop-filter: blur(35px) saturate(160%);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 28px;
     overflow: hidden;
@@ -7635,8 +7639,8 @@ body {
 .modern-glass-card {
     width: 100%;
     background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(30px) saturate(150%);
     -webkit-backdrop-filter: blur(30px) saturate(150%);
+    backdrop-filter: blur(30px) saturate(150%);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 35px;
     padding: 15px; /* เพิ่มความมนอีกเล็กน้อยให้ดูพรีเมียม */
@@ -7739,6 +7743,7 @@ body {
 .system-banner {
     position: fixed; top: 0; left: 0; right: 0; z-index: 1100;
     background: linear-gradient(90deg, rgba(37, 99, 235, 0.9), rgba(30, 64, 175, 0.9));
+    -webkit-backdrop-filter: blur(10px); color: white;
     backdrop-filter: blur(10px); color: white;
     padding: 8px 20px; display: flex; justify-content: space-between; align-items: center;
     border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -7898,6 +7903,7 @@ body {
     transform: translateY(-50%);
     width: 48px;
     background: rgba(255, 255, 255, 0.85);
+    -webkit-backdrop-filter: blur(15px);
     backdrop-filter: blur(15px);
     border: 1px solid rgba(226, 232, 240, 0.8);
     border-radius: 24px;
@@ -8216,6 +8222,7 @@ body.dark-mode .dock-item:hover .dock-label {
 /* --- Shared Components --- */
 .card-glass {
     background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 1.5rem;
@@ -11778,6 +11785,7 @@ body.dark-mode .sj-cyber-table thead th {
 
 .console-inner {
     background: rgba(255,255,255,0.03);
+    -webkit-backdrop-filter: blur(15px);
     backdrop-filter: blur(15px);
     border-radius: 22px;
     padding: 14px 24px;
@@ -14164,6 +14172,7 @@ body.dark-mode .toggle-slider {
     inset: 0;
     z-index: 10001; /* สูงกว่า Modal ปกติ */
     background: rgba(2, 6, 23, 0.92);
+    -webkit-backdrop-filter: blur(15px);
     backdrop-filter: blur(15px);
     display: flex;
     align-items: center;
@@ -14547,6 +14556,7 @@ body.dark-mode .f-part-spinner {
 
 .cyber-kpi-card {
     background: rgba(15, 23, 42, 0.85);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(30, 41, 59, 0.8);
     border-radius: 16px;
@@ -14669,6 +14679,7 @@ body.dark-mode #admin-table-body tr:hover {
 
 .cyber-kpi-v3 {
     background: rgba(15, 23, 42, 0.6);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-left: 4px solid var(--accent-color);
@@ -15056,6 +15067,7 @@ body.dark-mode #admin-table-body tr:hover {
 /* บังคับ Tooltip ของ ApexCharts ให้เป็น HUD Style */
 .apexcharts-tooltip {
     background: rgba(5, 10, 20, 0.9) !important; /* พื้นหลังดำน้ำเงิน */
+    -webkit-backdrop-filter: blur(10px) !important;
     backdrop-filter: blur(10px) !important;
     border: 1px solid rgba(0, 242, 255, 0.3) !important; /* ขอบฟ้า Cyan */
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8) !important;
@@ -15085,6 +15097,7 @@ body.dark-mode #admin-table-body tr:hover {
 /* บังคับ Tooltip ให้เป็นโทนมืดสนิท */
 .apexcharts-tooltip {
     background: rgba(10, 15, 25, 0.95) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
     backdrop-filter: blur(10px) !important;
     border: 1px solid rgba(0, 242, 255, 0.2) !important;
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8) !important;
@@ -15156,6 +15169,7 @@ body.dark-mode .cyber-table-row.kbd-row-selected {
     border-radius: 6px;
     border: 1px solid #e2e8f0;
     letter-spacing: 0.03em;
+    -webkit-user-select: none;
     user-select: none;
 }
 
