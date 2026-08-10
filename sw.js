@@ -1,5 +1,5 @@
 // อัปเดตเวอร์ชันแคชใหม่
-const CACHE_NAME = 'sqe-portal-v2.5'; 
+const CACHE_NAME = 'sqe-portal-v2.6'; 
 
 const urlsToCache = [
   './',

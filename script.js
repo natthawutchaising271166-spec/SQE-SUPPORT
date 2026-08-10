@@ -5064,11 +5064,13 @@ function formToSupabase(rec) {
 
 async function writeAuditLog(action, details) {
     try {
-        await sqeClient.from('audit_logs').insert([{
-            user_email: S.currentUser || 'System', // ใครทำ
-            action: action,                        // ทำอะไร (INSERT, DELETE, etc.)
-            details: details                       // รายละเอียดคืออะไร (จุดที่คุณถาม)
+        if (!sqeClient) return;
+        const { error } = await sqeClient.from('audit_logs').insert([{
+            user_email: S.currentUser || 'System',
+            action: action,
+            details: details
         }]);
+        if (error) console.warn("[Audit Log] Supabase Insert Error:", error.message || error);
     } catch (e) { console.error("Audit Error:", e); }
 }
 
@@ -9615,6 +9617,17 @@ const WapSupportLogs = (function () {
         };
     }
 
+    function _safeTime(d) {
+        if (!d) return 0;
+        if (typeof d === 'number') return d;
+        let s = String(d).trim();
+        if (s.includes(' ') && !s.includes('T')) s = s.replace(' ', 'T');
+        const t = new Date(s).getTime();
+        return isNaN(t) ? 0 : t;
+    }
+
+    let _scrollRaf = null;
+
     function _cacheDom() {
         $.tbody       = document.getElementById('tableBody');
         $.count       = document.getElementById('caseCount');
@@ -9622,6 +9635,18 @@ const WapSupportLogs = (function () {
         $.filterGrp   = document.getElementById('filterGroup');
         $.scrollArea  = document.getElementById('tableScrollArea');
         $.contentArea = document.getElementById('line-support-logs-content');
+
+        if ($.scrollArea && !$.scrollArea._vsAttached) {
+            $.scrollArea._vsAttached = true;
+            $.scrollArea.addEventListener('scroll', () => {
+                if (!_scrollRaf) {
+                    _scrollRaf = requestAnimationFrame(() => {
+                        _scrollRaf = null;
+                        _render(true);
+                    });
+                }
+            }, { passive: true });
+        }
     }
 
     async function _fetch() {
@@ -9629,9 +9654,26 @@ const WapSupportLogs = (function () {
         _fetching = true;
         const myToken = ++_fetchToken;
         try {
-            const { data, error } = await wapClient
+            if (!_user) {
+                _user = (S.userRole === 'supervisor') ? S.viewingUser : S.currentUser;
+            }
+            let data = null;
+            let error = null;
+
+            // ลองสั่งดึงข้อมูลด้วย event_date เป็นหลัก
+            const res1 = await wapClient
                 .from(TABLE).select('*').eq('user_id', _user)
-                .order('created_at', { ascending: false });
+                .order('event_date', { ascending: false });
+
+            if (res1.error) {
+                console.warn('[WapSupport] event_date order failed, retrying without order:', res1.error);
+                const res2 = await wapClient.from(TABLE).select('*').eq('user_id', _user);
+                data = res2.data;
+                error = res2.error;
+            } else {
+                data = res1.data;
+            }
+
             if (error) throw error;
             if (myToken !== _fetchToken || !_alive) return;
             _records = (data || []).map(_fromDb);
@@ -9639,8 +9681,13 @@ const WapSupportLogs = (function () {
         } catch (e) {
             console.error('[WapSupport] Fetch error:', e);
             if (myToken === _fetchToken && _alive) {
-                toast('⚠️ โหลดข้อมูล Support ไม่สำเร็จ: ' + (e.message || ''), 'error');
-                _records = [];
+                // สำรองกรณีเกิด Error ให้ดึงจาก S.wapData.achievements ที่ดึงมาแล้วได้
+                if (Array.isArray(S.wapData?.achievements) && S.wapData.achievements.length > 0) {
+                    _records = S.wapData.achievements.map(_fromDb);
+                } else {
+                    toast('⚠️ โหลดข้อมูล Support ไม่สำเร็จ: ' + (e.message || ''), 'error');
+                    _records = [];
+                }
                 _render();
             }
         } finally {
@@ -9649,7 +9696,11 @@ const WapSupportLogs = (function () {
     }
 
     function applyDateFilter() {
-        if (!_alive) return;
+        if (!_alive) {
+            const targetUser = (S.userRole === 'supervisor') ? S.viewingUser : S.currentUser;
+            init(targetUser);
+            return;
+        }
         const start = document.getElementById('cd-start-date')?.value;
         const end = document.getElementById('cd-end-date')?.value;
         let temp = [..._records];
@@ -9674,10 +9725,10 @@ const WapSupportLogs = (function () {
                 return directMatch || (cleanKw.length > 3 && fuzzyMatch);
             });
         }
-        // เรียงข้อมูลตามวันที่บันทึกล่าสุดลงไปเสมอ
+        // เรียงข้อมูลตามวันที่บันทึกล่าสุดลงไปเสมอ - ปลอดภัยบน Safari / iOS
         temp.sort((a, b) => {
-            const timeA = new Date(a.createdAt || a.eventDate || 0).getTime() || 0;
-            const timeB = new Date(b.createdAt || b.eventDate || 0).getTime() || 0;
+            const timeA = _safeTime(a.createdAt || a.eventDate);
+            const timeB = _safeTime(b.createdAt || b.eventDate);
             if (timeA !== timeB) return timeB - timeA;
             return String(b.id || '').localeCompare(String(a.id || ''));
         });
@@ -9686,7 +9737,29 @@ const WapSupportLogs = (function () {
         _render();
     }
 
-    function _render() {
+    function _render(fromScroll = false) {
+        // Re-cache DOM elements if lost or detached
+        if (!$.tbody || !document.body.contains($.tbody)) {
+            $.tbody = document.getElementById('tableBody');
+        }
+        if (!$.count || !document.body.contains($.count)) {
+            $.count = document.getElementById('caseCount');
+        }
+        if (!$.scrollArea || !document.body.contains($.scrollArea)) {
+            $.scrollArea = document.getElementById('tableScrollArea');
+            if ($.scrollArea && !$.scrollArea._vsAttached) {
+                $.scrollArea._vsAttached = true;
+                $.scrollArea.addEventListener('scroll', () => {
+                    if (!_scrollRaf) {
+                        _scrollRaf = requestAnimationFrame(() => {
+                            _scrollRaf = null;
+                            _render(true);
+                        });
+                    }
+                }, { passive: true });
+            }
+        }
+
         if (!$.tbody) return;
 
         if ($.count) $.count.textContent = _filtered.length + ' Case Logs';
@@ -9696,17 +9769,46 @@ const WapSupportLogs = (function () {
             return;
         }
 
-        const htmlRows = _filtered.map((item, index) => {
+        const totalRows = _filtered.length;
+        const ROW_HEIGHT = 48; // Estimated average row height in px
+        const OVERSCAN = 8;    // Extra rows above/below viewport
+
+        let startIndex = 0;
+        let endIndex = totalRows;
+        let topSpacerPx = 0;
+        let bottomSpacerPx = 0;
+
+        // Virtual windowing if total rows > 25
+        if (totalRows > 25 && $.scrollArea) {
+            const scrollTop = $.scrollArea.scrollTop || 0;
+            const clientHeight = $.scrollArea.clientHeight || 600;
+
+            startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+            endIndex = Math.min(totalRows, Math.ceil((scrollTop + clientHeight) / ROW_HEIGHT) + OVERSCAN);
+
+            topSpacerPx = startIndex * ROW_HEIGHT;
+            bottomSpacerPx = (totalRows - endIndex) * ROW_HEIGHT;
+        }
+
+        let htmlRows = '';
+
+        if (topSpacerPx > 0) {
+            htmlRows += `<tr class="vs-spacer" style="height:${topSpacerPx}px; border:none; background:transparent;"><td colspan="10" style="padding:0; border:none; height:${topSpacerPx}px;"></td></tr>`;
+        }
+
+        const visibleSlice = _filtered.slice(startIndex, endIndex);
+        htmlRows += visibleSlice.map((item, relIndex) => {
+            const index = startIndex + relIndex;
             const total = (Number(item.ok) || 0) + (Number(item.ng) || 0);
             const ngRate = total > 0 ? Math.round((item.ng / total) * 100) : 0;
-            const delay = index < 15 ? (index * 0.04).toFixed(2) : 0;
+            const delay = !fromScroll && index < 15 ? (index * 0.04).toFixed(2) : 0;
 
             let statusCls = 'status-sf';
             if (item.report === 'RP') statusCls = 'status-vendor';
             if (item.report === 'RECORDS') statusCls = 'status-ctc';
 
             return `
-                <tr style="animation-delay: ${delay}s" data-rid="${item.id}">
+                <tr style="${delay ? `animation-delay: ${delay}s` : ''}" data-rid="${item.id}">
                     <td class="col-date">${item.eventDate || '-'}</td>
                     <td class="col-problem">
                         <div class="col-problem">
@@ -9741,8 +9843,12 @@ const WapSupportLogs = (function () {
                 </tr>`;
         }).join('');
 
+        if (bottomSpacerPx > 0) {
+            htmlRows += `<tr class="vs-spacer" style="height:${bottomSpacerPx}px; border:none; background:transparent;"><td colspan="10" style="padding:0; border:none; height:${bottomSpacerPx}px;"></td></tr>`;
+        }
+
         $.tbody.innerHTML = htmlRows;
-        if (typeof window.animateTableRows === 'function') {
+        if (!fromScroll && typeof window.animateTableRows === 'function') {
             window.animateTableRows($.tbody, { y: 6, duration: 0.28, stagger: 0.02, ease: 'power2.out' });
         }
         if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
@@ -10780,12 +10886,23 @@ function _openViewModal(id) {
 
 
     function _fromDb(r) {
+        if (!r) return _blankRecord();
+        const okVal = parseFloat(String(r.ok_qty ?? r.ok ?? 0).replace(/,/g, '')) || 0;
+        const ngVal = parseFloat(String(r.ng_qty ?? r.ng ?? 0).replace(/,/g, '')) || 0;
         return {
-            id: r.id, problem: r.problem || '', action: r.action || 'Rework',
-            part: r.part || '-', lot: r.lot || '-', ok: Number(r.ok_qty) || 0,
-            ng: Number(r.ng_qty) || 0, report: r.report_type || 'VF',
-            remark: r.remark || '', eventDate: r.event_date || '', imageUrl: r.image_url || null, _user: r.user_id,
-            createdAt: r.created_at || r.createdAt || r.event_date || ''
+            id: r.id,
+            problem: r.problem || '',
+            action: r.action || 'Rework',
+            part: r.part || '-',
+            lot: r.lot || '-',
+            ok: okVal,
+            ng: ngVal,
+            report: r.report_type || r.report || 'VF',
+            remark: r.remark || '',
+            eventDate: r.event_date || r.eventDate || '',
+            imageUrl: r.image_url || r.imageUrl || null,
+            _user: r.user_id || r._user || '',
+            createdAt: r.created_at || r.createdAt || r.event_date || r.eventDate || ''
         };
     }
 
@@ -11884,7 +12001,7 @@ function triggerGlobalRefresh() {
             updateAttKPI();
         }
         else if (isSupport) {
-            WapSupportLogs.applyDateFilter(); // ใช้ applyDateFilter แทน init เพื่อไม่ให้ fetch ซ้ำ
+            WapSupportLogs.init(targetUser);
         }
         else if (is5S) {
             Wap5SExcellence.renderAll(); // เปลี่ยนจาก fetchRecords -> renderAll
