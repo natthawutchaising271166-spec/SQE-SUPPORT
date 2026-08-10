@@ -43,6 +43,40 @@ window.unlockMaintenanceForAdmin = function() {
 };
 
 /* ============================================================
+   GLOBAL IMAGE SANITIZATION & FALLBACK UTILITIES
+   Ensures robust rendering across all devices, browsers & networks
+   ============================================================ */
+window.SVG_IMAGE_ERROR_PLACEHOLDER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200" fill="%230f172a"><rect width="300" height="200" fill="%231e293b" rx="8"/><path d="M100 130l30-40 25 30 25-20 30 30H100z" fill="%23334155"/><circle cx="120" cy="80" r="12" fill="%23334155"/><text x="150" y="165" font-family="sans-serif" font-size="11" font-weight="bold" fill="%2394a3b8" text-anchor="middle">IMAGE UNREACHABLE / NO PREVIEW</text></svg>';
+
+window.handleImgError = function handleImgError(img) {
+    if (!img) return;
+    img.onerror = null;
+    img.src = window.SVG_IMAGE_ERROR_PLACEHOLDER;
+};
+
+window.formatImageUrl = function formatImageUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    let trimmed = url.trim();
+    if (!trimmed || trimmed === 'null' || trimmed === 'undefined' || trimmed === '[object Object]') return '';
+    
+    // 1. Raw Base64 string missing header
+    if (/^[A-Za-z0-9+/=]+$/.test(trimmed) && trimmed.length > 80) {
+        if (trimmed.startsWith('/9j/')) return 'data:image/jpeg;base64,' + trimmed;
+        if (trimmed.startsWith('iVBORw0KGgo')) return 'data:image/png;base64,' + trimmed;
+        if (trimmed.startsWith('R0lGOD')) return 'data:image/gif;base64,' + trimmed;
+        if (trimmed.startsWith('UklGR')) return 'data:image/webp;base64,' + trimmed;
+        return 'data:image/png;base64,' + trimmed;
+    }
+    
+    // 2. Upgrade http to https when running under secure https context to prevent Mixed Content Block
+    if (window.location.protocol === 'https:' && trimmed.startsWith('http://')) {
+        trimmed = 'https://' + trimmed.slice(7);
+    }
+    
+    return trimmed;
+};
+
+/* ============================================================
    UNIVERSAL VIRTUAL SCROLLING ENGINE (V8.0)
    High performance virtual renderer for large datasets
    ============================================================ */
@@ -5021,7 +5055,15 @@ async function loadRecords() {
             if (error) throw error;
             
             // อัปเดตข้อมูลลง Global State
-            S.records = (data || []).map(normalizeRecord);
+            const normalized = (data || []).map(normalizeRecord);
+            S.records = normalized;
+
+            // สำรองข้อมูลลง Local Storage เพื่อรองรับอุปกรณ์หรือเครือข่ายที่มีปัญหา
+            try {
+                localStorage.setItem(`carrier_records_backup_${targetUser}`, JSON.stringify(normalized.slice(0, 300)));
+            } catch (err) {
+                console.warn('[LocalStorage Backup Quota Exceeded]', err);
+            }
 
             // ดึงข้อมูลเคส 8D ล่าสุดเพื่อเทียบสถานะ
             if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
@@ -5036,30 +5078,53 @@ async function loadRecords() {
             renderTable();
             return;
         } catch (e) {
+            console.error('[loadRecords Fetch Error]', e);
             toast(getFriendlyErrorMessage(e), 'error');
         }
     }
-    // กรณีออฟไลน์หรือไม่มีข้อมูล
+
+    // กรณีออฟไลน์ เกิด Network Error หรือ Supabase โดนบล็อกในเครื่องนั้นๆ: ดึงจาก Backup Memory
+    try {
+        const backupStr = localStorage.getItem(`carrier_records_backup_${targetUser}`);
+        if (backupStr) {
+            const backupData = JSON.parse(backupStr);
+            if (Array.isArray(backupData) && backupData.length > 0) {
+                S.records = backupData;
+                toast('📦 โหลดข้อมูลเคสจากหน่วยความจำสำรองในเครื่องเรียบร้อย', 'info');
+                renderTable();
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn('[Backup Load Error]', e);
+    }
+
     S.records = [];
     renderTable();
 }
 
 function normalizeRecord(r) {
+    if (!r) return { id: '', date: '', shift: 'SHIFT A', line: '', ref: '', supplier: '', partNo: '', partName: '', qty: 0, unit: 'PCS', defect: '', remark: '', judgment: '', inspector: '', imageUrl: '', created_at: '' };
+    const rawImg = r.imageUrl || r.image_url || r.evidence_img || r.image || r.evidence || '';
     return {
         id: r.id, date: r.date || '', shift: r.shift || 'SHIFT A', line: r.line || '', ref: r.ref || '',
         supplier: r.supplier || '', partNo: r.partNo || '', partName: r.partName || '',
         qty: r.qty || 0, unit: r.unit || 'PCS', defect: r.defect || '', remark: r.remark || '', judgment: r.judgment || '',
         inspector: r.inspector || '',
+        imageUrl: typeof formatImageUrl === 'function' ? formatImageUrl(rawImg) : rawImg,
+        sync_status: r.sync_status || 'synced',
         created_at: r.created_at || r.createdAt || r.full_timestamp || r.date || ''
     };
 }
 
 function formToSupabase(rec) {
-    return {
+    const obj = {
         id: rec.id, date: rec.date, shift: rec.shift, line: rec.line, ref: rec.ref, supplier: rec.supplier,
         partNo: rec.partNo, partName: rec.partName, qty: parseInt(rec.qty) || 0, unit: rec.unit,
         defect: rec.defect, remark: rec.remark, judgment: rec.judgment, inspector: rec.inspector
     };
+    if (rec.created_at) obj.created_at = rec.created_at;
+    return obj;
 }
 
 async function writeAuditLog(action, details) {
@@ -5123,6 +5188,7 @@ function selectShift(btn, val) {
     S.selectedShift = val;
     document.querySelectorAll('.shift-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    if (typeof triggerClaimFormAutoDraft === 'function') triggerClaimFormAutoDraft();
 }
 
 function isDuplicate(refVal) {
@@ -5340,6 +5406,7 @@ function resetInputForm() {
     closeAllAC();
     if (document.activeElement) document.activeElement.blur();
     refreshNeonGlow();
+    if (typeof clearClaimFormDraft === 'function') clearClaimFormDraft();
 }
 
 
@@ -5377,6 +5444,9 @@ async function submitEntry() {
     btn.style.opacity = '0.7';
 
     const recordId = S.editingId || generateUUID();
+    const existingRow = S.editingId ? S.records.find(r => String(r.id) === String(S.editingId)) : null;
+    const originalCreatedAt = existingRow ? (existingRow.created_at || existingRow.createdAt) : null;
+
     const rowData = {
         id: recordId, 
         date: selectedDate, 
@@ -5392,7 +5462,8 @@ async function submitEntry() {
         remark: $id('f-remark').value.trim(),
         judgment: jdgSel.value, 
         inspector: S.currentUser,
-        sync_status: 'pending' 
+        sync_status: 'pending',
+        created_at: originalCreatedAt || new Date().toISOString()
     };
 
     try {
@@ -5970,16 +6041,221 @@ function closeModal() {
     if (root) root.innerHTML = '';
 }
 
+const THAI_MONTHS_SHORT = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const THAI_MONTHS_FULL  = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+const ENG_MONTHS_SHORT   = ['', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const ENG_MONTHS_FULL    = ['', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+
+function parseRecordDateComponents(dateStr) {
+    if (!dateStr) return null;
+    if (typeof dateStr !== 'string') dateStr = String(dateStr);
+    
+    // Check YYYY-MM-DD or YYYY/MM/DD
+    const matchYMD = dateStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (matchYMD) {
+        return {
+            year: parseInt(matchYMD[1], 10),
+            month: parseInt(matchYMD[2], 10),
+            day: parseInt(matchYMD[3], 10)
+        };
+    }
+    // Check DD/MM/YYYY or DD-MM-YYYY
+    const matchDMY = dateStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (matchDMY) {
+        return {
+            year: parseInt(matchDMY[3], 10),
+            month: parseInt(matchDMY[2], 10),
+            day: parseInt(matchDMY[1], 10)
+        };
+    }
+    // Fallback to standard JS Date
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+        return {
+            year: d.getFullYear(),
+            month: d.getMonth() + 1,
+            day: d.getDate()
+        };
+    }
+    return null;
+}
+
+function getRecordDateVariants(record) {
+    const rawDate = record.date || record.created_at || '';
+    const comp = parseRecordDateComponents(rawDate);
+    if (!comp) return [String(rawDate).toLowerCase()];
+
+    const y = comp.year;
+    const m = comp.month;
+    const d = comp.day;
+
+    const yBE = y > 2400 ? y : y + 543;
+    const yAD = y > 2400 ? y - 543 : y;
+    const shortYAD = String(yAD).slice(-2);
+    const shortYBE = String(yBE).slice(-2);
+
+    const dd = String(d).padStart(2, '0');
+    const mm = String(m).padStart(2, '0');
+
+    const thaiShortM = THAI_MONTHS_SHORT[m] || '';
+    const thaiCleanM = thaiShortM.replace(/\./g, '');
+    const thaiFullM  = THAI_MONTHS_FULL[m] || '';
+    const engShortM  = ENG_MONTHS_SHORT[m] || '';
+    const engFullM   = ENG_MONTHS_FULL[m] || '';
+
+    const variants = new Set([
+        // ISO
+        `${yAD}-${mm}-${dd}`, `${yAD}/${mm}/${dd}`, `${yAD}${mm}${dd}`,
+        // DMY AD
+        `${dd}/${mm}/${yAD}`, `${d}/${m}/${yAD}`, `${dd}-${mm}-${yAD}`, `${d}-${m}-${yAD}`, `${dd}.${mm}.${yAD}`,
+        `${dd}/${mm}/${shortYAD}`, `${d}/${m}/${shortYAD}`, `${dd}-${mm}-${shortYAD}`, `${d}-${m}-${shortYAD}`,
+        // DMY BE
+        `${dd}/${mm}/${yBE}`, `${d}/${m}/${yBE}`, `${dd}-${mm}-${yBE}`, `${d}-${m}-${yBE}`,
+        `${dd}/${mm}/${shortYBE}`, `${d}/${m}/${shortYBE}`, `${dd}-${mm}-${shortYBE}`, `${d}-${m}-${shortYBE}`,
+        `${yBE}-${mm}-${dd}`, `${yBE}/${mm}/${dd}`,
+        // DM Short
+        `${d}/${m}`, `${dd}/${mm}`, `${d}-${m}`, `${dd}-${mm}`,
+        // English
+        `${d} ${engShortM} ${yAD}`, `${dd} ${engShortM} ${yAD}`, `${d} ${engShortM} ${shortYAD}`, `${dd} ${engShortM} ${shortYAD}`,
+        `${d} ${engShortM}'${shortYAD}`, `${dd} ${engShortM}'${shortYAD}`, `${d} ${engShortM}`, `${dd} ${engShortM}`,
+        `${engShortM} ${d}`, `${engShortM} ${yAD}`, `${engShortM} ${shortYAD}`, `${engShortM}'${shortYAD}`, engShortM,
+        `${d} ${engFullM} ${yAD}`, `${dd} ${engFullM} ${yAD}`, `${d} ${engFullM}`, `${dd} ${engFullM}`, engFullM,
+        // Thai Short
+        `${d} ${thaiShortM} ${yBE}`, `${dd} ${thaiShortM} ${yBE}`, `${d} ${thaiShortM} ${shortYBE}`, `${dd} ${thaiShortM} ${shortYBE}`,
+        `${d} ${thaiShortM} ${yAD}`, `${dd} ${thaiShortM} ${yAD}`, `${d} ${thaiShortM} ${shortYAD}`, `${dd} ${thaiShortM} ${shortYAD}`,
+        `${d} ${thaiShortM}`, `${dd} ${thaiShortM}`, `${thaiShortM} ${yBE}`, `${thaiShortM} ${shortYBE}`, thaiShortM,
+        // Thai Clean (without dot)
+        `${d} ${thaiCleanM} ${yBE}`, `${dd} ${thaiCleanM} ${yBE}`, `${d} ${thaiCleanM} ${shortYBE}`, `${dd} ${thaiCleanM} ${shortYBE}`,
+        `${d} ${thaiCleanM} ${yAD}`, `${dd} ${thaiCleanM} ${yAD}`, `${d} ${thaiCleanM} ${shortYAD}`, `${dd} ${thaiCleanM} ${shortYAD}`,
+        `${d} ${thaiCleanM}`, `${dd} ${thaiCleanM}`, `${thaiCleanM} ${yBE}`, `${thaiCleanM} ${shortYBE}`, thaiCleanM,
+        // Thai Full
+        `${d} ${thaiFullM} ${yBE}`, `${dd} ${thaiFullM} ${yBE}`, `${d} ${thaiFullM} ${yAD}`, `${dd} ${thaiFullM} ${yAD}`,
+        `${d} ${thaiFullM}`, `${dd} ${thaiFullM}`, `${thaiFullM} ${yBE}`, `${thaiFullM} ${yAD}`, thaiFullM,
+        // Years alone
+        String(yAD), String(yBE), String(shortYAD), String(shortYBE),
+        // Raw string
+        String(rawDate).toLowerCase()
+    ]);
+
+    // Relative dates
+    const now = new Date();
+    const recDate = new Date(yAD, m - 1, d);
+    
+    if (now.getFullYear() === yAD && now.getMonth() === (m - 1) && now.getDate() === d) {
+        variants.add('วันนี้'); variants.add('today');
+    }
+    
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (yesterday.getFullYear() === yAD && yesterday.getMonth() === (m - 1) && yesterday.getDate() === d) {
+        variants.add('เมื่อวาน'); variants.add('เมื่อวานนี้'); variants.add('yesterday');
+    }
+
+    const firstDayOfWeek = new Date(now);
+    firstDayOfWeek.setDate(now.getDate() - now.getDay());
+    firstDayOfWeek.setHours(0,0,0,0);
+    const lastDayOfWeek = new Date(firstDayOfWeek);
+    lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
+    lastDayOfWeek.setHours(23,59,59,999);
+
+    if (recDate >= firstDayOfWeek && recDate <= lastDayOfWeek) {
+        variants.add('อาทิตย์นี้'); variants.add('สัปดาห์นี้'); variants.add('this week');
+    }
+
+    if (now.getFullYear() === yAD && now.getMonth() === (m - 1)) {
+        variants.add('เดือนนี้'); variants.add('this month');
+    }
+
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    if (lastMonth.getFullYear() === yAD && lastMonth.getMonth() === (m - 1)) {
+        variants.add('เดือนที่แล้ว'); variants.add('last month');
+    }
+
+    if (now.getFullYear() === yAD) {
+        variants.add('ปีนี้'); variants.add('this year');
+    }
+
+    return Array.from(variants).map(v => v.toLowerCase());
+}
+
+function smartMatchRecord(r, query) {
+    if (!query) return true;
+    const cleanKwd = query.trim().toLowerCase();
+    if (!cleanKwd) return true;
+
+    // 1. Qty Operator search: >10, <=5, =100
+    const qtyMatch = cleanKwd.match(/^([<>]=?|=)(\d+)$/);
+    if (qtyMatch) {
+        const op = qtyMatch[1];
+        const val = parseInt(qtyMatch[2], 10);
+        const rQty = parseInt(r.qty, 10) || 0;
+        if (op === '>') return rQty > val;
+        if (op === '<') return rQty < val;
+        if (op === '>=') return rQty >= val;
+        if (op === '<=') return rQty <= val;
+        if (op === '=') return rQty === val;
+    }
+
+    // 2. Line prefix: line:lc3 or l:lc3
+    const lineMatch = cleanKwd.match(/^(line|l):([\w-]+)$/i);
+    if (lineMatch) {
+        const targetLine = lineMatch[2].toLowerCase();
+        return (r.line || '').toLowerCase().includes(targetLine);
+    }
+
+    // 3. Status/Judgment prefix: is:sf or status:vendor
+    const statusMatch = cleanKwd.match(/^(is|status):([\w\s]+)$/i);
+    if (statusMatch) {
+        const targetStatus = statusMatch[2].toLowerCase();
+        if (targetStatus === '8d') {
+            return !!get8DCaseForRecord(r);
+        }
+        return (r.judgment || '').toLowerCase().includes(targetStatus);
+    }
+
+    // 4. Multi-token general search
+    const dateVariants = getRecordDateVariants(r);
+    const has8D = get8DCaseForRecord(r);
+    const eightDId = has8D ? String(has8D.id).toLowerCase() : '';
+    const eightDStatus = has8D ? String(has8D.status || '').toLowerCase() : '';
+
+    const textFields = [
+        String(r.id || '').toLowerCase(),
+        String(r.ref || '').toLowerCase(),
+        String(r.shift || '').toLowerCase(),
+        String(r.line || '').toLowerCase(),
+        String(r.supplier || '').toLowerCase(),
+        String(r.partNo || '').toLowerCase(),
+        String(r.partName || r.category || '').toLowerCase(),
+        String(r.defect || '').toLowerCase(),
+        String(r.qty || '').toLowerCase(),
+        String(r.unit || '').toLowerCase(),
+        String(r.judgment || '').toLowerCase(),
+        String(r.problem || r.action || '').toLowerCase(),
+        String(r.remark || '').toLowerCase(),
+        String(r.inspector || '').toLowerCase(),
+        eightDId,
+        eightDStatus,
+        has8D ? '8d' : '',
+        has8D ? 'มี 8d' : 'ไม่มี 8d'
+    ];
+
+    const allSearchableBlob = textFields.join(' ') + ' ' + dateVariants.join(' ');
+
+    if (allSearchableBlob.includes(cleanKwd)) {
+        return true;
+    }
+
+    const tokens = cleanKwd.split(/\s+/).filter(Boolean);
+    return tokens.every(token => {
+        const cleanToken = token.replace(/[\.]/g, '');
+        return allSearchableBlob.includes(token) || allSearchableBlob.replace(/[\.]/g, '').includes(cleanToken);
+    });
+}
+
 function getFilteredRecords() {
     let filtered = S.records;
     
-    // --- เพิ่มการกรองตามวันที่จาก Header ---
-    const start = ''; 
-    const end = '';
-    if (start && end) {
-        filtered = filtered.filter(r => r.date >= start && r.date <= end);
-    }
-
     // กรองตาม Judgment หรือ 8D Status
     if (S.activeFilter === '8D_HAS') {
         filtered = filtered.filter(r => !!get8DCaseForRecord(r));
@@ -5989,22 +6265,11 @@ function getFilteredRecords() {
         filtered = filtered.filter(r => r.judgment === S.activeFilter);
     }
     
-    // กรองตามคำค้นหา
+    // กรองตามคำค้นหาอัจฉริยะ (Smart Search Keyword)
     if (S.searchKeyword) {
-        const kw = S.searchKeyword.toLowerCase();
-        filtered = filtered.filter(r => {
-            const has8D = get8DCaseForRecord(r);
-            const eightDId = has8D ? String(has8D.id).toLowerCase() : '';
-            return (r.ref || '').toLowerCase().includes(kw) ||
-                (r.partNo || '').toLowerCase().includes(kw) ||
-                (r.partName || '').toLowerCase().includes(kw) ||
-                (r.supplier || '').toLowerCase().includes(kw) ||
-                (r.defect || '').toLowerCase().includes(kw) ||
-                (r.line || '').toLowerCase().includes(kw) ||
-                (r.remark || '').toLowerCase().includes(kw) ||
-                eightDId.includes(kw);
-        });
+        filtered = filtered.filter(r => smartMatchRecord(r, S.searchKeyword));
     }
+
     // เรียงลำดับจากวันที่ที่บันทึกล่าสุดเรียงลงไปเสมอ
     filtered.sort((a, b) => {
         const timeA = new Date(a.created_at || a.date || 0).getTime() || 0;
@@ -6021,7 +6286,6 @@ function filterTable(filter, btnEl) {
     document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
     if (btnEl) btnEl.classList.add('active');
 
-    
     renderTable();
 }
 
@@ -6044,19 +6308,9 @@ function debounceSearch() {
         return;
     }
 
-    const container = $id('table-container');
-    if (container) {
-        container.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full py-20 text-slate-400">
-                <div class="spinner spinner-dark mb-3"></div>
-                <p class="text-[11px] font-bold uppercase tracking-widest italic">Searching Cloud Database...</p>
-            </div>
-        `;
-    }
-
     searchTimer = setTimeout(() => {
         executeGlobalSearch(kw);
-    }, 400);
+    }, 200);
 }
 
 function clearFilterSearch() {
@@ -6069,70 +6323,39 @@ function clearFilterSearch() {
 }
 
 async function executeGlobalSearch(keyword) {
-    if (!navigator.onLine) { toast('⚠️ Offline Mode', 'error'); return; }
     const sb = getSupabase();
     const container = $id('table-container');
-    const cleanKwd = keyword.trim().toLowerCase();
-    
-    if (container) {
-        container.innerHTML = `<div class="flex flex-col items-center justify-center h-full py-20 text-slate-400"><div class="spinner spinner-dark mb-3"></div><p class="text-[11px] font-black uppercase italic">AI Scanning Cloud Database...</p></div>`;
-    }
+    const cleanKwd = keyword ? keyword.trim() : '';
+
+    S.searchKeyword = cleanKwd;
 
     try {
         const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-        let query = sb.from('records').select('*').eq('inspector', targetUser);
-        let searchLabel = `🔍 Search: "${keyword}"`;
+        
+        // If local records not populated, fetch latest records from Supabase
+        if ((!S.records || S.records.length === 0) && sb && navigator.onLine) {
+            const { data, error } = await sb.from('records')
+                .select('*')
+                .eq('inspector', targetUser)
+                .order('created_at', { ascending: false })
+                .limit(2000);
 
-        // 1. ตรวจจับตัวเลขและเครื่องหมาย (เช่น >10)
-        const qtyMatch = cleanKwd.match(/^([<>]=?|=)(\d+)$/);
-        // 2. ตรวจจับการระบุ Line (เช่น line:lc3)
-        const lineMatch = cleanKwd.match(/^(line|l):([\w-]+)$/);
-        // 3. ตรวจจับสถานะ (เช่น is:sf)
-        const statusMatch = cleanKwd.match(/^is:(sf|vendor|ctc|ok|can use)$/);
-
-        if (qtyMatch) {
-            const [_, op, val] = qtyMatch;
-            const opMap = { '>': 'gt', '<': 'lt', '>=': 'gte', '<=': 'lte', '=': 'eq' };
-            query = query[opMap[op]]('qty', parseInt(val));
-            searchLabel = `🔢 จำนวน ${op} ${val}`;
-        }
-        else if (lineMatch) {
-            const val = lineMatch[2].toUpperCase();
-            query = query.ilike('line', `%${val}%`);
-            searchLabel = `📍 Line: ${val}`;
-        }
-        else if (statusMatch) {
-            let status = statusMatch[1].toUpperCase();
-            if (status === 'OK') status = 'CAN USE';
-            query = query.ilike('judgment', `%${status}%`);
-            searchLabel = `⚖️ Status: ${status}`;
-        }
-        else if (['วันนี้', 'เมื่อวาน', 'อาทิตย์นี้'].includes(cleanKwd)) {
-            const now = new Date();
-            let start = new Date();
-            if (cleanKwd === 'วันนี้') query = query.eq('date', now.toISOString().split('T')[0]);
-            else if (cleanKwd === 'เมื่อวาน') { start.setDate(now.getDate() - 1); query = query.eq('date', start.toISOString().split('T')[0]); }
-            else if (cleanKwd === 'อาทิตย์นี้') { start.setDate(now.getDate() - now.getDay()); query = query.gte('date', start.toISOString().split('T')[0]); }
-            searchLabel = `📅 Period: ${cleanKwd}`;
-        }
-        else {
-            // ส่วนที่แก้ไข Error: ReferenceError: field is not defined
-            const searchPattern = `%${keyword}%`;
-            const searchFields = ['ref', 'partNo', 'partName', 'supplier', 'defect', 'remark', 'line'];
-            const orCondition = searchFields.map(f => `${f}.ilike.${searchPattern}`).join(',');
-            query = query.or(orCondition);
+            if (!error && data) {
+                S.records = data.map(normalizeRecord);
+            }
         }
 
-        const { data, error } = await query.order('created_at', { ascending: false }).limit(1000);
-        if (error) throw error;
-
-        S.records = (data || []).map(normalizeRecord);
         if (container) container.scrollTop = 0;
         renderTable(); 
 
+        const filteredCount = virtualTableState.allRows ? virtualTableState.allRows.length : 0;
         const countDisplay = $id('record-count');
         if (countDisplay) {
-            countDisplay.innerHTML = `${searchLabel} | พบ <span class="text-blue-600 font-bold">${data.length}</span> รายการ`;
+            if (cleanKwd) {
+                countDisplay.innerHTML = `🔍 ค้นหา: "${escapeHtml(cleanKwd)}" | พบ <span class="text-blue-600 font-bold">${filteredCount}</span> รายการ`;
+            } else {
+                countDisplay.innerHTML = `ทั้งหมด <span class="text-blue-600 font-bold">${S.records.length}</span> รายการ`;
+            }
         }
 
         rebuildSmartMemory();
@@ -6167,11 +6390,13 @@ function buildRow(r, i) {
     const rowStyle = isPending ? 'background-color: #fffbeb !important; border-left: 3px solid #f59e0b;' : '';
     let dateDisplay = '--';
     if (r.date) {
-        const d = new Date(r.date);
-        if (!isNaN(d)) {
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const dd = String(d.getDate()).padStart(2, '0');
-            dateDisplay = `<span style="font-family:'SF Mono',monospace; font-weight:600; color:#64748b;">${d.getFullYear()}-${mm}-${dd}</span>`;
+        const comp = parseRecordDateComponents(r.date);
+        if (comp) {
+            const mm = String(comp.month).padStart(2, '0');
+            const dd = String(comp.day).padStart(2, '0');
+            dateDisplay = `<span style="font-family:'SF Mono',monospace; font-weight:600; color:#64748b;">${comp.year}-${mm}-${dd}</span>`;
+        } else {
+            dateDisplay = `<span style="font-family:'SF Mono',monospace; font-weight:600; color:#64748b;">${escapeHtml(r.date)}</span>`;
         }
     }
     const shift = (r.shift || 'A').replace('SHIFT ', '');
@@ -6246,7 +6471,14 @@ function buildRow(r, i) {
             </div>
         </td>
         <td class="col-defect">
-            <span style="font-weight: 700; color: #475569; font-size: 10.5px;">${escapeHtml(r.defect || '-')}</span>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+                <span style="font-weight: 700; color: #475569; font-size: 10.5px;">${escapeHtml(r.defect || '-')}</span>
+                ${r.imageUrl ? `
+                    <span style="display:inline-flex; align-items:center; gap:3px; font-size:9px; color:#2563eb; font-weight:800; cursor:pointer;" onclick="event.stopPropagation(); WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))" data-img-url="${escapeHtml(r.imageUrl)}" title="คลิกเพื่อดูรูปภาพหลักฐาน">
+                        📷 ดูรูปภาพ
+                    </span>
+                ` : ''}
+            </div>
         </td>
         <td class="col-remark">
             <p style="font-size: 9.5px; color: #94a3b8; font-style: italic; line-height: 1.3; white-space: normal; max-width: 140px;">
@@ -6268,94 +6500,98 @@ function buildRow(r, i) {
     </tr>`;
 }
 
-
-
 /* ============================================================
-   UPGRADED: PART LINE CLAIM VIRTUAL RENDERER (V7.0 - Transform Base)
+   UPGRADED: PART LINE CLAIM VIRTUAL RENDERER (V7.5 - Multi-Device Robust)
    ============================================================ */
-const FIXED_ROW_HEIGHT = 52; // ให้ตรงกับ .data-table tbody tr { height: 52px }
-const HEADER_HEIGHT = 40;    // ตรวจสอบความสูง thead จริงด้วย (padding 6px+font+border)
+const FIXED_ROW_HEIGHT = 52; 
+const HEADER_HEIGHT = 40;    
 
 function renderTable() {
-    const container = document.getElementById('table-container');
-    if (!container) return;
+    try {
+        const container = document.getElementById('table-container');
+        if (!container) return;
 
-    const filtered = getFilteredRecords(); 
-    const total = filtered.length;
-    
-    // 1. อัปเดตตัวเลขจำนวนรายการ
-    const countDisplay = document.getElementById('record-count');
-    if (countDisplay) countDisplay.textContent = `${total.toLocaleString()} รายการ`;
-    
-    // 2. กรณีไม่มีข้อมูล (Empty State)
-    if (total === 0) {
+        const filtered = getFilteredRecords(); 
+        const total = filtered.length;
+        
+        // 1. อัปเดตตัวเลขจำนวนรายการ
+        const countDisplay = document.getElementById('record-count');
+        if (countDisplay) countDisplay.textContent = `${total.toLocaleString()} รายการ`;
+        
+        // 2. กรณีไม่มีข้อมูล (Empty State)
+        if (total === 0) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full py-20 text-slate-400">
+                    <svg class="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 7v10c0 1.1.9 2 2 2h12a2 2 0 002-2V7M4 7a2 2 0 012-2h12a2 2 0 012 2M4 7h16M9 12h6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    <p class="text-[11px] font-black uppercase tracking-widest">No Data Available</p>
+                </div>`;
+            virtualTableState.allRows = [];
+            return;
+        }
+
+        // 3. เตรียม State สำหรับการ Scroll
+        virtualTableState.allRows = filtered;
+        virtualTableState.prevStart = -1; 
+        virtualTableState.prevEnd = -1;
+        virtualTableState.isFreshRender = true;
+
+        const useVirtual = total > 150;
+        const runwayStyle = useVirtual ? `position: relative; width: 100%; height: ${total * FIXED_ROW_HEIGHT + HEADER_HEIGHT}px;` : 'position: relative; width: 100%; height: auto;';
+        const wrapperStyle = useVirtual ? 'position: absolute; top: 0; left: 0; right: 0;' : 'position: relative; width: 100%;';
+
         container.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full py-20 text-slate-400">
-                <svg class="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 7v10c0 1.1.9 2 2 2h12a2 2 0 002-2V7M4 7a2 2 0 012-2h12a2 2 0 012 2M4 7h16M9 12h6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                <p class="text-[11px] font-black uppercase tracking-widest">No Data Available</p>
-            </div>`;
-        virtualTableState.allRows = [];
-        return;
-    }
-
-    // 3. เตรียม State สำหรับการ Scroll
-    virtualTableState.allRows = filtered;
-    virtualTableState.prevStart = -1; 
-    virtualTableState.prevEnd = -1;
-    virtualTableState.isFreshRender = true;
-
-    /**
-     * 4. สร้างโครงสร้างใหม่ (Virtual DOM Structure)
-     * แก้ไขจุดนี้: ใส่ data-i18n ให้กับทุกหัวข้อคอลัมน์ (<th>)
-     */
-    container.innerHTML = `
-        <div id="table-runway" style="position: relative; width: 100%; height: ${total * FIXED_ROW_HEIGHT + HEADER_HEIGHT}px;">
-            <div id="table-content-wrapper" style="position: absolute; top: 0; left: 0; right: 0;">
-                <table class="data-table" style="table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0;">
-                    <colgroup>
-                        <col style="width: 45px;">   <!-- # -->
-                        <col style="width: 100px;">  <!-- DATE -->
-                        <col style="width: 130px;">  <!-- REF/LINE -->
-                        <col style="width: 260px;">  <!-- SUPPLIER/PART -->
-                        <col style="width: 70px;">   <!-- QTY -->
-                        <col style="width: 140px;">  <!-- DEFECT -->
-                        <col style="width: 160px;">  <!-- REMARK -->
-                        <col style="width: 120px;">  <!-- STATUS -->
-                        <col style="width: 100px;">  <!-- ACTIONS -->
-                    </colgroup>
-                    <thead class="sticky top-0 z-30">
-                        <tr style="height: ${HEADER_HEIGHT}px; background: #f1f5f9;">
-                            <th data-i18n="col_no">#</th>
-                            <th data-i18n="col_date">DATE</th>
-                            <th data-i18n="col_ref">REF/LINE/SHIFT</th>
-                            <th data-i18n="col_info">SUPPLIER/PART INFO</th>
-                            <th data-i18n="col_qty" style="text-align:center">QTY</th>
-                            <th data-i18n="col_defect">DEFECT</th>
-                            <th data-i18n="col_remark">REMARK</th>
-                            <th data-i18n="col_status" style="text-align:center">STATUS</th>
-                            <th data-i18n="col_actions" style="text-align:center">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-render-target">
-                        <!-- แถวข้อมูลจะถูกฉีดเข้าที่นี่ -->
-                    </tbody>
-                </table>
+            <div id="table-runway" style="${runwayStyle}">
+                <div id="table-content-wrapper" style="${wrapperStyle}">
+                    <table class="data-table" style="table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0;">
+                        <colgroup>
+                            <col style="width: 45px;">   <!-- # -->
+                            <col style="width: 100px;">  <!-- DATE -->
+                            <col style="width: 130px;">  <!-- REF/LINE -->
+                            <col style="width: 260px;">  <!-- SUPPLIER/PART -->
+                            <col style="width: 70px;">   <!-- QTY -->
+                            <col style="width: 140px;">  <!-- DEFECT -->
+                            <col style="width: 160px;">  <!-- REMARK -->
+                            <col style="width: 120px;">  <!-- STATUS -->
+                            <col style="width: 100px;">  <!-- ACTIONS -->
+                        </colgroup>
+                        <thead class="sticky top-0 z-30">
+                            <tr style="height: ${HEADER_HEIGHT}px; background: #f1f5f9;">
+                                <th data-i18n="col_no">#</th>
+                                <th data-i18n="col_date">DATE</th>
+                                <th data-i18n="col_ref">REF/LINE/SHIFT</th>
+                                <th data-i18n="col_info">SUPPLIER/PART INFO</th>
+                                <th data-i18n="col_qty" style="text-align:center">QTY</th>
+                                <th data-i18n="col_defect">DEFECT</th>
+                                <th data-i18n="col_remark">REMARK</th>
+                                <th data-i18n="col_status" style="text-align:center">STATUS</th>
+                                <th data-i18n="col_actions" style="text-align:center">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-render-target">
+                            <!-- แถวข้อมูลจะถูกฉีดเข้าที่นี่ -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
-    `;
+        `;
 
-    // 5. รีเซ็ตตำแหน่งการเลื่อน และผูก Event ใหม่ (ใช้ requestAnimationFrame เพื่อ 60FPS ลื่นไหล)
-    container.scrollTop = 0;
-    container.removeEventListener('scroll', handleTableScroll);
-    container.removeEventListener('scroll', _onTableScrollThrottled);
-    container.addEventListener('scroll', _onTableScrollThrottled, { passive: true });
+        // 5. รีเซ็ตตำแหน่งการเลื่อน และผูก Event ใหม่
+        container.scrollTop = 0;
+        container.removeEventListener('scroll', handleTableScroll);
+        container.removeEventListener('scroll', _onTableScrollThrottled);
+        if (useVirtual) {
+            container.addEventListener('scroll', _onTableScrollThrottled, { passive: true });
+        }
 
-    // 6. [จุดสำคัญ] สั่งแปลภาษาหัวตารางทันทีหลังวาด HTML
-    const currentLang = localStorage.getItem('carrier_lang') || 'en';
-    applyLanguage(currentLang);
+        // 6. แปลภาษาหัวตาราง
+        const currentLang = localStorage.getItem('carrier_lang') || 'en';
+        if (typeof applyLanguage === 'function') applyLanguage(currentLang);
 
-    // 7. สั่งวาดข้อมูลแถวแรกๆ
-    handleTableScroll();
+        // 7. สั่งวาดข้อมูล
+        handleTableScroll();
+    } catch (err) {
+        console.error('[renderTable Error]', err);
+    }
 }
 
 let _tableScrollTicking = false;
@@ -6370,67 +6606,83 @@ function _onTableScrollThrottled() {
 }
 
 /**
- * ฟังก์ชันจัดการ Virtual Scroll (High Performance)
- * ใช้การคำนวณตำแหน่งและดีดเนื้อหาด้วย Transform
+ * ฟังก์ชันจัดการ Virtual Scroll (High Performance & Fallback Robust)
  */
 function handleTableScroll() {
-    const container = document.getElementById('table-container');
-    const tbody = document.getElementById('table-render-target');
-    
-    // ตรวจสอบความพร้อมของข้อมูลและ Element
-    if (!container || !tbody || !virtualTableState.allRows.length) return;
+    try {
+        const container = document.getElementById('table-container');
+        const tbody = document.getElementById('table-render-target');
+        
+        if (!container || !tbody || !virtualTableState.allRows.length) return;
 
-    const allData = virtualTableState.allRows;
-    const totalCount = allData.length;
-    const scrollTop = container.scrollTop;
-    const viewHeight = Math.max(container.clientHeight || 0, window.innerHeight || 600);
-    
-    // 1. คำนวณหา Index ของแถวที่ต้องแสดงผล
-    // ใช้ BUFFER 6 แถวและ fallback viewHeight เพื่อป้องกันพื้นที่สีขาวเมื่อคำนวณขนาดจอคลาดเคลื่อน
-    const BUFFER = 6;
-    let startIdx = Math.floor(scrollTop / FIXED_ROW_HEIGHT) - BUFFER;
-    let endIdx = Math.ceil((scrollTop + viewHeight) / FIXED_ROW_HEIGHT) + BUFFER;
+        const allData = virtualTableState.allRows;
+        const totalCount = allData.length;
 
-    // ตรวจสอบขอบเขตของ Index (ไม่ให้ต่ำกว่า 0 หรือเกินจำนวนข้อมูลที่มี)
-    startIdx = Math.max(0, startIdx);
-    endIdx = Math.min(totalCount, endIdx);
+        tbody.style.transform = 'none';
 
-    // 2. Performance Check: หากเลื่อนไปแล้วยังอยู่ในช่วงเดิม ไม่ต้องวาด DOM ใหม่
-    if (startIdx === virtualTableState.prevStart && endIdx === virtualTableState.prevEnd) return;
-    
-    virtualTableState.prevStart = startIdx;
-    virtualTableState.prevEnd = endIdx;
-
-    // 3. การคำนวณตำแหน่ง (The Magic Logic)
-    // ดีดเฉพาะส่วนของ Tbody ลงมาให้ตรงกับตำแหน่งที่กำลัง Scroll
-    const offsetY = startIdx * FIXED_ROW_HEIGHT;
-    
-    // ใช้ translateY เพื่อรองรับทั้ง GPU และ Software Rendering
-    tbody.style.transform = `translateY(${offsetY}px)`;
-
-    // 4. วนลูปสร้างเฉพาะ HTML ของแถวในช่วงที่คำนวณได้
-    let loopHtml = '';
-    for (let i = startIdx; i < endIdx; i++) {
-        loopHtml += buildRow(allData[i], i);
-    }
-
-    // 5. ฉีดข้อมูลเข้าสู่ Tbody
-    tbody.innerHTML = loopHtml;
-    if (virtualTableState.isFreshRender) {
-        virtualTableState.isFreshRender = false;
-        if (typeof window.animateTableRows === 'function') {
-            window.animateTableRows(tbody, { y: 6, duration: 0.25, maxRows: 15, ease: 'power2.out' });
-        }
-    } else {
-        const trs = tbody.querySelectorAll('tr');
-        trs.forEach(tr => {
-            if (tr && tr.style) {
-                tr.style.opacity = '1';
-                tr.style.transform = 'none';
+        // หากข้อมูล <= 100 รายการ -> แสดงผลตรง 100% ป้องกันปัญหา CSS Virtual Scroll บนเครื่องบางรุ่น
+        if (totalCount <= 100) {
+            let html = '';
+            for (let i = 0; i < totalCount; i++) {
+                html += buildRow(allData[i], i);
             }
-        });
+            tbody.innerHTML = html;
+            return;
+        }
+
+        const scrollTop = container.scrollTop || 0;
+        const viewHeight = Math.max(container.clientHeight || 0, window.innerHeight || 600);
+        
+        const BUFFER = 10;
+        let startIdx = Math.floor(scrollTop / FIXED_ROW_HEIGHT) - BUFFER;
+        let endIdx = Math.ceil((scrollTop + viewHeight) / FIXED_ROW_HEIGHT) + BUFFER;
+
+        startIdx = Math.max(0, Math.min(totalCount, startIdx));
+        endIdx = Math.max(0, Math.min(totalCount, endIdx));
+
+        if (tbody.children.length === 0) {
+            virtualTableState.prevStart = -1;
+            virtualTableState.prevEnd = -1;
+        }
+
+        if (startIdx === virtualTableState.prevStart && endIdx === virtualTableState.prevEnd) return;
+        
+        virtualTableState.prevStart = startIdx;
+        virtualTableState.prevEnd = endIdx;
+
+        const topSpacerPx = startIdx * FIXED_ROW_HEIGHT;
+        const bottomSpacerPx = (totalCount - endIdx) * FIXED_ROW_HEIGHT;
+
+        let loopHtml = '';
+        if (topSpacerPx > 0) {
+            loopHtml += `<tr class="vs-spacer" style="height:${topSpacerPx}px; border:none; background:transparent;"><td colspan="9" style="padding:0; border:none; height:${topSpacerPx}px;"></td></tr>`;
+        }
+        for (let i = startIdx; i < endIdx; i++) {
+            loopHtml += buildRow(allData[i], i);
+        }
+        if (bottomSpacerPx > 0) {
+            loopHtml += `<tr class="vs-spacer" style="height:${bottomSpacerPx}px; border:none; background:transparent;"><td colspan="9" style="padding:0; border:none; height:${bottomSpacerPx}px;"></td></tr>`;
+        }
+
+        tbody.innerHTML = loopHtml;
+        if (virtualTableState.isFreshRender) {
+            virtualTableState.isFreshRender = false;
+            if (typeof window.animateTableRows === 'function') {
+                window.animateTableRows(tbody, { y: 6, duration: 0.25, maxRows: 15, ease: 'power2.out' });
+            }
+        } else {
+            const trs = tbody.querySelectorAll('tr:not(.vs-spacer)');
+            trs.forEach(tr => {
+                if (tr && tr.style) {
+                    tr.style.opacity = '1';
+                    tr.style.transform = 'none';
+                }
+            });
+        }
+        if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
+    } catch (err) {
+        console.error('[handleTableScroll Error]', err);
     }
-    if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
 }
 
 /**
@@ -7184,8 +7436,13 @@ function reapplyKbdRowSelection() {
         }
     }
 
-    if (ctx.type === 'claim' && tableKbdNavState.selectedIndex >= 0) {
-        const allData = (typeof virtualTableState !== 'undefined' && virtualTableState.allRows) ? virtualTableState.allRows : [];
+    if ((ctx.type === 'claim' || ctx.type === 'support') && tableKbdNavState.selectedIndex >= 0) {
+        let allData = [];
+        if (ctx.type === 'claim') {
+            allData = (typeof virtualTableState !== 'undefined' && virtualTableState.allRows) ? virtualTableState.allRows : [];
+        } else if (ctx.type === 'support') {
+            allData = (typeof WapSupportLogs !== 'undefined' && WapSupportLogs.getFilteredRecords) ? WapSupportLogs.getFilteredRecords() : [];
+        }
         if (allData[tableKbdNavState.selectedIndex]) {
             const id = allData[tableKbdNavState.selectedIndex].id;
             const tr = ctx.tbody.querySelector(`tr[data-rid="${id}"]`);
@@ -7199,13 +7456,31 @@ function moveTableSelection(ctx, direction) {
     if (!ctx) ctx = getActiveTableContext();
     if (!ctx || !ctx.tbody) return;
 
-    if (ctx.type === 'claim') {
-        const allData = (typeof virtualTableState !== 'undefined' && virtualTableState.allRows) ? virtualTableState.allRows : [];
-        if (allData.length === 0) return;
+    if (ctx.type === 'claim' || ctx.type === 'support') {
+        let allData = [];
+        let ROW_H = 52;
+        let container = ctx.container;
+
+        if (ctx.type === 'claim') {
+            allData = (typeof virtualTableState !== 'undefined' && virtualTableState.allRows) ? virtualTableState.allRows : [];
+            ROW_H = typeof FIXED_ROW_HEIGHT !== 'undefined' ? FIXED_ROW_HEIGHT : 52;
+            if (!container) container = document.getElementById('table-container');
+        } else if (ctx.type === 'support') {
+            allData = (typeof WapSupportLogs !== 'undefined' && WapSupportLogs.getFilteredRecords) ? WapSupportLogs.getFilteredRecords() : [];
+            ROW_H = 48;
+            if (!container) container = document.getElementById('tableScrollArea');
+        }
+
+        if (!allData || allData.length === 0) return;
 
         let currentIdx = tableKbdNavState.selectedIndex;
-        if (tableKbdNavState.selectedRowId && currentIdx === -1) {
-            currentIdx = allData.findIndex(r => r.id === tableKbdNavState.selectedRowId);
+        if (tableKbdNavState.selectedRowId) {
+            const foundIdx = allData.findIndex(r => String(r.id) === String(tableKbdNavState.selectedRowId));
+            if (foundIdx !== -1) {
+                currentIdx = foundIdx;
+            } else if (currentIdx >= allData.length) {
+                currentIdx = -1;
+            }
         }
 
         let newIdx;
@@ -7225,13 +7500,11 @@ function moveTableSelection(ctx, direction) {
         tableKbdNavState.selectedRowId = allData[newIdx].id;
         tableKbdNavState.activeType = ctx.type;
 
-        const container = ctx.container || document.getElementById('table-container');
         if (container) {
-            const FIXED_ROW_H = typeof FIXED_ROW_HEIGHT !== 'undefined' ? FIXED_ROW_HEIGHT : 52;
-            const rowTop = newIdx * FIXED_ROW_H;
+            const rowTop = newIdx * ROW_H;
             const containerHeight = container.clientHeight || 500;
-            if (rowTop < container.scrollTop + 40 || rowTop > container.scrollTop + containerHeight - 80) {
-                container.scrollTop = Math.max(0, rowTop - Math.floor(containerHeight / 2));
+            if (rowTop < container.scrollTop + 40 || rowTop + ROW_H > container.scrollTop + containerHeight - 40) {
+                container.scrollTop = Math.max(0, rowTop - Math.floor(containerHeight / 2) + Math.floor(ROW_H / 2));
             }
         }
 
@@ -7352,21 +7625,41 @@ function toggleKbdShortcutModal(show) {
         modal.id = 'kbd-shortcuts-modal';
         modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 hidden';
         modal.innerHTML = `
-            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all duration-200 scale-95 opacity-0" id="kbd-shortcuts-card">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all duration-200 scale-95 opacity-0" id="kbd-shortcuts-card">
                 <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
                     <div class="flex items-center gap-2.5">
                         <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-blue-500/20">⌨️</div>
                         <div>
-                            <h3 class="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide">Keyboard Shortcuts</h3>
-                            <p class="text-[10px] font-bold text-slate-400">Power-user navigation & controls</p>
+                            <h3 class="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide">Global Keyboard Shortcuts</h3>
+                            <p class="text-[10px] font-bold text-slate-400">Power-user navigation & entry speed controls</p>
                         </div>
                     </div>
                     <button onclick="toggleKbdShortcutModal(false)" class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center justify-center transition-colors">
                         ✕
                     </button>
                 </div>
-                <div class="p-6 space-y-2.5 max-h-[70vh] overflow-y-auto">
+                <div class="p-6 space-y-2.5 max-h-[75vh] overflow-y-auto">
                     <div class="grid grid-cols-2 gap-2.5 text-xs">
+                        <div class="flex items-center justify-between p-2.5 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50">
+                            <span class="font-bold text-blue-900 dark:text-blue-200">Save / Submit Form</span>
+                            <kbd class="px-2 py-0.5 text-[10px] font-black bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 rounded border border-blue-200 dark:border-blue-700 shadow-2xs">Ctrl + S</kbd>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50">
+                            <span class="font-bold text-blue-900 dark:text-blue-200">Focus Search</span>
+                            <kbd class="px-2 py-0.5 text-[10px] font-black bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 rounded border border-blue-200 dark:border-blue-700 shadow-2xs">Ctrl + F</kbd>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
+                            <span class="font-bold text-emerald-900 dark:text-emerald-200">New Entry / Modal</span>
+                            <kbd class="px-2 py-0.5 text-[10px] font-black bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 rounded border border-emerald-200 dark:border-emerald-700 shadow-2xs">Ctrl + N</kbd>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-cyan-50/60 dark:bg-cyan-950/30 rounded-xl border border-cyan-100 dark:border-cyan-900/50">
+                            <span class="font-bold text-cyan-900 dark:text-cyan-200">Vacuum IndexedDB</span>
+                            <kbd class="px-2 py-0.5 text-[10px] font-black bg-white dark:bg-slate-800 text-cyan-700 dark:text-cyan-300 rounded border border-cyan-200 dark:border-cyan-700 shadow-2xs">Ctrl + Shift + V</kbd>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-purple-50/60 dark:bg-purple-950/30 rounded-xl border border-purple-100 dark:border-purple-900/50">
+                            <span class="font-bold text-purple-900 dark:text-purple-200">Shortcuts Palette</span>
+                            <kbd class="px-2 py-0.5 text-[10px] font-black bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 rounded border border-purple-200 dark:border-purple-700 shadow-2xs">Ctrl + K</kbd>
+                        </div>
                         <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
                             <span class="font-bold text-slate-600 dark:text-slate-300">Navigate Rows</span>
                             <div class="flex items-center gap-1">
@@ -7375,18 +7668,18 @@ function toggleKbdShortcutModal(show) {
                             </div>
                         </div>
                         <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                            <span class="font-bold text-slate-600 dark:text-slate-300">Quick Nav</span>
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Vim Navigation</span>
                             <div class="flex items-center gap-1">
                                 <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">j</kbd>
                                 <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">k</kbd>
                             </div>
                         </div>
                         <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                            <span class="font-bold text-slate-600 dark:text-slate-300">Select Row</span>
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Select / Action</span>
                             <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">Enter</kbd>
                         </div>
                         <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                            <span class="font-bold text-slate-600 dark:text-slate-300">Focus Search</span>
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Quick Search</span>
                             <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">/</kbd>
                         </div>
                         <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
@@ -7397,7 +7690,7 @@ function toggleKbdShortcutModal(show) {
                             </div>
                         </div>
                         <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                            <span class="font-bold text-slate-600 dark:text-slate-300">Deselect / Close</span>
+                            <span class="font-bold text-slate-600 dark:text-slate-300">Close / Deselect</span>
                             <kbd class="px-1.5 py-0.5 text-[10px] font-black bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded border border-slate-200 dark:border-slate-600 shadow-2xs">Esc</kbd>
                         </div>
                         <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
@@ -7437,6 +7730,159 @@ function toggleKbdShortcutModal(show) {
 window.toggleKbdShortcutModal = toggleKbdShortcutModal;
 
 function handleGlobalTableKeydown(e) {
+    const isCtrl = e.ctrlKey || e.metaKey;
+    const isAlt = e.altKey;
+    const key = e.key ? e.key.toLowerCase() : '';
+
+    // 1. GLOBAL KEYBOARD SHORTCUTS (ทำงานได้เสมอแม้กำลังพิมพ์อยู่ใน Input)
+    // --- Ctrl+S / Cmd+S: บันทึกข้อมูล / Submit Form ---
+    if (isCtrl && key === 's') {
+        e.preventDefault();
+        let handled = false;
+
+        // ตรวจสอบว่ามี Modal แสดงอยู่หรือไม่
+        const visibleModals = Array.from(document.querySelectorAll('.modal, .modal-card, [id*="modal"], [id*="Modal"], [id*="dialog"]'))
+            .filter(m => m.offsetWidth > 0 && m.offsetHeight > 0 && !m.classList.contains('hidden') && getComputedStyle(m).display !== 'none');
+
+        for (const m of visibleModals) {
+            const submitBtn = m.querySelector('button[type="submit"], #btn-sup-submit, #btn-save-8d, .btn-submit, .btn-save, #btn-commit, button.bg-blue-600, button.bg-emerald-600');
+            if (submitBtn && !submitBtn.disabled) {
+                submitBtn.click();
+                handled = true;
+                break;
+            }
+        }
+
+        if (!handled) {
+            const ctx = getActiveTableContext();
+            if (ctx) {
+                if (ctx.type === 'claim') {
+                    const commitBtn = document.getElementById('btn-commit');
+                    if (commitBtn && !commitBtn.disabled) {
+                        commitBtn.click();
+                        handled = true;
+                    }
+                } else if (ctx.type === 'support') {
+                    if (typeof WapSupportLogs !== 'undefined' && WapSupportLogs.submit) {
+                        WapSupportLogs.submit();
+                        handled = true;
+                    } else {
+                        const supBtn = document.getElementById('btn-sup-submit');
+                        if (supBtn && !supBtn.disabled) {
+                            supBtn.click();
+                            handled = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!handled) {
+            const activeForm = document.activeElement ? document.activeElement.closest('form') : null;
+            if (activeForm) {
+                const formSubmitBtn = activeForm.querySelector('button[type="submit"], .btn-submit, #btn-commit');
+                if (formSubmitBtn) {
+                    formSubmitBtn.click();
+                    handled = true;
+                } else if (typeof activeForm.requestSubmit === 'function') {
+                    activeForm.requestSubmit();
+                    handled = true;
+                }
+            }
+        }
+
+        if (handled && typeof toast === 'function') {
+            toast('💾 บันทึกข้อมูลสำเร็จด้วยคีย์ลัด (Ctrl+S)', 'success');
+        }
+        return;
+    }
+
+    // --- Ctrl+F / Cmd+F: โฟกัสช่องค้นหา ---
+    if (isCtrl && key === 'f') {
+        e.preventDefault();
+        let searchInput = null;
+
+        // ตรวจสอบ Modal
+        const visibleModals = Array.from(document.querySelectorAll('.modal, .modal-card, [id*="modal"], [id*="Modal"]'))
+            .filter(m => m.offsetWidth > 0 && m.offsetHeight > 0 && !m.classList.contains('hidden') && getComputedStyle(m).display !== 'none');
+        if (visibleModals.length > 0) {
+            searchInput = visibleModals[0].querySelector('input[type="search"], input[id*="search"], input[placeholder*="Search"], input[placeholder*="ค้นหา"]');
+        }
+
+        // ตรวจสอบตามโมดูลหลัก
+        if (!searchInput) {
+            const ctx = getActiveTableContext();
+            if (ctx) {
+                if (ctx.type === 'claim') searchInput = document.getElementById('filter-search');
+                else if (ctx.type === 'support') searchInput = document.getElementById('searchInput');
+                else if (ctx.type === '8d') searchInput = document.getElementById('eightDSearch');
+                else if (ctx.type === 'admin') searchInput = document.getElementById('admin-search-input') || document.getElementById('admin-main-search-input');
+            }
+        }
+
+        // Fallback
+        if (!searchInput) {
+            searchInput = document.getElementById('filter-search') || 
+                          document.getElementById('searchInput') || 
+                          document.getElementById('eightDSearch') || 
+                          document.querySelector('input[type="search"]') || 
+                          document.querySelector('.search-input') ||
+                          document.querySelector('input[placeholder*="Search"], input[placeholder*="ค้นหา"]');
+        }
+
+        if (searchInput) {
+            searchInput.focus();
+            if (typeof searchInput.select === 'function') searchInput.select();
+            if (typeof toast === 'function') toast('🔍 โฟกัสช่องค้นหาเรียบร้อย (Ctrl+F)', 'info');
+        }
+        return;
+    }
+
+    // --- Ctrl+N / Cmd+N / Alt+N: สร้างรายการใหม่ / เปิด Modal กรอกข้อมูล ---
+    if ((isCtrl || isAlt) && key === 'n') {
+        e.preventDefault();
+        const ctx = getActiveTableContext();
+        if (ctx) {
+            if (ctx.type === 'claim') {
+                const supplierInput = document.getElementById('f-supplier') || document.getElementById('f-part') || document.getElementById('f-date');
+                if (supplierInput) {
+                    supplierInput.focus();
+                    if (typeof supplierInput.select === 'function') supplierInput.select();
+                    if (typeof toast === 'function') toast('➕ เริ่มสร้างรายการใหม่ (Part Claim)', 'info');
+                }
+            } else if (ctx.type === 'support') {
+                if (typeof WapSupportLogs !== 'undefined' && WapSupportLogs._openFormModal) {
+                    WapSupportLogs._openFormModal();
+                    if (typeof toast === 'function') toast('➕ เปิดแบบฟอร์มบันทึกเคสใหม่', 'info');
+                }
+            } else {
+                const addBtn = document.querySelector('.btn-add-record, .btn-create, .btn-add, button[title*="Add"], button[title*="เพิ่ม"]');
+                if (addBtn) addBtn.click();
+            }
+        } else {
+            const addBtn = document.querySelector('.btn-add-record, .btn-create, .btn-add');
+            if (addBtn) addBtn.click();
+        }
+        return;
+    }
+
+    // --- Ctrl+K / Cmd+K: เปิด Keyboard Shortcuts Palette ---
+    if (isCtrl && key === 'k') {
+        e.preventDefault();
+        toggleKbdShortcutModal();
+        return;
+    }
+
+    // --- Ctrl+Shift+V / Cmd+Shift+V / Alt+V: Vacuum IndexedDB & Clear Stale Indices ---
+    if ((isCtrl && e.shiftKey && key === 'v') || (isAlt && key === 'v')) {
+        e.preventDefault();
+        if (typeof performIDBVacuum === 'function') {
+            performIDBVacuum();
+        }
+        return;
+    }
+
+    // 2. ตรวจสอบสถานะการพิมพ์ใน Input
     const activeEl = document.activeElement;
     const isTyping = activeEl && (
         activeEl.tagName === 'TEXTAREA' ||
@@ -7705,6 +8151,131 @@ if (typeof initAttDashboard !== 'undefined') {
         renderDailySubmissionMatrix();
     };
 }
+/**
+ * ═══════════════════════════════════════════════════════
+ *  PART LINE CLAIM - INDEXEDDB AUTO-DRAFT SYSTEM
+ * ═══════════════════════════════════════════════════════
+ */
+let claimDraftTimer = null;
+
+function saveClaimFormDraft() {
+    if (S.editingId) return; // ไม่บันทึกแบบร่างขณะแก้ไขรายการเดิมที่มีในระบบ
+    
+    const partNo = $id('f-part')?.value.trim() || '';
+    const partName = $id('f-partname')?.value.trim() || '';
+    const supplier = $id('f-supplier')?.value.trim() || '';
+    const ref = $id('f-ref')?.value.trim() || '';
+    const qty = $id('f-qty')?.value.trim() || '';
+    const line = $id('f-line')?.value.trim() || '';
+    const defect = $id('f-defect')?.value.trim() || '';
+    const remark = $id('f-remark')?.value.trim() || '';
+    const judgment = $id('judgmentSelect')?.value || '';
+    const date = $id('f-date')?.value || '';
+    const unit = $id('f-unit')?.value || 'PCS';
+    const shift = S.selectedShift || 'SHIFT A';
+
+    const hasValue = !!(partNo || partName || supplier || ref || qty || line || defect || remark || judgment);
+    const badge = $id('claim-draft-badge');
+
+    if (!hasValue) {
+        if (typeof SQEIndexedDBManager !== 'undefined' && typeof SQEIndexedDBManager.clearDraft === 'function') {
+            SQEIndexedDBManager.clearDraft('part_line_claim');
+        }
+        if (badge) badge.classList.add('hidden');
+        return;
+    }
+
+    const draftData = {
+        partNo, partName, supplier, ref, qty, unit, line, defect, remark, judgment, date, shift,
+        savedAt: new Date().toISOString()
+    };
+
+    if (typeof SQEIndexedDBManager !== 'undefined' && typeof SQEIndexedDBManager.saveDraft === 'function') {
+        SQEIndexedDBManager.saveDraft('part_line_claim', draftData);
+    }
+    if (badge) badge.classList.remove('hidden');
+}
+
+function triggerClaimFormAutoDraft() {
+    updateInputResetButton();
+    if (claimDraftTimer) clearTimeout(claimDraftTimer);
+    claimDraftTimer = setTimeout(() => {
+        saveClaimFormDraft();
+    }, 250);
+}
+
+async function restoreClaimFormDraft() {
+    if (S.editingId) return;
+    try {
+        if (typeof SQEIndexedDBManager === 'undefined' || typeof SQEIndexedDBManager.getDraft !== 'function') return;
+        const draft = await SQEIndexedDBManager.getDraft('part_line_claim');
+        if (!draft) return;
+
+        const hasContent = !!(draft.partNo || draft.partName || draft.supplier || draft.ref || draft.qty || draft.line || draft.defect || draft.remark || draft.judgment);
+        if (!hasContent) return;
+
+        if (draft.date && $id('f-date')) $id('f-date').value = draft.date;
+        if (draft.partNo && $id('f-part')) $id('f-part').value = draft.partNo;
+        if (draft.partName && $id('f-partname')) $id('f-partname').value = draft.partName;
+        if (draft.supplier && $id('f-supplier')) $id('f-supplier').value = draft.supplier;
+        if (draft.ref && $id('f-ref')) $id('f-ref').value = draft.ref;
+        if (draft.qty && $id('f-qty')) $id('f-qty').value = draft.qty;
+        if (draft.unit && $id('f-unit')) $id('f-unit').value = draft.unit;
+        if (draft.line && $id('f-line')) $id('f-line').value = draft.line;
+        if (draft.defect && $id('f-defect')) $id('f-defect').value = draft.defect;
+        if (draft.remark && $id('f-remark')) $id('f-remark').value = draft.remark;
+        if (draft.judgment && $id('judgmentSelect')) {
+            $id('judgmentSelect').value = draft.judgment;
+            if (typeof handleJudgment === 'function') handleJudgment(draft.judgment);
+        }
+        if (draft.shift) {
+            S.selectedShift = draft.shift;
+            document.querySelectorAll('.shift-btn').forEach(b => {
+                const txt = b.textContent.trim();
+                b.classList.toggle('active', (draft.shift === 'SHIFT A' && txt === 'A') || (draft.shift === 'SHIFT B' && txt === 'B') || (draft.shift === 'SHIFT C' && txt === 'C'));
+            });
+        }
+
+        if (draft.partNo && typeof validatePartNoInput === 'function') {
+            validatePartNoInput($id('f-part'));
+        }
+
+        updateInputResetButton();
+
+        const badge = $id('claim-draft-badge');
+        if (badge) badge.classList.remove('hidden');
+
+        if (typeof toast === 'function') {
+            toast('📝 กู้คืนแบบร่าง Part Line Claim จาก IndexedDB เรียบร้อยแล้ว', 'info');
+        }
+    } catch (err) {
+        console.warn('Failed to restore claim form draft:', err);
+    }
+}
+
+function clearClaimFormDraft() {
+    if (claimDraftTimer) clearTimeout(claimDraftTimer);
+    if (typeof SQEIndexedDBManager !== 'undefined' && typeof SQEIndexedDBManager.clearDraft === 'function') {
+        SQEIndexedDBManager.clearDraft('part_line_claim');
+    }
+    const badge = $id('claim-draft-badge');
+    if (badge) badge.classList.add('hidden');
+}
+
+function initClaimFormAutoDraftListeners() {
+    const ids = ['f-date', 'f-part', 'f-partname', 'f-supplier', 'f-ref', 'f-qty', 'f-unit', 'f-line', 'f-defect', 'f-remark', 'judgmentSelect'];
+    ids.forEach(id => {
+        const el = $id(id);
+        if (el && !el.dataset.hasDraftListener) {
+            el.dataset.hasDraftListener = 'true';
+            el.addEventListener('input', triggerClaimFormAutoDraft);
+            el.addEventListener('change', triggerClaimFormAutoDraft);
+        }
+    });
+
+    restoreClaimFormDraft();
+}
+
 // ============================================================
 // 2. ส่วนตั้งค่าเริ่มต้นเมื่อโหลดหน้าจอ
 // ============================================================
@@ -7715,6 +8286,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     if ($id('f-date')) $id('f-date').value = `${yyyy}-${mm}-${dd}`;
+
+    initClaimFormAutoDraftListeners();
 
     window.addEventListener('online', () => { S.isOnline = true; updateOnlineBadge(); });
     window.addEventListener('offline', () => { S.isOnline = false; updateOnlineBadge(); });
@@ -9627,6 +10200,7 @@ const WapSupportLogs = (function () {
     }
 
     let _scrollRaf = null;
+    let _lastVsState = null;
 
     function _cacheDom() {
         $.tbody       = document.getElementById('tableBody');
@@ -9646,6 +10220,14 @@ const WapSupportLogs = (function () {
                     });
                 }
             }, { passive: true });
+
+            if (window.ResizeObserver && !$.scrollArea._vsRo) {
+                $.scrollArea._vsRo = new ResizeObserver(() => {
+                    _lastVsState = null;
+                    _render();
+                });
+                $.scrollArea._vsRo.observe($.scrollArea);
+            }
         }
     }
 
@@ -9677,18 +10259,44 @@ const WapSupportLogs = (function () {
             if (error) throw error;
             if (myToken !== _fetchToken || !_alive) return;
             _records = (data || []).map(_fromDb);
+
+            // สำรองข้อมูลลง LocalStorage เพื่อป้องกันปัญหาการเชื่อมต่อบนบางเครื่อง
+            try {
+                if (_user && _records.length > 0) {
+                    localStorage.setItem(`wap_support_cache_${_user}`, JSON.stringify(_records.slice(0, 300)));
+                }
+            } catch (err) {
+                console.warn('[WapSupportCache Error]', err);
+            }
+
             applyDateFilter();
         } catch (e) {
             console.error('[WapSupport] Fetch error:', e);
             if (myToken === _fetchToken && _alive) {
-                // สำรองกรณีเกิด Error ให้ดึงจาก S.wapData.achievements ที่ดึงมาแล้วได้
-                if (Array.isArray(S.wapData?.achievements) && S.wapData.achievements.length > 0) {
-                    _records = S.wapData.achievements.map(_fromDb);
-                } else {
-                    toast('⚠️ โหลดข้อมูล Support ไม่สำเร็จ: ' + (e.message || ''), 'error');
-                    _records = [];
+                let restored = false;
+                try {
+                    const cacheStr = localStorage.getItem(`wap_support_cache_${_user}`);
+                    if (cacheStr) {
+                        const parsed = JSON.parse(cacheStr);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            _records = parsed.map(_fromDb);
+                            restored = true;
+                            toast('📦 โหลดรายงานผลิตจากหน่วยความจำสำรองในเครื่องเรียบร้อย', 'info');
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[Cache Restore Error]', err);
                 }
-                _render();
+
+                if (!restored) {
+                    if (Array.isArray(S.wapData?.achievements) && S.wapData.achievements.length > 0) {
+                        _records = S.wapData.achievements.map(_fromDb);
+                    } else {
+                        toast('⚠️ โหลดข้อมูล Support ไม่สำเร็จ: ' + (e.message || ''), 'error');
+                        _records = [];
+                    }
+                }
+                applyDateFilter();
             }
         } finally {
             if (myToken === _fetchToken) _fetching = false;
@@ -9734,124 +10342,150 @@ const WapSupportLogs = (function () {
         });
 
         _filtered = temp;
+        _lastVsState = null;
         _render();
     }
 
     function _render(fromScroll = false) {
-        // Re-cache DOM elements if lost or detached
-        if (!$.tbody || !document.body.contains($.tbody)) {
-            $.tbody = document.getElementById('tableBody');
-        }
-        if (!$.count || !document.body.contains($.count)) {
-            $.count = document.getElementById('caseCount');
-        }
-        if (!$.scrollArea || !document.body.contains($.scrollArea)) {
-            $.scrollArea = document.getElementById('tableScrollArea');
-            if ($.scrollArea && !$.scrollArea._vsAttached) {
-                $.scrollArea._vsAttached = true;
-                $.scrollArea.addEventListener('scroll', () => {
-                    if (!_scrollRaf) {
-                        _scrollRaf = requestAnimationFrame(() => {
-                            _scrollRaf = null;
-                            _render(true);
-                        });
-                    }
-                }, { passive: true });
+        try {
+            // Re-cache DOM elements if lost or detached
+            if (!$.tbody || !document.body.contains($.tbody)) {
+                $.tbody = document.getElementById('tableBody');
             }
+            if (!$.count || !document.body.contains($.count)) {
+                $.count = document.getElementById('caseCount');
+            }
+            if (!$.scrollArea || !document.body.contains($.scrollArea)) {
+                $.scrollArea = document.getElementById('tableScrollArea');
+                if ($.scrollArea && !$.scrollArea._vsAttached) {
+                    $.scrollArea._vsAttached = true;
+                    $.scrollArea.addEventListener('scroll', () => {
+                        if (!_scrollRaf) {
+                            _scrollRaf = requestAnimationFrame(() => {
+                                _scrollRaf = null;
+                                _render(true);
+                            });
+                        }
+                    }, { passive: true });
+
+                    if (window.ResizeObserver && !$.scrollArea._vsRo) {
+                        $.scrollArea._vsRo = new ResizeObserver(() => {
+                            _lastVsState = null;
+                            _render();
+                        });
+                        $.scrollArea._vsRo.observe($.scrollArea);
+                    }
+                }
+            }
+
+            if (!$.tbody) return;
+
+            if ($.count) $.count.textContent = _filtered.length + ' Case Logs';
+
+            if (_filtered.length === 0) {
+                _lastVsState = null;
+                $.tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:80px;color:#cbd5e1;font-weight:600;letter-spacing:0.1em;">NO RECORDS FOUND</td></tr>`;
+                return;
+            }
+
+            const totalRows = _filtered.length;
+            const ROW_HEIGHT = 48; // Estimated average row height in px
+            const OVERSCAN = 15;   // Extra rows above/below viewport for seamless scrolling
+
+            let startIndex = 0;
+            let endIndex = totalRows;
+            let topSpacerPx = 0;
+            let bottomSpacerPx = 0;
+
+            // Virtual windowing if total rows > 25 AND scrollArea has valid height
+            if (totalRows > 25 && $.scrollArea && $.scrollArea.clientHeight > 0) {
+                const scrollTop = $.scrollArea.scrollTop || 0;
+                const clientHeight = $.scrollArea.clientHeight || 600;
+
+                startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+                endIndex = Math.min(totalRows, Math.ceil((scrollTop + clientHeight) / ROW_HEIGHT) + OVERSCAN);
+
+                topSpacerPx = startIndex * ROW_HEIGHT;
+                bottomSpacerPx = (totalRows - endIndex) * ROW_HEIGHT;
+            }
+
+            // Optimization: if scrolling and visible row window index has not changed, skip DOM re-render
+            if (fromScroll && _lastVsState && 
+                _lastVsState.startIndex === startIndex && 
+                _lastVsState.endIndex === endIndex && 
+                _lastVsState.totalRows === totalRows) {
+                return;
+            }
+
+            _lastVsState = { startIndex, endIndex, totalRows };
+
+            let htmlRows = '';
+
+            if (topSpacerPx > 0) {
+                htmlRows += `<tr class="vs-spacer" style="height:${topSpacerPx}px; border:none; background:transparent;"><td colspan="10" style="padding:0; margin:0; border:none; height:${topSpacerPx}px; line-height:0; font-size:0; pointer-events:none;"></td></tr>`;
+            }
+
+            const visibleSlice = _filtered.slice(startIndex, endIndex);
+            htmlRows += visibleSlice.map((item, relIndex) => {
+                const index = startIndex + relIndex;
+                const total = (Number(item.ok) || 0) + (Number(item.ng) || 0);
+                const ngRate = total > 0 ? Math.round((item.ng / total) * 100) : 0;
+                const delay = !fromScroll && index < 15 ? (index * 0.04).toFixed(2) : 0;
+
+                let statusCls = 'status-sf';
+                if (item.report === 'RP') statusCls = 'status-vendor';
+                if (item.report === 'RECORDS') statusCls = 'status-ctc';
+
+                const safeImg = typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : (item.imageUrl || '');
+
+                return `
+                    <tr style="${delay ? `animation-delay: ${delay}s` : ''}" data-rid="${item.id}">
+                        <td class="col-date">${item.eventDate || '-'}</td>
+                        <td class="col-problem">
+                            <div class="col-problem">
+        ${_esc(item.problem).replace(/(\d+)/g, '<span class="num-blue">$1</span>')}
+    </div>
+                        </td>
+                        <td><span class="col-action-badge">${_esc(item.action)}</span></td>
+                        <td class="col-part"><span class="text-main">${_esc(item.part)}</span></td>
+                        <td class="col-lot" style="font-family:monospace;">${_esc(item.lot)}</td>
+                        <td class="col-ok" style="text-align:center; font-weight:800; color:#059669;">${(item.ok || 0).toLocaleString()}</td>
+                        <td style="text-align:center;">
+                            <div class="col-ng-wrap">
+                                <span class="col-ng-num ${item.ng > 0 ? 'has-ng' : 'no-ng'}" style="font-weight:800;">${(item.ng || 0).toLocaleString()}</span>
+                                ${item.ng > 0 ? `<div class="col-ng-rate" style="font-size:9px; color:#ef4444; font-weight:700;">${ngRate}%</div>` : ''}
+                            </div>
+                        </td>
+                        <td style="text-align:center;"><span class="status-pill ${statusCls}">${item.report}</span></td>
+                        <td style="text-align:center;">
+                            ${safeImg ?
+                                `<span class="img-thumb" onclick="WapSupportLogs._openViewModal('${item.id}')">
+                                    <img src="${escapeHtml(safeImg)}" onerror="handleImgError(this)" style="width:100%; height:100%; object-fit:cover;" alt="Image" title="Click to view details">
+                                 </span>` :
+                                `<span style="color:#e2e8f0; font-size:10px; font-weight:700;">N/A</span>`}
+                        </td>
+                        <td>
+                            <div class="action-btns">
+                                <button  class="act-btn act-btn-view" onclick="WapSupportLogs._openViewModal('${item.id}')" data-tip="View" title="View Details" aria-label="View Details"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                                <button  class="act-btn act-btn-edit" onclick="WapSupportLogs._openFormModal('${item.id}')" data-tip="Edit" title="Edit Record" aria-label="Edit Record"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                                <button  class="act-btn act-btn-del" onclick="WapSupportLogs._confirmDelete('${item.id}')" data-tip="Delete" title="Delete Record" aria-label="Delete Record"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                            </div>
+                        </td>
+                    </tr>`;
+            }).join('');
+
+            if (bottomSpacerPx > 0) {
+                htmlRows += `<tr class="vs-spacer" style="height:${bottomSpacerPx}px; border:none; background:transparent;"><td colspan="10" style="padding:0; margin:0; border:none; height:${bottomSpacerPx}px; line-height:0; font-size:0; pointer-events:none;"></td></tr>`;
+            }
+
+            $.tbody.innerHTML = htmlRows;
+            if (!fromScroll && typeof window.animateTableRows === 'function') {
+                window.animateTableRows($.tbody, { y: 6, duration: 0.28, stagger: 0.02, ease: 'power2.out' });
+            }
+            if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
+        } catch (err) {
+            console.error('[WapSupportLogs._render Error]', err);
         }
-
-        if (!$.tbody) return;
-
-        if ($.count) $.count.textContent = _filtered.length + ' Case Logs';
-
-        if (_filtered.length === 0) {
-            $.tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:80px;color:#cbd5e1;font-weight:600;letter-spacing:0.1em;">NO RECORDS FOUND</td></tr>`;
-            return;
-        }
-
-        const totalRows = _filtered.length;
-        const ROW_HEIGHT = 48; // Estimated average row height in px
-        const OVERSCAN = 8;    // Extra rows above/below viewport
-
-        let startIndex = 0;
-        let endIndex = totalRows;
-        let topSpacerPx = 0;
-        let bottomSpacerPx = 0;
-
-        // Virtual windowing if total rows > 25
-        if (totalRows > 25 && $.scrollArea) {
-            const scrollTop = $.scrollArea.scrollTop || 0;
-            const clientHeight = $.scrollArea.clientHeight || 600;
-
-            startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-            endIndex = Math.min(totalRows, Math.ceil((scrollTop + clientHeight) / ROW_HEIGHT) + OVERSCAN);
-
-            topSpacerPx = startIndex * ROW_HEIGHT;
-            bottomSpacerPx = (totalRows - endIndex) * ROW_HEIGHT;
-        }
-
-        let htmlRows = '';
-
-        if (topSpacerPx > 0) {
-            htmlRows += `<tr class="vs-spacer" style="height:${topSpacerPx}px; border:none; background:transparent;"><td colspan="10" style="padding:0; border:none; height:${topSpacerPx}px;"></td></tr>`;
-        }
-
-        const visibleSlice = _filtered.slice(startIndex, endIndex);
-        htmlRows += visibleSlice.map((item, relIndex) => {
-            const index = startIndex + relIndex;
-            const total = (Number(item.ok) || 0) + (Number(item.ng) || 0);
-            const ngRate = total > 0 ? Math.round((item.ng / total) * 100) : 0;
-            const delay = !fromScroll && index < 15 ? (index * 0.04).toFixed(2) : 0;
-
-            let statusCls = 'status-sf';
-            if (item.report === 'RP') statusCls = 'status-vendor';
-            if (item.report === 'RECORDS') statusCls = 'status-ctc';
-
-            return `
-                <tr style="${delay ? `animation-delay: ${delay}s` : ''}" data-rid="${item.id}">
-                    <td class="col-date">${item.eventDate || '-'}</td>
-                    <td class="col-problem">
-                        <div class="col-problem">
-    ${_esc(item.problem).replace(/(\d+)/g, '<span class="num-blue">$1</span>')}
-</div>
-                    </td>
-                    <td><span class="col-action-badge">${_esc(item.action)}</span></td>
-                    <td class="col-part"><span class="text-main">${_esc(item.part)}</span></td>
-                    <td class="col-lot" style="font-family:monospace;">${_esc(item.lot)}</td>
-                    <td class="col-ok" style="text-align:center; font-weight:800; color:#059669;">${(item.ok || 0).toLocaleString()}</td>
-                    <td style="text-align:center;">
-                        <div class="col-ng-wrap">
-                            <span class="col-ng-num ${item.ng > 0 ? 'has-ng' : 'no-ng'}" style="font-weight:800;">${(item.ng || 0).toLocaleString()}</span>
-                            ${item.ng > 0 ? `<div class="col-ng-rate" style="font-size:9px; color:#ef4444; font-weight:700;">${ngRate}%</div>` : ''}
-                        </div>
-                    </td>
-                    <td style="text-align:center;"><span class="status-pill ${statusCls}">${item.report}</span></td>
-                    <td style="text-align:center;">
-                        ${item.imageUrl ?
-                            `<span class="img-thumb" onclick="WapSupportLogs._openViewModal('${item.id}')">
-                                <img  src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover;" alt="Image" title="Image">
-                             </span>` :
-                            `<span style="color:#e2e8f0; font-size:10px; font-weight:700;">N/A</span>`}
-                    </td>
-                    <td>
-                        <div class="action-btns">
-                            <button  class="act-btn act-btn-view" onclick="WapSupportLogs._openViewModal('${item.id}')" data-tip="View" title="Wap Support Logs._open View Modal" aria-label="Wap Support Logs._open View Modal"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                            <button  class="act-btn act-btn-edit" onclick="WapSupportLogs._openFormModal('${item.id}')" data-tip="Edit" title="Wap Support Logs._open Form Modal" aria-label="Wap Support Logs._open Form Modal"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                            <button  class="act-btn act-btn-del" onclick="WapSupportLogs._confirmDelete('${item.id}')" data-tip="Delete" title="Wap Support Logs._confirm Delete" aria-label="Wap Support Logs._confirm Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-                        </div>
-                    </td>
-                </tr>`;
-        }).join('');
-
-        if (bottomSpacerPx > 0) {
-            htmlRows += `<tr class="vs-spacer" style="height:${bottomSpacerPx}px; border:none; background:transparent;"><td colspan="10" style="padding:0; border:none; height:${bottomSpacerPx}px;"></td></tr>`;
-        }
-
-        $.tbody.innerHTML = htmlRows;
-        if (!fromScroll && typeof window.animateTableRows === 'function') {
-            window.animateTableRows($.tbody, { y: 6, duration: 0.28, stagger: 0.02, ease: 'power2.out' });
-        }
-        if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
     }
 
     /* ──────────────────────────────────────────
@@ -10654,6 +11288,9 @@ const WapSupportLogs = (function () {
             // Ensure problem string is set
             syncProblemSentence();
 
+            const existingRec = _editingId ? _records.find(x => String(x.id) === String(_editingId)) : null;
+            const originalCreatedAt = existingRec ? (existingRec.createdAt || existingRec.created_at) : null;
+
             const payload = {
                 id: _editingId || 'SUP-' + Date.now(),
                 user_id: S.currentUser,
@@ -10667,7 +11304,7 @@ const WapSupportLogs = (function () {
                 remark: fd.get('remark') || '',
                 event_date: fd.get('date'),
                 image_url: currentImage,
-                created_at: new Date().toISOString()
+                created_at: originalCreatedAt || new Date().toISOString()
             };
 
             try {
@@ -10817,11 +11454,17 @@ function _openViewModal(id) {
             </div>
 
             <!-- Image Section -->
-            <div style="width:100%; background:${isDark ? theme.headerBg : '#fff'}; border:1px solid ${theme.imgBorder}; border-radius:6px; display:flex; justify-content:center; align-items:center; padding:0; overflow:hidden; margin-bottom:10px;">
+            <div style="width:100%; background:${isDark ? '#020617' : '#0f172a'}; border:1px solid ${theme.imgBorder}; border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:12px; overflow:hidden; margin-bottom:10px;">
                 ${item.imageUrl 
-                    ? `<img  src="${item.imageUrl}" 
-                            onclick="WapSupportLogs._openLightbox('${item.imageUrl}')"
-                            style="max-width:100%; height:auto; max-height:380px; display:block; cursor:pointer; image-rendering: -webkit-optimize-contrast;" alt="Image" title="Image">` 
+                    ? `
+                    <div style="width:100%; max-height:480px; display:flex; justify-content:center; align-items:center;">
+                        <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
+                            onerror="handleImgError(this)"
+                            onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
+                            data-img-url="${escapeHtml(item.imageUrl)}"
+                            style="max-width:100%; max-height:450px; width:auto; height:auto; object-fit:contain; cursor:zoom-in; display:block; border-radius:6px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.5); image-rendering:-webkit-optimize-contrast;" 
+                            alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">
+                    </div>` 
                     : `<div style="padding:40px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>`
                 }
             </div>
@@ -10889,6 +11532,7 @@ function _openViewModal(id) {
         if (!r) return _blankRecord();
         const okVal = parseFloat(String(r.ok_qty ?? r.ok ?? 0).replace(/,/g, '')) || 0;
         const ngVal = parseFloat(String(r.ng_qty ?? r.ng ?? 0).replace(/,/g, '')) || 0;
+        const rawImg = r.image_url || r.imageUrl || r.evidence_img || r.image || null;
         return {
             id: r.id,
             problem: r.problem || '',
@@ -10900,7 +11544,7 @@ function _openViewModal(id) {
             report: r.report_type || r.report || 'VF',
             remark: r.remark || '',
             eventDate: r.event_date || r.eventDate || '',
-            imageUrl: r.image_url || r.imageUrl || null,
+            imageUrl: typeof formatImageUrl === 'function' ? formatImageUrl(rawImg) : rawImg,
             _user: r.user_id || r._user || '',
             createdAt: r.created_at || r.createdAt || r.event_date || r.eventDate || ''
         };
@@ -10928,8 +11572,17 @@ function _openViewModal(id) {
         _fetch();
 
         if ($.search) {
+            _search = $.search.value || '';
+            const clearBtn = document.getElementById('clearSupportSearchBtn');
+            if (clearBtn) {
+                clearBtn.classList.toggle('hidden', !_search.trim());
+            }
             $.search.oninput = (e) => {
                 _search = e.target.value;
+                const clearBtn = document.getElementById('clearSupportSearchBtn');
+                if (clearBtn) {
+                    clearBtn.classList.toggle('hidden', !_search.trim());
+                }
                 applyDateFilter();
             };
         }
@@ -10946,41 +11599,70 @@ function _openViewModal(id) {
     }
 
 /* ──────────────────────────────────────────
-       NEW: LIGHTBOX VIEWER (ขยายรูปภาพพรีเมียม)
+       NEW: LIGHTBOX VIEWER (ขยายรูปภาพพรีเมียม & Safe Preview)
        ────────────────────────────────────────── */
     function _openLightbox(url) {
-        if (!url) return;
+        const safeUrl = typeof formatImageUrl === 'function' ? formatImageUrl(url) : url;
+        if (!safeUrl) return;
+
+        const existing = document.querySelector('.lightbox-overlay');
+        if (existing) existing.remove();
 
         const lightbox = document.createElement('div');
         lightbox.className = 'lightbox-overlay';
         lightbox.innerHTML = `
             <div class="lightbox-content">
-                <button  class="lightbox-close" title="Lightbox Close" aria-label="Lightbox Close">✕</button>
-                <img  src="${url}" class="lightbox-img" alt="Image" title="Image">
-                <div style="text-align:center; color:white; margin-top:15px;">
-                    <p style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; opacity:0.8;">Case Image Preview</p>
-                    <p style="font-size:10px; opacity:0.5;">Click anywhere to close</p>
+                <div class="lightbox-toolbar">
+                    <a href="${escapeHtml(safeUrl)}" target="_blank" download="evidence-image.jpg" class="lightbox-btn" title="ดาวน์โหลดรูปภาพขนาดเต็ม" onclick="event.stopPropagation()">
+                        ⬇️ ดาวน์โหลดรูป
+                    </a>
+                    <a href="${escapeHtml(safeUrl)}" target="_blank" class="lightbox-btn" title="เปิดรูปในแท็บใหม่เพื่อดูความละเอียดสูงสุด" onclick="event.stopPropagation()">
+                        🔗 เปิดในแท็บใหม่ (100% HD)
+                    </a>
+                    <button class="lightbox-close" title="ปิดหน้าต่าง (Close)" aria-label="Close Preview">✕</button>
+                </div>
+                <div class="lightbox-img-wrapper">
+                    <img src="${escapeHtml(safeUrl)}" onerror="handleImgError(this)" class="lightbox-img" alt="Evidence Photo Full Screen" title="รูปภาพหลักฐานขนาดเต็ม">
+                </div>
+                <div style="text-align:center; color:white; margin-top:8px;">
+                    <p style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; opacity:0.9; margin:0;">Case Image Preview (Full Screen)</p>
+                    <p style="font-size:10px; opacity:0.6; margin:3px 0 0 0;">กดปุ่ม ✕ หรือคลิกที่ใดก็ได้นอกรูปภาพเพื่อปิด</p>
                 </div>
             </div>
         `;
 
         document.body.appendChild(lightbox);
 
-        // เล่น Animation ด้วย GSAP
         requestAnimationFrame(() => {
             lightbox.style.opacity = '1';
-            lightbox.querySelector('.lightbox-content').style.transform = 'scale(1)';
+            const cnt = lightbox.querySelector('.lightbox-content');
+            if (cnt) cnt.style.transform = 'scale(1)';
         });
 
-        // ปิด Lightbox
         const closeLB = () => {
             lightbox.style.opacity = '0';
-            lightbox.querySelector('.lightbox-content').style.transform = 'scale(0.9)';
-            setTimeout(() => lightbox.remove(), 400);
+            const cnt = lightbox.querySelector('.lightbox-content');
+            if (cnt) cnt.style.transform = 'scale(0.95)';
+            setTimeout(() => lightbox.remove(), 250);
         };
 
-        lightbox.onclick = closeLB;
-        lightbox.querySelector('.lightbox-close').onclick = closeLB;
+        lightbox.onclick = (e) => {
+            if (e.target === lightbox || e.target.classList.contains('lightbox-close') || e.target.classList.contains('lightbox-img-wrapper')) {
+                closeLB();
+            }
+        };
+        const closeBtn = lightbox.querySelector('.lightbox-close');
+        if (closeBtn) closeBtn.onclick = closeLB;
+    }
+
+    function setSearch(val) {
+        _search = val || '';
+        if ($.search) $.search.value = _search;
+        const clearBtn = document.getElementById('clearSupportSearchBtn');
+        if (clearBtn) {
+            clearBtn.classList.toggle('hidden', !_search.trim());
+        }
+        applyDateFilter();
     }
 
     function destroy() {
@@ -10989,18 +11671,34 @@ function _openViewModal(id) {
     }
 
 return {
-        init, destroy, applyDateFilter,
+        init, destroy, applyDateFilter, setSearch,
         _openViewModal,
         _openFormModal,
         _confirmDelete,
-        _openLightbox, // <--- เพิ่มบรรทัดนี้
+        _openLightbox,
         showPartAC,  
         selectPartAC,  
-        calcNG
+        calcNG,
+        getFilteredRecords: () => _filtered
     };
 
 
 })();
+
+window.clearSupportSearch = function() {
+    const input = document.getElementById('searchInput');
+    const clearBtn = document.getElementById('clearSupportSearchBtn');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    if (clearBtn) {
+        clearBtn.classList.add('hidden');
+    }
+    if (typeof WapSupportLogs !== 'undefined' && typeof WapSupportLogs.setSearch === 'function') {
+        WapSupportLogs.setSearch('');
+    }
+};
 
 /**
  * ═══════════════════════════════════════════════════════
@@ -13294,13 +13992,25 @@ function applyClaimDashPreset(type) {
     if (type === 'today') {
         start = now;
         const btn = document.getElementById('cd-preset-today');
-        btn.classList.replace('bg-white', 'bg-blue-600');
-        btn.classList.replace('text-slate-500', 'text-white');
+        if (btn) {
+            btn.classList.replace('bg-white', 'bg-blue-600');
+            btn.classList.replace('text-slate-500', 'text-white');
+        }
+    } else if (type === '7days') {
+        start = new Date();
+        start.setDate(now.getDate() - 6);
+        const btn = document.getElementById('cd-preset-7days');
+        if (btn) {
+            btn.classList.replace('bg-white', 'bg-blue-600');
+            btn.classList.replace('text-slate-500', 'text-white');
+        }
     } else if (type === 'month') {
         start = new Date(now.getFullYear(), now.getMonth(), 1);
         const btn = document.getElementById('cd-preset-month');
-        btn.classList.replace('bg-white', 'bg-blue-600');
-        btn.classList.replace('text-slate-500', 'text-white');
+        if (btn) {
+            btn.classList.replace('bg-white', 'bg-blue-600');
+            btn.classList.replace('text-slate-500', 'text-white');
+        }
     }
 
     claimDashFilterDate.start = start.toISOString().split('T')[0];
@@ -13310,7 +14020,8 @@ function applyClaimDashPreset(type) {
     document.getElementById('cd-start-date').value = claimDashFilterDate.start;
     document.getElementById('cd-end-date').value = claimDashFilterDate.end;
 
-    toast(`📅 แสดงข้อมูล: ${type === 'today' ? 'วันนี้' : 'เดือนนี้'}`, 'info');
+    const typeLabel = type === 'today' ? 'วันนี้' : (type === '7days' ? '7 วันล่าสุด' : 'เดือนนี้');
+    toast(`📅 แสดงข้อมูล: ${typeLabel}`, 'info');
     updateAllModuleFilters(); 
 }
 
@@ -13735,7 +14446,20 @@ const translations = {
         // --- ปุ่มสลับหน้า (Pill Buttons) และหัวข้อ Header ---
         tab_claim_entry: "บันทึกเคลม",
         tab_dashboard: "แดชบอร์ด",
-        header_title_claim: "บันทึกเคลมพาร์ท"
+        header_title_claim: "บันทึกเคลมพาร์ท",
+
+        // --- หัวตารางทะเบียนเคสและรายงานผลิต ---
+        table_case_register: "ทะเบียนเคสและรายงานผลิต",
+        th_date: "วันที่บันทึก",
+        th_problem: "รายละเอียดปัญหาที่ตรวจพบ",
+        th_action: "การแก้ไข",
+        th_part: "กลุ่มพาร์ท (PART Group)",
+        th_lot: "LOT NO.",
+        th_ok: "OK (ดี)",
+        th_ng: "NG (เสีย)",
+        th_type: "ประเภท",
+        th_photo: "รูปภาพ",
+        th_manage: "จัดการ"
     },
     en: {
         // --- หัวข้อหมวดหมู่ Sidebar ---
@@ -13753,12 +14477,25 @@ const translations = {
         nav_skill_matrix: "Skill Matrix",
         nav_special_jobs: "Special Jobs",
         nav_ot: "OT Management",
-        nav_sme: "SQE EN", // ใส่คอมม่าปิดท้ายบรรทัดนี้ด้วย
+        nav_sme: "SQE EN",
 
         // --- ปุ่มสลับหน้า (Pill Buttons) และหัวข้อ Header ---
         tab_claim_entry: "PART CLAIM",
         tab_dashboard: "DASHBOARD",
-        header_title_claim: "PART LINE CLAIM"
+        header_title_claim: "PART LINE CLAIM",
+
+        // --- Table Headers & Titles ---
+        table_case_register: "Case Register & Production Logs",
+        th_date: "RECORD DATE",
+        th_problem: "PROBLEM DETAILS",
+        th_action: "CORRECTION",
+        th_part: "PART Group",
+        th_lot: "LOT NO.",
+        th_ok: "OK (QTY)",
+        th_ng: "NG (QTY)",
+        th_type: "CATEGORY",
+        th_photo: "PHOTO",
+        th_manage: "ACTION"
     }
 };
 
@@ -14018,6 +14755,375 @@ async function syncSystemBanner() {
         console.error("Banner Sync Error:", err);
     }
 }
+
+/**
+ * ═══════════════════════════════════════════════════════
+ *  SQE INDEXEDDB MAINTENANCE & OPTIMIZATION ENGINE
+ * ═══════════════════════════════════════════════════════
+ */
+const SQEIndexedDBManager = (function() {
+    const DB_NAME = 'SQE_Portal_IDB';
+    const DB_VERSION = 1;
+    let _dbPromise = null;
+
+    function openDB() {
+        if (_dbPromise) return _dbPromise;
+
+        _dbPromise = new Promise((resolve, reject) => {
+            if (!('indexedDB' in window)) {
+                reject(new Error('IndexedDB is not supported in this environment'));
+                return;
+            }
+
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+
+                // 1. Store สำหรับตารางและรายงานผลิต (table_cache)
+                if (!db.objectStoreNames.contains('table_cache')) {
+                    const tableStore = db.createObjectStore('table_cache', { keyPath: 'id' });
+                    tableStore.createIndex('module', 'module', { unique: false });
+                    tableStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+                    tableStore.createIndex('isStale', 'isStale', { unique: false });
+                }
+
+                // 2. Store สำหรับดัชนีการค้นหาและฟิลเตอร์ (stale_indices)
+                if (!db.objectStoreNames.contains('stale_indices')) {
+                    const indexStore = db.createObjectStore('stale_indices', { keyPath: 'indexKey' });
+                    indexStore.createIndex('module', 'module', { unique: false });
+                    indexStore.createIndex('lastAccessed', 'lastAccessed', { unique: false });
+                    indexStore.createIndex('status', 'status', { unique: false });
+                }
+
+                // 3. Store สำหรับบันทึกประวัติการทำ Vacuum Maintenance
+                if (!db.objectStoreNames.contains('vacuum_logs')) {
+                    db.createObjectStore('vacuum_logs', { keyPath: 'id', autoIncrement: true });
+                }
+            };
+
+            request.onsuccess = (e) => {
+                resolve(e.target.result);
+            };
+
+            request.onerror = (e) => {
+                console.error('[IndexedDB] Open error:', e.target.error);
+                reject(e.target.error);
+            };
+        });
+
+        return _dbPromise;
+    }
+
+    // บันทึกรายงาน / ข้อมูลตารางเข้า IndexedDB
+    async function saveTableCache(moduleName, records) {
+        try {
+            const db = await openDB();
+            const tx = db.transaction(['table_cache', 'stale_indices'], 'readwrite');
+            const tableStore = tx.objectStore('table_cache');
+            const indexStore = tx.objectStore('stale_indices');
+
+            const now = Date.now();
+
+            if (Array.isArray(records)) {
+                records.forEach(rec => {
+                    const recId = rec.id || `${moduleName}_${Math.random().toString(36).substr(2, 9)}`;
+                    tableStore.put({
+                        id: String(recId),
+                        module: moduleName,
+                        data: rec,
+                        updatedAt: now,
+                        isStale: 0
+                    });
+                });
+            }
+
+            // อัปเดต Search Index Metadata
+            const idxKey = `idx_${moduleName}`;
+            indexStore.put({
+                indexKey: idxKey,
+                module: moduleName,
+                lastAccessed: now,
+                status: 'active',
+                recordCount: Array.isArray(records) ? records.length : 0
+            });
+
+            return new Promise((resolve) => {
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => resolve(false);
+            });
+        } catch (err) {
+            console.warn('[IndexedDB] Save cache error:', err);
+            return false;
+        }
+    }
+
+    // อ่านข้อมูลจาก IndexedDB Cache
+    async function getTableCache(moduleName) {
+        try {
+            const db = await openDB();
+            const tx = db.transaction('table_cache', 'readonly');
+            const store = tx.objectStore('table_cache');
+            const index = store.index('module');
+
+            return new Promise((resolve) => {
+                const request = index.getAll(moduleName);
+                request.onsuccess = () => {
+                    const results = request.result || [];
+                    resolve(results.map(r => r.data));
+                };
+                request.onerror = () => resolve([]);
+            });
+        } catch (err) {
+            console.warn('[IndexedDB] Get cache error:', err);
+            return [];
+        }
+    }
+
+    // ดึงสถิติการใช้งาน IndexedDB ปัจจุบัน
+    async function getStats() {
+        try {
+            const db = await openDB();
+            const tx = db.transaction(['table_cache', 'stale_indices'], 'readonly');
+            const tableStore = tx.objectStore('table_cache');
+            const indexStore = tx.objectStore('stale_indices');
+
+            const tableCountReq = tableStore.count();
+            const indexCountReq = indexStore.count();
+
+            await new Promise((res) => { tx.oncomplete = res; tx.onerror = res; });
+
+            return {
+                records: tableCountReq.result || 0,
+                indices: indexCountReq.result || 0
+            };
+        } catch (e) {
+            return { records: 0, indices: 0 };
+        }
+    }
+
+    // บันทึกแบบร่างฟอร์ม (Form Draft) ลง IndexedDB
+    async function saveDraft(formId, draftData) {
+        try {
+            const db = await openDB();
+            const tx = db.transaction('table_cache', 'readwrite');
+            const store = tx.objectStore('table_cache');
+            store.put({
+                id: `draft_${formId}`,
+                module: 'form_drafts',
+                data: draftData,
+                updatedAt: Date.now(),
+                isStale: 0
+            });
+            try { localStorage.setItem(`sqe_draft_${formId}`, JSON.stringify(draftData)); } catch (e) {}
+            return new Promise((res) => { tx.oncomplete = () => res(true); tx.onerror = () => res(false); });
+        } catch (err) {
+            try { localStorage.setItem(`sqe_draft_${formId}`, JSON.stringify(draftData)); } catch (e) {}
+            return false;
+        }
+    }
+
+    // ดึงแบบร่างฟอร์ม (Form Draft) จาก IndexedDB
+    async function getDraft(formId) {
+        try {
+            const db = await openDB();
+            const tx = db.transaction('table_cache', 'readonly');
+            const store = tx.objectStore('table_cache');
+            const req = store.get(`draft_${formId}`);
+            const result = await new Promise((res) => {
+                req.onsuccess = () => res(req.result ? req.result.data : null);
+                req.onerror = () => res(null);
+            });
+            if (result) return result;
+        } catch (err) {}
+        try {
+            const ls = localStorage.getItem(`sqe_draft_${formId}`);
+            return ls ? JSON.parse(ls) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // ลบแบบร่างฟอร์ม (Form Draft) ออกจาก IndexedDB
+    async function clearDraft(formId) {
+        try {
+            const db = await openDB();
+            const tx = db.transaction('table_cache', 'readwrite');
+            const store = tx.objectStore('table_cache');
+            store.delete(`draft_${formId}`);
+            try { localStorage.removeItem(`sqe_draft_${formId}`); } catch (e) {}
+            return new Promise((res) => { tx.oncomplete = () => res(true); tx.onerror = () => res(false); });
+        } catch (err) {
+            try { localStorage.removeItem(`sqe_draft_${formId}`); } catch (e) {}
+            return false;
+        }
+    }
+
+    /**
+     * 🧹 VACUUM & CLEAR STALE INDICES MAINTENANCE OPERATION
+     * - ล้างดัชนีเก่า (Stale Indices) ที่หมดอายุ (>24 ชม. หรือเลิกใช้งาน)
+     * - ล้าง Cache Records ที่ตกค้าง
+     * - Re-index Object Stores เพื่อเพิ่มความเร็วในการอ่านข้อมูล (Faster Data Retrieval)
+     * - Compact & Defragment IndexedDB Storage
+     */
+    async function performVacuum(options = {}) {
+        const startTime = performance.now();
+        const maxAgeMs = options.maxAgeMs !== undefined ? options.maxAgeMs : (12 * 60 * 60 * 1000); // Default 12 ชม.
+        const now = Date.now();
+        const cutoffTime = now - maxAgeMs;
+
+        let staleIndicesRemoved = 0;
+        let staleRecordsRemoved = 0;
+        let storesVacuumed = 0;
+        let freedBytesEstimate = 0;
+
+        try {
+            const db = await openDB();
+
+            // STEP 1: กวาดล้าง Stale Indices
+            const txIndices = db.transaction('stale_indices', 'readwrite');
+            const indexStore = txIndices.objectStore('stale_indices');
+            const allIndicesReq = indexStore.getAll();
+
+            await new Promise((res) => { txIndices.oncomplete = res; txIndices.onerror = res; });
+
+            const allIndices = allIndicesReq.result || [];
+            const txIndicesClean = db.transaction('stale_indices', 'readwrite');
+            const indexStoreClean = txIndicesClean.objectStore('stale_indices');
+
+            for (const idx of allIndices) {
+                if (idx.lastAccessed < cutoffTime || idx.status === 'stale' || !idx.lastAccessed || options.maxAgeMs === 0) {
+                    indexStoreClean.delete(idx.indexKey);
+                    staleIndicesRemoved++;
+                    freedBytesEstimate += 512;
+                }
+            }
+            await new Promise((res) => { txIndicesClean.oncomplete = res; txIndicesClean.onerror = res; });
+
+            // STEP 2: กวาดล้าง Stale Table Records และ Re-index Stores
+            const txTable = db.transaction('table_cache', 'readwrite');
+            const tableStore = txTable.objectStore('table_cache');
+            const allTableReq = tableStore.getAll();
+
+            await new Promise((res) => { txTable.oncomplete = res; txTable.onerror = res; });
+
+            const allRecords = allTableReq.result || [];
+            const activeRecords = [];
+
+            const txTableClean = db.transaction('table_cache', 'readwrite');
+            const tableStoreClean = txTableClean.objectStore('table_cache');
+
+            for (const item of allRecords) {
+                if ((item.updatedAt < cutoffTime && options.maxAgeMs > 0) || item.isStale === 1 || !item.data) {
+                    tableStoreClean.delete(item.id);
+                    staleRecordsRemoved++;
+                    freedBytesEstimate += JSON.stringify(item).length * 2;
+                } else {
+                    activeRecords.push(item);
+                }
+            }
+            await new Promise((res) => { txTableClean.oncomplete = res; txTableClean.onerror = res; });
+
+            // STEP 3: VACUUM COMPACTION - Re-writing active data to compact B-tree storage layout
+            if (options.forceReindex && activeRecords.length > 0) {
+                const txCompact = db.transaction('table_cache', 'readwrite');
+                const storeCompact = txCompact.objectStore('table_cache');
+                storeCompact.clear();
+                activeRecords.forEach(rec => {
+                    rec.updatedAt = now;
+                    storeCompact.put(rec);
+                });
+                await new Promise((res) => { txCompact.oncomplete = res; txCompact.onerror = res; });
+                storesVacuumed++;
+            }
+
+            // STEP 4: บันทึก Log การทำ Maintenance
+            const txLog = db.transaction('vacuum_logs', 'readwrite');
+            const logStore = txLog.objectStore('vacuum_logs');
+            const durationMs = Math.round(performance.now() - startTime);
+
+            logStore.add({
+                timestamp: now,
+                staleIndicesRemoved,
+                staleRecordsRemoved,
+                freedBytesEstimate,
+                durationMs
+            });
+
+            // STEP 5: ขอ Persistence จากเบราว์เซอร์
+            if (navigator.storage && navigator.storage.persist) {
+                navigator.storage.persist().catch(() => {});
+            }
+
+            const kbFreed = (freedBytesEstimate / 1024).toFixed(1);
+            console.log(`[IndexedDB Vacuum] Complete in ${durationMs}ms: Removed ${staleIndicesRemoved} stale indices, ${staleRecordsRemoved} stale records (~${kbFreed} KB optimized).`);
+
+            return {
+                success: true,
+                staleIndicesRemoved,
+                staleRecordsRemoved,
+                durationMs,
+                kbFreed
+            };
+        } catch (err) {
+            console.error('[IndexedDB Vacuum] Execution failed:', err);
+            return {
+                success: false,
+                error: err.message,
+                staleIndicesRemoved,
+                staleRecordsRemoved,
+                durationMs: Math.round(performance.now() - startTime),
+                kbFreed: '0.0'
+            };
+        }
+    }
+
+    return {
+        openDB,
+        saveTableCache,
+        getTableCache,
+        getStats,
+        saveDraft,
+        getDraft,
+        clearDraft,
+        performVacuum
+    };
+})();
+
+window.SQEIndexedDBManager = SQEIndexedDBManager;
+window.performIDBVacuum = async function() {
+    if (typeof toast === 'function') toast('🧹 กำลังทำความสะอาดดัชนีเก่าและ Vacuum IndexedDB...', 'info');
+    const result = await SQEIndexedDBManager.performVacuum({ forceReindex: true, maxAgeMs: 0 });
+    if (result.success) {
+        if (typeof toast === 'function') {
+            toast(`✨ IndexedDB Vacuum สำเร็จ! ล้าง ${result.staleIndicesRemoved} ดัชนีเก่า & ${result.staleRecordsRemoved} รายการค้าง (~${result.kbFreed} KB) ใน ${result.durationMs}ms`, 'success');
+        }
+        if (typeof updateIDBMetricsDisplay === 'function') {
+            updateIDBMetricsDisplay();
+        }
+    } else {
+        if (typeof toast === 'function') toast(`⚠️ ไม่สามารถทำ Vacuum ได้: ${result.error}`, 'error');
+    }
+    return result;
+};
+
+async function updateIDBMetricsDisplay() {
+    const elText = document.getElementById('idb-metrics-text');
+    const elBadge = document.getElementById('idb-status-badge');
+    if (!elText) return;
+
+    if (window.SQEIndexedDBManager) {
+        const stats = await SQEIndexedDBManager.getStats();
+        elText.textContent = `Active Cached Table Records: ${stats.records} | Active Search/Filter Indices: ${stats.indices}`;
+        if (elBadge) {
+            elBadge.textContent = 'Optimized';
+            elBadge.className = 'px-2 py-0.5 text-[9px] font-mono bg-emerald-950/80 text-emerald-300 rounded border border-emerald-500/40';
+        }
+    } else {
+        elText.textContent = 'IndexedDB Engine Standard Mode';
+    }
+}
+window.updateIDBMetricsDisplay = updateIDBMetricsDisplay;
 
 /**
  * ═══════════════════════════════════════════════════════
@@ -14406,7 +15512,7 @@ async function init() {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="4" class="p-4 border-none">
-                        <div class="bg-slate-950 border border-emerald-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden font-mono">
+                        <div class="bg-slate-950 border border-emerald-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden font-mono space-y-6">
                             <div class="flex flex-col md:flex-row gap-6 relative z-10">
                                 <div class="flex-shrink-0 w-full md:w-48">
                                     <label class="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-2 block">System Version</label>
@@ -14432,11 +15538,36 @@ async function init() {
                                     </button>
                                 </div>
                             </div>
+
+                            <!-- INDEXEDDB VACUUM & STALE INDEX MAINTENANCE BLOCK -->
+                            <div class="pt-6 border-t border-slate-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-bold text-lg shadow-lg shadow-cyan-500/10">🧹</div>
+                                    <div>
+                                        <div class="text-xs font-black text-cyan-300 uppercase tracking-wide flex items-center gap-2">
+                                            IndexedDB Engine & Cache Optimization
+                                            <span id="idb-status-badge" class="px-2 py-0.5 text-[9px] font-mono bg-cyan-900/60 text-cyan-200 rounded border border-cyan-500/30">Active</span>
+                                        </div>
+                                        <div class="text-[10px] font-mono text-slate-400 mt-0.5" id="idb-metrics-text">
+                                            Checking storage statistics...
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 w-full md:w-auto">
+                                    <button onclick="window.performIDBVacuum()" class="h-10 px-5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 border border-cyan-400/30 w-full md:w-auto" title="Clear Stale Indices & Vacuum IndexedDB" aria-label="Clear Stale Indices & Vacuum IndexedDB">
+                                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                        Clear Stale Indices & Vacuum DB
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </td>
                 </tr>
             `;
             loadCurrentVersionToInput();
+            if (typeof updateIDBMetricsDisplay === 'function') {
+                updateIDBMetricsDisplay();
+            }
             document.getElementById('admin-record-count').textContent = `SYSTEM CONTROL ACTIVE`;
             return;
         }
@@ -14509,20 +15640,20 @@ async function init() {
                         </td>
                         <td class="px-6 py-3 text-right">
                             <div class="flex justify-end gap-1.5">
-                                <button  onclick="WapAdminSystem.setForceReset('${u.id}', '${safeEmail}')" 
-                                        class="p-1.5 rounded-lg text-amber-400 hover:text-white hover:bg-amber-900/60 border border-amber-500/30 transition-all active:scale-95" 
-                                        title="${isReset ? 'Reset Key Pending' : 'Force Key Reset'}" aria-label="Force Reset">
+                                <button  onclick="WapAdminSystem.openResetSecurityModal('${u.id}')" 
+                                        class="p-1.5 rounded-lg text-amber-400 hover:text-white hover:bg-amber-900/60 border border-amber-500/30 transition-all active:scale-95 shadow-sm" 
+                                        title="Security Key & Reset Control" aria-label="Security Control">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M15 7a2 2 0 012 2m-2-2a2 2 0 00-2 2m2-2V5a2 2 0 10-4 0v2m4 0h-4m-1 0h-1a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1"/></svg>
                                 </button>
                                 <button  onclick="WapAdminSystem.openEditUserModal('${u.id}')" 
-                                        class="p-1.5 rounded-lg text-cyan-400 hover:text-white hover:bg-cyan-600/80 transition-all border border-cyan-500/30 active:scale-95" 
+                                        class="p-1.5 rounded-lg text-cyan-400 hover:text-white hover:bg-cyan-600/80 transition-all border border-cyan-500/30 active:scale-95 shadow-sm" 
                                         title="Edit Agent Account" aria-label="Edit User">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                         <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
                                 </button>
                                 <button  onclick="WapAdminSystem.openDeleteUserModal('${u.id}')" 
-                                        class="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-600/80 transition-all border border-rose-500/30 active:scale-95" 
+                                        class="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-600/80 transition-all border border-rose-500/30 active:scale-95 shadow-sm" 
                                         title="Delete Agent Account" aria-label="Delete User">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                         <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -14922,8 +16053,161 @@ async function init() {
         });
     }
 
+    function openResetSecurityModal(userId) {
+        const user = _data.users.find(u => String(u.id) === String(userId));
+        if (!user) return toast("ไม่พบข้อมูลผู้ใช้งาน", "error");
+
+        const modal = document.getElementById('admin-master-modal');
+        const content = document.getElementById('master-modal-content');
+        if (!modal || !content) return;
+
+        modal.classList.remove('hidden-view');
+        const safeEmail = user.email || 'unknown@carrier.com';
+        const safePass = user.password || '****';
+        const isReset = !!user.force_reset || !!user.is_reset_key_required;
+
+        content.innerHTML = `
+            <div class="space-y-4 text-left font-mono">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 class="text-sm font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> Security Key & Reset Control
+                    </h3>
+                    <span class="text-[9px] px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-700">AGENT ID: ${user.id}</span>
+                </div>
+
+                <div class="bg-black/80 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-400">Carrier Email:</span>
+                        <span class="font-bold text-cyan-300">${safeEmail}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-400">Current Key:</span>
+                        <code id="adm-sec-key-disp" class="bg-slate-900 px-2.5 py-1 rounded text-amber-300 font-bold border border-amber-500/20">${safePass}</code>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-400">Force Reset Status:</span>
+                        <span id="adm-sec-reset-status" class="px-2 py-0.5 rounded text-[9px] font-bold ${isReset ? 'bg-rose-950 text-rose-300 border border-rose-500/40' : 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'}">
+                            ${isReset ? '⚠️ PENDING RESET' : '✅ NORMAL'}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="space-y-2.5">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quick Actions</p>
+
+                    <button onclick="WapAdminSystem.copyUserCredentials('${safeEmail}', '${safePass}')"
+                            class="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-slate-100 font-bold text-xs rounded-xl flex items-center justify-between border border-slate-700 transition-all active:scale-[0.99]" title="Copy Credentials" aria-label="Copy Credentials">
+                        <span class="flex items-center gap-2">📋 Copy Credentials (Email & Password)</span>
+                        <span class="text-[9px] text-cyan-400 font-mono font-black">COPY</span>
+                    </button>
+
+                    <button onclick="WapAdminSystem.toggleForceResetState('${user.id}')"
+                            class="w-full py-2.5 px-3 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 font-bold text-xs rounded-xl flex items-center justify-between border border-amber-500/40 transition-all active:scale-[0.99]" title="Toggle Force Reset" aria-label="Toggle Force Reset">
+                        <span class="flex items-center gap-2">🔑 Toggle Force Reset on Next Login</span>
+                        <span class="text-[9px] text-amber-400 font-mono font-black">${isReset ? 'DISABLE RESET' : 'FORCE RESET'}</span>
+                    </button>
+
+                    <div class="p-3 bg-black/90 rounded-xl border border-slate-800 space-y-2">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase block">Generate & Apply New Password</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="adm-sec-new-pass" value="SQE-${Math.floor(1000 + Math.random() * 9000)}" class="flex-1 h-9 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs font-bold text-emerald-300 font-mono outline-none focus:border-emerald-500" title="New Password" aria-label="New Password">
+                            <button onclick="WapAdminSystem.applyNewSecurityKey('${user.id}')" class="px-4 h-9 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg border border-emerald-400/30 transition-all shadow-md active:scale-95" title="Apply Key" aria-label="Apply Key">
+                                Apply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button onclick="WapAdminSystem.closeMasterModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all" title="Close Modal" aria-label="Close Modal">
+                        Close
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    async function copyUserCredentials(email, pass) {
+        const text = `Email: ${email}\nPassword: ${pass}`;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+            toast("📋 คัดลอกข้อมูลเข้าใช้งานเรียบร้อย", "success");
+        } catch (e) {
+            toast("คัดลอกไม่สำเร็จ: " + e.message, "error");
+        }
+    }
+
+    async function toggleForceResetState(userId) {
+        const user = _data.users.find(u => String(u.id) === String(userId));
+        if (!user) return toast("ไม่พบข้อมูลผู้ใช้งาน", "error");
+
+        const currentVal = !!user.force_reset || !!user.is_reset_key_required;
+        const newVal = !currentVal;
+
+        showLoader(true);
+        try {
+            const { error } = await sqeClient.from('users').update({ 
+                force_reset: newVal, 
+                is_reset_key_required: newVal 
+            }).eq('id', userId);
+
+            if (error) throw error;
+
+            user.force_reset = newVal;
+            user.is_reset_key_required = newVal;
+
+            writeAuditLog('USER_FORCE_RESET_TOGGLE', `ปรับสถานะ Force Reset ให้กับ ${user.email}: ${newVal ? 'ENABLED' : 'DISABLED'}`);
+            toast(newVal ? "🔑 ตั้งค่าบังคับรีเซ็ตรหัสผ่านแล้ว" : "✅ ยกเลิกการบังคับรีเซ็ตรหัสผ่านแล้ว", "success");
+            
+            openResetSecurityModal(userId);
+            renderTable();
+            updateStats();
+        } catch (e) {
+            toast("ดำเนินการไม่สำเร็จ: " + (e.message || ''), "error");
+        }
+        showLoader(false);
+    }
+
+    async function applyNewSecurityKey(userId) {
+        const user = _data.users.find(u => String(u.id) === String(userId));
+        if (!user) return toast("ไม่พบข้อมูลผู้ใช้งาน", "error");
+
+        const newPass = document.getElementById('adm-sec-new-pass')?.value.trim();
+        if (!newPass) return toast("กรุณาระบุรหัสผ่านใหม่", "error");
+
+        showLoader(true);
+        try {
+            const { error } = await sqeClient.from('users').update({ 
+                password: newPass,
+                updated_at: new Date()
+            }).eq('id', userId);
+
+            if (error) throw error;
+
+            user.password = newPass;
+
+            writeAuditLog('USER_KEY_RESET', `ตั้งค่ารหัสผ่านใหม่ให้กับ ${user.email}`);
+            toast("⚡ เปลี่ยนรหัสผ่านใหม่สำเร็จ", "success");
+            
+            openResetSecurityModal(userId);
+            renderTable();
+            updateStats();
+        } catch (e) {
+            toast("เปลี่ยนรหัสผ่านไม่สำเร็จ: " + (e.message || ''), "error");
+        }
+        showLoader(false);
+    }
+
     function openEditUserModal(userId) {
-        const user = _data.users.find(u => u.id === userId);
+        const user = _data.users.find(u => String(u.id) === String(userId));
         if (!user) return toast("ไม่พบข้อมูลผู้ใช้งาน", "error");
 
         const modal = document.getElementById('admin-master-modal');
@@ -14935,40 +16219,48 @@ async function init() {
         const safePass = user.password || '';
         const currentRole = user.role || 'staff';
         const currentStatus = user.status || 'active';
+        const isForceReset = !!user.force_reset || !!user.is_reset_key_required;
 
         content.innerHTML = `
-            <h3 class="text-base font-black mb-4 uppercase text-cyan-400 tracking-widest flex items-center justify-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span> Edit Agent Account
-            </h3>
-            <div class="space-y-3 text-left">
-                <div>
-                    <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Carrier Email</label>
-                    <input  type="email" id="adm-edit-email" value="${safeEmail}" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="name@carrier.com" title="Name@Carrier.Com" aria-label="Name@Carrier.Com">
-                </div>
-                <div>
-                    <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Security Key (Password)</label>
-                    <input  type="text" id="adm-edit-pass" value="${safePass}" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="รหัสผ่านเข้าเครื่อง" title="รหัสผ่านเข้าเครื่อง" aria-label="รหัสผ่านเข้าเครื่อง">
-                </div>
-                <div class="grid grid-cols-2 gap-2">
+            <div class="space-y-4 text-left font-mono">
+                <h3 class="text-base font-black uppercase text-cyan-400 tracking-widest flex items-center justify-center gap-2 border-b border-slate-800 pb-3">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span> Edit Agent Account
+                </h3>
+                <div class="space-y-3">
                     <div>
-                        <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Clearance Role</label>
-                        <select  id="adm-edit-role" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" title="Adm Edit Role" aria-label="Adm Edit Role">
-                            <option value="staff" ${currentRole === 'staff' ? 'selected' : ''}>Staff (บันทึกข้อมูล)</option>
-                            <option value="supervisor" ${currentRole === 'supervisor' ? 'selected' : ''}>Supervisor (ดูรายงาน)</option>
-                        </select>
+                        <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Carrier Email</label>
+                        <input  type="email" id="adm-edit-email" value="${safeEmail}" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="name@carrier.com" title="Email" aria-label="Email">
                     </div>
                     <div>
-                        <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Account Status</label>
-                        <select  id="adm-edit-status" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" title="Adm Edit Status" aria-label="Adm Edit Status">
-                            <option value="active" ${currentStatus === 'active' ? 'selected' : ''}>ACTIVE</option>
-                            <option value="inactive" ${currentStatus === 'inactive' ? 'selected' : ''}>INACTIVE</option>
-                        </select>
+                        <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Security Key (Password)</label>
+                        <input  type="text" id="adm-edit-pass" value="${safePass}" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" placeholder="รหัสผ่านเข้าใช้งาน" title="Password" aria-label="Password">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Clearance Role</label>
+                            <select  id="adm-edit-role" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" title="Clearance Role" aria-label="Clearance Role">
+                                <option value="staff" ${currentRole === 'staff' ? 'selected' : ''}>Staff (บันทึกข้อมูล)</option>
+                                <option value="supervisor" ${currentRole === 'supervisor' ? 'selected' : ''}>Supervisor (ดูรายงาน)</option>
+                                <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>Admin (จัดการระบบ)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Account Status</label>
+                            <select  id="adm-edit-status" class="w-full h-10 px-3 bg-black border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-cyan-300 font-mono outline-none" title="Account Status" aria-label="Account Status">
+                                <option value="active" ${currentStatus === 'active' ? 'selected' : ''}>ACTIVE</option>
+                                <option value="inactive" ${currentStatus === 'inactive' ? 'selected' : ''}>INACTIVE</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pt-1 flex items-center gap-2">
+                        <input  type="checkbox" id="adm-edit-force" ${isForceReset ? 'checked' : ''} class="w-4 h-4 rounded border-slate-700 accent-cyan-500 cursor-pointer" title="Force Reset" aria-label="Force Reset">
+                        <label for="adm-edit-force" class="text-xs text-slate-300 font-bold cursor-pointer">บังคับให้เปลี่ยนรหัสผ่านเมื่อเข้าใช้งานครั้งถัดไป</label>
                     </div>
                 </div>
-            </div>
-            <div class="flex gap-3 mt-6">
-                <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Wap Admin System.Close Master Modal" aria-label="Wap Admin System.Close Master Modal">Cancel</button>
-                <button  onclick="WapAdminSystem.updateUser('${user.id}')" class="flex-[2] h-10 bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-cyan-500/20 border border-cyan-400/30" title="Wap Admin System.Update User" aria-label="Wap Admin System.Update User">Save Changes</button>
+                <div class="flex gap-3 mt-6">
+                    <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Cancel" aria-label="Cancel">Cancel</button>
+                    <button  onclick="WapAdminSystem.updateUser('${user.id}')" class="flex-[2] h-10 bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-cyan-500/20 border border-cyan-400/30" title="Save Changes" aria-label="Save Changes">Save Changes</button>
+                </div>
             </div>`;
     }
 
@@ -14977,6 +16269,7 @@ async function init() {
         const pass = document.getElementById('adm-edit-pass')?.value.trim();
         const role = document.getElementById('adm-edit-role')?.value || 'staff';
         const status = document.getElementById('adm-edit-status')?.value || 'active';
+        const forceReset = !!document.getElementById('adm-edit-force')?.checked;
 
         if (!email || !pass) return toast("กรุณากรอก Email และ Password ให้ครบถ้วน", "error");
 
@@ -14987,19 +16280,21 @@ async function init() {
                 password: pass,
                 role: role,
                 status: status,
+                force_reset: forceReset,
                 updated_at: new Date()
             }).eq('id', userId);
 
             if (error) throw error;
 
-            const idx = _data.users.findIndex(u => u.id === userId);
+            const idx = _data.users.findIndex(u => String(u.id) === String(userId));
             if (idx !== -1) {
                 _data.users[idx] = {
                     ..._data.users[idx],
                     email: email,
                     password: pass,
                     role: role,
-                    status: status
+                    status: status,
+                    force_reset: forceReset
                 };
             }
 
@@ -15016,36 +16311,44 @@ async function init() {
     }
 
     function openDeleteUserModal(userId) {
-        const user = _data.users.find(u => u.id === userId);
+        const user = _data.users.find(u => String(u.id) === String(userId));
         if (!user) return toast("ไม่พบข้อมูลผู้ใช้งาน", "error");
+
+        const safeEmail = user.email || 'unknown@carrier.com';
+
+        if (safeEmail.toLowerCase() === masterAdminEmail.toLowerCase() || safeEmail.toLowerCase() === (S.currentUser || '').toLowerCase()) {
+            toast("⚠️ ไม่สามารถลบบัญชี Master Admin หรือบัญชีผู้ใช้ที่ใช้อยู่ได้", "warn");
+            return;
+        }
 
         const modal = document.getElementById('admin-master-modal');
         const content = document.getElementById('master-modal-content');
         if (!modal || !content) return;
 
         modal.classList.remove('hidden-view');
-        const safeEmail = user.email || 'unknown@carrier.com';
 
         content.innerHTML = `
-            <div class="space-y-4 text-center">
+            <div class="space-y-4 text-center font-mono">
                 <div class="w-12 h-12 rounded-full bg-rose-950/80 border border-rose-500/50 flex items-center justify-center mx-auto text-rose-400">
                     <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-base font-black uppercase text-rose-400 tracking-wider">Confirm Delete Agent</h3>
+                    <h3 class="text-base font-black uppercase text-rose-400 tracking-wider">Confirm Delete Agent Account</h3>
                     <p class="text-xs font-mono text-slate-300 mt-2">
                         คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีพนักงานนี้?<br>
-                        <span class="text-rose-300 font-bold underline">${safeEmail}</span>
+                        <span class="text-rose-300 font-bold underline text-sm">${safeEmail}</span>
                     </p>
-                    <div class="mt-3 p-2.5 bg-rose-950/40 border border-rose-500/30 rounded-xl text-[10px] font-mono text-rose-200">
-                        ⚠️ การดำเนินการนี้จะไม่สามารถย้อนกลับได้ ข้อมูลการเข้าใช้งานจะถูกลบออกทันที
+                    <div class="mt-3 p-3 bg-rose-950/40 border border-rose-500/30 rounded-xl text-[10px] font-mono text-rose-200 text-left space-y-1">
+                        <p class="font-bold text-rose-300">⚠️ คำเตือนความปลอดภัย:</p>
+                        <p>• บัญชีและสิทธิ์การเข้าใช้งานจะถูกลบทันที</p>
+                        <p>• ประวัติการปฏิบัติงานเดิมจะยังถูกอ้างอิงเพื่อสอบทาน</p>
                     </div>
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Wap Admin System.Close Master Modal" aria-label="Wap Admin System.Close Master Modal">Cancel</button>
-                    <button  onclick="WapAdminSystem.confirmDeleteUser('${user.id}', '${safeEmail}')" class="flex-[2] h-10 bg-rose-600 hover:bg-rose-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-rose-500/20 border border-rose-400/30" title="Wap Admin System.Confirm Delete User" aria-label="Wap Admin System.Confirm Delete User">Delete Agent Account</button>
+                    <button  onclick="WapAdminSystem.closeMasterModal()" class="flex-1 py-2.5 font-bold text-slate-400 hover:text-white transition-all text-xs" title="Cancel" aria-label="Cancel">Cancel</button>
+                    <button  onclick="WapAdminSystem.confirmDeleteUser('${user.id}', '${safeEmail}')" class="flex-[2] h-10 bg-rose-600 hover:bg-rose-500 text-white font-mono font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-rose-500/20 border border-rose-400/30" title="Delete Agent Account" aria-label="Delete Agent Account">Delete Agent Account</button>
                 </div>
             </div>`;
     }
@@ -15056,7 +16359,7 @@ async function init() {
             const { error } = await sqeClient.from('users').delete().eq('id', userId);
             if (error) throw error;
 
-            _data.users = _data.users.filter(u => u.id !== userId);
+            _data.users = _data.users.filter(u => String(u.id) !== String(userId));
 
             writeAuditLog('USER_DELETE', `ลบบัญชีพนักงาน: ${email} (ID: ${userId})`);
             toast("🗑️ ลบบัญชีพนักงานเรียบร้อย", "success");
@@ -15137,6 +16440,7 @@ async function init() {
         toggleBanner, deleteEntry, closeMasterModal, handleAddNew, saveMaster, saveUser,
         toggleMaintenance, toggleUserStatus, setForceReset, performFullBackup, performArchive,
         deployNewVersion, triggerForceUpdate, saveQuickMaster,
+        openResetSecurityModal, copyUserCredentials, toggleForceResetState, applyNewSecurityKey,
         openEditUserModal, updateUser, openDeleteUserModal, confirmDeleteUser,
         triggerAutoPurgeSessions, triggerSecurityAuditScan, triggerOptimizeDatabase, triggerAutoSystemRelay
     };
@@ -15733,25 +17037,28 @@ function getDetailSentenceParts(c) {
         month: 'short', 
         year: 'numeric'
     });
-    const groupStr = c.part_group || c.part_name || "Steel";
 
-    if (/inform quality problem/i.test(cleanTitle)) {
-        let dateStr = createDate;
-        let pGroup = groupStr;
-        let defectStr = cleanTitle;
-
-        const dateMatch = cleanTitle.match(/^On\s+(.*?)\s+inform quality problem/i);
-        if (dateMatch) dateStr = dateMatch[1].trim();
-
-        const grpMatch = cleanTitle.match(/about\s+(.*?)\s+found defect/i);
-        if (grpMatch) pGroup = grpMatch[1].trim();
-
-        const defectMatch = cleanTitle.match(/found defect\s+(.*)$/i);
-        if (defectMatch) defectStr = defectMatch[1].trim();
-
-        return { dateStr, groupStr: pGroup, defectStr };
+    let dateStr = createDate;
+    const dateMatch = cleanTitle.match(/^On\s+(.*?)\s+inform quality problem/i);
+    if (dateMatch && dateMatch[1].trim()) {
+        dateStr = dateMatch[1].trim();
     }
-    return { dateStr: createDate, groupStr: groupStr, defectStr: cleanTitle };
+
+    const parsed = parseProblemTitleForD2(rawTitle, c);
+
+    let partDetail = parsed.partName;
+    if (parsed.drawingNo && parsed.drawingNo !== '-') {
+        partDetail += ` / ${parsed.drawingNo}`;
+    }
+    if (parsed.supplier && parsed.supplier !== '-' && parsed.supplier !== 'OSA') {
+        partDetail += ` ${parsed.supplier}`;
+    }
+
+    return {
+        dateStr: dateStr,
+        groupStr: partDetail,
+        defectStr: parsed.defectName || cleanTitle
+    };
 }
 
 function formatDetailSentence(c) {
@@ -15763,17 +17070,94 @@ function formatDetailSentence(c) {
         month: 'short', 
         year: 'numeric'
     });
-    const partName = c.part_group || c.part_name || "Steel";
 
-    if (/inform quality problem/i.test(cleanTitle)) {
-        let formatted = cleanTitle;
-        formatted = formatted.replace(/^On\s+(.*?)\s+inform quality problem/i, 'On <span style="color:#2563eb; font-weight: 900;">$1</span> inform quality problem');
-        formatted = formatted.replace(/about\s+(.*?)\s+found defect/i, 'about <span style="color:#2563eb; font-weight: 900;">$1</span> found defect');
-        formatted = formatted.replace(/found defect\s+(.*)$/i, 'found defect <span style="color:red; font-weight:900;">$1</span>');
-        return formatted;
-    } else {
-        return `On <span style="color:#2563eb; font-weight: 900;">${createDate}</span> OSA inform quality problem about <span style="color: #2563eb; font-weight: 900;">${partName}</span> found defect <span style="color:red; font-weight:900;">${cleanTitle}</span>`;
+    let dateStr = createDate;
+    const dateMatch = cleanTitle.match(/^On\s+(.*?)\s+inform quality problem/i);
+    if (dateMatch && dateMatch[1].trim()) {
+        dateStr = dateMatch[1].trim();
     }
+
+    const parsed = parseProblemTitleForD2(rawTitle, c);
+
+    let partDetail = parsed.partName;
+    if (parsed.drawingNo && parsed.drawingNo !== '-') {
+        partDetail += ` / ${parsed.drawingNo}`;
+    }
+    if (parsed.supplier && parsed.supplier !== '-' && parsed.supplier !== 'OSA') {
+        partDetail += ` ${parsed.supplier}`;
+    }
+
+    const defectStr = parsed.defectName || cleanTitle;
+
+    return `On <span style="color:#2563eb; font-weight: 900;">${dateStr}</span> inform quality problem about <span style="color:#2563eb; font-weight: 900;">${partDetail}</span> found defect <span style="color:red; font-weight:900;">${defectStr}</span>`;
+}
+
+function parseProblemTitleForD2(rawTitle, caseData = {}) {
+    let pName = caseData.part_name || caseData.part || "-";
+    let dNo   = caseData.drawing_no || caseData.part_no || "-";
+    let supp  = caseData.supplier || "OSA";
+    let dName = caseData.defect || rawTitle || "-";
+
+    const cleanTitle = getCleanProblemTitle(rawTitle || "");
+
+    if (cleanTitle) {
+        let afterMarker = cleanTitle;
+        if (/about/i.test(cleanTitle)) {
+            const parts = cleanTitle.split(/about/i);
+            afterMarker = parts[parts.length - 1].trim();
+        } else if (/inform/i.test(cleanTitle)) {
+            const parts = cleanTitle.split(/inform/i);
+            afterMarker = parts[parts.length - 1].trim();
+        }
+
+        if (afterMarker.includes("/")) {
+            const slashParts = afterMarker.split("/");
+            const extractedPartName = slashParts[0].trim();
+            if (extractedPartName) pName = extractedPartName;
+
+            const restAfterSlash = slashParts.slice(1).join("/").trim();
+
+            let beforeDefectStr = restAfterSlash;
+            let extractedDefectStr = "";
+
+            if (/found defect/i.test(restAfterSlash)) {
+                const defectSplit = restAfterSlash.split(/found defect/i);
+                beforeDefectStr = defectSplit[0].trim();
+                extractedDefectStr = defectSplit.slice(1).join("found defect").trim();
+            } else if (/problem/i.test(restAfterSlash)) {
+                const probSplit = restAfterSlash.split(/problem/i);
+                beforeDefectStr = probSplit[0].trim();
+                extractedDefectStr = probSplit.slice(1).join("problem").trim() || restAfterSlash;
+            }
+
+            if (extractedDefectStr) dName = extractedDefectStr;
+
+            if (beforeDefectStr) {
+                const tokens = beforeDefectStr.split(/\s+/);
+                if (tokens.length > 0 && tokens[0]) {
+                    dNo = tokens[0].trim();
+                    if (tokens.length > 1) {
+                        const candidateSupp = tokens.slice(1).join(" ").trim();
+                        if (candidateSupp) supp = candidateSupp;
+                    }
+                }
+            }
+        } else {
+            if (/found defect/i.test(cleanTitle)) {
+                const parts = cleanTitle.split(/found defect/i);
+                if (parts[1] && parts[1].trim()) {
+                    dName = parts[1].trim();
+                }
+            }
+        }
+    }
+
+    return {
+        partName: pName,
+        drawingNo: dNo,
+        supplier: supp,
+        defectName: dName
+    };
 }
 
 const Wap8DSystem = (function() {
@@ -16348,26 +17732,13 @@ async function exportToPPTX(targetCaseId) {
     });
 
     // --- LOGIC: SMART PARSING (แยกข้อมูลจากหัวข้อปัญหาหน้าแรก) ---
-    // ตัวอย่าง: V1_M2 Inform CABI-SIDE-OUT(01S1) / 1134212501 V.PARADISE Deformed problem
     const rawTitle = caseData.problem_title || "";
-    let pName = "-", dNo = "-", supp = "-", dName = "-";
+    const parsedD2 = parseProblemTitleForD2(rawTitle, caseData);
 
-    try {
-        if (rawTitle.includes("Inform")) {
-            const dataPart = rawTitle.split(/Inform/i)[1].trim(); // CABI-SIDE-OUT(01S1) / 1134212501 V.PARADISE Deformed problem
-            const segments = dataPart.split("/"); 
-            
-            if (segments.length > 1) {
-                pName = segments[0].trim(); // CABI-SIDE-OUT(01S1)
-                const rest = segments[1].trim(); // 1134212501 V.PARADISE Deformed problem
-                const parts = rest.split(/\s+/); // แยกด้วยช่องว่าง
-                
-                dNo = parts[0] || "-"; // 1134212501
-                supp = parts[1] || "-"; // V.PARADISE
-                dName = parts.slice(2).join(" ") || "-"; // Deformed problem
-            }
-        }
-    } catch (e) { console.error("Parsing Error", e); }
+    let pName = parsedD2.partName;
+    let dNo   = parsedD2.drawingNo;
+    let supp  = parsedD2.supplier;
+    let dName = parsedD2.defectName;
 
     const exportDate = new Date().toISOString().split('T')[0]; 
     const valStyle = (txt, color = '1e293b') => {
@@ -16606,7 +17977,7 @@ async function exportToPPTX(targetCaseId) {
     slide4.addText([
         { text: "On ", options: { bold: true, color: '000000' } },
         { text: `${dParts.dateStr} `, options: { bold: true, color: '0000FF' } },
-        { text: "OSA inform quality problem about ", options: { bold: true, color: '000000' } },
+        { text: "inform quality problem about ", options: { bold: true, color: '000000' } },
         { text: `${dParts.groupStr} `, options: { bold: true, color: '0000FF' } },
         { text: "found defect ", options: { bold: true, color: '000000' } },
         { text: `${dParts.defectStr}`, options: { bold: true, color: 'FF0000' } }
@@ -17980,24 +19351,13 @@ if (_currentSlide === 0) {
 // แผ่นที่ 3: D2- Define the Problem (ฉบับ Responsive ป้องกันตารางล้น 100%)
 // ==========================================
 else if (_currentSlide === 2) {
-    const rawTitle = getCleanProblemTitle(c.problem_title || "");
-    
-    // --- 1. ระบบ AI Parsing แยกส่วนข้อมูล ---
-    let extPartName = c.part_name || "-";
-    let extDrawing = "-";
-    let extSupplier = "OSA"; 
-    let extDefect = rawTitle;
+    const rawTitle = c.problem_title || "";
+    const parsedD2 = parseProblemTitleForD2(rawTitle, c);
 
-    try {
-        const match = rawTitle.match(/Inform\s+(.*?)\s*\/\s*(\d+)\s+(.*?)\s+(.*)/i);
-        if (match) {
-            extPartName = match[1].replace(/quality problem about/i, '').trim(); 
-            extDrawing  = match[2].trim();     
-            extSupplier = match[3].trim();     
-            let defectPart = match[4].replace(/found defect/i, '').trim();
-            extDefect = defectPart.split(/[=:/]/)[0].trim(); 
-        }
-    } catch (e) { console.log("Parsing fallback"); }
+    let extPartName = parsedD2.partName;
+    let extDrawing  = parsedD2.drawingNo;
+    let extSupplier = parsedD2.supplier; 
+    let extDefect   = parsedD2.defectName;
 
     // --- 2. ระบบคำนวณสถิติ ---
     const ng = Number(c.ng_qty) || 0;
@@ -19112,6 +20472,7 @@ if (typeof window !== 'undefined') {
         formToSupabase, writeAuditLog, deleteRecordFromCloud, cloudSyncAll, selectShift,
         isDuplicate, validateRef, handleJudgment, quickPickJudgment, refreshNeonGlow,
         checkAnomaly, updateInputResetButton, resetInputForm, clearForm, confirmResetForm, submitEntry,
+        saveClaimFormDraft, triggerClaimFormAutoDraft, restoreClaimFormDraft, clearClaimFormDraft, initClaimFormAutoDraftListeners,
         backgroundSync, syncAllPendingData, editRecord, cloneRecord, confirmDelete, showCustomConfirmDialog,
         showModal, closeModal, getFilteredRecords, filterTable, debounceSearch,
         get8DCaseForRecord, create8DFromClaimRecord, openReportFromRecord,

@@ -2223,7 +2223,7 @@ table, th, td {
             background: #f8fafc;
             border: 1.5px solid #e2e8f0;
             border-radius: 10px;
-            padding: 0 12px 0 34px;
+            padding: 0 30px 0 34px;
             font-size: 11px;
             font-weight: 500;
             color: #334155;
@@ -2311,44 +2311,57 @@ table, th, td {
         /* --- Table Header Info Bar --- */
         
 
-        .table-title {
-    font-size: 11px;
-            font-weight: 900;
-            color: #1e293b;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
+        .table-info-bar {
             display: flex;
             align-items: center;
-            gap: 8px;
-}
+            justify-content: space-between;
+            padding: 12px 18px;
+            border-bottom: 1px solid #cbd5e1;
+            flex-shrink: 0;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            position: relative;
+            z-index: 1;
+        }
+
+        .table-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
         .live-dot {
-    position: relative;
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    background: #10b981;
-    border-radius: 50%;
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
-    animation: livePulse 2s infinite;
-}
+            position: relative;
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+            animation: livePulse 2s infinite;
+        }
 
         @keyframes livePulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
+            0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(0.85); }
-}
+        }
 
         .case-count-badge {
-    font-size: 10px;
+            font-size: 11px;
             font-weight: 800;
             font-family: 'SF Mono', Monaco, Consolas, monospace;
-            background: #eff6ff;
-            color: #2563eb;
-            padding: 3px 10px;
-            border-radius: 6px;
-            border: 1px solid #bfdbfe;
+            background: #dbeafe;
+            color: #1d4ed8;
+            padding: 4px 14px;
+            border-radius: 20px;
+            border: 1px solid #93c5fd;
             letter-spacing: 0.02em;
-}
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
+        }
 
                 /* ==========================================
            TABLE SCROLL CONTAINER — แกน X และ Y
@@ -2394,30 +2407,42 @@ table, th, td {
 
         /* --- Sticky Header --- */
         .support-table thead th {
-    position: sticky;
+            position: sticky;
             top: 0;
             z-index: 10;
-            background: #f8fafc;
-            padding: 10px 12px;
+            background: linear-gradient(180deg, #f8fafc 0%, #edf2f7 100%);
+            padding: 11px 14px;
             text-align: left;
-            font-size: 9px;
-            font-weight: 800;
-            color: #64748b;
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #1e293b;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            border-bottom: 2px solid #e2e8f0;
+            letter-spacing: 0.08em;
+            border-bottom: 1px solid #cbd5e1;
+            border-right: 1px solid rgba(203, 213, 225, 0.5);
             white-space: nowrap;
             vertical-align: middle;
-            transition: background 0.2s;
-}
+            transition: all 0.2s ease;
+            box-shadow: inset 0 -2px 0 0 rgba(37, 99, 235, 0.5), 0 3px 6px rgba(15, 23, 42, 0.04);
+            user-select: none;
+        }
+
+        .support-table thead th:hover {
+            background: linear-gradient(180deg, #f0f7ff 0%, #e0eefe 100%);
+            color: #1d4ed8;
+            box-shadow: inset 0 -2px 0 0 #2563eb, 0 3px 8px rgba(37, 99, 235, 0.12);
+        }
 
         .support-table thead th:first-child {
-    padding-left: 16px;
-}
+            padding-left: 18px;
+            border-top-left-radius: 6px;
+        }
 
         .support-table thead th:last-child {
-    padding-right: 16px;
-}
+            padding-right: 18px;
+            border-right: none;
+            border-top-right-radius: 6px;
+        }
 
         /* --- Table Body Rows --- */
         .support-table tbody tr:not(.vs-spacer) {
@@ -4377,6 +4402,21 @@ table, th, td {
 .action-btn-hub svg {
     width: 13px;
     height: 13px;
+    transform-origin: center;
+    transform-box: fill-box;
+}
+
+#sync-icon.spinning,
+.sync-spinning {
+    animation: spin-smooth 0.8s linear infinite !important;
+    transform-origin: center !important;
+    transform-box: fill-box !important;
+    display: inline-block;
+}
+
+@keyframes spin-smooth {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 /* เมื่อพับ Sidebar */
@@ -5306,12 +5346,29 @@ body.dark-mode h2, body.dark-mode h3 {
 
 
 
-/* สไตล์ไอคอนตอนสลับ */
+/* สไตล์ไอคอนและปุ่มสลับธีม */
+#theme-toggle-btn {
+    background-color: var(--theme-btn-bg);
+    border: 1px solid var(--theme-btn-border);
+    color: var(--theme-btn-text);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#theme-toggle-btn:hover {
+    background-color: var(--theme-btn-hover);
+    transform: scale(1.08);
+}
+
+#theme-toggle-btn:active {
+    transform: scale(0.92);
+}
+
 #theme-toggle-btn svg {
     transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--theme-btn-text);
 }
-body.dark-mode #theme-toggle-btn svg {
-    transform: rotate(360deg); color: #fbbf24;
+body.dark-mode #theme-toggle-btn svg, html.dark #theme-toggle-btn svg {
+    transform: rotate(360deg);
 }
 
 /* ============================================================
@@ -5398,9 +5455,8 @@ body.dark-mode .user-panel-integrated {
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     /* แบบที่ถูกต้อง */
--webkit-box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-                inset 0 0 20px rgba(255, 255, 255, 0.02) !important;
+-webkit-box-shadow: 0 4px 12px rgba(0,0,0,0.05), inset 0 0 20px rgba(255, 255, 255, 0.02) !important;
+box-shadow: 0 4px 12px rgba(0,0,0,0.05), inset 0 0 20px rgba(255, 255, 255, 0.02) !important;
 }
 
 /* 3. ปรับสีเส้นแบ่งภายใน Card */
@@ -6208,24 +6264,33 @@ body.dark-mode .table-card {
 
 /* แถบสรุปข้อมูลเหนือตาราง (Table Info Bar) */
 body.dark-mode .table-info-bar {
-    background: #020617 !important;
+    background: #090d16 !important;
     border-bottom-color: #1e293b !important;
 }
 body.dark-mode .table-title {
-    color: #ffffff !important;
+    color: #f8fafc !important;
 }
 body.dark-mode .case-count-badge {
-    background: rgba(37, 99, 235, 0.1) !important;
-    color: #60a5fa !important;
-    border-color: rgba(37, 99, 235, 0.2) !important;
+    background: rgba(30, 58, 138, 0.4) !important;
+    color: #93c5fd !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
 }
 
 /* 4. ส่วนประกอบภายในตาราง (Support Table) */
 /* หัวตาราง (Sticky Header) */
 body.dark-mode .support-table thead th {
-    background: #1e293b !important;
-    color: #94a3b8 !important;
-    border-bottom-color: #020617 !important;
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
+    color: #e2e8f0 !important;
+    font-weight: 600 !important;
+    border-bottom-color: #334155 !important;
+    border-right-color: rgba(51, 65, 85, 0.6) !important;
+    box-shadow: inset 0 -2px 0 0 rgba(59, 130, 246, 0.7), 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.dark-mode .support-table thead th:hover {
+    background: linear-gradient(180deg, #1e3a8a 0%, #0f172a 100%) !important;
+    color: #60a5fa !important;
+    box-shadow: inset 0 -2px 0 0 #3b82f6, 0 3px 12px rgba(59, 130, 246, 0.25) !important;
 }
 
 /* แถวข้อมูล (Rows) */
@@ -7229,18 +7294,36 @@ body.dark-mode .submenu-container {
     --dark-border: #1e293b; /* สีการ์ด/ตาราง */
     --dark-text-main: #f1f5f9; /* เส้นขอบ */
     --dark-text-sub: #94a3b8; /* ตัวหนังสือหลัก */
-    /* ตัวหนังสือรอง */
+    
+    /* Global Theme CSS Custom Properties (Light Mode) */
     --bg-main: #f8fafc;
     --bg-card: #ffffff;
+    --bg-header: #ffffff;
+    --bg-sidebar: #0f172a;
     --text-primary: #1e293b;
+    --text-secondary: #64748b;
     --border-color: #e2e8f0;
+    --accent-color: #2563eb;
+    --theme-btn-bg: #f1f5f9;
+    --theme-btn-hover: #e2e8f0;
+    --theme-btn-border: #e2e8f0;
+    --theme-btn-text: #d97706;
 }
 
-.dark-mode {
+body.dark-mode, html.dark, .dark-mode {
+    /* Global Theme CSS Custom Properties (Dark Mode) */
     --bg-main: #020617;
     --bg-card: #0f172a;
+    --bg-header: #0f172a;
+    --bg-sidebar: #020617;
     --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
     --border-color: #1e293b;
+    --accent-color: #3b82f6;
+    --theme-btn-bg: #1e293b;
+    --theme-btn-hover: #334155;
+    --theme-btn-border: #334155;
+    --theme-btn-text: #fbbf24;
 }
 
 /* นำตัวแปรไปใช้กับโครงสร้างหลัก */
@@ -14193,62 +14276,118 @@ body.dark-mode .toggle-slider {
 }
 
 /* ============================================================
-   PREMIUM IMAGE LIGHTBOX (ขยายรูปภาพเต็มจอ)
+   PREMIUM IMAGE LIGHTBOX (ขยายรูปภาพเต็มจอ ความคมชัดสูง)
    ============================================================ */
 .lightbox-overlay {
     position: fixed;
     inset: 0;
     z-index: 10001; /* สูงกว่า Modal ปกติ */
-    background: rgba(2, 6, 23, 0.92);
-    -webkit-backdrop-filter: blur(15px);
-    backdrop-filter: blur(15px);
+    background: rgba(2, 6, 23, 0.95);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    padding: 16px;
     cursor: zoom-out;
     opacity: 0;
-    transition: opacity 0.4s ease;
+    transition: opacity 0.3s ease;
 }
 
 .lightbox-content {
-    max-width: 95%;
-    max-height: 90vh;
+    width: 100%;
+    max-width: 1400px;
+    height: 100%;
+    max-height: 96vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     position: relative;
-    transform: scale(0.9);
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: scale(0.95);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.lightbox-img {
-    width: auto;
-    height: auto;
-    max-width: 100%;
-    max-height: 90vh;
+.lightbox-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    width: 100%;
+    padding: 6px 12px;
+    margin-bottom: 8px;
+    z-index: 10;
+}
+
+.lightbox-btn {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.lightbox-btn:hover {
+    background: #2563eb;
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+}
+
+.lightbox-img-wrapper {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
     border-radius: 12px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.lightbox-img {
+    max-width: 100%;
+    max-height: 82vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+    cursor: default;
+    image-rendering: -webkit-optimize-contrast;
+}
+
 .lightbox-close {
-    position: absolute;
-    top: -50px;
-    right: 0;
-    width: 40px;
-    height: 40px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    width: 36px;
+    height: 36px;
+    background: rgba(239, 68, 68, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
     transition: all 0.2s;
 }
 
 .lightbox-close:hover {
-    background: #ef4444;
+    background: #dc2626;
     border-color: #ef4444;
-    transform: rotate(90deg);
+    transform: rotate(90deg) scale(1.1);
 }
 /* เมื่อชี้ไปที่รูปหลักใน Modal หรือรูปที่มีการคลิกดู Lightbox */
 .modal-overlay img, 
@@ -15352,4 +15491,61 @@ html, body {
 /* ลบเงาหรือ Margin ของ Header ที่อาจดันตัวลงมา */
 header {
     margin-top: 0 !important;
+}
+
+/* TABLET & MOBILE RESPONSIVE HEADER DATE FILTER FIX */
+#claim-dash-filter-wrap input[type="date"] {
+    font-family: inherit;
+    font-size: 9.5px;
+    padding: 0 1px !important;
+    margin: 0 !important;
+}
+
+#claim-dash-filter-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+    width: 10px !important;
+    height: 10px !important;
+    padding: 0 !important;
+    margin-left: 1px !important;
+    cursor: pointer;
+}
+
+@media (max-width: 1280px) {
+    header {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        gap: 6px !important;
+    }
+
+    #terminal-sub-nav {
+        margin-right: auto;
+        padding: 2px !important;
+    }
+
+    #sub-btn-entry, #sub-btn-cockpit {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        font-size: 8.5px !important;
+    }
+
+    #claim-dash-filter-wrap {
+        padding: 2px 6px !important;
+        gap: 4px !important;
+    }
+
+    #claim-dash-filter-wrap .cd-date-range-box {
+        padding: 2px 4px !important;
+        gap: 3px !important;
+    }
+
+    #claim-dash-filter-wrap input[type="date"] {
+        width: 76px !important;
+        font-size: 9.5px !important;
+    }
+
+    #cd-preset-today, #cd-preset-7days, #cd-preset-month {
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+        font-size: 8.5px !important;
+        height: 24px !important;
+    }
 }

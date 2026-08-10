@@ -1,7 +1,9 @@
-// อัปเดตเวอร์ชันแคชใหม่
-const CACHE_NAME = 'sqe-portal-v2.6'; 
+// Service Worker for SQE Portal & WAP System with Table Data Caching
+const CACHE_NAME = 'sqe-portal-v2.8'; 
+const DATA_CACHE_NAME = 'sqe-table-data-v1';
+const IMAGE_CACHE_NAME = 'sqe-images-v1';
 
-const urlsToCache = [
+const STATIC_URLS = [
   './',
   './index.html',
   './styles.css',
@@ -9,123 +11,139 @@ const urlsToCache = [
   './apple-touch-icon-180.png',
   './icon-192.png',
   './icon-512.png',
-  './icon-maskable-512.png'
+  './icon-maskable-512.png',
+  './manifest.json'
 ];
-
-/**
- * ฟังก์ชันช่วยระบุ Content-Type ตามนามสกุลไฟล์
- * เพื่อแก้ปัญหา "Response should include 'content-type' header"
- */
-function getMimeType(url) {
-  const extension = url.split('.').pop().split(/\#|\?/)[0];
-  const mimeMap = {
-    'html': 'text/html; charset=utf-8',
-    'js':   'application/javascript; charset=utf-8',
-    'css':  'text/css; charset=utf-8',
-    'png':  'image/png',
-    'jpg':  'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'gif':  'image/gif',
-    'svg':  'image/svg+xml',
-    'json': 'application/json; charset=utf-8',
-    'ico':  'image/x-icon'
-  };
-  return mimeMap[extension] || 'application/octet-stream';
-}
-
-/**
- * ฟังก์ชันช่วย: แนบ Header ด้านความปลอดภัยและประเภทไฟล์
- * - Content-Type: แก้ปัญหา "Response should include 'content-type' header"
- * - Cache-Control: แก้ปัญหา "cache-control header is missing"
- * - X-Content-Type-Options: nosniff
- */
-function withImprovedHeaders(response, requestUrl, cacheControlValue) {
-  if (!response) return response;
-
-  const newHeaders = new Headers(response.headers);
-  
-  // 1. ตั้งค่า Content-Type ถ้ายังไม่มี (สำคัญมากสำหรับการโหลดไฟล์จาก Cache)
-  if (!newHeaders.has('Content-Type')) {
-    newHeaders.set('Content-Type', getMimeType(requestUrl));
-  }
-  
-  // 2. ตั้งค่าการควบคุมแคช
-  newHeaders.set('Cache-Control', cacheControlValue);
-  
-  // 3. ตั้งค่าความปลอดภัย
-  newHeaders.set('X-Content-Type-Options', 'nosniff');
-
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: newHeaders
-  });
-}
 
 // ติดตั้ง Service Worker
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(STATIC_URLS);
+    })
   );
 });
 
-// Activate และลบ Cache เก่า
+// Activate: ลบ Cache เก่าทั้งหมด
 self.addEventListener('activate', event => {
+  const currentCaches = [CACHE_NAME, DATA_CACHE_NAME, IMAGE_CACHE_NAME];
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) return caches.delete(cacheName);
+          if (!currentCaches.includes(cacheName)) {
+            console.log('[SW] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
         })
       );
     }).then(() => self.clients.claim())
   );
 });
 
-// การ Fetch ข้อมูล
+// ตรวจสอบและประมวลผลการ Fetch ข้อมูล
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
+  const request = event.request;
+  const url = new URL(request.url);
 
-  // ข้าม Supabase หรือไม่ใช่ GET
-  if (url.hostname.endsWith('.supabase.co') || event.request.method !== 'GET') {
+  // ข้าม Request ที่ไม่ใช่ GET (POST, PUT, DELETE ให้ผ่านเครือข่ายปกติ)
+  if (request.method !== 'GET') {
     return;
   }
 
-  // Network-First สำหรับไฟล์หลัก (HTML, JS, CSS)
-  if (url.pathname.endsWith('script.js') || url.pathname.endsWith('styles.css') || url.pathname.endsWith('index.html') || url.pathname === '/') {
+  // 1. แคชข้อมูลตารางจาก Supabase (REST API Table Data): Network-First พร้อม fallback ไปยัง Data Cache เมื่อออฟไลน์
+  if (url.hostname.endsWith('.supabase.co') && url.pathname.includes('/rest/v1/')) {
     event.respondWith(
-      fetch(event.request)
+      fetch(request)
         .then(networkResponse => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseWithHeaders = withImprovedHeaders(networkResponse, event.request.url, 'no-cache');
-            const responseClone = responseWithHeaders.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
-            return responseWithHeaders;
+          if (networkResponse && networkResponse.ok) {
+            const responseClone = networkResponse.clone();
+            caches.open(DATA_CACHE_NAME).then(cache => cache.put(request, responseClone));
           }
           return networkResponse;
         })
-        .catch(() =>
-          caches.match(event.request).then(cachedResponse =>
-            withImprovedHeaders(cachedResponse, event.request.url, 'no-cache')
-          )
-        )
+        .catch(async () => {
+          console.log('[SW] Network offline, serving cached table data:', request.url);
+          const cachedResponse = await caches.match(request);
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // หากพารามิเตอร์ URL ต่างกันเล็กน้อย ค้นหาข้อมูลตารางจาก Cache ที่ตรงกับ Base Endpoint
+          const cache = await caches.open(DATA_CACHE_NAME);
+          const keys = await cache.keys();
+          for (const key of keys) {
+            if (key.url.split('?')[0] === request.url.split('?')[0]) {
+              const matched = await cache.match(key);
+              if (matched) return matched;
+            }
+          }
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        })
     );
     return;
   }
 
-  // Cache-First สำหรับรูปภาพและไอคอน
+  // 2. แคชรูปภาพและรูปหลักฐาน (Supabase Storage หรือไฟล์รูปภาพ): Stale-While-Revalidate / Cache-First
+  if (
+    request.destination === 'image' ||
+    url.pathname.match(/\.(png|jpg|jpeg|gif|svg|webp|ico)$/i) ||
+    (url.hostname.endsWith('.supabase.co') && url.pathname.includes('/storage/v1/object/'))
+  ) {
+    event.respondWith(
+      caches.match(request).then(cachedResponse => {
+        if (cachedResponse) {
+          fetch(request).then(networkResponse => {
+            if (networkResponse && networkResponse.ok) {
+              caches.open(IMAGE_CACHE_NAME).then(cache => cache.put(request, networkResponse));
+            }
+          }).catch(() => {});
+          return cachedResponse;
+        }
+
+        return fetch(request).then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            const responseClone = networkResponse.clone();
+            caches.open(IMAGE_CACHE_NAME).then(cache => cache.put(request, responseClone));
+          }
+          return networkResponse;
+        }).catch(() => {
+          return new Response('', { status: 404 });
+        });
+      })
+    );
+    return;
+  }
+
+  // 3. ไฟล์หลัก App Shell (script.js, styles.css, index.html): Network-First
+  if (
+    url.origin === location.origin &&
+    (url.pathname.endsWith('script.js') || url.pathname.endsWith('styles.css') || url.pathname.endsWith('index.html') || url.pathname === '/')
+  ) {
+    event.respondWith(
+      fetch(request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // 4. ทั่วไป: Cache-First
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      if (cachedResponse) {
-        return withImprovedHeaders(cachedResponse, event.request.url, 'public, max-age=604800, immutable');
-      }
-      return fetch(event.request).then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseWithHeaders = withImprovedHeaders(networkResponse, event.request.url, 'public, max-age=604800, immutable');
-          const responseClone = responseWithHeaders.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
-          return responseWithHeaders;
+    caches.match(request).then(cachedResponse => {
+      return cachedResponse || fetch(request).then(networkResponse => {
+        if (networkResponse && networkResponse.ok && url.origin === location.origin) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
         }
         return networkResponse;
       });
