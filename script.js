@@ -358,6 +358,15 @@ window.animateTableRows = function(target, options = {}) {
     }
 };
 
+window.addEventListener('mousedown', (e) => {
+    if (!e.target.closest('.modal-ac-dropdown') && 
+        !e.target.getAttribute('oninput')?.includes('renderModalAC')) {
+        document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
+            dd.style.display = 'none';
+        });
+    }
+});
+
 /* --- หลังจากนี้จึงตามด้วย Code ส่วนที่เหลือของคุณ --- */
 // -------------------------------------
 const VENDOR_MASTER = {
@@ -3792,21 +3801,25 @@ const authHeaders = {
     Authorization: `Bearer ${SQE_KEY}`
 };
 
-// 1. แก้จุดประกาศตัวแปรหลัก
-let sqeClient = window.supabase.createClient(SQE_URL, SQE_KEY, {
-    auth: { persistSession: false },
-    global: { headers: authHeaders }
-});
+// 1. ประกาศตัวแปรเชื่อมต่อ Supabase อย่างปลอดภัย รองรับการโหลดแบบ Async/CDN บน GitHub และทุกสภาพแวดล้อม
+let sqeClient = (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function')
+    ? window.supabase.createClient(SQE_URL, SQE_KEY, {
+        auth: { persistSession: false },
+        global: { headers: authHeaders }
+    })
+    : null;
 
-let wapClient = window.supabase.createClient(WAP_URL, WAP_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: {
-        headers: {
-            apikey: WAP_KEY,
-            Authorization: `Bearer ${WAP_KEY}`
+let wapClient = (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function')
+    ? window.supabase.createClient(WAP_URL, WAP_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        global: {
+            headers: {
+                apikey: WAP_KEY,
+                Authorization: `Bearer ${WAP_KEY}`
+            }
         }
-    }
-});
+    })
+    : null;
 
 // ── แทนที่ 2 บรรทัดเดิมนี้ ──
 // let sqeClient = supabase.createClient(SQE_URL, SQE_KEY);
@@ -3932,14 +3945,30 @@ function shake(el) {
     }
 }
 
-// 2. แก้ฟังก์ชัน getSupabase ให้ส่ง Headers ครบด้วย
+// 2. แก้ฟังก์ชัน getSupabase และ getWapSupabase ให้ส่ง Headers ครบถ้วนและปลอดภัย
 function getSupabase() {
-    if (!sqeClient) {
+    if (!sqeClient && typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
         sqeClient = window.supabase.createClient(SQE_URL, SQE_KEY, {
+            auth: { persistSession: false },
             global: { headers: authHeaders }
         });
     }
     return sqeClient;
+}
+
+function getWapSupabase() {
+    if (!wapClient && typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+        wapClient = window.supabase.createClient(WAP_URL, WAP_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+            global: {
+                headers: {
+                    apikey: WAP_KEY,
+                    Authorization: `Bearer ${WAP_KEY}`
+                }
+            }
+        });
+    }
+    return wapClient;
 }
 
 function switchLoginTab(role) {
@@ -4718,18 +4747,26 @@ async function onStaffSelect(email) {
    UPGRADED: PREMIUM PASS-RATE GAUGE ENGINE (MATCH IMAGE 100%)
    ========================================================================== */
 function updateMainGauge(pct) {
+    // 1. ดึง Element ทั้งหมดจาก DOM
     const arc = document.getElementById('mainGaugeArc');
     const needle = document.getElementById('mainGaugeNeedle');
     const valText = document.getElementById('mainGaugeValue');
     const statusLabel = document.getElementById('mainGaugeStatus');
     const statusText = document.getElementById('mainGaugeStatusText');
     const ticksGroup = document.getElementById('gaugeTicksGroup');
+    const footStatus = document.getElementById('yield-status-text');
+
+    // 🚨 NULL GUARD (สำคัญมาก!): 
+    // ถ้าไม่อยู่ในหน้า Dashboard หรือหา Element หลักไม่เจอ ให้หยุดทำงานทันที (ป้องกัน Error และประหยัด CPU)
+    if (!arc || !needle || !valText) {
+        return;
+    }
 
     const minAngle = -120;
     const maxAngle = 120;
     const angleRange = maxAngle - minAngle; // 240 degrees
 
-    // 2. วาดขีด Ticks (วาดครั้งเดียว)
+    // 2. วาดขีด Ticks (วาดครั้งเดียวเฉพาะตอนที่มี ticksGroup อยู่จริง)
     if (ticksGroup && ticksGroup.innerHTML === "") {
         let ticksHtml = "";
         for (let i = 0; i <= 50; i++) {
@@ -4756,7 +4793,7 @@ function updateMainGauge(pct) {
     else if (safePct >= 85) { color = "#3b82f6"; label = "GOOD"; }
     else if (safePct >= 70) { color = "#f59e0b"; label = "STABLE"; }
 
-    // 4. อัปเดตสถานะ Badge
+    // 4. อัปเดตสถานะ Badge (เช็ค null ก่อนเสมอ)
     if (statusLabel) {
         if (statusText) statusText.textContent = label;
         statusLabel.style.color = color;
@@ -4765,28 +4802,25 @@ function updateMainGauge(pct) {
         if (dot) dot.style.background = color;
     }
 
-    // 5. อัปเดตข้อความ Footer
-    const footStatus = document.getElementById('yield-status-text');
+    // 5. อัปเดตข้อความ Footer (เช็ค null ก่อนเสมอ)
     if (footStatus) {
         footStatus.textContent = label;
         footStatus.style.color = color;
     }
 
-    if (arc) {
-        arc.style.stroke = color;
-        arc.style.transition = "none";
-    }
-    if (needle) {
-        needle.style.transition = "none";
-    }
+    // กำหนดค่าสีเริ่มต้นให้เส้นและเข็ม
+    arc.style.stroke = color;
+    arc.style.transition = "none";
+    needle.style.transition = "none";
 
     const circumference = 2 * Math.PI * 75;
     const totalArcLength = (angleRange / 360) * circumference;
     const targetDrawLength = (safePct / 100) * totalArcLength;
     const targetAngle = minAngle + (safePct * (angleRange / 100));
 
-    // 6. GSAP Sweep Animation: เข็มและแถบสีวิ่งตวัดไปขวาสุด (100%) แล้วค่อยๆ ไหลกลับมายังจุดจำนวนจริงพร้อมกัน
+    // 6. GSAP Sweep Animation
     if (window.gsap) {
+        // เคลียร์แอนิเมชั่นเก่าออกก่อนเพื่อไม่ให้ตีกัน
         gsap.killTweensOf([needle, arc, valText]);
 
         const animObj = {
@@ -4797,7 +4831,7 @@ function updateMainGauge(pct) {
 
         const tl = gsap.timeline();
 
-        // Step 1: วิ่งตวัดไปขวาสุดอย่างนุ่มนวล (100% / maxAngle)
+        // Step 1: วิ่งตวัดไปขวาสุดอย่างนุ่มนวล (100%)
         tl.to(animObj, {
             angle: maxAngle,
             drawLen: totalArcLength,
@@ -4805,20 +4839,14 @@ function updateMainGauge(pct) {
             duration: 0.95,
             ease: "power2.inOut",
             onUpdate: () => {
-                if (needle) {
-                    needle.style.transform = `rotate(${animObj.angle}deg)`;
-                    needle.style.transformOrigin = "100px 112px";
-                }
-                if (arc) {
-                    arc.style.strokeDasharray = `${animObj.drawLen} ${circumference}`;
-                }
-                if (valText) {
-                    valText.innerHTML = `${animObj.val.toFixed(1)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
-                }
+                needle.style.transform = `rotate(${animObj.angle}deg)`;
+                needle.style.transformOrigin = "100px 112px";
+                arc.style.strokeDasharray = `${animObj.drawLen} ${circumference}`;
+                valText.innerHTML = `${animObj.val.toFixed(1)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
             }
         });
 
-        // Step 2: ค่อยๆ ไหลกลับมายังจุดจำนวนจริงอย่างช้าๆ นุ่มนวล (ทั้งเข็ม แถบสี และตัวเลข)
+        // Step 2: ค่อยๆ ไหลกลับมายังจุดจำนวนจริงอย่างช้าๆ นุ่มนวล
         tl.to(animObj, {
             angle: targetAngle,
             drawLen: targetDrawLength,
@@ -4826,30 +4854,18 @@ function updateMainGauge(pct) {
             duration: 2.2,
             ease: "power2.out",
             onUpdate: () => {
-                if (needle) {
-                    needle.style.transform = `rotate(${animObj.angle}deg)`;
-                    needle.style.transformOrigin = "100px 112px";
-                }
-                if (arc) {
-                    arc.style.strokeDasharray = `${animObj.drawLen} ${circumference}`;
-                }
-                if (valText) {
-                    valText.innerHTML = `${animObj.val.toFixed(1)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
-                }
+                needle.style.transform = `rotate(${animObj.angle}deg)`;
+                needle.style.transformOrigin = "100px 112px";
+                arc.style.strokeDasharray = `${animObj.drawLen} ${circumference}`;
+                valText.innerHTML = `${animObj.val.toFixed(1)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
             }
         });
     } else {
         // Fallback กรณีไม่มี GSAP
-        if (needle) {
-            needle.style.transform = `rotate(${targetAngle}deg)`;
-            needle.style.transformOrigin = "100px 112px";
-        }
-        if (arc) {
-            arc.style.strokeDasharray = `${targetDrawLength} ${circumference}`;
-        }
-        if (valText) {
-            valText.innerHTML = `${safePct.toFixed(1)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
-        }
+        needle.style.transform = `rotate(${targetAngle}deg)`;
+        needle.style.transformOrigin = "100px 112px";
+        arc.style.strokeDasharray = `${targetDrawLength} ${circumference}`;
+        valText.innerHTML = `${safePct.toFixed(1)}<span style="font-size: 0.6em; margin-left: 2px; font-weight: 800;">%</span>`;
     }
 }
 
@@ -5127,16 +5143,94 @@ function formToSupabase(rec) {
     return obj;
 }
 
-async function writeAuditLog(action, details) {
+// ฟังก์ชัน writeAuditLog ที่ได้รับการปรับปรุงให้รองรับทุกชนิดของ record_id, JSONB Data และป้องกัน 400 Bad Request
+async function writeAuditLog(action, recordId = null, oldData = null, newData = null) {
     try {
+        if (!sqeClient && typeof getSupabase === 'function') {
+            sqeClient = getSupabase();
+        }
         if (!sqeClient) return;
-        const { error } = await sqeClient.from('audit_logs').insert([{
-            user_email: S.currentUser || 'System',
-            action: action,
-            details: details
-        }]);
-        if (error) console.warn("[Audit Log] Supabase Insert Error:", error.message || error);
-    } catch (e) { console.error("Audit Error:", e); }
+
+        const email = S.currentUser || 'System';
+        const rawAction = String(action || 'SYSTEM').trim();
+        const upperAction = rawAction.toUpperCase();
+
+        // 1. ข้อกำหนดของ Database Constraint (audit_logs_action_check) อนุญาตเฉพาะ 3 ค่านิยามนี้เท่านั้น: 'INSERT', 'UPDATE', 'DELETE'
+        let validAction = 'UPDATE';
+        if (upperAction.includes('DELETE') || upperAction.includes('REMOVE') || upperAction.includes('CLEAR') || upperAction.includes('PURGE')) {
+            validAction = 'DELETE';
+        } else if (upperAction.includes('INSERT') || upperAction.includes('CREATE') || upperAction.includes('ADD') || upperAction.includes('NEW') || upperAction.includes('IMPORT') || upperAction.includes('REGISTER')) {
+            validAction = 'INSERT';
+        } else {
+            validAction = 'UPDATE';
+        }
+
+        // 2. ข้อกำหนด NOT NULL บน Column record_id (ห้ามเป็น null หรือค่าว่างเด็ดขาด)
+        let sanitizedRecordId = '0';
+        let detailMessage = null;
+
+        if (recordId !== null && recordId !== undefined && String(recordId).trim() !== '') {
+            const recStr = String(recordId).trim();
+            if (/^\d+$/.test(recStr) || /^[0-9a-fA-F-]{8,}$/.test(recStr) || recStr.length <= 64) {
+                sanitizedRecordId = recStr;
+            } else {
+                detailMessage = recStr;
+                sanitizedRecordId = '0';
+            }
+        } else {
+            sanitizedRecordId = '0';
+        }
+
+        // 3. แปลงและทำความสะอาด oldData และ newData ให้เป็น JSON Object เสมอสำหรับ Column JSONB
+        let sanitizedOldData = null;
+        if (oldData && typeof oldData === 'object') {
+            try { sanitizedOldData = JSON.parse(JSON.stringify(oldData)); } catch (_) { sanitizedOldData = { info: String(oldData) }; }
+        } else if (oldData !== null && oldData !== undefined) {
+            sanitizedOldData = { info: String(oldData) };
+        }
+
+        let sanitizedNewData = null;
+        if (newData && typeof newData === 'object') {
+            try { sanitizedNewData = JSON.parse(JSON.stringify(newData)); } catch (_) { sanitizedNewData = { info: String(newData) }; }
+        } else if (newData !== null && newData !== undefined) {
+            sanitizedNewData = { info: String(newData) };
+        }
+
+        if (rawAction !== validAction || detailMessage) {
+            sanitizedNewData = sanitizedNewData || {};
+            if (rawAction !== validAction) sanitizedNewData._original_action = rawAction;
+            if (detailMessage) sanitizedNewData.details = detailMessage;
+        }
+
+        const payload = {
+            inspector: email,
+            user_email: email,
+            action: validAction,
+            record_id: sanitizedRecordId,
+            old_data: sanitizedOldData,
+            new_data: sanitizedNewData
+        };
+
+        const { error } = await sqeClient.from('audit_logs').insert([payload]);
+
+        if (error) {
+            console.warn("Audit Log Warning:", error.message);
+            // Fallback Retry โดยแน่ใจว่า record_id ไม่เป็น null และ action เป็นค่าที่ผ่าน Check Constraint เสมอ
+            const fallbackPayload = {
+                action: 'UPDATE',
+                user_email: email,
+                inspector: email,
+                record_id: '0',
+                new_data: {
+                    action_orig: rawAction,
+                    details: detailMessage || String(recordId || '')
+                }
+            };
+            await sqeClient.from('audit_logs').insert([fallbackPayload]);
+        }
+    } catch (e) {
+        console.warn("Critical Audit Error:", e);
+    }
 }
 
 async function deleteRecordFromCloud(id) {
@@ -5278,34 +5372,51 @@ function quickPickJudgment(val) {
 function refreshNeonGlow() {
     const qtyEl = $id('f-qty');
     const unitEl = $id('f-unit');
-    const btnCommit = $id('btn-commit'); // อ้างอิงปุ่ม Commit Data
-    const hasQty = qtyEl && parseFloat(qtyEl.value) > 0;
+    const dateEl = $id('f-date'); // ดึง Element วันที่
+    const remarkEl = $id('f-remark');
+    const btnCommit = $id('btn-commit');
+    
+    // ตรวจสอบจำนวน: ต้องมีค่าและมากกว่าหรือเท่ากับ 1
+    const hasQty = qtyEl && qtyEl.value !== '' && parseFloat(qtyEl.value) >= 1;
 
-    // 1. จัดการความโปร่งแสงของหน่วย (Unit Selection)
+    // --- ส่วนที่ 1: จัดการช่องหน่วย และ ช่องวันที่ (ทำงานเหมือนกัน) ---
+    // ให้เขียวเฉพาะตอนที่มีจำนวน (hasQty) เท่านั้น
     if (unitEl) {
-        unitEl.disabled = false;
-        unitEl.style.opacity = hasQty ? '1' : '0.6';
-        unitEl.style.cursor = 'pointer';
+        if (hasQty) unitEl.classList.add('valid');
+        else unitEl.classList.remove('valid');
     }
 
-    // 2. วนลูปเช็คค่าในช่อง Input เพื่อใส่ Class 'valid' (ขอบเขียวเรืองแสง)
-    const watchedIds = ['f-part', 'f-partname', 'f-supplier', 'f-line', 'f-defect', 'f-remark', 'f-date'];
+    if (dateEl) {
+        if (hasQty) dateEl.classList.add('valid');
+        else dateEl.classList.remove('valid');
+    }
+
+    // --- ส่วนที่ 2: วนลูปเช็คช่องอื่นๆ (เอา f-date ออกจากรายการนี้) ---
+    const watchedIds = ['f-part', 'f-partname', 'f-supplier', 'f-line', 'f-defect', 'f-ref', 'f-qty', 'f-remark'];
+    
     watchedIds.forEach(id => {
         const el = $id(id);
         if (!el) return;
+        
         if (id === 'f-part') {
             validatePartNoInput(el);
             return;
         }
-        if (el.value && el.value !== '' && el.value !== '-' && el.value !== '0') {
+
+        if (id === 'f-remark') {
+            if (el.value.trim().length > 0) el.classList.add('valid');
+            else el.classList.remove('valid');
+            return;
+        }
+
+        if (el.value && el.value.trim() !== '' && el.value !== '-' && el.value !== '0') {
             el.classList.add('valid');
         } else {
             el.classList.remove('valid');
         }
     });
 
-    // 3. [Neural Interaction]: ตรวจสอบความสมบูรณ์ของฟอร์มเพื่อเปิดโหมด Pulse เรืองแสงที่ปุ่ม
-    // เงื่อนไข: ต้องมี Part No, Ref No, Qty > 0 และเลือก Judgment แล้ว
+    // --- ส่วนที่ 3: เช็คความพร้อมปุ่ม Commit ---
     const isFormComplete = 
         ($id('f-part')?.value || '').trim() !== '' && 
         ($id('f-ref')?.value || '').trim() !== '' && 
@@ -5313,13 +5424,7 @@ function refreshNeonGlow() {
         ($id('judgmentSelect')?.value || '') !== '';
 
     if (btnCommit) {
-        if (isFormComplete) {
-            // ถ้าพร้อมบันทึก ให้ปุ่มเริ่ม "เต้น" และเรืองแสง
-            btnCommit.classList.add('btn-neural-ready');
-        } else {
-            // ถ้าข้อมูลไม่ครบ ให้ปิดเอฟเฟกต์
-            btnCommit.classList.remove('btn-neural-ready');
-        }
+        btnCommit.classList.toggle('btn-neural-ready', isFormComplete);
     }
 
     updateInputResetButton();
@@ -5392,16 +5497,28 @@ function updateInputResetButton() {
 
 function resetInputForm() {
     const fields = ['f-part', 'f-partname', 'f-supplier', 'f-ref', 'f-line', 'f-qty', 'f-defect', 'f-remark'];
-    fields.forEach(id => { const el = $id(id); if (el) { el.value = ''; el.classList.remove('valid', 'invalid'); } });
+    
+    fields.forEach(id => { 
+        const el = $id(id); 
+        if (el) { 
+            // [จุดที่ปรับ] ถ้าเป็นช่อง f-qty ให้ค่าเริ่มต้นเป็น 0 นอกนั้นเป็นค่าว่าง
+            el.value = (id === 'f-qty') ? '0' : ''; 
+            el.classList.remove('valid', 'invalid'); 
+        } 
+    });
+
     if (typeof validatePartNoInput === 'function') validatePartNoInput($id('f-part'));
     const d = $id('f-date'); if (d) d.value = new Date().toISOString().split('T')[0];
     const u = $id('f-unit'); if (u) u.value = 'PCS';
     const j = $id('judgmentSelect'); if (j) j.value = '';
+    
     document.querySelectorAll('.shift-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
     S.selectedShift = 'SHIFT A';
     handleJudgment('');
+    
     const cancelBtn = $id('btn-cancel'); if (cancelBtn) cancelBtn.classList.add('hidden');
     const text = $id('btn-commit-text'); if (text) text.textContent = 'Commit Data';
+    
     S.editingId = null;
     closeAllAC();
     if (document.activeElement) document.activeElement.blur();
@@ -6690,6 +6807,7 @@ function handleTableScroll() {
  */
 function switchSubTerminal(view) {
     if (typeof clearTableSelection === 'function') clearTableSelection();
+    if (typeof clearAllPageFilters === 'function') clearAllPageFilters(true);
     const entryDiv = $id('entry-terminal-content');
     const cockpitDiv = $id('overview-cockpit-content');
     const btnEntry = $id('sub-btn-entry');
@@ -6797,6 +6915,7 @@ function switchSubTerminal(view) {
  */
 function switchPage(name, el) {
     if (typeof clearTableSelection === 'function') clearTableSelection();
+    if (typeof clearAllPageFilters === 'function') clearAllPageFilters(true);
     const pageNameUpper = name.toUpperCase();
     const titleEl = document.getElementById('header-title');
     const subNav = document.getElementById('terminal-sub-nav'); 
@@ -7046,14 +7165,34 @@ function getWAPDate(row) {
 }
 
 function toggleSidebar(forceState = null) {
-    const sidebar = $id('sidebar');
+    const sidebar = document.getElementById('sidebar');
+    const body = document.body;
+    
+    // 1. เพิ่ม Class เพื่อบอกว่ากำลังเริ่มเคลื่อนที่
+    body.classList.add('is-animating');
+
     const isCollapsing = forceState === 'open' ? false : forceState === 'close' ? true : !sidebar.classList.contains('collapsed');
     sidebar.classList.toggle('collapsed', isCollapsing);
+
+    // 2. ปิดการคำนวณกราฟซ้ำซ้อน (หน่วงเวลาเท่ากับ Transition 0.4s)
+    clearTimeout(window.resizeTimer);
+    window.resizeTimer = setTimeout(() => {
+        // ลบ Class เมื่อเคลื่อนที่เสร็จ
+        body.classList.remove('is-animating');
+        
+        // 3. สั่งให้ทุก Module (โดยเฉพาะ Job Support) ปรับขนาดทีเดียวตอนจบ
+        if (typeof renderTable === 'function') renderTable();
+        
+        // ส่ง Event Resize ครั้งเดียวเพื่อให้กราฟ ApexCharts ปรับขนาดให้เป๊ะ
+        window.dispatchEvent(new Event('resize'));
+        
+        console.log("Sidebar Transition Complete - UI Refreshed");
+    }, 400); // 400ms คือเวลาที่เท่ากับ CSS Transition
 }
 
 function rebuildSmartMemory() {
     smartMemory = {
-        values: { partNo: new Set(), partName: new Set(), supplier: new Set(), line: new Set(), defect: new Set() },
+        values: { partNo: new Set(), partName: new Set(), supplier: new Set(), line: new Set(), defect: new Set(), category: new Set(), action: new Set(), report: new Set() },
         byPartNo: {}, byPartName: {}, bySupplier: {}, byLine: {}
     };
 
@@ -7063,12 +7202,18 @@ function rebuildSmartMemory() {
         const supplier = (r.supplier || '').trim();
         const line = (r.line || '').trim();
         const defect = (r.defect || '').trim();
+        const category = (r.part || r.category || '').trim();
+        const action = (r.action || '').trim();
+        const report = (r.report_type || r.report || '').trim();
 
         if (partNo) smartMemory.values.partNo.add(partNo);
         if (partName) smartMemory.values.partName.add(partName);
         if (supplier) smartMemory.values.supplier.add(supplier);
         if (line) smartMemory.values.line.add(line);
         if (defect) smartMemory.values.defect.add(defect);
+        if (category && category !== '-') smartMemory.values.category.add(category);
+        if (action) smartMemory.values.action.add(action);
+        if (report) smartMemory.values.report.add(report);
 
         const pack = { partNo, partName, supplier, line, defect, unit: r.unit || 'PCS', judgment: r.judgment || '' };
         if (partNo) { const k = partNo.toLowerCase(); (smartMemory.byPartNo[k] = smartMemory.byPartNo[k] || []).push(pack); }
@@ -7333,36 +7478,126 @@ function closeAllAC() {
     document.querySelectorAll('.ac-dropdown.open').forEach(d => d.classList.remove('open'));
 }
 
+// ประกาศไว้ด้านบนสุดของไฟล์
+let currentACIndex = -1; 
+
 function renderACDropdown(type, inputEl) {
     if (!inputEl) return;
     const wrap = inputEl.closest('.form-input-wrap');
     if (!wrap) return;
 
     let dd = wrap.querySelector('.ac-dropdown');
-    if (!dd) { dd = document.createElement('div'); dd.className = 'ac-dropdown'; wrap.appendChild(dd); }
+    if (!dd) { 
+        dd = document.createElement('div'); 
+        dd.className = 'ac-dropdown'; 
+        wrap.appendChild(dd); 
+    }
+
+    // [จุดที่เพิ่ม] รีเซ็ตตำแหน่งการไฮไลต์ทุกครั้งที่มีการพิมพ์หรือเริ่มค้นหาใหม่
+    currentACIndex = -1;
 
     const query = (inputEl.value || '').trim().toLowerCase();
     const values = Array.from((smartMemory.values && smartMemory.values[type]) || []);
+    
+    // กรองข้อมูล
     let matched = query ? values.filter(v => v.toLowerCase().includes(query)) : values;
+    
+    // เรียงลำดับข้อมูล
     matched.sort((a, b) => {
         if (!query) return a.localeCompare(b);
         const aStart = a.toLowerCase().startsWith(query) ? 0 : 1;
         const bStart = b.toLowerCase().startsWith(query) ? 0 : 1;
         return aStart - bStart || a.localeCompare(b);
     });
+
+    // จำกัดจำนวนรายการที่จะแสดง (15 รายการ)
     matched = matched.slice(0, 15);
 
-    if (!matched.length) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+    // ถ้าไม่พบข้อมูลให้ปิด Dropdown
+    if (!matched.length) { 
+        dd.classList.remove('open'); 
+        dd.innerHTML = ''; 
+        return; 
+    }
 
-    dd.innerHTML = matched.map(v => `<div class="ac-item" data-type="${type}" data-value="${escapeHtml(v)}">${escapeHtml(v)}</div>`).join('');
+    // วาดรายการ Item ลงใน Dropdown
+    dd.innerHTML = matched.map(v => 
+        `<div class="ac-item" data-type="${type}" data-value="${escapeHtml(v)}">${escapeHtml(v)}</div>`
+    ).join('');
+
     dd.classList.add('open');
+
+    // จัดการ Event สำหรับการคลิกเมาส์ (ยังคงไว้เหมือนเดิม)
     dd.querySelectorAll('.ac-item').forEach(item => {
         item.addEventListener('mousedown', (e) => {
             e.preventDefault();
             applyACPick(item.dataset.type, item.dataset.value, inputEl);
+            currentACIndex = -1; // รีเซ็ตหลังเลือกเสร็จ
         });
     });
 }
+
+// ฟังก์ชันจัดการไฮไลต์รายการใน Dropdown
+function updateACHighlight(dropdown) {
+    const items = dropdown.querySelectorAll('.ac-item');
+    items.forEach(item => item.classList.remove('active'));
+    
+    if (currentACIndex >= 0 && currentACIndex < items.length) {
+        const target = items[currentACIndex];
+        target.classList.add('active');
+        // สั่งให้เลื่อน Scroll ตามรายการที่เลือกถ้ามันล้นกล่อง
+        target.scrollIntoView({ block: 'nearest' }); 
+    }
+}
+
+// ฟังก์ชันดักจับคีย์บอร์ดที่ช่อง PN
+document.addEventListener('keydown', (e) => {
+    const activeEl = document.activeElement;
+    
+    // ตรวจสอบว่าเป็นช่องกรอกพาร์ทหรือไม่ (หรือช่องที่มี Autocomplete)
+    if (activeEl.id === 'f-part' || activeEl.id === 'f-partname' || activeEl.id === 'f-supplier') {
+        const wrap = activeEl.closest('.form-input-wrap');
+        const dd = wrap ? wrap.querySelector('.ac-dropdown.open') : null;
+
+        if (dd) {
+            const items = dd.querySelectorAll('.ac-item');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                currentACIndex = (currentACIndex + 1) % items.length;
+                updateACHighlight(dd);
+            } 
+            else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                currentACIndex = (currentACIndex - 1 + items.length) % items.length;
+                updateACHighlight(dd);
+            } 
+            else if (e.key === 'Enter') {
+                if (currentACIndex >= 0) {
+                    e.preventDefault();
+                    const selected = items[currentACIndex];
+                    applyACPick(selected.dataset.type, selected.dataset.value, activeEl);
+                    currentACIndex = -1; // รีเซ็ตหลังเลือก
+                } else {
+                    // ถ้า Dropdown เปิดอยู่แต่ไม่ได้ไฮไลต์อะไร ให้ปิด Dropdown
+                    closeAllAC();
+                }
+            }
+            else if (e.key === 'Escape') {
+                closeAllAC();
+            }
+        } else if (e.key === 'Enter') {
+            // ถ้า Dropdown ปิดอยู่ และกด Enter ให้เรียกใช้ Submit
+            e.preventDefault();
+            submitEntry();
+        }
+    } 
+    // กรณีที่ช่องอื่นๆ (ที่ไม่ใช่ Autocomplete) กด Enter ให้ Submit เช่นกัน
+    else if (activeEl.classList.contains('form-input') && e.key === 'Enter') {
+        e.preventDefault();
+        submitEntry();
+    }
+});
 
 function applyACPick(type, value, inputEl) {
     inputEl.value = value;
@@ -7376,7 +7611,14 @@ function applyACPick(type, value, inputEl) {
     else if (type === 'supplier') autoFillFromPack(getMostFrequentPack(smartMemory.bySupplier[key]));
     else if (type === 'line') autoFillFromPack(getMostFrequentPack(smartMemory.byLine[key]));
     else if (type === 'defect') translateDefectToRemark();
+    
     updateInputResetButton();
+
+    // [จุดที่เพิ่ม] สั่งให้ Cursor กระโดดไปที่ช่อง Ref No ทันทีหลังเลือกเสร็จ
+    const refInput = document.getElementById('f-ref');
+    if (refInput) {
+        refInput.focus();
+    }
 }
 
 document.addEventListener('click', e => {
@@ -8295,7 +8537,35 @@ window.addEventListener('DOMContentLoaded', () => {
     $id('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
     $id('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
 
-    if ($id('f-qty')) $id('f-qty').addEventListener('input', refreshNeonGlow);
+    // --- [จุดที่ปรับปรุง] ระบบดักจับและล็อคค่าช่อง QTY ---
+    const qtyInput = $id('f-qty');
+    if (qtyInput) {
+        // 1. ป้องกันการพิมพ์เครื่องหมายลบ (-) และตัวอักษร e, E (ทางคีย์บอร์ด)
+        qtyInput.addEventListener('keydown', function(e) {
+            if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                e.preventDefault();
+            }
+        });
+
+        // 2. ตรวจสอบทันทีเมื่อมีการกรอก/วาง และสั่งอัปเดตขอบเขียวนีออน
+        qtyInput.addEventListener('input', function() {
+            if (this.value < 0) this.value = 0;
+            refreshNeonGlow(); // อัปเดตขอบเขียวทันทีขณะพิมพ์
+        });
+
+        // 3. ป้องกันการลบจนว่าง (เมื่อเสีย Focus ให้กลับมาเป็น 0)
+        qtyInput.addEventListener('blur', function() {
+            if (this.value === "" || this.value < 0) {
+                this.value = 0;
+            }
+        });
+    }
+
+    // --- [จุดที่เพิ่ม] ดักจับการพิมพ์ในหมายเหตุเพื่ออัปเดตขอบเขียว ---
+    if ($id('f-remark')) {
+        $id('f-remark').addEventListener('input', refreshNeonGlow);
+    }
+
     if ($id('f-defect')) $id('f-defect').addEventListener('change', translateDefectToRemark);
 
     // --- ผูก Event ของ Date Picker ใน Header ---
@@ -8388,6 +8658,9 @@ function refreshClaimDashboard() {
     // --- [1. KPI หลัก] ---
     animateValue('kpi-total', 0, totalQty, 1200);
     animateValue('kpi-total-lots', 0, totalRows, 1200);
+    if (typeof renderKpiTotalSparkline === 'function') {
+        renderKpiTotalSparkline(filtered);
+    }
     
     // --- [2. Fault Cards (SF, CTC, OK, Vendor)] ---
     const updateFaultCard = (prefix, judgmentKey) => {
@@ -8475,6 +8748,203 @@ function refreshClaimDashboard() {
             duration: 0.4, y: 15, opacity: 0, stagger: 0.04, ease: "expo.out"
         });
     }
+}
+
+let lastSparklineRecords = null;
+let sparklineResizeTimer = null;
+
+/**
+ * ✨ D3-based Real-time Animated Sparkline Chart for #kpi-total (Production Summary Card)
+ * Fully responsive: Recalculates width/height on container resize while preserving 24-hour trend.
+ */
+function renderKpiTotalSparkline(records) {
+    if (records !== undefined) {
+        lastSparklineRecords = records;
+    } else {
+        records = lastSparklineRecords || (typeof S !== 'undefined' ? S.records : []);
+    }
+
+    const container = document.getElementById('kpi-total-sparkline');
+    if (!container) return;
+    if (typeof d3 === 'undefined') return;
+
+    // Attach ResizeObserver once to handle container dimension changes dynamically
+    if (!container._sparklineObserverAttached && typeof ResizeObserver !== 'undefined') {
+        container._sparklineObserverAttached = true;
+        const ro = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                if (entry.contentRect && entry.contentRect.width > 0) {
+                    clearTimeout(sparklineResizeTimer);
+                    sparklineResizeTimer = setTimeout(() => {
+                        renderKpiTotalSparkline();
+                    }, 80);
+                }
+            }
+        });
+        ro.observe(container);
+    }
+
+    // 1. Calculate 24-hour time slots
+    const now = new Date();
+    const hourlyData = [];
+    for (let i = 23; i >= 0; i--) {
+        const slotTime = new Date(now.getTime() - i * 60 * 60 * 1000);
+        hourlyData.push({
+            index: 23 - i,
+            hourLabel: slotTime.getHours() + ':00',
+            time: slotTime,
+            qty: 0
+        });
+    }
+
+    // 2. Aggregate quantity per hour slot
+    if (records && records.length > 0) {
+        records.forEach(r => {
+            const rawTime = r.created_at || r.date;
+            if (rawTime) {
+                const rTime = new Date(rawTime);
+                if (!isNaN(rTime.getTime())) {
+                    const diffHours = Math.floor((now.getTime() - rTime.getTime()) / (1000 * 60 * 60));
+                    if (diffHours >= 0 && diffHours < 24) {
+                        const idx = 23 - diffHours;
+                        if (hourlyData[idx]) {
+                            hourlyData[idx].qty += (parseFloat(r.qty) || 1);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Fallback: If no hourly timestamp alignment found, simulate organic production wave based on total
+    const totalQty = records ? records.reduce((sum, r) => sum + (parseFloat(r.qty) || 0), 0) : 0;
+    const hasData = hourlyData.some(d => d.qty > 0);
+    if (!hasData) {
+        const base = totalQty > 0 ? Math.ceil(totalQty / 24) : 12;
+        hourlyData.forEach((d, idx) => {
+            const wave = Math.sin(idx / 2.5) * (base * 0.45) + Math.cos(idx / 1.8) * (base * 0.25);
+            d.qty = Math.max(3, Math.round(base + wave));
+        });
+    }
+
+    container.innerHTML = '';
+    const rect = container.getBoundingClientRect();
+    const width = Math.max(60, rect.width || container.clientWidth || 112);
+    const height = Math.max(24, rect.height || container.clientHeight || 36);
+    const margin = { top: 4, right: 6, bottom: 4, left: 4 };
+
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .attr('class', 'overflow-visible');
+
+    const g = svg.append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    // Gradient definition
+    const gradId = 'sparkline-emerald-grad-' + Math.floor(Math.random() * 100000);
+    const defs = svg.append('defs');
+    const gradient = defs.append('linearGradient')
+        .attr('id', gradId)
+        .attr('x1', '0%').attr('y1', '0%')
+        .attr('x2', '0%').attr('y2', '100%');
+
+    gradient.append('stop')
+        .attr('offset', '0%')
+        .attr('stop-color', '#10b981')
+        .attr('stop-opacity', 0.5);
+
+    gradient.append('stop')
+        .attr('offset', '100%')
+        .attr('stop-color', '#10b981')
+        .attr('stop-opacity', 0.0);
+
+    const xScale = d3.scaleLinear()
+        .domain([0, hourlyData.length - 1])
+        .range([0, innerWidth]);
+
+    const maxVal = d3.max(hourlyData, d => d.qty) || 10;
+    const yScale = d3.scaleLinear()
+        .domain([0, maxVal * 1.18])
+        .range([innerHeight, 0]);
+
+    const area = d3.area()
+        .x((d, i) => xScale(i))
+        .y0(innerHeight)
+        .y1(d => yScale(d.qty))
+        .curve(d3.curveMonotoneX);
+
+    const line = d3.line()
+        .x((d, i) => xScale(i))
+        .y(d => yScale(d.qty))
+        .curve(d3.curveMonotoneX);
+
+    // Render Gradient Area
+    g.append('path')
+        .datum(hourlyData)
+        .attr('fill', `url(#${gradId})`)
+        .attr('d', area);
+
+    // Render Animated Line
+    const path = g.append('path')
+        .datum(hourlyData)
+        .attr('fill', 'none')
+        .attr('stroke', '#10b981')
+        .attr('stroke-width', 2)
+        .attr('stroke-linecap', 'round')
+        .attr('d', line);
+
+    const totalLength = path.node() ? path.node().getTotalLength() : 200;
+
+    path.attr('stroke-dasharray', `${totalLength} ${totalLength}`)
+        .attr('stroke-dashoffset', totalLength)
+        .transition()
+        .duration(1000)
+        .ease(d3.easeCubicOut)
+        .attr('stroke-dashoffset', 0);
+
+    // Real-time Pulsing Dot on Last Point
+    const lastX = xScale(hourlyData.length - 1);
+    const lastY = yScale(hourlyData[hourlyData.length - 1].qty);
+
+    const pulseCircle = g.append('circle')
+        .attr('cx', lastX)
+        .attr('cy', lastY)
+        .attr('r', 2.5)
+        .attr('fill', '#10b981')
+        .attr('opacity', 0.8);
+
+    pulseCircle.transition()
+        .duration(1400)
+        .ease(d3.easeLinear)
+        .on('start', function repeat() {
+            d3.active(this)
+                .attr('r', 2.5)
+                .attr('opacity', 0.8)
+                .transition()
+                .duration(900)
+                .attr('r', 6.5)
+                .attr('opacity', 0)
+                .transition()
+                .duration(0)
+                .attr('r', 2.5)
+                .attr('opacity', 0.8)
+                .on('start', repeat);
+        });
+
+    g.append('circle')
+        .attr('cx', lastX)
+        .attr('cy', lastY)
+        .attr('r', 2.5)
+        .attr('fill', '#059669')
+        .attr('stroke', '#ffffff')
+        .attr('stroke-width', 1.2);
 }
 let resizeTimer2 = null;
 window.addEventListener('resize', () => {
@@ -10183,8 +10653,8 @@ const WapSupportLogs = (function () {
 
     function _blankRecord() {
         return {
-            id: null, problem: '', action: 'Rework', part: '', lot: '',
-            ok: 0, ng: 0, report: 'VF', remark: '',
+            id: null, problem: '', action: '', part: '', lot: '',
+            ok: '', ng: '', report: '', remark: '',
             eventDate: new Date().toISOString().split('T')[0],
             imageUrl: null
         };
@@ -10262,8 +10732,9 @@ const WapSupportLogs = (function () {
 
             // สำรองข้อมูลลง LocalStorage เพื่อป้องกันปัญหาการเชื่อมต่อบนบางเครื่อง
             try {
-                if (_user && _records.length > 0) {
-                    localStorage.setItem(`wap_support_cache_${_user}`, JSON.stringify(_records.slice(0, 300)));
+                if (_records.length > 0) {
+                    if (_user) localStorage.setItem(`wap_support_cache_${_user}`, JSON.stringify(_records.slice(0, 300)));
+                    localStorage.setItem(`wap_support_cache_last`, JSON.stringify(_records.slice(0, 300)));
                 }
             } catch (err) {
                 console.warn('[WapSupportCache Error]', err);
@@ -10275,7 +10746,8 @@ const WapSupportLogs = (function () {
             if (myToken === _fetchToken && _alive) {
                 let restored = false;
                 try {
-                    const cacheStr = localStorage.getItem(`wap_support_cache_${_user}`);
+                    let cacheStr = _user ? localStorage.getItem(`wap_support_cache_${_user}`) : null;
+                    if (!cacheStr) cacheStr = localStorage.getItem('wap_support_cache_last');
                     if (cacheStr) {
                         const parsed = JSON.parse(cacheStr);
                         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -10389,16 +10861,17 @@ const WapSupportLogs = (function () {
             }
 
             const totalRows = _filtered.length;
-            const ROW_HEIGHT = 48; // Estimated average row height in px
-            const OVERSCAN = 15;   // Extra rows above/below viewport for seamless scrolling
+            const isSmallScreen = window.innerWidth < 1024 || ($.scrollArea && $.scrollArea.clientWidth < 768);
+            const ROW_HEIGHT = isSmallScreen ? 64 : 52; // Estimated average row height in px
+            const OVERSCAN = isSmallScreen ? 35 : 25;   // Extra rows above/below viewport for seamless scrolling
 
             let startIndex = 0;
             let endIndex = totalRows;
             let topSpacerPx = 0;
             let bottomSpacerPx = 0;
 
-            // Virtual windowing if total rows > 25 AND scrollArea has valid height
-            if (totalRows > 25 && $.scrollArea && $.scrollArea.clientHeight > 0) {
+            // Virtual windowing if total rows > 60 AND scrollArea has valid height
+            if (totalRows > 60 && $.scrollArea && $.scrollArea.clientHeight > 0) {
                 const scrollTop = $.scrollArea.scrollTop || 0;
                 const clientHeight = $.scrollArea.clientHeight || 600;
 
@@ -10488,9 +10961,6 @@ const WapSupportLogs = (function () {
         }
     }
 
-    /* ──────────────────────────────────────────
-       FORM MODAL (เพิ่มระบบ Sync To Special Jobs + Commander Suggestion)
-       ────────────────────────────────────────── */
    /* ──────────────────────────────────────────
        FORM MODAL (Integrated: Special Jobs + 8D Report)
        ────────────────────────────────────────── */
@@ -10702,42 +11172,100 @@ const WapSupportLogs = (function () {
                             </div>
                         </div>
 
-                        <!-- Grid 3 คอลัมน์สำหรับข้อมูลพาร์ท -->
-                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-                            <div>
-                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔢 รหัสพาร์ท (Part No.) *</label>
-                                <input type="text" id="prob-partno" list="partno-datalist" value="${parsedPartNo}" placeholder="พิมพ์รหัสพาร์ท..." class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" title="Part No" aria-label="Part No" autocomplete="off">
-                                <datalist id="partno-datalist">${partnoDatalistOptions}</datalist>
-                            </div>
-                            <div>
-                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🧩 ชื่อพาร์ท (Part Name) *</label>
-                                <input type="text" id="prob-part" list="partname-datalist" value="${parsedPart}" placeholder="พิมพ์ชื่อพาร์ท..." class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700;" title="Part Name" aria-label="Part Name" autocomplete="off">
-                                <datalist id="partname-datalist">${partnameDatalistOptions}</datalist>
-                            </div>
-                            <div>
-                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🏭 ผู้จำหน่าย (Supplier)</label>
-                                <input type="text" id="prob-supplier" list="supplier-datalist" value="${parsedSupplier}" placeholder="พิมพ์ชื่อผู้จำหน่าย..." class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700; color:#0284c7;" title="Supplier Name" aria-label="Supplier Name" autocomplete="off">
-                                <datalist id="supplier-datalist">${supplierDatalistOptions}</datalist>
-                            </div>
-                        </div>
+<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+    <!-- 1. ช่องรหัสพาร์ท (Part No.) -->
+    <div>
+        <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔢 รหัสพาร์ท (Part No.) *</label>
+        <div style="position:relative;"> <!-- เพิ่มตัวครอบเพื่อให้ Dropdown ลอยตรงตำแหน่ง -->
+            <input type="text" id="prob-partno" 
+                   value="${parsedPartNo}" 
+                   placeholder="พิมพ์รหัสพาร์ท..." 
+                   class="form-input" 
+                   style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" 
+                   oninput="renderModalAC('partno', this)" 
+                   onfocus="renderModalAC('partno', this)"
+                   autocomplete="off" 
+                   title="Part No" aria-label="Part No">
+        </div>
+    </div>
+
+    <!-- 2. ช่องชื่อพาร์ท (Part Name) -->
+    <div>
+        <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🧩 ชื่อพาร์ท (Part Name) *</label>
+        <div style="position:relative;">
+            <input type="text" id="prob-part" 
+                   value="${parsedPart}" 
+                   placeholder="พิมพ์ชื่อพาร์ท..." 
+                   class="form-input" 
+                   style="width:100%; height:32px; font-size:11px; font-weight:700;" 
+                   oninput="renderModalAC('partname', this)" 
+                   onfocus="renderModalAC('partname', this)"
+                   autocomplete="off" 
+                   title="Part Name" aria-label="Part Name">
+        </div>
+    </div>
+
+    <!-- 3. ช่องผู้จำหน่าย (Supplier) -->
+    <div>
+        <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🏭 ผู้จำหน่าย (Supplier)</label>
+        <div style="position:relative;">
+            <input type="text" id="prob-supplier" 
+                   value="${parsedSupplier}" 
+                   placeholder="พิมพ์ชื่อผู้จำหน่าย..." 
+                   class="form-input" 
+                   style="width:100%; height:32px; font-size:11px; font-weight:700; color:#0284c7;" 
+                   oninput="renderModalAC('supplier', this)" 
+                   onfocus="renderModalAC('supplier', this)"
+                   autocomplete="off" 
+                   title="Supplier Name" aria-label="Supplier Name">
+        </div>
+    </div>
+</div>
 
                         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📦 หมวดหมู่พาร์ท</label>
-                                <select id="f-sup-part-cat" name="part" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:600;" required title="Part Category" aria-label="Part Category">
-                                    <option value="" ${!r.part ? 'selected' : ''}>-- เลือกหมวดหมู่ --</option>
-                                    ${partOptions}
-                                </select>
+                                <div style="position:relative;">
+                                    <input type="text" id="f-sup-part-cat" name="part" 
+                                           value="${r.part || ''}" 
+                                           placeholder="พิมพ์/เลือกหมวดหมู่..." 
+                                           class="form-input" 
+                                           style="width:100%; height:32px; font-size:11px; font-weight:600;" 
+                                           oninput="renderModalAC('category', this)" 
+                                           onfocus="renderModalAC('category', this)" 
+                                           autocomplete="off" 
+                                           title="Part Category" aria-label="Part Category">
+                                </div>
                             </div>
-                            <div>
-                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📍 ผู้แจ้ง / พื้นที่ (Area/Dept)</label>
-                                <input type="text" id="prob-user" value="${parsedUser}" placeholder="เช่น OSA-A1" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:600;" title="User/Area" aria-label="User/Area">
-                            </div>
-                            <div>
-                                <label style="font-size:10px; font-weight:700; color:#e11d48; margin-bottom:2px; display:block;">⚠️ อาการเสีย (Defect Detail)</label>
-                                <input type="text" id="prob-defect" list="defect-datalist" value="${parsedDefect}" placeholder="ระบุอาการเสีย..." class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700; color:#e11d48;" title="Defect" aria-label="Defect" autocomplete="off">
-                                <datalist id="defect-datalist">${defectDatalistOptions}</datalist>
-                            </div>
+
+<div>
+    <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📍 ผู้แจ้ง / พื้นที่ (Area/Dept)</label>
+    <div style="position:relative;"> <!-- เพิ่มตัวครอบ -->
+        <input type="text" id="prob-user" 
+               value="${parsedUser}" 
+               placeholder="เช่น OSA-A1" 
+               class="form-input" 
+               style="width:100%; height:32px; font-size:11px; font-weight:600;" 
+               oninput="renderModalAC('user', this)" 
+               onfocus="renderModalAC('user', this)"
+               autocomplete="off" 
+               title="User/Area" aria-label="User/Area">
+    </div>
+</div>
+<div>
+    <label style="font-size:10px; font-weight:700; color:#e11d48; margin-bottom:2px; display:block;">⚠️ อาการเสีย (Defect Detail)</label>
+    <div style="position:relative;"> <!-- เพิ่มตัวครอบ -->
+        <input type="text" id="prob-defect" 
+               value="${parsedDefect}" 
+               placeholder="ระบุอาการเสีย..." 
+               class="form-input" 
+               style="width:100%; height:32px; font-size:11px; font-weight:700; color:#e11d48;" 
+               oninput="renderModalAC('defect', this)" 
+               onfocus="renderModalAC('defect', this)"
+               autocomplete="off" 
+               title="Defect" aria-label="Defect">
+    </div>
+</div>
                         </div>
 
                         <!-- Live Preview Banner -->
@@ -10763,31 +11291,31 @@ const WapSupportLogs = (function () {
                             </div>
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔧 การแก้ไข (ACTION)</label>
-                                <select id="f-sup-action" name="action" class="form-input" style="width:100%; height:32px; font-size:11px;" title="Action" aria-label="Action">
-                                    <option value="" ${!r.action ? 'selected' : ''}>-- เลือก ACTION --</option>
-                                    <option value="Rework" ${r.action==='Rework'?'selected':''}>Rework (แก้ไขงานซ่อม)</option>
-                                    <option value="Repair" ${r.action==='Repair'?'selected':''}>Repair (ซ่อมแซมตามเงื่อนไข)</option>
-                                    <option value="Replace" ${r.action==='Replace'?'selected':''}>Replace (เปลี่ยนชิ้นส่วนใหม่)</option>
-                                    <option value="Sorting 100%" ${r.action==='Sorting 100%'?'selected':''}>Sorting 100% (คัดแยกชิ้นงาน 100%)</option>
-                                    <option value="Screening & Re-inspection" ${r.action==='Screening & Re-inspection'?'selected':''}>Screening & Re-inspection (คัดกรองตรวจซ้ำ)</option>
-                                    <option value="Use as is" ${r.action==='Use as is'||r.action==='Use as is / Concession'?'selected':''}>Use as is / Concession (อนุโลมใช้ตามสภาพ)</option>
-                                    <option value="Scrap" ${r.action==='Scrap'?'selected':''}>Scrap (ทำลายชิ้นงาน NG)</option>
-                                    <option value="Return to Vendor" ${r.action==='Return to Vendor'||r.action==='RTV'?'selected':''}>RTV (ส่งคืนผู้ขาย/ซัพพลายเออร์)</option>
-                                    <option value="Containment / Quarantine" ${r.action==='Containment / Quarantine'?'selected':''}>Containment / Hold (กักกันชิ้นงานเสี่ยง)</option>
-                                    <option value="Engineering Change (EC/ECN)" ${r.action==='Engineering Change (EC/ECN)'?'selected':''}>Engineering Change (EC/ECN)</option>
-                                    <option value="Poka-Yoke / Error Proofing" ${r.action==='Poka-Yoke / Error Proofing'?'selected':''}>Poka-Yoke / Jig Adjustment</option>
-                                    <option value="Line Stop & Purge" ${r.action==='Line Stop & Purge'?'selected':''}>Line Purge & Clean (เคลียร์สายการผลิต)</option>
-                                    <option value="Supplier On-site Sorting" ${r.action==='Supplier On-site Sorting'?'selected':''}>Supplier On-site Sorting</option>
-                                    <option value="Process Parameter Adjustment" ${r.action==='Process Parameter Adjustment'?'selected':''}>Process Parameter Adjustment</option>
-                                </select>
+                                <div style="position:relative;">
+                                    <input type="text" id="f-sup-action" name="action" 
+                                           value="${isEdit ? (r.action || '') : ''}" 
+                                           placeholder="พิมพ์/เลือก ACTION..." 
+                                           class="form-input" 
+                                           style="width:100%; height:32px; font-size:11px; font-weight:600;" 
+                                           oninput="renderModalAC('action', this)" 
+                                           onfocus="renderModalAC('action', this)" 
+                                           autocomplete="off" 
+                                           title="Action" aria-label="Action">
+                                </div>
                             </div>
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📋 ประเภทรายงาน</label>
-                                <select name="report" class="form-input" style="width:100%; height:32px; font-size:11px;" title="Report" aria-label="Report">
-                                    <option value="VF" ${r.report==='VF'?'selected':''}>VF Report</option>
-                                    <option value="RP" ${r.report==='RP'?'selected':''}>RP Report</option>
-                                    <option value="RECORDS" ${r.report==='RECORDS'?'selected':''}>Records</option> 
-                                </select>
+                                <div style="position:relative;">
+                                    <input type="text" id="f-sup-report" name="report" 
+                                           value="${isEdit ? (r.report === 'RP' ? 'RP Report' : (r.report === 'RECORDS' ? 'Records' : (r.report === 'VF' ? 'VF Report' : (r.report || '')))) : ''}" 
+                                           placeholder="พิมพ์/เลือกประเภท..." 
+                                           class="form-input" 
+                                           style="width:100%; height:32px; font-size:11px; font-weight:600;" 
+                                           oninput="renderModalAC('report', this)" 
+                                           onfocus="renderModalAC('report', this)" 
+                                           autocomplete="off" 
+                                           title="Report" aria-label="Report">
+                                </div>
                             </div>
                         </div>
 
@@ -10853,10 +11381,13 @@ const WapSupportLogs = (function () {
                          หมวดหมู่ 3: รูปภาพหลักฐาน (Evidence Image Upload Wide Bar)
                          ========================================================== -->
                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
-                        <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
-                            📸 3. รูปภาพหลักฐาน (Evidence)
-                        </label>
-                        <div style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:10px; min-height:60px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
+                                📸 3. รูปภาพหลักฐาน (Evidence)
+                            </label>
+                            <span id="img-status-badge" style="font-size:9.5px; font-weight:800; padding:2px 8px; border-radius:6px; transition:all 0.25s ease;"></span>
+                        </div>
+                        <div id="img-dropzone" style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:10px; min-height:60px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease;">
                             <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;" title="Img Input" aria-label="Img Input">
                             <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
                                 ${r.imageUrl ? `<img src="${r.imageUrl}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">` : `
@@ -10981,6 +11512,9 @@ const WapSupportLogs = (function () {
             }
 
             syncProblemSentence();
+            if (typeof updateSupportFormValidation === 'function') {
+                updateSupportFormValidation();
+            }
         }
 
         const partNoEl = modal.querySelector('#prob-partno');
@@ -11094,20 +11628,71 @@ const WapSupportLogs = (function () {
 
         // --- Logic: Image Upload ---
         let currentImage = r.imageUrl || null;
+        modal._currentImage = currentImage;
         const imgInput = document.getElementById('img-input');
+        const imgDropzone = document.getElementById('img-dropzone');
+
+        function handleImageFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                currentImage = ev.target.result;
+                modal._currentImage = currentImage;
+                const area = document.getElementById('img-preview-area');
+                if (area) area.innerHTML = `<img src="${ev.target.result}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">`;
+                saveDraftData();
+                updateSupportFormValidation();
+            };
+            reader.readAsDataURL(file);
+        }
+
         if (imgInput) {
             imgInput.onchange = (e) => {
                 const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    currentImage = ev.target.result;
-                    document.getElementById('img-preview-area').innerHTML = `<img src="${ev.target.result}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">`;
-                    saveDraftData();
-                };
-                reader.readAsDataURL(file);
+                handleImageFile(file);
             };
         }
+
+        if (imgDropzone) {
+            imgDropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                imgDropzone.style.borderColor = '#2563eb';
+                imgDropzone.style.background = '#eff6ff';
+            });
+            imgDropzone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                imgDropzone.style.borderColor = '#cbd5e1';
+                imgDropzone.style.background = '#ffffff';
+            });
+            imgDropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                imgDropzone.style.borderColor = '#cbd5e1';
+                imgDropzone.style.background = '#ffffff';
+                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleImageFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        // Allow pasting image from Clipboard (Ctrl+V) into modal
+        const handlePasteImage = (e) => {
+            if (!document.body.contains(modal)) {
+                window.removeEventListener('paste', handlePasteImage);
+                return;
+            }
+            const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+            if (items) {
+                for (let item of items) {
+                    if (item.type && item.type.indexOf('image') === 0) {
+                        const blob = item.getAsFile();
+                        handleImageFile(blob);
+                        if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ', 'success');
+                        break;
+                    }
+                }
+            }
+        };
+        window.addEventListener('paste', handlePasteImage);
 
         // --- Offline Draft Management & Auto-Save ---
         const DRAFT_KEY = 'wap_sup_form_draft';
@@ -11191,7 +11776,7 @@ const WapSupportLogs = (function () {
                     category: modal.querySelector('#f-sup-part-cat')?.value || '',
                     eventDate: modal.querySelector('#f-sup-date')?.value || '',
                     action: modal.querySelector('#f-sup-action')?.value || '',
-                    report: modal.querySelector('select[name="report"]')?.value || '',
+                    report: modal.querySelector('#f-sup-report')?.value || modal.querySelector('select[name="report"]')?.value || '',
                     lot: modal.querySelector('#f-sup-lot')?.value || '',
                     ok: modal.querySelector('#f-sup-ok')?.value || '',
                     ng: modal.querySelector('#f-sup-ng')?.value || '',
@@ -11223,7 +11808,7 @@ const WapSupportLogs = (function () {
                 if (d.category !== undefined && modal.querySelector('#f-sup-part-cat')) modal.querySelector('#f-sup-part-cat').value = d.category;
                 if (d.eventDate !== undefined && modal.querySelector('#f-sup-date')) modal.querySelector('#f-sup-date').value = d.eventDate;
                 if (d.action !== undefined && modal.querySelector('#f-sup-action')) modal.querySelector('#f-sup-action').value = d.action;
-                if (d.report !== undefined && modal.querySelector('select[name="report"]')) modal.querySelector('select[name="report"]').value = d.report;
+                if (d.report !== undefined && modal.querySelector('#f-sup-report')) modal.querySelector('#f-sup-report').value = d.report;
                 if (d.lot !== undefined && modal.querySelector('#f-sup-lot')) modal.querySelector('#f-sup-lot').value = d.lot;
                 if (d.ok !== undefined && modal.querySelector('#f-sup-ok')) modal.querySelector('#f-sup-ok').value = d.ok;
                 if (d.ng !== undefined && modal.querySelector('#f-sup-ng')) modal.querySelector('#f-sup-ng').value = d.ng;
@@ -11240,10 +11825,12 @@ const WapSupportLogs = (function () {
                 }
                 if (d.image) {
                     currentImage = d.image;
+                    modal._currentImage = d.image;
                     const area = document.getElementById('img-preview-area');
                     if (area) area.innerHTML = `<img src="${d.image}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">`;
                 }
                 syncProblemSentence();
+                updateSupportFormValidation();
             } catch(e) {
                 console.warn('Draft restore error:', e);
             }
@@ -11252,6 +11839,8 @@ const WapSupportLogs = (function () {
         if (formEl) {
             formEl.addEventListener('input', saveDraftData);
             formEl.addEventListener('change', saveDraftData);
+            formEl.addEventListener('input', updateSupportFormValidation);
+            formEl.addEventListener('change', updateSupportFormValidation);
         }
 
         const handleOnlineOfflineState = () => {
@@ -11264,6 +11853,7 @@ const WapSupportLogs = (function () {
         window.addEventListener('offline', handleOnlineOfflineState);
 
         updateOfflineStatusUI();
+        updateSupportFormValidation();
 
         // --- Save Support Form ---
         formEl.onsubmit = async (e) => {
@@ -11271,6 +11861,47 @@ const WapSupportLogs = (function () {
             if (submitBtn.disabled) return;
             
             saveDraftData();
+
+            // 0. ตรวจสอบข้อมูลช่องที่จำเป็น (Validation check & highlight missing fields)
+            const requiredFields = [
+                { id: 'prob-partno', name: 'รหัสพาร์ท (Part No.)' },
+                { id: 'prob-part', name: 'ชื่อพาร์ท (Part Name)' },
+                { id: 'prob-defect', name: 'อาการเสีย (Defect Detail)' },
+                { id: 'f-sup-lot', name: 'QTY รวม (Lot No.)' }
+            ];
+
+            let missingFields = [];
+            requiredFields.forEach(item => {
+                const el = modal.querySelector('#' + item.id);
+                if (!el || !el.value || el.value.trim() === '' || (item.id === 'f-sup-lot' && Number(el.value) <= 0)) {
+                    missingFields.push(item);
+                    if (el) {
+                        el.classList.add('field-glow-error');
+                        el.classList.remove('field-glow-pending', 'field-glow-filled');
+                        if (typeof shake === 'function') shake(el);
+                    }
+                }
+            });
+
+            if (missingFields.length > 0) {
+                const firstMissingEl = modal.querySelector('#' + missingFields[0].id);
+                if (firstMissingEl) firstMissingEl.focus();
+                toast(`⚠️ กรุณากรอกข้อมูลในช่องที่ไฮไลต์ให้ครบถ้วน: ${missingFields.map(m => m.name).join(', ')}`, 'error');
+                return;
+            }
+
+            // ตรวจสอบรูปภาพหลักฐาน (บังคับแนบรูปภาพหลักฐานก่อนบันทึก)
+            const hasImg = Boolean(currentImage || modal._currentImage || modal.querySelector('#img-preview-area img'));
+            if (!hasImg) {
+                const imgDropzone = modal.querySelector('#img-dropzone');
+                if (imgDropzone) {
+                    imgDropzone.classList.add('field-glow-error');
+                    imgDropzone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (typeof shake === 'function') shake(imgDropzone);
+                }
+                toast('⚠️ กรุณาแนบรูปภาพหลักฐานก่อนทำการบันทึกรายงาน', 'error');
+                return;
+            }
 
             if (!navigator.onLine) {
                 toast('📶 ขณะนี้คุณอยู่ออฟไลน์: ระบบได้บันทึกข้อมูลแบบร่างลง LocalStorage เรียบร้อยแล้ว', 'info');
@@ -11291,6 +11922,11 @@ const WapSupportLogs = (function () {
             const existingRec = _editingId ? _records.find(x => String(x.id) === String(_editingId)) : null;
             const originalCreatedAt = existingRec ? (existingRec.createdAt || existingRec.created_at) : null;
 
+            let repVal = (fd.get('report') || 'VF').toString().trim();
+            if (repVal.toUpperCase().includes('RP')) repVal = 'RP';
+            else if (repVal.toUpperCase().includes('RECORD')) repVal = 'RECORDS';
+            else if (repVal.toUpperCase().includes('VF')) repVal = 'VF';
+
             const payload = {
                 id: _editingId || 'SUP-' + Date.now(),
                 user_id: S.currentUser,
@@ -11300,7 +11936,7 @@ const WapSupportLogs = (function () {
                 lot: Number(fd.get('lot')) || 0,
                 ok_qty: Number(fd.get('ok')) || 0,
                 ng_qty: Number(fd.get('ng')) || 0,
-                report_type: fd.get('report') || 'VF',
+                report_type: repVal,
                 remark: fd.get('remark') || '',
                 event_date: fd.get('date'),
                 image_url: currentImage,
@@ -11330,7 +11966,13 @@ const WapSupportLogs = (function () {
                     await Wap8DSystem.createNewCase(payload);
                 }
 
+                // ล้างแบบร่าง ล้างฟอร์ม และล้างเอฟเฟกต์ไฮไลต์
                 localStorage.removeItem(DRAFT_KEY);
+                formEl.reset();
+                modal.querySelectorAll('.field-glow-unfilled, .field-glow-filled, .valid, .invalid').forEach(el => {
+                    el.classList.remove('field-glow-unfilled', 'field-glow-filled', 'valid', 'invalid');
+                });
+
                 window.removeEventListener('online', handleOnlineOfflineState);
                 window.removeEventListener('offline', handleOnlineOfflineState);
 
@@ -14025,28 +14667,49 @@ function applyClaimDashPreset(type) {
     updateAllModuleFilters(); 
 }
 
-function resetClaimDashFilter() {
+function clearAllPageFilters(silent = false) {
     // 1. ล้างตัวแปรวันที่
     claimDashFilterDate = { start: '', end: '' };
     
-    // 2. ล้างค่าในช่อง Input วันที่บน Header
-    if ($id('cd-start-date')) $id('cd-start-date').value = '';
-    if ($id('cd-end-date')) $id('cd-end-date').value = '';
+    // 2. ล้างค่าในช่อง Input วันที่และ Vendor บน Header
+    const startDateEl = document.getElementById('cd-start-date');
+    if (startDateEl) startDateEl.value = '';
+    const endDateEl = document.getElementById('cd-end-date');
+    if (endDateEl) endDateEl.value = '';
     
-    // 3. ✨ [เพิ่มใหม่] รีเซ็ตช่องเลือก Vendor ให้เป็น ALL
-    const vendorSelect = $id('claim-vendor-filter');
+    const vendorSelect = document.getElementById('claim-vendor-filter');
     if (vendorSelect) vendorSelect.value = 'ALL';
 
-    // 4. คืนค่าสีปุ่ม Preset (Today/Month)
+    // 3. คืนค่าสีปุ่ม Preset (Today / 7 Days / Month)
     document.querySelectorAll('#claim-dash-filter-wrap button').forEach(b => {
         b.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
         b.classList.add('bg-white', 'text-slate-500');
     });
 
-    toast('🧹 ล้างตัวกรองและรีเซ็ต Vendor เรียบร้อย', 'success');
-    
-    // 5. สั่งรีเฟรชหน้าจอใหม่ทั้งหมด
-    triggerGlobalRefresh(); 
+    // 4. ล้างคำค้นหาในช่องค้นหาต่างๆ
+    const filterSearchEl = document.getElementById('filter-search');
+    if (filterSearchEl) filterSearchEl.value = '';
+    const adminSearchEl = document.getElementById('admin-search-input');
+    if (adminSearchEl) adminSearchEl.value = '';
+    const eightDSearchEl = document.getElementById('eightDSearch');
+    if (eightDSearchEl) eightDSearchEl.value = '';
+    const searchInputEl = document.getElementById('searchInput');
+    if (searchInputEl) searchInputEl.value = '';
+
+    // 5. ล้างสถานะการกรองใน State S
+    if (typeof S !== 'undefined') {
+        S.activeFilter = 'ALL';
+        S.searchKeyword = '';
+    }
+
+    if (!silent) {
+        if (typeof toast === 'function') toast('🧹 ล้างตัวกรองและรีเซ็ตการค้นหาทั้งหมดเรียบร้อย', 'success');
+        if (typeof triggerGlobalRefresh === 'function') triggerGlobalRefresh(); 
+    }
+}
+
+function resetClaimDashFilter() {
+    clearAllPageFilters(false);
 }
 
 //กราฟVendor Fault Feed
@@ -14418,9 +15081,7 @@ function updateThemeIcon(isDark) {
 
     container.innerHTML = isDark ? moonIcon : sunIcon;
 }
-// ============================================================
-// 1. คลังข้อมูลคำแปลฉบับสมบูรณ์ (Unified i18n Dictionary)
-// ============================================================
+
 // ============================================================
 // 1. คลังข้อมูลคำแปลฉบับสมบูรณ์ (ตรวจสอบ Syntax Error แล้ว)
 // ============================================================
@@ -14485,17 +15146,17 @@ const translations = {
         header_title_claim: "PART LINE CLAIM",
 
         // --- Table Headers & Titles ---
-        table_case_register: "Case Register & Production Logs",
+        table_case_register: "Support production line",
         th_date: "RECORD DATE",
         th_problem: "PROBLEM DETAILS",
-        th_action: "CORRECTION",
+        th_action: "Action",
         th_part: "PART Group",
         th_lot: "LOT NO.",
         th_ok: "OK (QTY)",
         th_ng: "NG (QTY)",
-        th_type: "CATEGORY",
+        th_type: "Judgment",
         th_photo: "PHOTO",
-        th_manage: "ACTION"
+        th_manage: "Edit"
     }
 };
 
@@ -16779,8 +17440,295 @@ async function handlePasswordResetSubmit(email) {
  *  PERSONAL SETTINGS & PROFILE MANAGEMENT
  * ═══════════════════════════════════════════════════════
  */
-
+let currentModalACIndex = -1; 
 let tempAvatarBase64 = null; // ตัวแปรพักรูปภาพ
+
+function renderModalAC(type, inputEl) {
+    if (!inputEl || inputEl._suppressAC) return;
+
+    const wrap = inputEl.parentElement;
+    if (!wrap) return;
+
+    let dd = wrap.querySelector('.modal-ac-dropdown');
+    if (!dd) {
+        dd = document.createElement('div');
+        dd.className = 'modal-ac-dropdown';
+        wrap.appendChild(dd);
+    }
+
+    const query = inputEl.value.trim().toLowerCase();
+    
+    // ดึงข้อมูลต้นทางตามประเภทที่ส่งมา
+    let source = [];
+    if (type === 'partno') source = Array.from(smartMemory.values.partNo || []);
+    else if (type === 'partname') source = Array.from(smartMemory.values.partName || []);
+    else if (type === 'supplier') source = Array.from(smartMemory.values.supplier || []);
+    else if (type === 'defect') source = Array.from(smartMemory.values.defect || []);
+    else if (type === 'user') source = Array.from(smartMemory.values.line || []);
+    else if (type === 'category') {
+        const defaultCats = [
+            "Plastic Resin Mold Part", "Plastic Resin (Assy)", "Packaging part Form",
+            "Aluminium Part", "Steel", "Copper Part", "Terminal", "Remote Control",
+            "Motors", "Electric Controls", "PCBA", "Compressors", "Piping Part", "Printing part"
+        ];
+        const catSet = new Set(defaultCats);
+        if (smartMemory.values && smartMemory.values.category) {
+            smartMemory.values.category.forEach(c => { if (c) catSet.add(c); });
+        }
+        source = Array.from(catSet);
+    }
+    else if (type === 'action') {
+        const defaultActions = [
+            "Rework (แก้ไขงานซ่อม)",
+            "Repair (ซ่อมแซมตามเงื่อนไข)",
+            "Replace (เปลี่ยนชิ้นส่วนใหม่)",
+            "Sorting 100% (คัดแยกชิ้นงาน 100%)",
+            "Screening & Re-inspection (คัดกรองตรวจซ้ำ)",
+            "Use as is / Concession (อนุโลมใช้ตามสภาพ)",
+            "Scrap (ทำลายชิ้นงาน NG)",
+            "RTV (ส่งคืนผู้ขาย/ซัพพลายเออร์)",
+            "Containment / Hold (กักกันชิ้นงานเสี่ยง)",
+            "Engineering Change (EC/ECN)",
+            "Poka-Yoke / Jig Adjustment",
+            "Line Purge & Clean (เคลียร์สายการผลิต)",
+            "Supplier On-site Sorting",
+            "Process Parameter Adjustment"
+        ];
+        const actSet = new Set(defaultActions);
+        if (smartMemory.values && smartMemory.values.action) {
+            smartMemory.values.action.forEach(a => { if (a) actSet.add(a); });
+        }
+        source = Array.from(actSet);
+    }
+    else if (type === 'report') {
+        source = ["VF Report", "RP Report", "Records"];
+    }
+
+    // Logic การ Filter: ถ้ามีคำค้นให้กรอง ถ้าไม่มีให้โชว์ทั้งหมด
+    let matched = query 
+        ? source.filter(v => v.toLowerCase().includes(query)) 
+        : source;
+
+    // เรียงลำดับตัวที่ขึ้นต้นด้วยคำค้นให้มาก่อน (Priority Sorting)
+    matched.sort((a, b) => {
+        if (!query) return 0;
+        const aStart = a.toLowerCase().startsWith(query) ? 0 : 1;
+        const bStart = b.toLowerCase().startsWith(query) ? 0 : 1;
+        return aStart - bStart || a.localeCompare(b);
+    });
+
+    const displayItems = matched.slice(0, 20);
+
+    // ปิดดรอปดาวน์ถ้าไม่มีข้อมูลให้แสดง
+    if (displayItems.length === 0) {
+        dd.style.display = 'none';
+        return;
+    }
+
+    dd.style.display = 'block';
+    currentModalACIndex = -1; // รีเซ็ตตำแหน่งเลือกคีย์บอร์ด
+
+    dd.innerHTML = displayItems.map((v, i) => `
+        <div class="modal-ac-item" data-index="${i}" data-value="${v.replace(/"/g, '&quot;')}">
+            ${v}
+        </div>
+    `).join('');
+
+    // จัดการ Event สำหรับการเลือกรายการ
+    dd.querySelectorAll('.modal-ac-item').forEach(item => {
+        item.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // ป้องกันช่อง input เสียโฟกัสก่อนได้รับค่า
+            const val = item.getAttribute('data-value');
+            applyModalAC(type, val, inputEl);
+        });
+    });
+}
+
+// ฟังก์ชันเลือกรายการ
+function applyModalAC(type, value, inputEl) {
+    if (!inputEl) return;
+
+    // 1. ใส่ค่าที่เลือกลงในช่อง Input
+    inputEl.value = value;
+
+    // 2. [จุดสำคัญ] สั่งให้ดรอปดาวน์ "หายไป" และ "ล้างข้อมูล" ทันที
+    const wrap = inputEl.parentElement;
+    const dd = wrap ? wrap.querySelector('.modal-ac-dropdown') : null;
+    if (dd) {
+        dd.style.display = 'none';
+        dd.innerHTML = ''; // ล้างรายการเก่าออกเพื่อไม่ให้ค้างในหน่วยความจำ
+    }
+
+    // 3. รีเซ็ต Index ของคีย์บอร์ดกลับไปที่ค่าเริ่มต้น
+    currentModalACIndex = -1;
+
+    // 4. ระบุ flag เพื่อป้องกันการเปิดดรอปดาวน์ซ้ำขณะ dispatchEvent
+    inputEl._suppressAC = true;
+
+    // 5. กระตุ้นระบบ Auto-fill และ Sync ช่องอื่นๆ
+    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+    delete inputEl._suppressAC;
+
+    // 6. อัปเดตไฮไลต์การกรอกข้อมูล
+    if (typeof updateSupportFormValidation === 'function') {
+        updateSupportFormValidation();
+    }
+
+    // 7. ย้าย Focus ไปยังช่องถัดไปเพื่อความสะดวก
+    const form = inputEl.closest('form');
+    if (form) {
+        const focusable = Array.from(form.querySelectorAll('input:not([type="hidden"]), select, textarea')).filter(el => !el.disabled && el.offsetParent !== null);
+        const idx = focusable.indexOf(inputEl);
+        if (idx >= 0 && idx < focusable.length - 1) {
+            focusable[idx + 1].focus();
+        }
+    }
+}
+
+// ฟังก์ชันตรวจสองสถานะการกรอกข้อมูลของ Support Form และเน้นสีขอบ/Glow Effect
+function updateSupportFormValidation() {
+    const modal = document.getElementById('support-form-modal');
+    if (!modal) return;
+
+    // ตรวจสอบการกรอก 🔢 รหัสพาร์ท (Part No.) เพื่อใช้กำหนดสถานะช่อง 📅 วันที่รายงาน
+    const partNoEl = modal.querySelector('#prob-partno');
+    const hasPartNo = Boolean(partNoEl && (partNoEl.value || '').trim() !== '');
+
+    // 📅 วันที่รายงาน (ให้เป็นสีเทาเสมอหากยังไม่มีการกรอก Part No.)
+    const dateEl = modal.querySelector('#f-sup-date');
+    if (dateEl) {
+        if (!hasPartNo) {
+            dateEl.style.color = '#94a3b8';
+            dateEl.style.backgroundColor = '#f1f5f9';
+            dateEl.style.borderColor = '#cbd5e1';
+            dateEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+        } else {
+            dateEl.style.color = '';
+            dateEl.style.backgroundColor = '';
+            dateEl.style.borderColor = '';
+            const val = (dateEl.value || '').trim();
+            if (val !== '') {
+                dateEl.classList.add('field-glow-filled');
+                dateEl.classList.remove('field-glow-pending', 'field-glow-error');
+            } else {
+                dateEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            }
+        }
+    }
+
+    // ทุกช่องปกติ: เมื่อมีการเติมข้อมูล ค่อยขึ้นสีเขียว (field-glow-filled) ถ้าไม่มีข้อมูลเป็นสีเทาปกติ (ไม่มีกรอบสีเหลือง)
+    const textFields = [
+        'prob-partno',
+        'prob-part',
+        'prob-supplier',
+        'f-sup-part-cat',
+        'prob-user',
+        'prob-defect',
+        'f-sup-action',
+        'f-sup-report'
+    ];
+
+    textFields.forEach(id => {
+        const el = modal.querySelector('#' + id);
+        if (!el) return;
+
+        const val = (el.value || '').trim();
+        const hasVal = val !== '' && val !== '--';
+
+        if (hasVal) {
+            el.classList.add('field-glow-filled');
+            el.classList.remove('field-glow-pending', 'field-glow-error');
+        } else {
+            el.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+        }
+    });
+
+    const remarkEl = modal.querySelector('textarea[name="remark"]');
+    if (remarkEl) {
+        const val = (remarkEl.value || '').trim();
+        if (val !== '') {
+            remarkEl.classList.add('field-glow-filled');
+            remarkEl.classList.remove('field-glow-pending', 'field-glow-error');
+        } else {
+            remarkEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+        }
+    }
+
+    // 📦 LOT NO., ✅ OK QTY, ❌ NG QTY: เอากรอบสีเหลืองออกทั้งหมด เมื่อมีข้อมูลให้ขึ้นสีเขียว
+    const lotEl = modal.querySelector('#f-sup-lot');
+    if (lotEl) {
+        const num = parseFloat(lotEl.value);
+        if (!isNaN(num) && num > 0) {
+            lotEl.classList.add('field-glow-filled');
+            lotEl.classList.remove('field-glow-pending', 'field-glow-error');
+        } else {
+            lotEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+        }
+    }
+
+    const okEl = modal.querySelector('#f-sup-ok');
+    if (okEl) {
+        const val = (okEl.value || '').trim();
+        if (val !== '' && !isNaN(parseFloat(val))) {
+            okEl.classList.add('field-glow-filled');
+            okEl.classList.remove('field-glow-pending', 'field-glow-error');
+        } else {
+            okEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+        }
+    }
+
+    const ngEl = modal.querySelector('#f-sup-ng');
+    const lotNum = parseFloat(lotEl?.value);
+    if (ngEl) {
+        const ngVal = (ngEl.value || '').trim();
+        if (!isNaN(lotNum) && lotNum > 0 && ngVal !== '') {
+            ngEl.classList.add('field-glow-filled');
+            ngEl.classList.remove('field-glow-pending', 'field-glow-error');
+        } else {
+            ngEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+        }
+    }
+
+    // 📸 3. รูปภาพหลักฐาน (Evidence Box) - ให้คงกรอบสีเหลืองไว้ช่องเดียวเพื่อแจ้งเตือนรอแนบรูป
+    const imgDropzone = modal.querySelector('#img-dropzone');
+    const imgBadge = modal.querySelector('#img-status-badge');
+    const previewImg = modal.querySelector('#img-preview-area img');
+    const hasImg = Boolean(modal._currentImage || (previewImg && previewImg.getAttribute('src')));
+
+    if (imgDropzone) {
+        if (hasImg) {
+            imgDropzone.classList.add('field-glow-filled');
+            imgDropzone.classList.remove('field-glow-pending', 'field-glow-error');
+            if (imgBadge) {
+                imgBadge.innerHTML = '✅ แนบรูปภาพหลักฐานเรียบร้อยแล้ว';
+                imgBadge.style.background = '#d1fae5';
+                imgBadge.style.color = '#059669';
+                imgBadge.style.border = '1px solid #6ee7b7';
+            }
+        } else {
+            imgDropzone.classList.add('field-glow-pending');
+            imgDropzone.classList.remove('field-glow-filled', 'field-glow-error');
+            if (imgBadge) {
+                imgBadge.innerHTML = '⚠️ กรุณาแนบรูปภาพหลักฐาน (จำเป็นสำหรับการบันทึก)';
+                imgBadge.style.background = '#fef3c7';
+                imgBadge.style.color = '#d97706';
+                imgBadge.style.border = '1px solid #fcd34d';
+            }
+        }
+    }
+}
+
+// ฟังก์ชันอัปเดตแถบสีไฮไลต์
+function updateModalACHighlight(dd) {
+    const items = dd.querySelectorAll('.modal-ac-item');
+    items.forEach(it => it.classList.remove('active'));
+    if (currentModalACIndex >= 0) {
+        items[currentModalACIndex].classList.add('active');
+        items[currentModalACIndex].scrollIntoView({ block: 'nearest' });
+    }
+}
 
 // 1. เปิดหน้าต่างตั้งค่าโปรไฟล์
 async function openPersonalSettings() {
@@ -17011,21 +17959,35 @@ function updateStars() {
     requestAnimationFrame(updateStars);
 }
 
+// ฟังก์ชันล้างข้อความหัวข้อปัญหาให้กระชับ และแก้ปัญหาวันที่แสดงซ้ำซ้อน
 function getCleanProblemTitle(title) {
     if (!title) return "";
     let str = String(title).trim();
 
+    // 1. แก้ไขปัญหาวันที่ซ้ำกัน (เช่น "10 Aug'26 Aug'26" ให้เหลือแค่ "10 Aug'26")
+    // ค้นหารูปแบบ: วันที่ เดือน'ปี แล้วตามด้วย วันที่ เดือน'ปี อีกรอบ หรือแค่ เดือน'ปี ซ้ำ
+    const fullDatePattern = /(\d{1,2}\s+[A-Za-z']+\d{2})\s+(\d{1,2}\s+[A-Za-z']+\d{2})/i;
+    const partialDatePattern = /(\d{1,2}\s+[A-Za-z']+\d{2})\s+([A-Za-z']+\d{2})/i;
+    
+    str = str.replace(fullDatePattern, "$1");
+    str = str.replace(partialDatePattern, "$1");
+
+    // 2. จัดการส่วน "inform quality problem" ไม่ให้ซ้ำซ้อนกรณีมีการต่อประโยคหลายครั้ง
     if (/inform quality problem/i.test(str)) {
         const parts = str.split(/inform quality problem/i);
         if (parts.length > 2) {
-            const lastPart = parts[parts.length - 1];
-            const prevPart = parts[parts.length - 2];
-            const lastOnIdx = prevPart.lastIndexOf('On ');
-            const onPrefix = lastOnIdx !== -1 ? prevPart.substring(lastOnIdx).trim() : 'On';
-            str = `${onPrefix} inform quality problem ${lastPart}`.replace(/\s+/g, ' ').trim();
+            // ดึงส่วนแรกสุด (Prefix) และส่วนท้ายสุด (ข้อมูลปัญหาจริง) มาประกอบกันใหม่
+            const firstPart = parts[0].trim();
+            const lastPart = parts[parts.length - 1].trim();
+            
+            // ตรวจสอบว่าส่วนแรกมี "On " นำหน้าหรือไม่ ถ้าไม่มีให้เติมให้สมบูรณ์
+            const prefix = firstPart.toLowerCase().startsWith('on') ? firstPart : `On ${firstPart}`;
+            str = `${prefix} inform quality problem ${lastPart}`;
         }
     }
-    return str;
+
+    // ล้างช่องว่างที่เกินมา และส่งค่ากลับ
+    return str.replace(/\s+/g, ' ').trim();
 }
 
 function getDetailSentenceParts(c) {
@@ -19049,22 +20011,23 @@ function renderDashboard() {
                 </div>
             </td>
 
-            <td class="px-6 py-5">
+            <td class="px-6 py-5 min-w-[340px] md:min-w-[420px]">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-sm shrink-0">
                         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </div>
-                    <div class="flex flex-col max-w-md">
-                        <p class="text-[13px] font-black text-slate-700 leading-tight mb-1 truncate group-hover:text-blue-700 transition-colors" title="${displayTitle}">
+                    <div class="flex flex-col min-w-[280px] sm:min-w-[340px] md:min-w-[420px] flex-1">
+                        <p class="text-[12.5px] font-black text-slate-700 leading-snug mb-1.5 group-hover:text-blue-700 transition-colors" 
+                           style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-break: break-word;">
                             ${displayTitle}
                         </p>
-                        <div class="flex items-center gap-3">
-                            <span class="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                        <div class="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
+                            <span class="text-[10px] font-bold text-slate-400 flex items-center gap-1 shrink-0">
                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                 ${c.part_name || 'Generic Part'}
                             </span>
-                            <span class="text-[10px] font-bold text-slate-300">|</span>
-                            <span class="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                            <span class="text-[10px] font-bold text-slate-300 shrink-0">|</span>
+                            <span class="text-[10px] font-bold text-slate-400 flex items-center gap-1 shrink-0">
                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                 ${new Date(c.created_at).toLocaleDateString()}
                             </span>
@@ -20492,7 +21455,7 @@ if (typeof window !== 'undefined') {
         countWeekdaysInRange, attToast, onAttYearChange, toggleFormPanel, renderAll,
         triggerModuleInit, triggerGlobalRefresh, resetHeaderFilters, toggleSubmenu,
         editAttRecord, updateTarget, validateOtTime, onClaimDashDateChange,
-        applyClaimDashPreset, resetClaimDashFilter, updateVendorFaultFeed, exportToCSV,
+        applyClaimDashPreset, resetClaimDashFilter, clearAllPageFilters, updateVendorFaultFeed, exportToCSV,
         triggerImport, confirmClearAll, findBestMatch, handleImport, animateValue,
         toggleTheme, updateThemeIcon, toggleLangMenu, changeLanguage, validateEmail,
         hideCapsLock, updateLoginNetStatus, autoHideBanner, handleGlobalAdd,
@@ -20689,7 +21652,93 @@ function simulateTrafficSpike() {
     }
 }
 
+// ดึง Element ช่อง QTY
+const qtyInput = document.getElementById('f-qty');
 
+if (qtyInput) {
+    // 1. ป้องกันการพิมพ์เครื่องหมายลบ (-) และตัวอักษร e, E (ทางคีย์บอร์ด)
+    qtyInput.addEventListener('keydown', function(e) {
+        if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+            e.preventDefault();
+        }
+    });
+
+    // 2. ตรวจสอบทันทีเมื่อมีการกรอก (กรณี Copy-Paste หรือกดปุ่มลูกศรในช่อง Input)
+    qtyInput.addEventListener('input', function() {
+        if (this.value < 0) {
+            this.value = 0;
+        }
+    });
+
+    // 3. ป้องกันการลบข้อมูลจนว่างเปล่า (เมื่อเสีย Focus ให้กลับมาเป็น 0)
+    qtyInput.addEventListener('blur', function() {
+        if (this.value === "" || this.value < 0) {
+            this.value = 0;
+        }
+    });
+}
+
+document.addEventListener('keydown', (e) => {
+    const activeEl = document.activeElement;
+    
+    // [จุดที่ปรับปรุง] เพิ่ม ID ของช่อง Category, Action, Report เข้าไปในรายการตรวจสอบ
+    const acInputIds = ['prob-partno', 'prob-part', 'prob-supplier', 'prob-defect', 'prob-user', 'f-sup-part-cat', 'f-sup-action', 'f-sup-report'];
+    const isACInput = acInputIds.includes(activeEl.id);
+    
+    if (isACInput) {
+        const wrap = activeEl.parentElement;
+        const dd = wrap.querySelector('.modal-ac-dropdown');
+        
+        // ทำงานเฉพาะเมื่อดรอปดาวน์กำลังแสดงผลอยู่
+        if (dd && dd.style.display !== 'none') {
+            const items = dd.querySelectorAll('.modal-ac-item');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                currentModalACIndex = (currentModalACIndex + 1) % items.length;
+                updateModalACHighlight(dd);
+            } 
+            else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                currentModalACIndex = (currentModalACIndex - 1 + items.length) % items.length;
+                updateModalACHighlight(dd);
+            } 
+            else if (e.key === 'Enter') {
+                if (currentModalACIndex >= 0) {
+                    e.preventDefault(); 
+                    
+                    const selectedValue = items[currentModalACIndex].getAttribute('data-value');
+                    
+                    // [จุดที่ปรับปรุง] เพิ่มการ Map ค่า ID ใหม่ให้ตรงกับ Type ข้อมูล
+                    const typeMap = {
+                        'prob-partno': 'partno',
+                        'prob-part': 'partname',
+                        'prob-supplier': 'supplier',
+                        'prob-defect': 'defect',
+                        'prob-user': 'user',
+                        'f-sup-part-cat': 'category',
+                        'f-sup-action': 'action',
+                        'f-sup-report': 'report'
+                    };
+                    
+                    const type = typeMap[activeEl.id];
+                    
+                    // เรียกฟังก์ชันหลักเพื่อเติมข้อมูลและปิดดรอปดาวน์
+                    applyModalAC(type, selectedValue, activeEl);
+                    
+                } else {
+                    // ถ้าดรอปดาวน์เปิดอยู่แต่ไม่ได้เลือกแถว ให้ปิดไปเมื่อกด Enter
+                    dd.style.display = 'none';
+                }
+            }
+            else if (e.key === 'Escape') {
+                e.preventDefault();
+                dd.style.display = 'none';
+                currentModalACIndex = -1;
+            }
+        }
+    }
+});
 
 // --- ส่วนเชื่อมต่อฟังก์ชันจากภายในสคริปต์ ออกไปให้ปุ่มใน HTML ใช้งานได้ ---
 
@@ -20713,3 +21762,6 @@ window.handleLogout = handleLogout;
 window.cloudSyncAll = cloudSyncAll;
 window.submitEntry = submitEntry;
 window.openPersonalSettings = openPersonalSettings;
+window.updateSupportFormValidation = updateSupportFormValidation;
+window.renderModalAC = renderModalAC;
+window.applyModalAC = applyModalAC;

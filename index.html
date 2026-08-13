@@ -14,6 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -720,14 +721,18 @@
 <div class="compact-kpi-grid">
     
     <!-- 1. PRODUCTION SUMMARY -->
-    <div class="kpi-card-v2 border-emerald-100">
+    <div class="kpi-card-v2 border-emerald-100 relative overflow-hidden">
         <div class="flex justify-between items-start">
             <span class="kpi-v2-label text-emerald-600">PRODUCTION SUMMARY</span>
             <div class="w-6 h-6 bg-emerald-50 rounded flex items-center justify-center text-xs">📦</div>
         </div>
-        <div class="mt-2">
-            <h2 id="kpi-total" class="kpi-v2-val">0</h2>
-            <span class="text-[10px] font-bold text-slate-400 ml-1">PCS</span>
+        <div class="mt-2 flex items-center justify-between gap-1">
+            <div>
+                <h2 id="kpi-total" class="kpi-v2-val inline-block">0</h2>
+                <span class="text-[10px] font-bold text-slate-400 ml-1">PCS</span>
+            </div>
+            <!-- D3 Animated Real-time Sparkline Chart -->
+            <div id="kpi-total-sparkline" class="h-9 w-28 shrink-0 overflow-visible relative" title="24-Hour Production Volume Trend"></div>
         </div>
         <div class="flex justify-between items-end mt-auto pt-2 border-t border-slate-50">
             <div>
@@ -1373,7 +1378,7 @@
                     <thead>
                         <tr>
                             <th style="width:105px;" data-i18n="th_date">RECORD DATE</th>
-                            <th style="min-width:260px;" data-i18n="th_problem">PROBLEM DETAILS</th>
+                            <th style="min-width:360px;" data-i18n="th_problem">PROBLEM DETAILS</th>
                             <th style="width:120px;" data-i18n="th_action">CORRECTION</th>
                             <th style="width:145px;" data-i18n="th_part">PART Group</th>
                             <th style="width:110px;" data-i18n="th_lot">LOT NO.</th>

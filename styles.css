@@ -2914,6 +2914,8 @@ table, th, td {
     flex: 1;
     min-height: 0;
     overflow: auto; /* สำคัญมาก: ถ้าไม่มี overflow จะไม่ทำงาน */
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: #94a3b8 #f1f5f9;
     position: relative;
@@ -3694,14 +3696,13 @@ table, th, td {
  /* ลดจาก 1200 ลดการล้นบนแท็บเล็ต */
 .col-problem {
     white-space: normal !important;
-    /* ลบ max-width: 320px;
-    ออก หรือเปลี่ยนเป็น none */
-    max-width: none !important;
+    min-width: 360px !important;
+    max-width: 650px !important;
     line-height: 1.5;
     font-weight: 600;
     color: #1e293b;
-    max-width: none;
-    min-width: 180px;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 /* 5S Excellence — คุมกราฟไม่ให้ยื่นล้น */
@@ -5140,7 +5141,7 @@ table, th, td {
     border-spacing: 0;
     font-size: 11px;
     line-height: 1.4;
-    min-width: 900px;
+    min-width: 1200px !important;
     font-family: 'Inter', 'Prompt', 'Sarabun', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
@@ -11501,25 +11502,35 @@ body.dark-mode .panel-header-flex {
     margin-bottom: 2px !important;
 }
 
-/* 5. จัดการปุ่ม Toggle (ที่วงกลมสีขาวแลบออกมาในรูปที่สอง) */
-/* ซ่อนเงาส่วนเกินของปุ่ม Toggle ใน Sidebar ถ้ามันไปทับหน้าจอ */
 .float-toggle {
     position: absolute;
-    width: 24px;
-    height: 24px; /* ขนาดเล็กลงแต่กดง่ายเพราะมีเงาช่วย */
+    width: 26px; /* ขยายขนาดนิดหน่อยให้กดง่าย */
+    height: 26px;
+    background: #fff;
     border: 1.5px solid #e2e8f0;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: #94a3b8;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    top: 50px;
-    right: -12px; /* ขยับขึ้นเล็กน้อยให้อยู่กึ่งกลางระหว่าง Header กับเมนูแรก */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    background: #fff;
-    z-index: 100;
+    color: #64748b;
+    top: 56px; /* ให้กึ่งกลางกับ Header พอดี */
+    right: -13px; /* ให้วงกลมอยู่ตรงกลางเส้นขอบพอดี */
+    z-index: 1001; /* ให้อยู่เหนือทุกอย่าง */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* ใช้ Bezier ให้ลื่นไหล */
+}
+
+/* ทำให้ไอคอนลูกศรหมุนเมื่อพับ/กาง */
+#sidebar.collapsed .float-toggle svg {
+    transform: rotate(180deg);
+}
+
+.float-toggle:hover {
+    color: #2563eb;
+    border-color: #3b82f6;
+    background: #f8fafc;
+    transform: scale(1.1);
 }
 body.dark-mode .float-toggle {
     background: #1e293b;
@@ -15140,6 +15151,7 @@ body.dark-mode #admin-table-body tr:hover {
     backface-visibility: hidden;
     transform: translateZ(0); /* เปิดใช้งาน 3D Acceleration */
     will-change: transform, opacity;
+    
 }
 
 /* ลดภาระการคำนวณเงาขณะเลื่อน (Scroll) */
@@ -15548,4 +15560,521 @@ header {
         font-size: 8.5px !important;
         height: 24px !important;
     }
+}
+/* --- 1. จัดการโครงสร้างหลักของแอป (ห้ามเพี้ยน) --- */
+#dashboard-view {
+    display: flex !important;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden; /* ล็อคหน้าจอหลักไม่ให้มี Scrollbar ซ้อน */
+}
+
+main {
+    flex: 1;
+    min-width: 0; /* สำคัญมาก: ป้องกันเนื้อหา Dashboard ดัน Sidebar จนเพี้ยน */
+    display: flex;
+    flex-direction: column;
+    background-color: #f1f5f9;
+}
+
+/* --- 2. แก้ไข Sidebar แบบปุ่มไม่โดนตัด (Layered Fix) --- */
+#sidebar {
+    position: relative;
+    height: 100vh;
+    background: #fff;
+    border-right: 1px solid #e2e8f0;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+    
+    /* อนุญาตให้ปุ่มลอยออกไปได้ */
+    overflow: visible !important; 
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0; /* บังคับความกว้าง Sidebar ไม่ให้โดนบีบ */
+}
+
+/* บังคับให้ส่วน Scroll อยู่แค่ในเมนูเท่านั้น ไม่เกี่ยวกับตัว Sidebar หลัก */
+#sidebar-nav {
+    flex: 1;
+    overflow-y: auto; 
+    overflow-x: hidden;
+    padding: 12px;
+    /* ซ่อน Scrollbar ให้ดูพรีเมียม */
+    scrollbar-width: none; 
+    -ms-overflow-style: none;
+}
+#sidebar-nav::-webkit-scrollbar {
+    display: none;
+}
+
+/* --- 3. จัดตำแหน่งปุ่ม Toggle ให้ลอยอยู่บนเส้นขอบพอดี --- */
+.float-toggle {
+    position: absolute;
+    right: -13px; /* กึ่งกลางปุ่มทับเส้นขอบพอดี */
+    top: 50px;
+    width: 26px;
+    height: 26px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1002;
+    cursor: pointer;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+/* --- 4. ป้องกัน Grid ในหน้า Dashboard เพี้ยน --- */
+.compact-main-grid, 
+.compact-feed-grid {
+    display: grid !important;
+    min-height: 0; /* ป้องกันลูกดันแม่จนล้น */
+    min-width: 0;
+}
+
+/* กรณีหน้าจอกว้างไม่พอ ให้เลื่อนเฉพาะตัว Dashboard ไม่ให้ดัน Sidebar */
+#content-area {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+}
+/* 1. บังคับให้ Sidebar ยอมให้ปุ่มแลบออกไปได้ (ไม่โดนตัดขอบ) */
+#sidebar {
+    overflow: visible !important; 
+    position: relative; 
+    z-index: 1001 !important; /* ต้องสูงกว่า Header ของหน้าปกติ */
+}
+
+/* 2. ปรับแต่งปุ่ม Toggle ให้ลอยอยู่บนสุด (Top Layer) */
+.float-toggle {
+    position: absolute !important;
+    /* ขยับปุ่มให้พ้นขอบ Sidebar ออกมา */
+    right: -13px; 
+    top: 50px; 
+    
+    /* บังคับให้อยู่เลเยอร์สูงสุด ทับทุกกล่องชื่อหน้า */
+    z-index: 9999 !important; 
+    
+    /* สไตล์ปุ่ม */
+    width: 26px;
+    height: 26px;
+    background-color: #ffffff !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    
+    /* เพิ่มเงาเข้มขึ้นเพื่อให้ดู "ลอย" เหนือกล่องหัวข้อ */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); 
+    transition: all 0.3s ease;
+}
+
+/* 3. จัดการ Layout ฝั่งขวา (Main Content) ไม่ให้มาทับ */
+main, header {
+    z-index: 1; /* ตั้งให้ต่ำกว่า Sidebar และปุ่ม */
+}
+
+/* เอฟเฟกต์ตอน Hover ให้ปุ่มเด่นขึ้นอีก */
+.float-toggle:hover {
+    transform: scale(1.1);
+    border-color: #2563eb !important;
+    color: #2563eb;
+    box-shadow: 0 0 15px rgba(37, 99, 235, 0.2);
+}
+
+/* ============================================================
+   ULTRA-FUTURISTIC DARK MODE: CLAIM MODAL
+   ============================================================ */
+
+/* 1. ฉากหลังเบลอเข้มขึ้น (Backdrop) */
+body.dark-mode .modal-overlay {
+    background: rgba(2, 6, 23, 0.85) !important;
+    backdrop-filter: blur(12px) !important;
+}
+
+/* 2. ตัวกล่อง Modal หลัก: Midnight Steel Shell */
+body.dark-mode #support-form-modal > div,
+body.dark-mode #support-form-modal .bg-white {
+    background: #050a14 !important; /* ดำลึกน้ำเงิน */
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.1), 0 30px 100px rgba(0, 0, 0, 0.9) !important;
+    border-radius: 28px !important;
+}
+
+/* 3. ส่วนหัว Modal: Cyber Blue Gradient */
+body.dark-mode #support-form-modal div[style*="background:#1e293b"] {
+    background: linear-gradient(90deg, #0f172a 0%, #1e3a8a 100%) !important;
+    border-bottom: 2px solid rgba(37, 99, 235, 0.3) !important;
+    padding: 16px 24px !important;
+}
+
+/* 4. แถบแจ้งเตือนแบบร่าง (Draft Banner): Deep Purple Pulse */
+body.dark-mode #offline-draft-banner {
+    background: linear-gradient(90deg, #1e1b4b, #2e1065) !important;
+    border: 1px solid #4c1d95 !important;
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.2);
+}
+body.dark-mode #offline-indicator-text { color: #ddd6fe !important; }
+
+/* 5. กล่อง Section ภายใน: Inset Glass Panels */
+body.dark-mode #sup-form > div {
+    background: rgba(15, 23, 42, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3) !important;
+    border-radius: 20px !important;
+    padding: 20px !important;
+}
+
+/* 6. หัวข้อช่องกรอก (Labels): High-Visibility Slate */
+body.dark-mode .form-label, 
+body.dark-mode label {
+    color: #94a3b8 !important;
+    font-weight: 800 !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* 7. ช่อง Input / Select / Textarea: Obsidian Interface */
+body.dark-mode .form-input, 
+body.dark-mode #sup-form input, 
+body.dark-mode #sup-form select, 
+body.dark-mode #sup-form textarea {
+    background-color: #020617 !important;
+    border: 1.5px solid #1e293b !important;
+    color: #ffffff !important;
+    border-radius: 14px !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5) !important;
+}
+
+body.dark-mode .form-input:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.25), inset 0 2px 4px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 8. กล่อง PREVIEW (Terminal Style) */
+body.dark-mode #prob-preview-text {
+    background: #000000 !important;
+    border: 1px solid #1e3a8a !important;
+    color: #38bdf8 !important; /* ฟ้า Cyan นีออน */
+    font-family: 'DM Mono', 'Fira Code', monospace !important;
+    padding: 15px !important;
+    border-radius: 12px !important;
+    opacity: 0.9;
+}
+
+/* 9. แถบปุ่ม Toggle (Special Mission & 8D) */
+body.dark-mode #sync-container {
+    background: rgba(37, 99, 235, 0.05) !important;
+    border: 1px dashed rgba(59, 130, 246, 0.4) !important;
+}
+body.dark-mode [id="8d-container"] {
+    background: rgba(225, 29, 72, 0.05) !important;
+    border: 1px dashed rgba(244, 63, 94, 0.4) !important;
+}
+
+/* 10. กล่องรูปภาพ Evidence: Matrix Box */
+body.dark-mode div[style*="dashed #cbd5e1"] {
+    background: #020617 !important;
+    border: 2px dashed #1e293b !important;
+    transition: all 0.3s;
+}
+body.dark-mode div[style*="dashed #cbd5e1"]:hover {
+    border-color: #3b82f6 !important;
+    background: rgba(59, 130, 246, 0.03) !important;
+}
+
+/* 11. ปุ่มดำเนินการด้านล่าง (Action Buttons) */
+body.dark-mode #sup-form-submit-btn {
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    letter-spacing: 1px;
+    height: 52px !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4) !important;
+}
+
+body.dark-mode button[onclick*="remove()"] {
+    background: #1e293b !important;
+    color: #94a3b8 !important;
+    border: 1px solid #334155 !important;
+}
+
+/* กิมมิก: ตัวเลข NG อัตโนมัติสีแดงเรืองแสง */
+body.dark-mode #f-sup-ng {
+    color: #f87171 !important;
+    background: rgba(225, 29, 72, 0.1) !important;
+    border-color: #ef4444 !important;
+    text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+/* บังคับตัวหนังสือในกล่อง Toggle ทั้งสองฝั่งให้สว่างชัดเจนในโหมดมืด */
+body.dark-mode #sync-container p,
+body.dark-mode [id="8d-container"] p {
+    color: #f8fafc !important; /* สีขาวนวลความสว่างสูง */
+    font-weight: 850 !important; /* เพิ่มความหนาให้ฟอนต์ภาษาไทยอ่านง่ายขึ้น */
+    font-size: 11.5px !important;
+    letter-spacing: 0.02em !important;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5) !important; /* เงาหลังตัวอักษรช่วยตัดขอบ */
+    opacity: 1 !important;
+}
+
+/* แถม: กรณีเปิดพิมพ์ชื่อผู้สั่งงาน (Commander) ให้ตัวหนังสือในช่องนั้นสว่างด้วย */
+body.dark-mode #commander-input-wrap input {
+    color: #38bdf8 !important;
+    background-color: #040d1a !important;
+    border-color: #1e3a8a !important;
+}
+/* บังคับให้ใช้ Hardware Acceleration และแยกเลเยอร์การคำนวณ */
+#sidebar, main, #content-area {
+    will-change: width, min-width; /* บอก Browser ให้เตรียมตัวขยับ */
+    transform: translateZ(0);     /* บังคับใช้ GPU */
+    backface-visibility: hidden;
+    perspective: 1000;
+}
+
+/* สำคัญมาก: ช่วยลดการหน่วงในหน้าที่มีกราฟเยอะๆ */
+#dashboard-view main {
+    contain: layout; /* ป้องกันไม่ให้การขยับของ Sidebar ไปรบกวนการวาดกราฟภายใน */
+}
+
+/* ลดภาระระหว่างเคลื่อนที่: ซ่อน Tooltip หรือเอฟเฟกต์เงาชั่วคราวขณะขยับ (ถ้ามี) */
+body.is-animating .apexcharts-tooltip {
+    display: none !important;
+}
+/* ==========================================================================
+   GLOBAL TABLE HEADER STANDARD 
+   (บังคับหัวตารางทุกหน้าให้ใช้ ฟอนต์, ขนาด, และพื้นหลัง เดียวกับหน้า PART LINE CLAIM)
+   ========================================================================== */
+.data-table thead th,
+.support-table thead th,
+.s5-cyber-table thead th,
+.sj-premium-table thead th,
+.ot-premium-table thead th,
+.att-records-table thead th,
+.table-v2 thead th,
+#admin-table-head th,
+#eight-d-table-container thead th,
+table thead th {
+    /* 1. พื้นหลัง: สีเทาอมฟ้าอ่อนแบบเดียวกับ PART LINE CLAIM (#f1f5f9) */
+    background: #f1f5f9 !important;
+    background-color: #f1f5f9 !important;
+    
+    /* 2. ฟอนต์ & ขนาด: ใช้ Inter/Prompt ขนาด 10px หนา 800 */
+    font-family: 'Inter', 'Prompt', 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    color: #475569 !important; /* สีตัวหนังสือ Slate-600 */
+    
+    /* 3. การจัดวาง & ช่องไฟตัวอักษร */
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    line-height: 1.2 !important;
+    
+    /* 4. ความสูงและ Padding ให้กะทัดรัด (Slim Height 40px) */
+    height: 40px !important;
+    padding: 10px 14px !important;
+    
+    /* 5. เส้นขอบ: เน้นเส้นใต้อย่างเดียว สะอาดตา */
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    
+    /* 6. ลบเงาหรือสีแปลกๆ ที่อาจติดมาจากหน้าอื่น */
+    box-shadow: none !important;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* ปรับสีตอนเอาเมาส์ไปวางให้สว่างและเนียนขึ้นเหมือนกันทุกตาราง */
+.data-table thead th:hover,
+.support-table thead th:hover,
+.s5-cyber-table thead th:hover,
+.sj-premium-table thead th:hover,
+.ot-premium-table thead th:hover,
+table thead th:hover {
+    background-color: #e2e8f0 !important;
+    color: #1e293b !important;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ==========================================================================
+   8D REPORT HEADER OVERRIDE
+   (กู้คืนสีน้ำเงินอ่อนและสไตล์ดั้งเดิมให้กับตารางในสไลด์ 8D)
+   ========================================================================== */
+#eight-d-slide-content table thead th {
+    /* 1. คืนค่าพื้นหลังสีน้ำเงินอ่อน (Light Blue) */
+    background: #99badd !important;
+    background-color: #99badd !important;
+    
+    /* 2. คืนค่าตัวหนังสือสีดำ และปรับขนาดให้พอดีกับฟอร์ม */
+    color: #000000 !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    
+    /* 3. คืนค่าเส้นขอบสีดำรอบด้านแบบสไตล์กระดาษ */
+    border: 1.2px solid #000000 !important;
+    
+    /* 4. คืนค่าระยะห่างและความสูงเดิม */
+    height: auto !important;
+    padding: 6px 5px !important;
+    letter-spacing: 0 !important;
+}
+
+/* แก้ไขกรณี "SUPPLIER NAME MEMBER" ที่ต้องเป็นตัวหนังสือสีแดง */
+#eight-d-slide-content table.supplier-table thead th,
+#eight-d-slide-content thead th[colspan="3"]:nth-child(1) {
+    /* เราจะไปบังคับใน JS อีกทีเพื่อให้แม่นยำ 100% แต่ใส่ตรงนี้ไว้กันเหนียว */
+}
+
+/* สไตล์สำหรับรายการที่กำลังถูกเลือกผ่านคีย์บอร์ด */
+.ac-item.active {
+    background-color: #eff6ff !important; /* สีน้ำเงินอ่อน */
+    color: #2563eb !important;           /* ตัวหนังสือสีน้ำเงินเข้ม */
+    font-weight: 800 !important;
+    border-left: 4px solid #2563eb;     /* เพิ่มขีดด้านข้างให้เห็นชัด */
+}
+
+/* คอนเทนเนอร์ของดรอปดาวน์ใน Modal */
+.modal-ac-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10005;
+    background: white;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    max-height: 250px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+/* รายการแต่ละแถว */
+.modal-ac-item {
+    padding: 10px 15px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    border-bottom: 1px solid #f8fafc;
+    transition: all 0.2s;
+}
+
+.modal-ac-item:last-child { border-bottom: none; }
+
+/* สถานะเมื่อใช้ปุ่มลูกศรเลือก หรือเอาเมาส์วาง */
+.modal-ac-item.active, .modal-ac-item:hover {
+    background-color: #eff6ff !important;
+    color: #2563eb !important;
+    padding-left: 20px; /* กิมมิกเลื่อนขวานิดๆ */
+    border-left: 4px solid #2563eb;
+}
+
+/* ==========================================================
+   SUPPORT & CLAIM FORM VALIDATION HIGHLIGHT EFFECTS
+   ========================================================== */
+
+/* Green Glow: Activated for filled / completed fields */
+.field-glow-filled {
+  border-color: #10b981 !important;
+  background-color: #f0fdf4 !important;
+  box-shadow: 0 0 0 2.5px rgba(16, 185, 129, 0.3) !important;
+  transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s !important;
+}
+
+body.dark-mode .field-glow-filled,
+body.dark .field-glow-filled {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  border-color: #34d399 !important;
+  box-shadow: 0 0 0 2.5px rgba(52, 211, 153, 0.35) !important;
+}
+
+/* Soft Yellow / Amber Glow: Activated for operational action/pending fields that need review */
+.field-glow-pending {
+  border-color: #f59e0b !important;
+  background-color: #fffbeb !important;
+  box-shadow: 0 0 0 2.5px rgba(245, 158, 11, 0.28) !important;
+  transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s !important;
+}
+
+body.dark-mode .field-glow-pending,
+body.dark .field-glow-pending {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 0 2.5px rgba(251, 191, 36, 0.32) !important;
+}
+
+/* Red Error Pulse: Only when required submit fails */
+@keyframes pulseErrorGlow {
+  0% {
+    border-color: #f87171 !important;
+    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.25), 0 0 8px rgba(244, 63, 94, 0.15) !important;
+  }
+  50% {
+    border-color: #e11d48 !important;
+    box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.35), 0 0 14px rgba(225, 29, 72, 0.25) !important;
+  }
+  100% {
+    border-color: #f87171 !important;
+    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.25), 0 0 8px rgba(244, 63, 94, 0.15) !important;
+  }
+}
+
+.field-glow-error {
+  border-color: #f87171 !important;
+  background-color: #fff1f2 !important;
+  animation: pulseErrorGlow 1.8s infinite ease-in-out !important;
+  transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s !important;
+}
+
+body.dark-mode .field-glow-error,
+body.dark .field-glow-error {
+  background-color: rgba(225, 29, 72, 0.2) !important;
+  border-color: #fb7185 !important;
+}
+
+/* Custom Responsive Table & Ultra-Clear Image Display Optimization */
+img, svg {
+  max-width: 100%;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.table-responsive,
+.table-wrapper,
+.overflow-x-auto,
+div[class*="overflow-x"] {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: thin;
+}
+
+/* Crisp & Responsive Image Previews Across Devices */
+.img-thumb img,
+.modal-overlay img,
+#user-avatar img,
+.lightbox-img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* Ensure smooth touch scrolling and full visibility for older & newer mobile screens */
+@media (max-width: 768px) {
+  table {
+    min-width: 600px;
+  }
+  .table-responsive, .overflow-x-auto {
+    width: 100%;
+    display: block;
+    -webkit-overflow-scrolling: touch;
+  }
 }
