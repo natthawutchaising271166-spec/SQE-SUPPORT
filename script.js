@@ -3901,69 +3901,100 @@ const resolveSignatureAssetUrl = (assetPath) => {
 };
 
 const SIG_LIBRARY = {
-    "Mr.Nattawut C.": "data:image/png;base64,",
-    "Mr.Natthawut C.": "./signatures/natthawut_sig.png",
-    "Nattawut C.": "./signatures/natthawut_sig.png",
-    "Natthawut C.": "./signatures/natthawut_sig.png",
+    "Mr.Nattawut C.": "./signatures/Natthawut_sig.png",
+    "Mr.Natthawut C.": "./signatures/Natthawut_sig.png",
+    "Nattawut C.": "./signatures/Natthawut_sig.png",
+    "Natthawut C.": "./signatures/Natthawut_sig.png",
+    
     "Mr.Pongpan P.": "./signatures/Pongpan_sig.png",
     "Pongpan P.": "./signatures/Pongpan_sig.png",
-    "Mr.Komsan N.": "./signatures/komsan_sig.png",
-    "Komsan N.": "./signatures/komsan_sig.png",
-    "Mr.Eakkachai B.": "./signatures/eakkachai_sig.png",
-    "Eakkachai B.": "./signatures/eakkachai_sig.png",
-    "Mr.Ubonsak J.": "./signatures/ubonsak_sig.png",
-    "Mr.Somchay R.": "./signatures/somchay_sig.png",
-    "Somchay R.": "./signatures/somchay_sig.png",
-    "Mr.Thawutchai T.": "./signatures/thawutchai_sig.png",
-    "Thawutchai T.": "./signatures/thawutchai_sig.png",
-    "Ms.Nipawan J.": "./signatures/nipawan_sig.png",
-    "Nipawan J.": "./signatures/nipawan_sig.png",
-    "Ms.Siriwan S.": "./signatures/siriwan_sig.png",
-    "Siriwan S.": "./signatures/siriwan_sig.png",
-    "Ms.Supaporn S.": "./signatures/supaporn_sig.png",
-    "Supaporn S.": "./signatures/supaporn_sig.png",
-    "Mr.Kaptan Y.": "./signatures/kaptan_sig.png",
-    "Kaptan Y.": "./signatures/kaptan_sig.png",
-    "Mr.Aphinan P.": "./signatures/aphinan_sig.png",
-    "Aphinan P.": "./signatures/aphinan_sig.png",
-    "Mr.Satthra O.": "./signatures/satthra_sig.png",
-    "Satthra O.": "./signatures/satthra_sig.png",
-    "Mr.Anuchit A.": "./signatures/anuchit_sig.png",
-    "Anuchit A.": "./signatures/anuchit_sig.png",
-    "Mr.Eueangkoon S.": "./signatures/eueangkoon_sig.png",
-    "Eueangkoon S.": "./signatures/eueangkoon_sig.png",
-    "Mr.Meechai T.": "./signatures/meechai_sig.png",
-    "Meechai T.": "./signatures/meechai_sig.png",
-    "Mr.Puruwat S.": "./signatures/puruwat_sig.png",
-    "Puruwat S.": "./signatures/puruwat_sig.png",
-    "Mr.Theerapol W.": "./signatures/theerapol_sig.png",
-    "Mr.Pratheep N.": "./signatures/pratheep_sig.png",
-    "Mr.Kraiwit P.": "./signatures/kraiwit_sig.png",
-    "Kraiwit P.": "./signatures/kraiwit_sig.png",
-    "Mr.Sornchai W.": "./signatures/sornchai_sig.png",
-    "Sornchai W.": "./signatures/sornchai_sig.png",
-    "Ms.Panida B.": "./signatures/panida_sig.png",
-    "Panida B.": "./signatures/panida_sig.png",
-    "Mr.Pakon M.": "./signatures/pakon_sig.png",
-    "Pakon M.": "./signatures/pakon_sig.png",
-    "Mr.Watcharin Y.": "./signatures/watcharin_sig.png",
-    "Watcharin Y.": "./signatures/watcharin_sig.png",
-    "Ms.Songporn C.": "./signatures/songporn_sig.png",
-    "Songporn C.": "./signatures/songporn_sig.png",
-    "Ms.Siriporn P.": "./signatures/siriporn_sig.png",
-    "Siriporn P.": "./signatures/siriporn_sig.png",
-    "Mr.Ekkalak L.": "./signatures/ekkalak_sig.png",
-    "Ekkalak L.": "./signatures/ekkalak_sig.png",
-    "Mr.Komson N.": "./signatures/komson_sig.png",
-    "Komson N.": "./signatures/komson_sig.png",
-    "Mr.Witsarut S.": "./signatures/witsarut_sig.png",
-    "Witsarut S.": "./signatures/witsarut_sig.png",
-    "Mr.Chiraphat K.": "./signatures/chiraphat_sig.png",
-    "Chiraphat K.": "./signatures/chiraphat_sig.png",
-    "Ms.Naruemon C.": "./signatures/naruemon_sig.png",
-    "Naruemon C.": "./signatures/naruemon_sig.png",
-    "Mr.Pratheep N.": "./signatures/pratheep_sig.png",
-    "Pratheep N.": "./signatures/pratheep_sig.png"
+    
+    "Mr.Komsan N.": "./signatures/Komsan_sig.png",
+    "Komsan N.": "./signatures/Komsan_sig.png",
+    
+    "Mr.Eakkachai B.": "./signatures/Eakkachai_sig.png",
+    "Eakkachai B.": "./signatures/Eakkachai_sig.png",
+    
+    "Mr.Ubonsak J.": "./signatures/Ubonsak_sig.png",
+    "Ubonsak J.": "./signatures/Ubonsak_sig.png",
+    
+    "Mr.Somchay R.": "./signatures/Somchay_sig.png",
+    "Somchay R.": "./signatures/Somchay_sig.png",
+    
+    "Mr.Thawutchai T.": "./signatures/Thawutchai_sig.png",
+    "Thawutchai T.": "./signatures/Thawutchai_sig.png",
+    
+    "Ms.Nipawan J.": "./signatures/Nipawan_sig.png",
+    "Nipawan J.": "./signatures/Nipawan_sig.png",
+    
+    "Ms.Siriwan S.": "./signatures/Siriwan_sig.png",
+    "Siriwan S.": "./signatures/Siriwan_sig.png",
+    
+    "Ms.Supaporn S.": "./signatures/Supaporn_sig.png",
+    "Supaporn S.": "./signatures/Supaporn_sig.png",
+    
+    "Mr.Kaptan Y.": "./signatures/Kaptan_sig.png",
+    "Kaptan Y.": "./signatures/Kaptan_sig.png",
+    
+    "Mr.Aphinan P.": "./signatures/Aphinan_sig.png",
+    "Aphinan P.": "./signatures/Aphinan_sig.png",
+    
+    "Mr.Satthra O.": "./signatures/Satthra_sig.png",
+    "Satthra O.": "./signatures/Satthra_sig.png",
+    
+    "Mr.Anuchit A.": "./signatures/Anuchit_sig.png",
+    "Anuchit A.": "./signatures/Anuchit_sig.png",
+    
+    "Mr.Eueangkoon S.": "./signatures/Eueangkoon_sig.png",
+    "Eueangkoon S.": "./signatures/Eueangkoon_sig.png",
+    
+    "Mr.Meechai T.": "./signatures/Meechai_sig.png",
+    "Meechai T.": "./signatures/Meechai_sig.png",
+    
+    "Mr.Puruwat S.": "./signatures/Puruwat_sig.png",
+    "Puruwat S.": "./signatures/Puruwat_sig.png",
+    
+    "Mr.Theerapol W.": "./signatures/Theerapol_sig.png",
+    "Theerapol W.": "./signatures/Theerapol_sig.png",
+    
+    "Mr.Pratheep N.": "./signatures/Pratheep_sig.png",
+    "Pratheep N.": "./signatures/Pratheep_sig.png",
+    
+    "Mr.Kraiwit P.": "./signatures/Kraiwit_sig.png",
+    "Kraiwit P.": "./signatures/Kraiwit_sig.png",
+    
+    "Mr.Sornchai W.": "./signatures/Sornchai_sig.png",
+    "Sornchai W.": "./signatures/Sornchai_sig.png",
+    
+    "Ms.Panida B.": "./signatures/Panida_sig.png",
+    "Panida B.": "./signatures/Panida_sig.png",
+    
+    "Mr.Pakon M.": "./signatures/Pakon_sig.png",
+    "Pakon M.": "./signatures/Pakon_sig.png",
+    
+    "Mr.Watcharin Y.": "./signatures/Watcharin_sig.png",
+    "Watcharin Y.": "./signatures/Watcharin_sig.png",
+    
+    "Ms.Songporn C.": "./signatures/Songporn_sig.png",
+    "Songporn C.": "./signatures/Songporn_sig.png",
+    
+    "Ms.Siriporn P.": "./signatures/Siriporn_sig.png",
+    "Siriporn P.": "./signatures/Siriporn_sig.png",
+    
+    "Mr.Ekkalak L.": "./signatures/Ekkalak_sig.png",
+    "Ekkalak L.": "./signatures/Ekkalak_sig.png",
+    
+    "Mr.Komson N.": "./signatures/Komson_sig.png",
+    "Komson N.": "./signatures/Komson_sig.png",
+    
+    "Mr.Witsarut S.": "./signatures/Witsarut_sig.png",
+    "Witsarut S.": "./signatures/Witsarut_sig.png",
+    
+    "Mr.Chiraphat K.": "./signatures/Chiraphat_sig.png",
+    "Chiraphat K.": "./signatures/Chiraphat_sig.png",
+    
+    "Ms.Naruemon C.": "./signatures/Naruemon_sig.png",
+    "Naruemon C.": "./signatures/Naruemon_sig.png"
 };
 
 function getStaffSignatureImage(name) {
