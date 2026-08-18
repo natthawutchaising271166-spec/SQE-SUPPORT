@@ -18,8 +18,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
-    
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Comic+Neue:ital,wght@0,700;1,700&family=Dancing+Script:wght@600;700&family=Great+Vibes&family=Inter:wght@300;400;500;600;700;800;900&family=Kalam:wght@700&family=Patrick+Hand&family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&family=Satisfy&family=Style+Script&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png">
     <link rel="apple-touch-icon" href="./apple-touch-icon-180.png">
@@ -350,18 +351,46 @@
 <!-- หมวด INSIGHTS -->
 <p class="sidebar-section-label" data-i18n="nav_insights_label">Insights</p>
 
-<!-- เมนู SQE EN ที่เพิ่มใหม่ -->
-<div onclick="switchPage('SQE EN', this)" class="nav-item">
-    <div class="icon-bg">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+<!-- เมนู SQE EN แบบ Dropdown -->
+<div class="menu-group">
+    <div onclick="toggleSubmenu(this)" class="nav-item flex justify-between">
+        <div class="flex items-center gap-3">
+            <div class="icon-bg">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+            </div>
+            <span class="sidebar-text" data-i18n="nav_sme">SQE EN</span>
+        </div>
+        <svg class="dropdown-chevron w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M19 9l-7 7-7-7" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"></path>
         </svg>
     </div>
-    <span class="sidebar-text" data-i18n="nav_sme">SQE EN</span>
-</div>
 
+    <div id="sqe-submenu" class="submenu-container" style="padding-top: 4px;">
+        <!-- เมนูย่อย 1 -->
+        <div onclick="switchPage('SQE EN', this)" class="nav-item sub-nav-item">
+            <div class="icon-bg"><svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2"></path></svg></div>
+            <span class="sidebar-text">8D / VF Report</span>
+        </div>
+        <!-- เมนูย่อย 2 (ที่เพิ่มใหม่) -->
+<div onclick="switchPage('Running number', this)" class="nav-item sub-nav-item">
+    <div class="icon-bg">
+        <!-- วาง SVG ตัวใหม่ที่ผมให้ไว้ด้านบนตรงนี้ -->
+        <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="10" y1="6" x2="21" y2="6"></line>
+            <line x1="10" y1="12" x2="21" y2="12"></line>
+            <line x1="10" y1="18" x2="21" y2="18"></line>
+            <path d="M4 6h1v4"></path>
+            <path d="M4 10h2"></path>
+            <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
+        </svg>
+    </div>
+    <span class="sidebar-text">Running Number</span>
 </div>
-
+    </div>
+</div>
+</div>
 <!-- Footer ส่วนล่างสุดของ Sidebar -->
 <div class="sidebar-footer">
     <div class="user-panel-integrated">
@@ -402,17 +431,52 @@
 <div id="sidebar-backdrop" onclick="toggleSidebar('close')"></div>
         <main class="flex-1 flex flex-col overflow-hidden bg-slate-50 min-w-0">
 <header class="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-2 sm:px-3 md:px-4 h-14 min-h-[56px] flex items-center justify-between gap-1.5 sm:gap-2 z-30 flex-nowrap overflow-x-auto scrollbar-none min-w-0">
-    <!-- [กลุ่มฝั่งซ้าย]: ปุ่มเมนูมือถือ + หัวข้อหน้า -->
-    <div class="flex items-center gap-2 shrink-0">
+    <!-- [กลุ่มฝั่งซ้าย]: ปุ่มเมนูมือถือ + หัวข้อหน้า + ปุ่มสลับแท็บ SQE EN -->
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <button  onclick="toggleSidebar('open')" class="sm:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200 mr-1" title="Toggle Sidebar" aria-label="Toggle Sidebar">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <div class="min-w-0 shrink-0 hidden xl:block">
+        <div class="min-w-0 shrink-0 hidden sm:block">
             <p class="text-[7px] text-slate-400 font-bold uppercase tracking-widest leading-none">CLAIM OPERATIONS</p>
             <h2 id="header-title" class="font-bold text-slate-800 dark:text-slate-100 text-[10px] sm:text-[11px] truncate uppercase max-w-[100px] xs:max-w-[130px] sm:max-w-[170px] md:max-w-none">PART LINE CLAIM</h2>
         </div>
-    </div>
 
+        <!-- [แถบสลับหน้า SQE EN]: วางต่อท้าย CLAIM OPERATIONS / SQE EN -->
+        <div id="sqe-header-tools" class="hidden items-center gap-1 sm:gap-1.5 flex-nowrap shrink-0 ml-0.5 sm:ml-1.5">
+            <div class="flex bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-inner items-center gap-0.5">
+                <button id="btn-sqe-tab-8d" onclick="Wap8DSystem.switchSqeTab('8d')" class="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider transition-all bg-blue-600 text-white shadow-xs" title="หน้า 8D REPORT" aria-label="หน้า 8D REPORT">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span class="whitespace-nowrap">หน้า 8D REPORT</span>
+                </button>
+                <button id="btn-sqe-tab-vf" onclick="Wap8DSystem.switchSqeTab('vf')" class="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider transition-all text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white" title="หน้า VF / RP REPORT" aria-label="หน้า VF / RP REPORT">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    <span class="whitespace-nowrap">หน้า VF / RP REPORT</span>
+                </button>
+            </div>
+        </div>
+    </div>
+<!-- แถบสลับหน้า Running Number ใน Header -->
+<div id="rn-header-tools" class="hidden items-center gap-1.5 flex-nowrap shrink-0 ml-1.5">
+    <div class="flex bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-inner items-center gap-0.5">
+        <button id="btn-rn-tab-vf" onclick="WapRNSystem.switchRnTab('vf')" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all bg-blue-600 text-white shadow-sm" title="VF Running">
+            VF Running
+        </button>
+        <button id="btn-rn-tab-rp" onclick="WapRNSystem.switchRnTab('rp')" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-rose-600" title="RP Running">
+            RP Running
+        </button>
+    </div>
+</div>
+<!-- แถบสลับหน้า Running Number ใน Header -->
+<div id="rn-header-tools" class="hidden items-center gap-1.5 flex-nowrap shrink-0 ml-1.5">
+    <div class="flex bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-inner items-center gap-0.5">
+        <button id="btn-rn-tab-vf" onclick="WapRNSystem.switchRnTab('vf')" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all bg-blue-600 text-white shadow-sm">
+            VF Running
+        </button>
+        <button id="btn-rn-tab-rp" onclick="WapRNSystem.switchRnTab('rp')" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-rose-600">
+            RP Running
+        </button>
+    </div>
+</div>
 
 <!-- [กลุ่มตรงกลาง]: ปุ่มสลับ PART CLAIM / DASHBOARD + Theme + Lang + Settings -->
 <div id="terminal-sub-nav" class="flex bg-slate-50 dark:bg-slate-800/50 p-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-inner items-center shrink-0 gap-0.5">
@@ -451,6 +515,15 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
                 <circle cx="12" cy="12" r="3"/>
+            </svg>
+        </button>
+
+        <!-- [เพิ่มใหม่]: ปุ่ม Local Data Backup Hub -->
+        <button  onclick="LocalBackupSystem.openBackupModal()" class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-500 hover:bg-white dark:hover:bg-slate-700 transition-all" title="Local Data Backup (JSON)" aria-label="Local Data Backup">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
             </svg>
         </button>
     </div>
@@ -708,7 +781,6 @@
 
     </div>
 <!-- NEXUS Quick-Link Dock (Far Right) -->
-
 </div> <!-- ปิด entry-terminal-content -->
 
     <!-- ============================================================
@@ -726,13 +798,13 @@
             <span class="kpi-v2-label text-emerald-600">PRODUCTION SUMMARY</span>
             <div class="w-6 h-6 bg-emerald-50 rounded flex items-center justify-center text-xs">📦</div>
         </div>
-        <div class="mt-2 flex items-center justify-between gap-1">
-            <div>
+        <div class="mt-2 flex items-baseline justify-between gap-2 overflow-hidden w-full">
+            <div class="shrink-0 flex items-baseline gap-1 whitespace-nowrap min-w-0">
                 <h2 id="kpi-total" class="kpi-v2-val inline-block">0</h2>
-                <span class="text-[10px] font-bold text-slate-400 ml-1">PCS</span>
+                <span class="text-[10px] font-bold text-slate-400">PCS</span>
             </div>
-            <!-- D3 Animated Real-time Sparkline Chart -->
-            <div id="kpi-total-sparkline" class="h-9 w-28 shrink-0 overflow-visible relative" title="24-Hour Production Volume Trend"></div>
+            <!-- D3 Animated Real-time Sparkline Chart (Always positioned after the number without overlapping) -->
+            <div id="kpi-total-sparkline" class="h-8 flex-1 min-w-[40px] max-w-[120px] overflow-hidden relative ml-auto" title="24-Hour Production Volume Trend"></div>
         </div>
         <div class="flex justify-between items-end mt-auto pt-2 border-t border-slate-50">
             <div>
@@ -1578,45 +1650,96 @@
             <div class="console-inner">
                 <div class="flex-1 relative">
                     <span class="input-tag">Skill Identity</span>
-                    <input  type="text" id="sm-f-name" class="console-input" placeholder="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)..." title="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)..." aria-label="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)...">
+                    <input type="text" id="sm-f-name" class="console-input" placeholder="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)..." title="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)..." aria-label="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)...">
                 </div>
-                <div class="w-40 relative">
+                <div class="w-36 relative">
                     <span class="input-tag">Proficiency</span>
-                    <input  type="number" id="sm-f-value" class="console-input" placeholder="0-100%" title="0 100%" aria-label="0 100%">
+                    <input type="number" id="sm-f-value" class="console-input" min="0" max="100" placeholder="0-100%" title="0 100%" aria-label="0 100%">
                 </div>
-                <button  onclick="WapSkillMatrix.submit()" class="btn-sm-trigger" title="UPDATE CORE SKILL" aria-label="UPDATE CORE SKILL">
-                    <span>UPDATE CORE SKILL</span>
+                <button onclick="WapSkillMatrix.submit()" class="btn-sm-trigger" title="UPDATE CORE SKILL" aria-label="UPDATE CORE SKILL">
+                    <span>➕ เพิ่ม/อัปเดตทักษะ</span>
                     <div class="btn-reflection"></div>
+                </button>
+                <button onclick="WapSkillMatrix.clearAll()" class="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 rounded-xl text-[11px] font-bold transition-all" title="Clear All Skills">
+                    🗑️ ล้างทั้งหมด
                 </button>
             </div>
         </div>
 
-        <!-- แถวที่ 3: Deep Analytics (Spider Chart & Proficiency Bars) -->
+        <!-- แถวที่ 3: Deep Analytics Grid -->
         <div class="sm-analytics-grid">
             <!-- 3.1 Radar Map -->
-            <div class="analytics-card flex-[1.2]">
-                <div class="card-head"><h3>Skill Radar Map</h3></div>
-                <div class="card-body"><div id="sm-radar-chart"></div></div>
+            <div class="analytics-card">
+                <div class="card-head flex justify-between items-center">
+                    <h3>Skill Radar Map</h3>
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Multi-Axis Spider</span>
+                </div>
+                <div class="card-body relative overflow-hidden flex items-center justify-center p-3 min-h-[310px]">
+                    <div id="sm-radar-chart" class="w-full h-full min-h-[290px]"></div>
+                </div>
             </div>
 
-            <!-- 3.2 Neon Proficiency Bars (รายการทักษะแบบเลื่อน) -->
-            <div class="analytics-card flex-[1.5]">
+            <!-- 3.2 Skill Level Breakdown & Neon Bars -->
+            <div class="analytics-card">
                 <div class="card-head flex justify-between items-center">
                     <h3>Proficiency Breakdown</h3>
-                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Live Sync</span>
+                    <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
+                        <button onclick="WapSkillMatrix.toggleViewMode('bar')" id="sm-btn-mode-bar" class="px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transition-all">📊 Graph</button>
+                        <button onclick="WapSkillMatrix.toggleViewMode('list')" id="sm-btn-mode-list" class="px-2.5 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all">📋 List (Edit/Delete)</button>
+                    </div>
                 </div>
-                <div id="sm-bar-list" class="card-body scroll-hide">
-                    <!-- รายการบาร์ทักษะจะถูกฉีดเข้าที่นี่ -->
+                <div class="card-body relative overflow-hidden p-3 flex flex-col justify-center min-h-[310px]">
+                    <div id="sm-bar-chart" class="w-full h-full min-h-[290px]"></div>
+                    <div id="sm-bar-list" class="hidden w-full h-full overflow-y-auto scroll-hide space-y-2 max-h-[290px]">
+                        <!-- รายการบาร์ทักษะจะถูกฉีดเข้าที่นี่ -->
+                    </div>
                 </div>
             </div>
 
             <!-- 3.3 Skill Weight Donut -->
-            <div class="analytics-card flex-[0.8]">
-                <div class="card-head"><h3>Competency Weight</h3></div>
-                <div class="card-body flex flex-col items-center">
-                    <div id="sm-donut-chart"></div>
-                    <div id="sm-donut-legend" class="w-full mt-4"></div>
+            <div class="analytics-card">
+                <div class="card-head flex justify-between items-center">
+                    <h3>Competency Weight</h3>
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tier Distribution</span>
                 </div>
+                <div class="card-body flex flex-col items-center justify-between p-3 min-h-[310px]">
+                    <div id="sm-donut-chart" class="w-full min-h-[180px] flex justify-center items-center"></div>
+                    <div id="sm-donut-legend" class="w-full mt-2 space-y-1"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- แถวที่ 4: Management Table (ตารางทักษะพร้อมปุ่มแก้ไข/ลบ) -->
+        <div class="sm-table-card analytics-card w-full shadow-sm">
+            <div class="card-head flex justify-between items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <div class="flex items-center gap-2">
+                        <span class="text-blue-500 text-sm">⚡</span>
+                        <h3 class="text-xs sm:text-sm font-extrabold tracking-wide text-slate-800 dark:text-slate-100 uppercase">Skill Competency Matrix Table</h3>
+                    </div>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800" id="sm-table-count">0 Items</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="relative">
+                        <input type="text" id="sm-search-input" oninput="WapSkillMatrix.filterTable()" placeholder="🔍 ค้นหาทักษะ..." class="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-44 sm:w-56 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400">
+                    </div>
+                </div>
+            </div>
+            <div class="sm-table-container w-full overflow-x-auto overflow-y-visible min-h-[220px]">
+                <table class="w-full text-left border-collapse min-w-[650px]">
+                    <thead class="sticky top-0 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-md text-[10.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 z-10">
+                        <tr>
+                            <th class="py-3 px-4 text-center w-14">#</th>
+                            <th class="py-3 px-4">Skill Identity</th>
+                            <th class="py-3 px-4 w-56 sm:w-64">Proficiency Level</th>
+                            <th class="py-3 px-4 text-center w-36">Competency Tier</th>
+                            <th class="py-3 px-4 text-center w-32">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sm-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/70 text-xs font-bold text-slate-700 dark:text-slate-200">
+                        <!-- Table Rows Injected Here -->
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -2054,7 +2177,7 @@
             </div>
 
             <!-- Automation Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 
                 <!-- Card 1: Session Sentinel -->
                 <div class="bg-black/60 border border-cyan-500/30 rounded-xl p-3 flex flex-col justify-between hover:border-cyan-400/60 transition-all">
@@ -2114,6 +2237,26 @@
                         <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m-2.828 9.9a9 9 0 010-12.728M12 12h.01"/></svg>
                         Broadcast System Status
                     </button>
+                </div>
+
+                <!-- Card 5: Daily JSON Auto Backup -->
+                <div class="bg-black/60 border border-cyan-500/40 rounded-xl p-3 flex flex-col justify-between hover:border-cyan-400/80 transition-all">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                            💾 Daily JSON Backup
+                        </span>
+                        <span id="badge-auto-backup" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-500/40">READY</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mb-3">สำรองสถานะ App State ทั้งหมดลง JSON ทุกวัน</p>
+                    <div class="flex gap-1.5">
+                        <button  onclick="LocalBackupSystem.executeBackup(true)" class="flex-1 h-8 bg-cyan-950 hover:bg-cyan-900/90 text-cyan-300 border border-cyan-500/40 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1" title="Export State Now" aria-label="Export State Now">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Export
+                        </button>
+                        <button  onclick="LocalBackupSystem.openBackupModal()" class="w-8 h-8 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-[10px] font-bold transition-all active:scale-95 flex items-center justify-center" title="Backup Center Hub" aria-label="Backup Center Hub">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        </button>
+                    </div>
                 </div>
 
             </div>
@@ -2281,56 +2424,56 @@
     <div id="maintenance-view-backup" class="hidden-view"></div> 
     
 
-    <div id="eight-d-content" class="hidden-view h-full flex flex-col p-6 gap-6 overflow-hidden bg-transparent">
+    <div id="eight-d-content" class="hidden-view h-full flex flex-col p-3 sm:p-5 lg:p-6 gap-3 sm:gap-4 overflow-hidden bg-transparent min-h-0">
     
     <!-- ส่วนที่ 1: หน้าตาราง (Dashboard) -->
-    <div id="eight-d-dashboard" class="flex flex-col gap-6 h-full">
+    <div id="eight-d-dashboard" class="flex flex-col gap-3 sm:gap-4 h-full min-h-0 overflow-hidden">
         <!-- Header & Quick Stats -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shrink-0">
             <div>
-                <h2 class="text-2xl font-black text-slate-800 tracking-tight">8D CORRECTIVE ACTION</h2>
-                <p class="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Quality Incident Management System</p>
+                <h2 class="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">8D CORRECTIVE ACTION</h2>
+                <p class="text-slate-500 dark:text-slate-400 text-[11px] sm:text-xs font-bold uppercase tracking-widest mt-0.5">Quality Incident Management System</p>
             </div>
-            <div class="flex gap-3">
-                <div id="card-stat-8d-total" onclick="Wap8DSystem.filterByStat('all')" class="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm text-center min-w-[100px] cursor-pointer hover:border-blue-500 transition-all active:scale-95">
-                    <p class="text-[9px] font-black text-slate-400 uppercase">Total Cases</p>
-                    <p id="stat-8d-total" class="text-lg font-black text-blue-600">0</p>
+            <div class="flex gap-2 sm:gap-3 flex-wrap">
+                <div id="card-stat-8d-total" onclick="Wap8DSystem.filterByStat('all')" class="bg-blue-50/40 dark:bg-blue-950/30 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-blue-500 hover:border-blue-600 dark:border-blue-500 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95">
+                    <p class="text-[8.5px] sm:text-[9.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">TOTAL CASES</p>
+                    <p id="stat-8d-total" class="text-base sm:text-xl font-black text-blue-600 dark:text-blue-400 mt-0.5">0</p>
                 </div>
-                <div id="card-stat-8d-pending" onclick="Wap8DSystem.filterByStat('d1-d3')" class="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm text-center min-w-[100px] cursor-pointer hover:border-orange-500 transition-all active:scale-95">
-                    <p class="text-[9px] font-black text-slate-400 uppercase">D1-D3 Open</p>
-                    <p id="stat-8d-pending" class="text-lg font-black text-orange-500">0</p>
+                <div id="card-stat-8d-pending" onclick="Wap8DSystem.filterByStat('d1-d3')" class="bg-orange-50/40 dark:bg-orange-950/30 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-orange-400 hover:border-orange-500 dark:border-orange-500 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95">
+                    <p class="text-[8.5px] sm:text-[9.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">D1-D3 OPEN</p>
+                    <p id="stat-8d-pending" class="text-base sm:text-xl font-black text-orange-500 dark:text-orange-400 mt-0.5">0</p>
                 </div>
-                <div id="card-stat-8d-overdue" onclick="Wap8DSystem.filterByStat('overdue')" class="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm text-center min-w-[100px] cursor-pointer hover:border-rose-500 transition-all active:scale-95">
-                    <p class="text-[9px] font-black text-slate-400 uppercase">Overdue (>15d)</p>
-                    <p id="stat-8d-overdue" class="text-lg font-black text-rose-600">0</p>
+                <div id="card-stat-8d-overdue" onclick="Wap8DSystem.filterByStat('overdue')" class="bg-rose-50/40 dark:bg-rose-950/30 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-rose-400 hover:border-rose-500 dark:border-rose-500 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95">
+                    <p class="text-[8.5px] sm:text-[9.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">OVERDUE (>15D)</p>
+                    <p id="stat-8d-overdue" class="text-base sm:text-xl font-black text-rose-600 dark:text-rose-400 mt-0.5">0</p>
                 </div>
             </div>
         </div>
 
         <!-- Action Toolbar -->
-        <div class="flex flex-wrap items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-            <button  onclick="Wap8DSystem.openHistoryPicker()" class="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-blue-600 transition-all shadow-lg shadow-slate-200" title="Pick from History" aria-label="Pick from History">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 4v16m8-8H4"/></svg> Pick from History
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs shrink-0">
+            <button  onclick="Wap8DSystem.openHistoryPicker()" class="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-xl text-[10.5px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95" title="Pick from History" aria-label="Pick from History">
+                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 4v16m8-8H4"/></svg> <span>Pick from History</span>
             </button>
-            <div class="relative w-full md:w-80">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                <input  type="text" id="eightDSearch" placeholder="SEARCH CASE..." class="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" title="SEARCH CASE..." aria-label="SEARCH CASE...">
+            <div class="relative w-full sm:w-72 md:w-80">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                <input  type="text" id="eightDSearch" placeholder="SEARCH CASE..." class="w-full h-10 pl-9 pr-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500/20 outline-none transition-all dark:text-white" title="SEARCH CASE..." aria-label="SEARCH CASE...">
             </div>
         </div>
 
         <!-- Table Area -->
-        <div class="flex-1 bg-white rounded-[24px] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="flex-1 min-h-0 bg-white dark:bg-slate-900 rounded-[20px] sm:rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden flex flex-col">
             <div class="table-scroll-area flex-1 overflow-auto" id="eight-d-table-container">
                 <table class="w-full border-collapse">
                     <thead>
-                        <tr class="bg-slate-50/80 border-b border-slate-200 sticky top-0 z-10">
-                            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Case Profile</th>
-                            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Incident Detail</th>
-                            <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Progress</th>
-                            <th class="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+                        <tr class="bg-slate-50/90 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 backdrop-blur-xs">
+                            <th class="px-4 sm:px-6 py-3.5 text-left text-[9.5px] sm:text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest">Case Profile</th>
+                            <th class="px-4 sm:px-6 py-3.5 text-left text-[9.5px] sm:text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest">Incident Detail</th>
+                            <th class="px-4 sm:px-6 py-3.5 text-center text-[9.5px] sm:text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest">Progress</th>
+                            <th class="px-4 sm:px-6 py-3.5 text-right text-[9.5px] sm:text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="eight-d-list-body" class="divide-y divide-slate-100"></tbody>
+                    <tbody id="eight-d-list-body" class="divide-y divide-slate-100 dark:divide-slate-800/60"></tbody>
                 </table>
             </div>
         </div>
@@ -2347,15 +2490,81 @@
                 <span id="slide-index-display" class="text-[11px] font-black text-blue-600 uppercase">PAGE 1 / 10</span>
                 <button  onclick="Wap8DSystem.nextSlide()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white text-slate-600" title="▶" aria-label="▶">▶</button>
             </div>
-            <!-- เปลี่ยนจาก Generate PDF เป็น PPTX -->
-<button  onclick="Wap8DSystem.exportToPPTX()" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-200" title="Export to PowerPoint" aria-label="Export to PowerPoint">
-    Export to PowerPoint
-</button>
+            <!-- Dynamic Buttons: Send Email (When all signed) & Export Button -->
+            <div class="flex items-center gap-2">
+                <button id="eight-d-email-btn" onclick="Wap8DSystem.sendIssueByEmail()" class="hidden px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-200 flex items-center gap-1.5 active:scale-95 cursor-pointer" title="ส่งอีเมล (Send Email)" aria-label="ส่งอีเมล">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>ส่งอีเมล</span>
+                </button>
+                <button id="eight-d-export-btn" onclick="Wap8DSystem.exportToPPTX()" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-200 flex items-center gap-1.5 active:scale-95 cursor-pointer" title="Export Report" aria-label="Export Report">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span id="eight-d-export-btn-label">Export to PowerPoint</span>
+                </button>
+            </div>
         </div>
         <div id="eight-d-presentation-container" class="flex-1 overflow-hidden bg-slate-200 rounded-2xl border border-slate-300 p-3 flex justify-center items-center relative min-h-0 w-full">
             <div id="eight-d-slide-wrapper" class="relative flex-shrink-0" style="position: relative;">
                 <div id="eight-d-slide-content" class="slide-page-paper"></div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==========================================
+     9. RUNNING NUMBER MANAGEMENT (Updated Headers)
+     ========================================== -->
+<div id="rn-management-content" class="hidden-view h-full flex flex-col p-4 gap-4 overflow-hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm flex-1 flex flex-col overflow-hidden relative">
+        <div id="rn-table-accent" class="h-1.5 w-full bg-blue-600 transition-all duration-500"></div>
+        
+        <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/30">
+            <div>
+                <h3 id="rn-table-title" class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">VF Running Number Registry</h3>
+                <p class="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Carrier Supplier Quality Control Traceability System</p>
+            </div>
+            <span id="rn-record-count" class="px-4 py-1.5 bg-white dark:bg-slate-800 text-blue-600 border border-slate-200 dark:border-slate-700 rounded-full text-[10px] font-black shadow-sm">0 Records</span>
+        </div>
+
+        <!-- ส่วนตาราง: เพิ่ม overflow-x-auto เพื่อให้เลื่อนซ้ายขวาได้ -->
+        <div class="flex-1 overflow-auto scroll-custom">
+            <table class="w-full border-collapse text-left" style="min-width: 3500px;"> <!-- กำหนดความกว้างขั้นต่ำเพื่อให้คอลัมน์ไม่เบียดกัน -->
+                <thead class="sticky top-0 z-20">
+                    <tr id="rn-table-header" class="text-white">
+                        <th style="width: 50px;">No</th>
+                        <th style="width: 130px;">Ref.Vendor</th>
+                        <th style="width: 120px;">Trob Date</th>
+                        <th style="width: 120px;">Issue Date</th>
+                        <th style="width: 150px;">Part Number</th>
+                        <th style="width: 180px;">Part Name</th>
+                        <th style="width: 250px;">Failed Description</th>
+                        <th style="width: 300px;">Non-Conformance details</th>
+                        <th style="width: 180px;">Defective Mode (CTQ)</th>
+                        <th style="width: 120px;">Vendor Code</th>
+                        <th style="width: 200px;">VENDOR NAME</th>
+                        <th style="width: 130px;">Part Code</th>
+                        <th style="width: 130px;">Part Group</th>
+                        <th style="width: 180px;">Incoming or PD Order (Pcs)</th>
+                        <th style="width: 150px;">SS. Defect Quantity</th>
+                        <th style="width: 150px;">Total Part V/F (Pcs)</th>
+                        <th style="width: 130px;">Model Effect</th>
+                        <th style="width: 130px;">Issue By</th>
+                        <th style="width: 200px;">Response</th>
+                        <th style="width: 120px;">Target Date</th>
+                        <th style="width: 150px;">2nd Follow up Date</th>
+                        <th style="width: 120px;">Report Type</th>
+                        <th style="width: 120px; text-align:center;">Status</th>
+                        <th style="width: 130px;">Complete Date</th>
+                        <th style="width: 110px;">Count PPM</th>
+                        <th style="width: 150px;">Quality Event (QS)</th>
+                        <th style="width: 250px;">Remark</th>
+                        <th style="width: 180px;">Continue Follow up Date</th>
+                        <th style="width: 110px;">Progress</th>
+                    </tr>
+                </thead>
+                <tbody id="rn-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    <!-- ข้อมูลจะว่างเปล่าตามคำขอ -->
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

@@ -1,6 +1,11 @@
 {
   "name": "SQE & WAP Support Portal",
   "short_name": "SQE Support",
+  "description": "Quality engineering and production line claim management system with automated daily local data backup.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b1220",

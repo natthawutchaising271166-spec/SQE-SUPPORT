@@ -51,7 +51,17 @@ window.SVG_IMAGE_ERROR_PLACEHOLDER = 'data:image/svg+xml;utf8,<svg xmlns="http:/
 window.handleImgError = function handleImgError(img) {
     if (!img) return;
     img.onerror = null;
-    img.src = window.SVG_IMAGE_ERROR_PLACEHOLDER;
+    
+    // ตรวจสอบว่าถ้าเป็นรูปในรายงาน (ลายเซ็น) ให้ทำพื้นหลังใส
+    if (img.classList.contains('vf-sig-img')) {
+        img.style.opacity = '0'; // ซ่อนรูปที่เสีย
+        const parent = img.parentElement;
+        if (parent) {
+            parent.style.borderBottom = "1px dashed #cbd5e1"; // แสดงเส้นประแทน
+        }
+    } else {
+        img.src = window.SVG_IMAGE_ERROR_PLACEHOLDER;
+    }
 };
 
 window.formatImageUrl = function formatImageUrl(url) {
@@ -358,15 +368,37 @@ window.animateTableRows = function(target, options = {}) {
     }
 };
 
+// ตัวแปรเก็บรมดรอปดาวน์ที่เปิดอยู่ในปัจจุบัน
+let currentOpenModalDropdown = null;
+
 window.addEventListener('mousedown', (e) => {
-    if (!e.target.closest('.modal-ac-dropdown') && 
-        !e.target.getAttribute('oninput')?.includes('renderModalAC')) {
-        document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
-            dd.style.display = 'none';
-        });
+    // ตรวจสอบว่าคลิกอยู่ใน Dropdown หรือ Input ที่ trigger dropdown
+    const isInDropdown = e.target.closest('.modal-ac-dropdown');
+    const isInInput = e.target.closest('input[onfocus*="renderModalAC"]');
+    
+    // ถ้าคลิกอยู่ใน Dropdown หรือ Input ให้ไม่ปิด
+    if (isInDropdown || isInInput) {
+        return;
     }
+    
+    // ถ้าคลิกนอก Dropdown และนอก Input ให้ปิดทั้งหมด
+    document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
+        dd.style.display = 'none';
+    });
+    currentOpenModalDropdown = null;
 });
 
+window.checkDeepLinkParams = function() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        return {
+            caseId: urlParams.get('caseId'),
+            mode: urlParams.get('mode'),
+            email: urlParams.get('email'),
+            ctrl: urlParams.get('ctrl')   // ← เพิ่มบรรทัดนี้
+        };
+    } catch (e) { return { caseId: null, mode: null, email: null, ctrl: null }; }
+};
 /* --- หลังจากนี้จึงตามด้วย Code ส่วนที่เหลือของคุณ --- */
 // -------------------------------------
 const VENDOR_MASTER = {
@@ -3719,6 +3751,378 @@ const VENDOR_MASTER = {
     "LT0107": "TOA SE (THAILAND) CO.,LTD"
 };
 
+const STAFF_TEAMS = [
+    {
+        team: "Mold",
+        icon: "🏭",
+        members: [
+            "Mr.Eakkachai B.",
+            "Mr.Ubonsak J.",
+            "Mr.Somchay R.",
+            "Mr.Nattawut C.",
+            "Mr.Thawutchai T.",
+            "Mr.Pongpan P.",
+            "Ms.Nipawan J."
+        ]
+    },
+    {
+        team: "Printing",
+        icon: "🖨️",
+        members: [
+            "Ms.Siriwan S.",
+            "Ms.Supaporn S.",
+            "Mr.Kaptan Y."
+        ]
+    },
+    {
+        team: "Steel",
+        icon: "🔩",
+        members: [
+            "Mr.Aphinan P.",
+            "Mr.Satthra O."
+        ]
+    },
+    {
+        team: "Piping and Mat",
+        icon: "🔧",
+        members: [
+            "Mr.Anuchit A.",
+            "Mr.Eueangkoon S.",
+            "Mr.Meechai T."
+        ]
+    },
+    {
+        team: "Electronic",
+        icon: "⚡",
+        members: [
+            "Mr.Puruwat S.",
+            "Mr.Theerapol W.",
+            "Mr.Pratheep N.",
+            "Mr.Kraiwit P.",
+            "Mr.Sornchai W.",
+            "Ms.Panida B.",
+            "Mr.Pakon M."
+        ]
+    },
+    {
+        team: "Approved",
+        icon: "✅",
+        members: [
+            "Mr.Watcharin Y.",
+            "Ms.Songporn C.",
+            "Ms.Siriporn P.",
+            "Mr.Ekkalak L.",
+            "Mr.Komson N.",
+            "Mr.Witsarut S.",
+            "Mr.Chiraphat K.",
+            "Ms.Naruemon C."
+        ]
+    }
+];
+
+const STAFF_LIST = STAFF_TEAMS.reduce((acc, t) => acc.concat(t.members), []);
+
+const STAFF_EMAIL_MAP = {
+    // Mold
+    "Mr.Eakkachai B.": "eakkachai.butnet@carrier.com",
+    "Eakkachai B.": "eakkachai.butnet@carrier.com",
+    "Mr.Ubonsak J.": "ubonsak.j@carrier.com",
+    "Mr.Somchay R.": "somchai.rukkachat@carrier.com",
+    "Mr.Nattawut C.": "natthawut.chaising@carrier.com",
+    "Mr.Natthawut C.": "natthawut.chaising@carrier.com",
+    "Mr.Thawutchai T.": "tawatchai.tathong@carrier.com",
+    "Mr.Pongpan P.": "pongpan.panna@carrier.com",
+    "Ms.Nipawan J.": "nipawan.janpong@carrier.com",
+    "Nipawan J.": "nipawan.janpong@carrier.com",
+    
+    // Printing
+    "Ms.Siriwan S.": "siriwan.sonkaew@carrier.com",
+    "Ms.Supaporn S.": "supaporn.sata@carrier.com",
+    "Mr.Kaptan Y.": "KAPTAN.YOOUSUK@carrier.com",
+    
+    // Steel
+    "Mr.Aphinan P.": "aphinan.phookrongnak@carrier.com",
+    "Mr. Aphinan P.": "aphinan.phookrongnak@carrier.com",
+    "Mr.Satthra O.": "Satthra.Onsawarng@carrier.com",
+    "Mr. Satthra O.": "Satthra.Onsawarng@carrier.com",
+    
+    // Piping and Mat
+    "Mr.Anuchit A.": "anuchit.arnoon@carrier.com",
+    "Mr.Eueangkoon S.": "EUEANGKOON.SEESANIT@carrier.com",
+    "Mr.Meechai T.": "meechai.thawornpong@carrier.com",
+    
+    // Electronic
+    "Mr.Puruwat S.": "puriwat.sangjan@carrier.com",
+    "Mr.Theerapol W.": "theerapol.wanna@carrier.com",
+    "Theerapol W.": "theerapol.wanna@carrier.com",
+    "Mr.Pratheep N.": "pratheep.ngoenon@carrier.com",
+    "Mr.Kraiwit P.": "kraiwit.priawkudro@carrier.com",
+    "Mr.Sornchai W.": "SORNCHAI.WONGJANTA@carrier.com",
+    "Ms.Panida B.": "panida.boonchamoi@carrier.com",
+    "Mr.Pakon M.": "pakon.muanglen@carrier.com",
+
+    // Approved Team
+    "Mr.Watcharin Y.": "watcharin.yawanopart@carrier.com",
+    "Watcharin Y.": "watcharin.yawanopart@carrier.com",
+    "Ms.Songporn C.": "songporn.chaisim@carrier.com",
+    "Ms.Siriporn P.": "Siriporn.Prasongsuk@carrier.com",
+    "Siriporn P.": "Siriporn.Prasongsuk@carrier.com",
+    "Mr.Ekkalak L.": "ekkalak.laksanasamrith@carrier.com",
+    "Ekkalak L.": "ekkalak.laksanasamrith@carrier.com",
+    "Mr.Komson N.": "komson.namwicha@carrier.com",
+    "Mr.Witsarut S.": "witsarut.singholsai@carrier.com",
+    "Mr.Chiraphat K.": "Chiraphat.Khanthong@carrier.com",
+    "Ms.Naruemon C.": "naruemon.champa@carrier.com",
+    "Naruemon C.": "naruemon.champa@carrier.com",
+
+    // Aliases & Legacy
+    "Mr.Komsan N.": "komson.namwicha@carrier.com",
+    "Ms.Worrav J.": "worrav.j@carrier.com",
+    "Mr.Ekaraj I.": "ekaraj.inpara@carrier.com",
+    "Ekaraj I.": "ekaraj.inpara@carrier.com"
+};
+
+// --- คลังรูปภาพลายเซ็นประจำตัวพนักงาน (Signature Library - PNG Files Only in signatures/ folder) ---
+const resolveSignatureAssetUrl = (assetPath) => {
+    if (!assetPath || typeof assetPath !== 'string') return '';
+    const trimmed = assetPath.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('data:') || /^https?:\/\//i.test(trimmed)) return trimmed;
+
+    try {
+        if (window.location && window.location.protocol === 'file:') {
+            return new URL(trimmed, window.location.href).href;
+        }
+    } catch (err) {
+        console.warn('[Signature Asset Resolver]', err);
+    }
+
+    return trimmed;
+};
+
+const SIG_LIBRARY = {
+    "Mr.Nattawut C.": "data:image/png;base64,",
+    "Mr.Natthawut C.": "./signatures/natthawut_sig.png",
+    "Nattawut C.": "./signatures/natthawut_sig.png",
+    "Natthawut C.": "./signatures/natthawut_sig.png",
+    "Mr.Pongpan P.": "../CLIAM DATA AI 2027/signatures/Pongpan_sig.png",
+    "Pongpan P.": "../CLIAM DATA AI 2027/signatures/Pongpan_sig.png",
+    "Mr.Komsan N.": "./signatures/komsan_sig.png",
+    "Komsan N.": "./signatures/komsan_sig.png",
+    "Mr.Eakkachai B.": "./signatures/eakkachai_sig.png",
+    "Eakkachai B.": "./signatures/eakkachai_sig.png",
+    "Mr.Ubonsak J.": "./signatures/ubonsak_sig.png",
+    "Mr.Somchay R.": "./signatures/somchay_sig.png",
+    "Somchay R.": "./signatures/somchay_sig.png",
+    "Mr.Thawutchai T.": "./signatures/thawutchai_sig.png",
+    "Thawutchai T.": "./signatures/thawutchai_sig.png",
+    "Ms.Nipawan J.": "./signatures/nipawan_sig.png",
+    "Nipawan J.": "./signatures/nipawan_sig.png",
+    "Ms.Siriwan S.": "./signatures/siriwan_sig.png",
+    "Siriwan S.": "./signatures/siriwan_sig.png",
+    "Ms.Supaporn S.": "./signatures/supaporn_sig.png",
+    "Supaporn S.": "./signatures/supaporn_sig.png",
+    "Mr.Kaptan Y.": "./signatures/kaptan_sig.png",
+    "Kaptan Y.": "./signatures/kaptan_sig.png",
+    "Mr.Aphinan P.": "./signatures/aphinan_sig.png",
+    "Aphinan P.": "./signatures/aphinan_sig.png",
+    "Mr.Satthra O.": "./signatures/satthra_sig.png",
+    "Satthra O.": "./signatures/satthra_sig.png",
+    "Mr.Anuchit A.": "./signatures/anuchit_sig.png",
+    "Anuchit A.": "./signatures/anuchit_sig.png",
+    "Mr.Eueangkoon S.": "./signatures/eueangkoon_sig.png",
+    "Eueangkoon S.": "./signatures/eueangkoon_sig.png",
+    "Mr.Meechai T.": "./signatures/meechai_sig.png",
+    "Meechai T.": "./signatures/meechai_sig.png",
+    "Mr.Puruwat S.": "./signatures/puruwat_sig.png",
+    "Puruwat S.": "./signatures/puruwat_sig.png",
+    "Mr.Theerapol W.": "./signatures/theerapol_sig.png",
+    "Mr.Pratheep N.": "./signatures/pratheep_sig.png",
+    "Mr.Kraiwit P.": "./signatures/kraiwit_sig.png",
+    "Kraiwit P.": "./signatures/kraiwit_sig.png",
+    "Mr.Sornchai W.": "./signatures/sornchai_sig.png",
+    "Sornchai W.": "./signatures/sornchai_sig.png",
+    "Ms.Panida B.": "./signatures/panida_sig.png",
+    "Panida B.": "./signatures/panida_sig.png",
+    "Mr.Pakon M.": "./signatures/pakon_sig.png",
+    "Pakon M.": "./signatures/pakon_sig.png",
+    "Mr.Watcharin Y.": "./signatures/watcharin_sig.png",
+    "Watcharin Y.": "./signatures/watcharin_sig.png",
+    "Ms.Songporn C.": "./signatures/songporn_sig.png",
+    "Songporn C.": "./signatures/songporn_sig.png",
+    "Ms.Siriporn P.": "./signatures/siriporn_sig.png",
+    "Siriporn P.": "./signatures/siriporn_sig.png",
+    "Mr.Ekkalak L.": "./signatures/ekkalak_sig.png",
+    "Ekkalak L.": "./signatures/ekkalak_sig.png",
+    "Mr.Komson N.": "./signatures/komson_sig.png",
+    "Komson N.": "./signatures/komson_sig.png",
+    "Mr.Witsarut S.": "./signatures/witsarut_sig.png",
+    "Witsarut S.": "./signatures/witsarut_sig.png",
+    "Mr.Chiraphat K.": "./signatures/chiraphat_sig.png",
+    "Chiraphat K.": "./signatures/chiraphat_sig.png",
+    "Ms.Naruemon C.": "./signatures/naruemon_sig.png",
+    "Naruemon C.": "./signatures/naruemon_sig.png",
+    "Mr.Pratheep N.": "./signatures/pratheep_sig.png",
+    "Pratheep N.": "./signatures/pratheep_sig.png"
+};
+
+function getStaffSignatureImage(name) {
+    if (!name) return "";
+    
+    // ล้างชื่อให้เหลือแค่ชื่อภาษาอังกฤษเน้นๆ (เช่น Natthawut C.)
+    const clean = typeof cleanSignatureName === 'function' ? cleanSignatureName(name) : name.trim();
+    const lower = clean.toLowerCase().replace(/[\s\.]/g, '');
+
+    // 1. ตรวจสอบใน Library ก่อน (เน้น Key ที่ตรงเป๊ะ)
+    if (typeof SIG_LIBRARY !== 'undefined') {
+        if (SIG_LIBRARY[clean]) return resolveSignatureAssetUrl(SIG_LIBRARY[clean]);
+        if (SIG_LIBRARY[name.trim()]) return resolveSignatureAssetUrl(SIG_LIBRARY[name.trim()]);
+    }
+
+    // 2. Fallback Logic: ตรวจสอบคำสำคัญในชื่อ
+    if (lower.includes("nattawut") || lower.includes("natthawut")) {
+        return resolveSignatureAssetUrl("./signatures/natthawut_sig.png");
+    }
+    if (lower.includes("pongpan")) {
+        return resolveSignatureAssetUrl("../CLIAM DATA AI 2027/signatures/Pongpan_sig.png");
+    }
+    if (lower.includes("nipawan")) {
+        return resolveSignatureAssetUrl("./signatures/nipawan_sig.png");
+    }
+    if (lower.includes("eakkachai")) {
+        return resolveSignatureAssetUrl("./signatures/eakkachai_sig.png");
+    }
+    if (lower.includes("somchay")) {
+        return resolveSignatureAssetUrl("./signatures/somchay_sig.png");
+    }
+    if (lower.includes("thawutchai")) {
+        return resolveSignatureAssetUrl("./signatures/thawutchai_sig.png");
+    }
+    if (lower.includes("siriwan")) {
+        return resolveSignatureAssetUrl("./signatures/siriwan_sig.png");
+    }
+    if (lower.includes("supaporn")) {
+        return resolveSignatureAssetUrl("./signatures/supaporn_sig.png");
+    }
+    if (lower.includes("kaptan")) {
+        return resolveSignatureAssetUrl("./signatures/kaptan_sig.png");
+    }
+    if (lower.includes("aphinan")) {
+        return resolveSignatureAssetUrl("./signatures/aphinan_sig.png");
+    }
+    if (lower.includes("satthra")) {
+        return resolveSignatureAssetUrl("./signatures/satthra_sig.png");
+    }
+    if (lower.includes("anuchit")) {
+        return resolveSignatureAssetUrl("./signatures/anuchit_sig.png");
+    }
+    if (lower.includes("eueangkoon")) {
+        return resolveSignatureAssetUrl("./signatures/eueangkoon_sig.png");
+    }
+    if (lower.includes("meechai")) {
+        return resolveSignatureAssetUrl("./signatures/meechai_sig.png");
+    }
+    if (lower.includes("puruwat")) {
+        return resolveSignatureAssetUrl("./signatures/puruwat_sig.png");
+    }
+    if (lower.includes("kraiwit")) {
+        return resolveSignatureAssetUrl("./signatures/kraiwit_sig.png");
+    }
+    if (lower.includes("sornchai")) {
+        return resolveSignatureAssetUrl("./signatures/sornchai_sig.png");
+    }
+    if (lower.includes("panida")) {
+        return resolveSignatureAssetUrl("./signatures/panida_sig.png");
+    }
+    if (lower.includes("pakon")) {
+        return resolveSignatureAssetUrl("./signatures/pakon_sig.png");
+    }
+    if (lower.includes("watcharin")) {
+        return resolveSignatureAssetUrl("./signatures/watcharin_sig.png");
+    }
+    if (lower.includes("songporn")) {
+        return resolveSignatureAssetUrl("./signatures/songporn_sig.png");
+    }
+    if (lower.includes("siriporn")) {
+        return resolveSignatureAssetUrl("./signatures/siriporn_sig.png");
+    }
+    if (lower.includes("ekkalak")) {
+        return resolveSignatureAssetUrl("./signatures/ekkalak_sig.png");
+    }
+    if (lower.includes("komson") || lower.includes("komsan")) {
+        return resolveSignatureAssetUrl("./signatures/komson_sig.png");
+    }
+    if (lower.includes("witsarut")) {
+        return resolveSignatureAssetUrl("./signatures/witsarut_sig.png");
+    }
+    if (lower.includes("chiraphat")) {
+        return resolveSignatureAssetUrl("./signatures/chiraphat_sig.png");
+    }
+    if (lower.includes("naruemon")) {
+        return resolveSignatureAssetUrl("./signatures/naruemon_sig.png");
+    }
+    if (lower.includes("pratheep")) {
+        return resolveSignatureAssetUrl("./signatures/pratheep_sig.png");
+    }
+
+    // 3. ถ้าไม่เจอเลย ให้ใช้ชื่อแรกเป็นชื่อไฟล์ (เช่น Nipawan -> signatures/nipawan_sig.png)
+    const firstName = lower.split(' ')[0] || 'default';
+    return resolveSignatureAssetUrl(`./signatures/${firstName}_sig.png`);
+}
+window.getStaffSignatureImage = getStaffSignatureImage;
+window.SIG_LIBRARY = SIG_LIBRARY;
+// --- ฟังก์ชันทำความสะอาดชื่อ (ลบ Mr. Ms. ฯลฯ) ---
+function cleanSignatureName(name) {
+    if (!name) return "";
+    return String(name).trim()
+        .replace(/^(?:mr|ms|mrs|miss|khun|dr|k)\.?\s*/gi, '')
+        .replace(/^(?:นาย|นางสาว|นาง|คุณ)\s*/gi, '')
+        .trim();
+}
+
+// --- ฟังก์ชันระบุทีมของพนักงาน (Mold, Printing, Steel, Piping and Mat, Electronic) ---
+function getStaffTeamName(inputName) {
+    if (!inputName) return null;
+    const clean = typeof cleanSignatureName === 'function' ? cleanSignatureName(inputName).toLowerCase().trim() : String(inputName).toLowerCase().trim();
+    if (!clean) return null;
+    const teams = typeof STAFF_TEAMS !== 'undefined' ? STAFF_TEAMS : [];
+    for (const t of teams) {
+        if (t.members && t.members.some(m => {
+            const cleanM = typeof cleanSignatureName === 'function' ? cleanSignatureName(m).toLowerCase().trim() : m.toLowerCase().trim();
+            return cleanM === clean || m.toLowerCase().trim() === clean || (clean.length >= 3 && (cleanM.includes(clean) || clean.includes(cleanM)));
+        })) {
+            return t.team;
+        }
+    }
+    return null;
+}
+window.getStaffTeamName = getStaffTeamName;
+
+// --- ฟังก์ชันดึงอีเมลจากชื่อพนักงาน (ป้องกัน Error: getEmailByStaffName is not defined) ---
+function getEmailByStaffName(inputName) {
+    if (!inputName) return (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : "natthawutchaising271166@gmail.com";
+    
+    // ถ้าส่งมาเป็นอีเมลอยู่แล้ว
+    if (String(inputName).includes('@')) return String(inputName).trim();
+
+    // ทำความสะอาดชื่อเพื่อใช้เปรียบเทียบ
+    const normalize = (s) => cleanSignatureName(s)
+        .replace(/\./g, '')
+        .replace(/\s+/g, '')
+        .toUpperCase();
+
+    const target = normalize(inputName);
+
+    // ค้นหาใน STAFF_EMAIL_MAP (ฐานข้อมูลที่คุณมี)
+    const foundKey = Object.keys(STAFF_EMAIL_MAP).find(key => normalize(key) === target || normalize(key).includes(target) || target.includes(normalize(key)));
+    if (foundKey && STAFF_EMAIL_MAP[foundKey]) return STAFF_EMAIL_MAP[foundKey];
+
+    // สร้าง Carrier อีเมลอัตโนมัติตามชื่อถ้ายังไม่พบ
+    const cleaned = cleanSignatureName(inputName).toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/g, '');
+    if (cleaned && cleaned.length >= 3) return `${cleaned}@carrier.com`;
+
+    return (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : "natthawutchaising271166@gmail.com";
+}
 // ตั้งค่าฐานข้อมูลในเครื่อง
 // --- บรรทัดที่ 1 ของไฟล์ script.js ---
 // เพิ่มฟังก์ชันนี้ไว้บนสุดของ script.js
@@ -3857,6 +4261,7 @@ let S = {
     selectedShift: 'SHIFT A',
     editingId: null,
     isOnline: navigator.onLine,
+    isLinkSession: false, 
     loginRole: 'staff'
 };
 
@@ -4081,6 +4486,41 @@ async function handleLogin() {
         btn.disabled = false;
     }
 }
+
+async function checkDeepLinkAndAutoLogin() {
+    const params = window.checkDeepLinkParams();
+    if (!params.email) return; // ไม่มี email ใน URL ก็ไม่ต้องทำอะไร
+
+    console.log("🔗 Deep Link Auto-Login for:", params.email);
+
+    const emailInput = document.getElementById('login-email');
+    const passInput = document.getElementById('login-pass');
+    if (emailInput) {
+        emailInput.value = decodeURIComponent(params.email);
+        emailInput.classList.add('valid');
+    }
+
+    try {
+        const { data, error } = await sqeClient
+            .from('users')
+            .select('password, role')
+            .eq('email', params.email.toLowerCase())
+            .single();
+
+        if (!error && data) {
+            if (passInput) passInput.value = data.password;
+            S.loginRole = data.role || 'staff';
+            toast("🔑 กำลังล็อกอินอัตโนมัติจากลิงก์อีเมล...", "info");
+            await handleLogin(); // ระบบเดิมจะไปต่อที่ finalizeLogin → launchDirectWarp เอง
+        } else {
+            toast("⚠️ ไม่พบบัญชีผู้ใช้ตามอีเมลในลิงก์ กรุณาลงชื่อเข้าใช้ด้วยตนเอง", "error");
+        }
+    } catch (e) {
+        console.error("Auto-login failed:", e);
+        toast("❌ ล็อกอินอัตโนมัติไม่สำเร็จ กรุณากรอกรหัสผ่านเอง", "error");
+    }
+}
+window.checkDeepLinkAndAutoLogin = checkDeepLinkAndAutoLogin;
 
 async function checkSupervisorRole(email) {
     let isSupervisor = false; // ✅ ประกาศ local ป้องกัน global leak
@@ -4351,9 +4791,6 @@ async function startNeuralBootSequence(email, role) {
     }
 }
 
-/**
- * 3. อนิเมชั่น DIRECT WARP
- */
 function launchDirectWarp(email, role) {
     const overlay = document.getElementById('neural-boot-overlay');
     const bgScene = document.querySelector('.background-scene');
@@ -4361,16 +4798,67 @@ function launchDirectWarp(email, role) {
     const dashboardView = document.getElementById('dashboard-view');
     const banner = document.getElementById('system-announcement');
 
+    // 1. ตรวจสอบ Deep Link ตั้งแต่ต้น
+    const linkData = window.checkDeepLinkParams();
+    const hasDeepLink = !!(linkData && (linkData.caseId || linkData.ctrl));
+
     S.currentUser = email;
     S.userRole = role;
     S.viewingUser = email;
     S.isLoggedIn = true;
+    S.isLinkSession = hasDeepLink;
 
     const launchTL = gsap.timeline({
-        onComplete: () => {
+        onComplete: async () => {
+            // เคลียร์หน้าจอ Login
             if(overlay) overlay.classList.add('hidden-view');
             if(loginView) loginView.classList.add('hidden-view');
             gsap.set(bgScene, { scale: 1, filter: "blur(0px) brightness(1)" });
+
+            // 2. กรณีมี Deep Link: บังคับรอข้อมูลเคส (Data-Ready Guard)
+            if (hasDeepLink) {
+                console.log("🎯 Deep Link detected: Initializing Data-Ready Guard...");
+                
+                try {
+                    // ขั้นตอนที่ 1: สลับไปหน้ารอ (SQE EN) ก่อนเพื่อให้ UI พร้อมรับข้อมูล
+                    switchPage('8D REPORT', document.querySelector('[data-view="eight-d-content"]'));
+
+                    // ขั้นตอนที่ 2: บังคับโหลด Case จากฐานข้อมูลให้เสร็จ 100% (ใช้ await)
+                    // ตัวนี้จะทำให้มั่นใจว่า _cases ในหน่วยความจำจะไม่ว่างเปล่า
+                    if (typeof Wap8DSystem !== 'undefined') {
+                        toast("⌛ Loading report data...", "info");
+                        await Wap8DSystem.fetchCases(); 
+                        
+                        const isVfMode = (linkData.mode === 'vf' || linkData.mode === 'rp');
+
+                        // ขั้นตอนที่ 3: ตั้งค่า Tab (VF หรือ 8D) ตามที่ระบุในลิงก์
+                        if (linkData.mode) {
+                            Wap8DSystem.switchSqeTab(linkData.mode);
+                        }
+
+                        // ขั้นตอนที่ 4: ค้นหา Case ID ที่ถูกต้อง
+                        let targetCaseId = linkData.caseId;
+                        if (!targetCaseId && linkData.ctrl) {
+                            targetCaseId = resolveCaseIdByControlNo(linkData.ctrl);
+                        }
+
+                        // ขั้นตอนที่ 5: เมื่อข้อมูลพร้อมแล้ว สั่งเปิด Report ทันที
+                        if (targetCaseId) {
+                            setTimeout(() => {
+                                Wap8DSystem.openReport(targetCaseId, isVfMode);
+                                // เคลียร์ URL ให้สะอาด
+                                window.history.replaceState({}, document.title, window.location.pathname);
+                                toast(`📂 เปิดรายงานสำเร็จ`, "success");
+                            }, 300); // หน่วงเวลาสั้นๆ ให้ DOM วาดตารางเสร็จก่อนเปิดซ้อน
+                        } else {
+                            toast("⚠️ ไม่พบเคสที่ระบุในระบบ", "error");
+                        }
+                    }
+                } catch (err) {
+                    console.error("Critical Deep Link Error:", err);
+                    toast("❌ ไม่สามารถเปิดรายงานอัตโนมัติได้", "error");
+                }
+            }
         }
     });
 
@@ -4380,7 +4868,8 @@ function launchDirectWarp(email, role) {
         .to(overlay, { opacity: 0, scale: 1.2, duration: 0.6, ease: "power2.in" }, 0.2)
         .call(() => {
             if(dashboardView) dashboardView.classList.remove('hidden-view');
-            showDashboard();
+            // ส่งสัญญาณ hasDeepLink เข้าไป เพื่อบอก showDashboard ว่า "ไม่ต้องดึงหน้ากลับไปที่ Operations"
+            showDashboard(hasDeepLink); 
         }, null, 0.4)
         .fromTo(dashboardView, 
             { opacity: 0, scale: 0.95, filter: "blur(10px)" }, 
@@ -4388,7 +4877,6 @@ function launchDirectWarp(email, role) {
             0.5
         );
 }
-
 /**
  * 4. ฟังก์ชันควบคุมโหมดปิดปรับปรุง (Maintenance Mode) - แก้ไข Error ตรงนี้
  */
@@ -4424,58 +4912,140 @@ async function enforceMaintenanceMode() {
     } catch (err) { console.log("Maintenance check skip"); }
 }
 
-/**
- * 5. ระบบ INITIALIZATION เมื่อโหลดหน้าเว็บ
- */
-window.addEventListener('load', () => {
-    console.log("SQE & WAP System: Final Initializing...");
 
+/**
+ * 🔑 ฟังก์ชันกระตุ้นการ Login อัตโนมัติ
+ */
+async function runAutoLoginFromLink() {
+    const params = window.checkDeepLinkParams();
+    
+    // ถ้ามีข้อมูลครบในลิงก์
+    if (params.email && params.caseId) {
+        const emailInput = document.getElementById('login-email');
+        const passInput = document.getElementById('login-pass');
+        
+        if (!emailInput || !passInput) return;
+
+        // ใส่ค่าอีเมลลงไปก่อน
+        emailInput.value = decodeURIComponent(params.email);
+
+        try {
+            // ไปดึงรหัสผ่านของคนนี้จากฐานข้อมูลมาเงียบๆ
+            const { data, error } = await sqeClient
+                .from('users')
+                .select('password, role')
+                .eq('email', params.email.toLowerCase())
+                .single();
+
+            if (data && !error) {
+                // เติมรหัสผ่านและสั่ง Login
+                passInput.value = data.password;
+                S.loginRole = data.role;
+                
+                toast("🔑 ล็อกอินอัตโนมัติเพื่อตรวจสอบเคส...", "info");
+                handleLogin(); // เรียกฟังก์ชันล็อกอินเดิมที่คุณมีอยู่แล้ว
+            }
+        } catch (e) { console.warn("Auto-login step failed", e); }
+    }
+}
+window.addEventListener('load', () => {
+    console.group("🚀 System Boot Sequence");
+    
+    // 1. ตรวจสอบสถานะเครือข่ายและประกาศแจ้งเตือน
     if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
     if (typeof autoHideBanner === 'function') autoHideBanner();
 
+    // 2. ระบบจัดการภาษา (Localization)
     const savedLang = localStorage.getItem('carrier_lang') || (navigator.language.startsWith('th') ? 'th' : 'en');
-    applyLanguage(savedLang);
+    if (typeof applyLanguage === 'function') applyLanguage(savedLang);
 
-    const savedEmail = localStorage.getItem('carrier_remembered_email');
-    if (savedEmail) {
-        const emailIn = document.getElementById('login-email');
-        if (emailIn) { emailIn.value = savedEmail; emailIn.classList.add('valid'); }
+    // 3. วิเคราะห์ Deep Link (ดึงค่า Case ID, Mode, Email จาก URL)
+    let linkData = { caseId: null, mode: null, email: null };
+    if (typeof window.checkDeepLinkParams === 'function') {
+        linkData = window.checkDeepLinkParams();
     }
 
-    // ตรวจสอบ Auto-Login หลังอัปเดต
+    // 4. จัดเตรียมหน้า Login (Auto-fill Email)
+    const emailInput = document.getElementById('login-email');
+    const passInput = document.getElementById('login-pass');
+
+    if (emailInput) {
+        if (linkData.email) {
+            // ถ้าเปิดจากลิงก์: ใช้อีเมลจากลิงก์ (สำคัญที่สุด)
+            emailInput.value = decodeURIComponent(linkData.email);
+            emailInput.classList.add('valid');
+            console.log("🔗 Login ready for:", linkData.email);
+            
+            // กระโดดไปรอที่ช่องรหัสผ่านทันที เพื่อความรวดเร็ว
+            setTimeout(() => {
+                if (passInput) passInput.focus();
+            }, 800);
+            
+            toast("📧 เตรียมอีเมลของคุณไว้แล้ว โปรดใส่ Security Key", "info");
+        } else {
+            // ถ้าเปิดปกติ: ใช้อีเมลที่เคยจำไว้ (Remember Me)
+            const savedEmail = localStorage.getItem('carrier_remembered_email');
+            if (savedEmail) {
+                emailInput.value = savedEmail;
+                emailInput.classList.add('valid');
+            }
+        }
+    }
+
+    // 5. ระบบตรวจสอบการเข้าสู่ระบบอัตโนมัติ (Session Restore)
+    // ลำดับ: A. หลังการอัปเดตระบบ (Reboot) -> B. Session เดิมที่ยังไม่หมดอายุ
     const rebootEmail = sessionStorage.getItem('reboot_login_email');
     const rebootRole = sessionStorage.getItem('reboot_login_role');
-    if (rebootEmail && rebootRole) {
+    const session = sessionStorage.getItem('sqe_session');
+
+    if (rebootEmail && rebootRole && typeof startNeuralBootSequence === 'function') {
+        console.log("🔄 System Reboot Login detected...");
         sessionStorage.removeItem('reboot_login_email');
         sessionStorage.removeItem('reboot_login_role');
         startNeuralBootSequence(rebootEmail, rebootRole);
+        console.groupEnd();
         return; 
     }
 
-    // ตรวจสอบ Session เดิม
-    const session = sessionStorage.getItem('sqe_session');
-    if (session) {
+    if (session && typeof startNeuralBootSequence === 'function') {
         try {
             const userData = JSON.parse(session);
+            console.log("🔓 Session Restored for:", userData.email);
             startNeuralBootSequence(userData.email, userData.role);
-        } catch (e) { sessionStorage.removeItem('sqe_session'); }
-    }
-
-    // รันระบบ Background
-    watchSystemUpdate();
-    setInterval(watchSystemUpdate, 180000);
-    enforceMaintenanceMode(); // เรียกฟังก์ชันที่เคย Error
-    setInterval(enforceMaintenanceMode, 30000);
-    updateUserPresence();
-    setInterval(updateUserPresence, 300000);
-
-    if ('serviceWorker' in navigator) {
-        try {
-            navigator.serviceWorker.register('sw.js').catch(err => console.log('PWA Error', err));
-        } catch (e) {
-            console.log('PWA Register Error', e);
+            console.groupEnd();
+            return; 
+        } catch (e) { 
+            console.error("Session Corrupted");
+            sessionStorage.removeItem('sqe_session'); 
         }
     }
+
+    // 6. รันระบบเบื้องหลัง (Background Services)
+    if (typeof watchSystemUpdate === 'function') {
+        watchSystemUpdate();
+        setInterval(watchSystemUpdate, 180000); // เช็คอัปเดตทุก 3 นาที
+    }
+    
+    if (typeof enforceMaintenanceMode === 'function') {
+        enforceMaintenanceMode();
+        setInterval(enforceMaintenanceMode, 30000); // เช็คโหมดซ่อมบำรุงทุก 30 วินาที
+    }
+
+    if (typeof updateUserPresence === 'function') {
+        updateUserPresence();
+        setInterval(updateUserPresence, 300000); // แจ้งสถานะออนไลน์ทุก 5 นาที
+    }
+
+    // 7. ลงทะเบียน PWA Service Worker (เพื่อการใช้งานออฟไลน์)
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(() => console.log("📦 ServiceWorker: Ready"))
+            .catch(err => console.warn("📦 ServiceWorker: Failed", err));
+    }
+
+    console.log("✅ Initialization Complete");
+    console.groupEnd();
+    setTimeout(checkDeepLinkAndAutoLogin, 500); 
 });
 
 /* ============================================================
@@ -4592,8 +5162,8 @@ function handleLogout() {
     toast('Logged out successfully', 'info');
 }
 
-async function showDashboard() {
-    // --- [เพิ่มส่วนนี้: อัปเดตธีมทันทีที่เปลี่ยนหน้า] ---
+async function showDashboard(isDeepLink = false) { // 1. เพิ่ม parameter เพื่อรับสถานะลิงก์
+    // --- [ส่วนที่ 1: จัดการธีม] ---
     const savedTheme = localStorage.getItem('carrier_theme');
     const isDark = (savedTheme === 'dark');
     if (isDark) {
@@ -4601,31 +5171,28 @@ async function showDashboard() {
     } else {
         document.body.classList.remove('dark-mode');
     }
-    // สั่งให้วาดไอคอนลงในปุ่มทันที
     if (typeof updateThemeIcon === 'function') {
         updateThemeIcon(isDark);
     }
-    // ----------------------------------------------
 
-    // 1. สลับหน้าจอจาก Login ไปยัง Dashboard ทันที
+    // --- [ส่วนที่ 2: สลับหน้าจอและตั้งค่า Sidebar] ---
     $id('login-view').classList.add('hidden-view');
     $id('dashboard-view').classList.remove('hidden-view');
     
-    // 2. ตั้งค่าข้อมูลผู้ใช้บน Sidebar
     const namePart = S.currentUser.split('@')[0] || 'USER';
     const initial = namePart.charAt(0).toUpperCase();
     $id('user-avatar').textContent = initial;
     $id('user-display-name').textContent = namePart.replace(/\./g, ' ').toUpperCase();
     $id('user-display-email').textContent = S.currentUser;
 
-    // 3. จัดการส่วนของ Supervisor (หัวหน้างาน) และระบบ Lock ฟอร์ม
+    // --- [ส่วนที่ 3: จัดการ Form Panel และสิทธิ์ Supervisor] ---
     const staffWrap = $id('staff-selector-wrap');
     const showFormBtn = $id('show-form-btn'); 
     const formPanel = $id('form-panel');
     const showBtn = $id('show-form-btn');
 
     if (formPanel && showBtn) {
-        isFormHidden = true; // บังคับสถานะเป็นปิด
+        isFormHidden = true; 
         gsap.set(formPanel, { x: -350, opacity: 0, width: 0, marginRight: -12 });
         formPanel.classList.add('hidden');
         showBtn.classList.remove('hidden');
@@ -4638,15 +5205,8 @@ async function showDashboard() {
             staffWrap.classList.add('flex');
         }
         await loadStaffList(); 
-
-        if (typeof isFormHidden !== 'undefined' && !isFormHidden) {
-            toggleFormPanel(); 
-        }
-
-        if (showFormBtn) {
-            showFormBtn.style.display = 'none'; 
-        }
-
+        if (typeof isFormHidden !== 'undefined' && !isFormHidden) toggleFormPanel(); 
+        if (showFormBtn) showFormBtn.style.display = 'none'; 
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
         if (internalCloseBtn) internalCloseBtn.style.display = 'none';
 
@@ -4656,13 +5216,10 @@ async function showDashboard() {
             el.style.opacity = '0.6';
             el.style.cursor = 'not-allowed';
         });
-
     } else {
         if (staffWrap) staffWrap.classList.add('hidden');
         S.viewingUser = S.currentUser;
-
         if (showFormBtn) showFormBtn.style.display = 'flex';
-        
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
         if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
 
@@ -4674,23 +5231,18 @@ async function showDashboard() {
         });
     }
 
-    // ============================================================
-    // [แก้ไขใหม่]: ตรวจสอบสิทธิ์ Admin สูงสุด (Natthawut Chaising)
-    // ============================================================
-    // [แก้ไขใหม่]: จัดการปุ่มเข้าหน้า Admin ในโซน Footer
+    // --- [ส่วนที่ 4: ตรวจสอบ Admin Access] ---
     const adminFooterBtn = document.getElementById('admin-footer-access');
-    const masterAdminEmail = 'natthawut.chaising@carrier.com'; // อีเมลที่ได้รับสิทธิ์
-
+    const masterAdminEmail = 'natthawut.chaising@carrier.com'; 
     if (S.currentUser.toLowerCase() === masterAdminEmail.toLowerCase()) {
         if (adminFooterBtn) adminFooterBtn.classList.remove('hidden');
-        console.log("Master Admin Access Granted");
     } else {
         if (adminFooterBtn) adminFooterBtn.classList.add('hidden');
     }
     
     updateOnlineBadge();
 
-    // 4. --- เริ่มการซิงค์ข้อมูลชุดใหญ่ (SQE + WAP) ---
+    // --- [ส่วนที่ 5: ซิงค์ข้อมูลชุดใหญ่] ---
     toast("📡 กำลังเชื่อมต่อฐานข้อมูล Online...", "info");
 
     try {
@@ -4699,16 +5251,32 @@ async function showDashboard() {
             fetchWAPData()
         ]);
 
-        const firstMenuBtn = document.querySelector('.nav-item');
-        switchPage('Part line claim', firstMenuBtn);
+        // >>> [จุดสำคัญที่สุด]: การตัดสินใจเลือกหน้าที่จะแสดง <<<
+        if (!isDeepLink) {
+            // ถ้าเป็นการ Login ปกติ ให้ไปหน้าแรก (PART LINE CLAIM)
+            const firstMenuBtn = document.querySelector('.nav-item');
+            switchPage('Part line claim', firstMenuBtn);
+            console.log("Standard entry: Redirecting to Home.");
+        } else {
+            // ถ้ามาจาก Deep Link ไม่ต้องสั่ง switchPage
+            // ปล่อยให้ Logic ใน launchDirectWarp พาไปที่หน้า 8D/VF เอง
+            console.log("Deep link entry: Hold redirection.");
+        }
         
         toast("✅ ซิงค์ข้อมูลสำเร็จ", "success");
+        if (typeof LocalBackupSystem !== 'undefined') {
+            LocalBackupSystem.checkAndRunDailyBackup();
+        }
 
     } catch (error) {
         console.error("Critical Sync Error:", error);
         toast("❌ การโหลดข้อมูลบางส่วนล้มเหลว", "error");
-        const firstMenuBtn = document.querySelector('.nav-item');
-        switchPage('Part line claim', firstMenuBtn);
+        
+        // แม้จะ Error ถ้าไม่ใช่ลิงก์ ก็ควรพาไปหน้าแรก
+        if (!isDeepLink) {
+            const firstMenuBtn = document.querySelector('.nav-item');
+            switchPage('Part line claim', firstMenuBtn);
+        }
     }
 }
 
@@ -6924,6 +7492,7 @@ function switchPage(name, el) {
     
     // อ้างอิงแถบเครื่องมือ Admin ใน Header ที่เพิ่มเข้าไปใหม่
     const adminHeaderTools = document.getElementById('admin-header-tools');
+    const sqeHeaderTools = document.getElementById('sqe-header-tools');
 
     // อ้างอิง UI Elements ส่วนกลาง
     const staffWrap = document.getElementById('staff-selector-wrap');
@@ -6936,6 +7505,10 @@ function switchPage(name, el) {
     if (onlineBadge) onlineBadge.classList.add('hidden');
     if (vendorFilter) vendorFilter.classList.add('hidden');
     if (vendorDivider) vendorDivider.classList.add('hidden');
+    if (sqeHeaderTools) {
+        sqeHeaderTools.classList.remove('flex');
+        sqeHeaderTools.classList.add('hidden');
+    }
 
     // --- STEP 2: MANAGE SIDEBAR ACTIVE STATE ---
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
@@ -6952,7 +7525,8 @@ function switchPage(name, el) {
         'entry-terminal-content', 'overview-cockpit-content', 'exec-dashboard-content',
         'attendance-logs', 'line-support-logs-content', 'five-s-content',
         'skill-matrix-content', 'special-jobs-content', 'ot-management-content',
-        'admin-console-content','eight-d-content' 
+        'admin-console-content', 'eight-d-content',
+    'rn-management-content'
     ];
     allPages.forEach(id => {
         const pageEl = document.getElementById(id);
@@ -7004,6 +7578,24 @@ function switchPage(name, el) {
         
         document.querySelectorAll('.submenu-container').forEach(s => s.classList.remove('open'));
     }
+    else if (pageNameUpper === 'SQE EN' || pageNameUpper === '8D REPORT' || pageNameUpper === 'SME RECEIVABLES') {
+        if (subNav) subNav.classList.add('hidden'); 
+        if (claimOpTools) claimOpTools.classList.add('hidden');
+        if (dashFilterWrap) {
+            dashFilterWrap.classList.remove('hidden');
+            dashFilterWrap.classList.add('flex');
+        }
+        if (vendorFilter) {
+            vendorFilter.classList.remove('hidden');
+            if (typeof populateVendorFilter === 'function') populateVendorFilter();
+        }
+        if (vendorDivider) vendorDivider.classList.remove('hidden');
+        if (sqeHeaderTools) {
+            sqeHeaderTools.classList.remove('hidden');
+            sqeHeaderTools.classList.add('flex');
+        }
+        if (titleEl) titleEl.textContent = 'SQE EN';
+    }
     else {
         // หน้าปกติอื่นๆ
         if (subNav) subNav.classList.add('hidden'); 
@@ -7028,9 +7620,17 @@ function switchPage(name, el) {
         'OT MANAGEMENT': 'ot-management-content',
         '8D REPORT': 'eight-d-content',
         'SQE EN': 'eight-d-content',
-        'SME RECEIVABLES': 'eight-d-content'
+        'SME RECEIVABLES': 'eight-d-content',
+        'RUNNING NUMBER': 'rn-management-content'
     };
 
+if (pageNameUpper === 'RUNNING NUMBER') {
+    $id('rn-header-tools').classList.remove('hidden');
+    $id('rn-header-tools').classList.add('flex');
+} else {
+    $id('rn-header-tools').classList.add('hidden');
+    $id('rn-header-tools').classList.remove('flex');
+}
     const targetId = targetIdMap[pageNameUpper];
     if (targetId) {
         const targetEl = document.getElementById(targetId);
@@ -7038,27 +7638,29 @@ function switchPage(name, el) {
         
         const targetUser = (S.userRole === 'supervisor') ? S.viewingUser : S.currentUser;
 
-        switch(pageNameUpper) {
-            case 'PART LINE CLAIM': renderTable(); break;
-            case 'EXEC DASHBOARD': initExecDashboard(); break;
-            case 'ATTENDANCE LOGS': initAttDashboard(); break;
-            case 'LINE SUPPORT LOGS': WapSupportLogs.init(targetUser); break;
-            case '5S EXCELLENCE': Wap5SExcellence.init(); break;
-            case 'SKILL MATRIX': WapSkillMatrix.init(); break;
-            case 'SPECIAL JOBS': WapSpecialJobs.init(); break;
-            case 'OT MANAGEMENT': WapOTManagement.init(); break;
-            case '8D REPORT':
-            case 'SQE EN':
-            case 'SME RECEIVABLES':
-                Wap8DSystem.init(); break;
-case 'ADMIN CONSOLE': 
-    if (typeof WapAdminSystem !== 'undefined') {
-        WapAdminSystem.init(); 
-        // เติมบรรทัดนี้ลงไป กราฟจะถูกวาดทันทีที่กดเมนู Admin จากแถบข้าง
-        setTimeout(renderCyberAnalytics, 300); 
-    }
-    break;
-        }
+// ค้นหาส่วนนี้ในฟังก์ชัน switchPage
+switch(pageNameUpper) {
+    case 'PART LINE CLAIM': renderTable(); break;
+    case 'EXEC DASHBOARD': initExecDashboard(); break;
+    case 'ATTENDANCE LOGS': initAttDashboard(); break;
+    case 'LINE SUPPORT LOGS': WapSupportLogs.init(targetUser); break;
+    case '5S EXCELLENCE': Wap5SExcellence.init(); break;
+    case 'SKILL MATRIX': WapSkillMatrix.init(); break;
+    case 'SPECIAL JOBS': WapSpecialJobs.init(); break;
+    case 'OT MANAGEMENT': WapOTManagement.init(); break;
+    case '8D REPORT':
+    case 'SQE EN':
+    case 'SME RECEIVABLES':
+        Wap8DSystem.init(); break;
+    case 'ADMIN CONSOLE': 
+        if (typeof WapAdminSystem !== 'undefined') WapAdminSystem.init(); 
+        break;
+    
+    // >>> เพิ่ม 3 บรรทัดนี้เข้าไป <<<
+    case 'RUNNING NUMBER':
+        if (typeof WapRNSystem !== 'undefined') WapRNSystem.init();
+        break;
+}
     }
     
     if (window.innerWidth <= 768) toggleSidebar('close');
@@ -7090,16 +7692,19 @@ function applyLanguage(lang) {
         }
     });
 
-    // 2.2 อัปเดต Dynamic Header Title
+    // 2.2 อัปเดต Dynamic Header Title (เฉพาะเมื่ออยู่หน้า PART LINE CLAIM)
     const titleEl = document.getElementById('header-title');
     if (titleEl) {
-        const isDashboard = titleEl.textContent.includes('DASHBOARD');
-        // ตรวจสอบภาษาปัจจุบันและเปลี่ยนคำแปลตามหน้า
-        if (!isDashboard) {
-            titleEl.textContent = data.header_title_claim || titleEl.textContent;
-        } else {
-            const baseTitle = data.header_title_claim || "PART LINE CLAIM";
-            titleEl.textContent = (lang === 'th' ? "แดชบอร์ด " : "DASHBOARD ") + baseTitle;
+        const isPartClaimPage = !document.getElementById('entry-terminal-content')?.classList.contains('hidden-view') || 
+                                !document.getElementById('overview-cockpit-content')?.classList.contains('hidden-view');
+        if (isPartClaimPage) {
+            const isDashboard = titleEl.textContent.includes('DASHBOARD') || titleEl.textContent.includes('แดชบอร์ด');
+            if (!isDashboard) {
+                titleEl.textContent = data.header_title_claim || titleEl.textContent;
+            } else {
+                const baseTitle = data.header_title_claim || "PART LINE CLAIM";
+                titleEl.textContent = (lang === 'th' ? "แดชบอร์ด " : "DASHBOARD ") + baseTitle;
+            }
         }
     }
 
@@ -7137,11 +7742,12 @@ async function fetchWAPData() {
     if (!targetUser) return false;
 
     try {
-        const [resAct, resS5, resAtt, resSJ] = await Promise.all([
+        const [resAct, resS5, resAtt, resSJ, resSkills] = await Promise.all([
             wapClient.from('support_records').select('*').eq('user_id', targetUser).order('event_date', { ascending: false }),
             wapClient.from('s5_records').select('*').eq('user_id', targetUser).order('month', { ascending: false }),
             wapClient.from('daily_reports').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
-            wapClient.from('special_jobs').select('*').eq('user_id', targetUser).order('date', { ascending: false })
+            wapClient.from('special_jobs').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
+            wapClient.from('skill_matrix').select('*').eq('user_id', targetUser).order('skill_value', { ascending: false })
         ]);
 
         // อัปเดตข้อมูลลง State
@@ -7149,6 +7755,7 @@ async function fetchWAPData() {
         S.wapData.score5s = resS5.data || [];
         S.wapData.specialJobs = resSJ.data || [];
         S.attLeaveRecords = resAtt.data || [];
+        S.wapData.skills = resSkills.data || [];
         
         return true;
     } catch (e) {
@@ -7180,8 +7787,9 @@ function toggleSidebar(forceState = null) {
         // ลบ Class เมื่อเคลื่อนที่เสร็จ
         body.classList.remove('is-animating');
         
-        // 3. สั่งให้ทุก Module (โดยเฉพาะ Job Support) ปรับขนาดทีเดียวตอนจบ
-        if (typeof renderTable === 'function') renderTable();
+        // 3. สั่งให้ทุก Module ปรับขนาดทีเดียวตอนจบ
+        const isPartClaimActive = !document.getElementById('entry-terminal-content')?.classList.contains('hidden-view');
+        if (isPartClaimActive && typeof renderTable === 'function') renderTable();
         
         // ส่ง Event Resize ครั้งเดียวเพื่อให้กราฟ ApexCharts ปรับขนาดให้เป๊ะ
         window.dispatchEvent(new Event('resize'));
@@ -8313,6 +8921,13 @@ const updateAllModuleFilters = () => {
             renderDailySubmissionMatrix(); 
         }
     }
+
+    // 8. หน้า SQE EN (8D / VF Report Dashboard)
+    if (currentTitle.includes('SQE') || currentTitle.includes('8D') || currentTitle.includes('VF') || currentTitle.includes('SME')) {
+        if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.renderDashboard) {
+            Wap8DSystem.renderDashboard();
+        }
+    }
 };
 
 function renderDailySubmissionMatrix() {
@@ -8393,6 +9008,7 @@ if (typeof initAttDashboard !== 'undefined') {
         renderDailySubmissionMatrix();
     };
 }
+
 /**
  * ═══════════════════════════════════════════════════════
  *  PART LINE CLAIM - INDEXEDDB AUTO-DRAFT SYSTEM
@@ -8829,20 +9445,20 @@ function renderKpiTotalSparkline(records) {
 
     container.innerHTML = '';
     const rect = container.getBoundingClientRect();
-    const width = Math.max(60, rect.width || container.clientWidth || 112);
-    const height = Math.max(24, rect.height || container.clientHeight || 36);
-    const margin = { top: 4, right: 6, bottom: 4, left: 4 };
+    const width = Math.max(36, Math.round(container.clientWidth || (rect && rect.width) || 80));
+    const height = Math.max(20, Math.round(container.clientHeight || (rect && rect.height) || 32));
+    const margin = { top: 3, right: 5, bottom: 3, left: 3 };
 
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
+    const innerWidth = Math.max(20, width - margin.left - margin.right);
+    const innerHeight = Math.max(14, height - margin.top - margin.bottom);
 
     const svg = d3.select(container)
         .append('svg')
         .attr('width', '100%')
         .attr('height', '100%')
         .attr('viewBox', `0 0 ${width} ${height}`)
-        .attr('preserveAspectRatio', 'xMidYMid meet')
-        .attr('class', 'overflow-visible');
+        .attr('preserveAspectRatio', 'none')
+        .attr('class', 'overflow-hidden block w-full h-full');
 
     const g = svg.append('g')
         .attr('transform', `translate(${margin.left},${margin.top})`);
@@ -10623,6 +11239,7 @@ const calcNG = () => {
     const result = totalLot - okQty;
 
     ngInput.value = result >= 0 ? result : 0;
+    ngInput.dispatchEvent(new Event('input', { bubbles: true }));
 
     if (result > 0) {
         ngInput.style.backgroundColor = '#fff1f2';
@@ -10654,7 +11271,7 @@ const WapSupportLogs = (function () {
     function _blankRecord() {
         return {
             id: null, problem: '', action: '', part: '', lot: '',
-            ok: '', ng: '', report: '', remark: '',
+            ok: '', ng: '', report: '', po_no: '', inv_no: '', remark: '',
             eventDate: new Date().toISOString().split('T')[0],
             imageUrl: null
         };
@@ -10982,26 +11599,140 @@ const WapSupportLogs = (function () {
             return `${day} ${month}'${yr}`;
         }
 
-        // Parse initial problem fields (Default to EMPTY if creating a new record)
-        let parsedUser = "";
-        let parsedPart = "";
-        let parsedPartNo = "";
-        let parsedSupplier = "";
-        let parsedDefect = "";
-        let parsedDateStr = _formatProblemDateStr(r.eventDate);
+        // Helper: Parse Problem Details thoroughly for RP and Line Claim (VF)
+        function parseProblemDetails(rawProb, rec = {}) {
+            let res = {
+                user: (rec.user || rec.informer || rec.area || rec.dept || rec.line || '').trim(),
+                partName: (rec.partName || rec.part_name || '').trim(),
+                partNo: (rec.partNo || rec.part_no || '').trim(),
+                supplier: (rec.supplier || '').trim(),
+                defect: (rec.defect || rec.defect_detail || '').trim(),
+                dateStr: _formatProblemDateStr(rec.eventDate),
+                isRP: false
+            };
 
-        if (isEdit && r.problem) {
-            const match = r.problem.match(/^On\s+(.*?)\s+(.*?)\s+inform quality problem about\s+(.*?)\s+\/\s+(.*?)\s+(.*?)\s+found defect\s+(.*)$/i);
-            if (match) {
-                parsedDateStr = match[1] || parsedDateStr;
-                parsedUser = match[2] || "";
-                parsedPart = match[3] || "";
-                parsedPartNo = match[4] || "";
-                parsedSupplier = match[5] || "";
-                parsedDefect = match[6] || "";
+            const clean = getCleanProblemTitle(rawProb || '');
+            if (!clean) return res;
+
+            res.isRP = (/^IQC/i.test(clean) || (rec.report || '').toString().toUpperCase().includes('RP'));
+
+            if (res.isRP) {
+                // 5. 📍 ผู้แจ้ง / พื้นที่ (Area/Dept) คือ IQC incoming inspection
+                res.user = "IQC incoming inspection";
+
+                let afterAbout = clean;
+                if (/about/i.test(clean)) {
+                    const parts = clean.split(/about/i);
+                    afterAbout = parts.slice(1).join('about').trim();
+                }
+
+                // ตัดส่วน ". IQC judgement..." ด้านหลัง
+                let mainPart = afterAbout;
+                if (/IQC judgement/i.test(afterAbout)) {
+                    mainPart = afterAbout.split(/\.?\s*IQC judgement/i)[0].trim();
+                }
+
+                // 2 & 3. แยกชื่อพาร์ท (หลัง about) และรหัสพาร์ท (หลัง /)
+                if (mainPart.includes('/')) {
+                    const slashParts = mainPart.split('/');
+                    res.partName = slashParts[0].trim();
+                    const rest = slashParts.slice(1).join('/').trim();
+
+                    if (/found defect/i.test(rest)) {
+                        const defSplit = rest.split(/found defect/i);
+                        const beforeDef = defSplit[0].trim();
+                        res.defect = defSplit.slice(1).join('found defect').trim();
+                        const tokens = beforeDef.split(/\s+/);
+                        if (tokens.length > 0 && tokens[0]) {
+                            res.partNo = tokens[0].trim();
+                            if (tokens.length > 1) {
+                                res.supplier = tokens.slice(1).join(' ').trim();
+                            }
+                        }
+                    } else {
+                        const tokens = rest.split(/\s+/);
+                        if (tokens.length > 0 && tokens[0]) {
+                            res.partNo = tokens[0].trim();
+                            if (tokens.length === 2) {
+                                res.defect = tokens[1].trim();
+                            } else if (tokens.length > 2) {
+                                res.supplier = tokens.slice(1, -1).join(' ').trim();
+                                res.defect = tokens[tokens.length - 1].trim();
+                            }
+                        }
+                    }
+                } else {
+                    if (/found defect/i.test(mainPart)) {
+                        const defSplit = mainPart.split(/found defect/i);
+                        res.partName = defSplit[0].trim();
+                        res.defect = defSplit.slice(1).join('found defect').trim();
+                    } else {
+                        res.partName = mainPart;
+                    }
+                }
             } else {
-                parsedDefect = r.problem;
+                // VF / Line Claim: e.g. "On 14 Aug'26 OSA-A1 inform quality problem about COVER-MOTOR / 1129810601 V.PARADISE found defect BROKEN"
+                const match = clean.match(/^On\s+(.*?)\s+(.*?)\s+inform quality problem about\s+(.*?)(?:\s+found defect\s+(.*))?$/i);
+                if (match) {
+                    let rawDateStr = (match[1] || '').trim();
+                    let rawUserStr = (match[2] || '').trim();
+                    rawUserStr = rawUserStr.replace(/\b\d{1,2}\s+[A-Za-z']+\d{2}\b/gi, '').replace(/\b[A-Za-z']+\d{2}\b/gi, '').trim();
+
+                    res.dateStr = getCleanProblemTitle(rawDateStr) || res.dateStr;
+                    res.user = rawUserStr;
+                    const aboutContent = (match[3] || '').trim();
+                    res.defect = (match[4] || '').trim();
+
+                    if (aboutContent.includes('/')) {
+                        const slashParts = aboutContent.split('/');
+                        res.partName = slashParts[0].trim();
+                        const rest = slashParts.slice(1).join('/').trim();
+                        const tokens = rest.split(/\s+/);
+                        if (tokens.length > 0 && tokens[0]) {
+                            res.partNo = tokens[0].trim();
+                            if (tokens.length > 1) {
+                                res.supplier = tokens.slice(1).join(' ').trim();
+                            }
+                        }
+                    } else {
+                        res.partName = aboutContent;
+                    }
+                } else if (/inform/i.test(clean) && /about/i.test(clean)) {
+                    const preAbout = clean.split(/about/i)[0];
+                    const postAbout = clean.split(/about/i).slice(1).join('about');
+                    const userMatch = preAbout.match(/inform/i);
+                    if (userMatch) {
+                        const beforeInform = preAbout.slice(0, userMatch.index).trim();
+                        const dateMatch = beforeInform.match(/^On\s+(.*?)\s+(.*)$/i);
+                        if (dateMatch) {
+                            res.dateStr = dateMatch[1].trim();
+                            res.user = dateMatch[2].trim();
+                        } else {
+                            res.user = beforeInform.replace(/^On\s+/i, '').trim();
+                        }
+                    }
+                    if (postAbout.includes('/')) {
+                        const slashParts = postAbout.split('/');
+                        res.partName = slashParts[0].trim();
+                        const rest = slashParts.slice(1).join('/').trim();
+                        if (/found defect/i.test(rest)) {
+                            const defSplit = rest.split(/found defect/i);
+                            const suppTokens = defSplit[0].trim().split(/\s+/);
+                            if (suppTokens.length > 0 && suppTokens[0]) res.partNo = suppTokens[0].trim();
+                            if (suppTokens.length > 1) res.supplier = suppTokens.slice(1).join(' ').trim();
+                            res.defect = defSplit.slice(1).join('found defect').trim();
+                        } else {
+                            const tokens = rest.split(/\s+/);
+                            if (tokens[0]) res.partNo = tokens[0].trim();
+                            if (tokens.length > 1) res.defect = tokens.slice(1).join(' ').trim();
+                        }
+                    }
+                } else {
+                    res.defect = clean;
+                }
             }
+
+            return res;
         }
 
         // 1. รายการหมวดหมู่พาร์ท
@@ -11030,26 +11761,14 @@ const WapSupportLogs = (function () {
 
         const processRecordForMap = (rec) => {
             if (!rec) return;
-            let pNo = (rec.partNo || rec.part_no || '').trim();
-            let pName = (rec.partName || rec.part_name || '').trim();
-            let sup = (rec.supplier || '').trim();
-            let def = (rec.defect || rec.defect_detail || '').trim();
+            const parsed = parseProblemDetails(rec.problem, rec);
+            let pNo = (rec.partNo || rec.part_no || parsed.partNo || '').trim();
+            let pName = (rec.partName || rec.part_name || parsed.partName || '').trim();
+            let sup = (rec.supplier || parsed.supplier || '').trim();
+            let def = (rec.defect || rec.defect_detail || parsed.defect || '').trim();
             let rawGrp = (rec.partGroup || rec.part_group || rec.part || rec.category || '').trim();
             let grp = (rawGrp === '-' || rawGrp === '--' || rawGrp.toLowerCase() === 'null' || rawGrp.toLowerCase() === 'undefined') ? '' : rawGrp;
-            let usr = (rec.user || rec.informer || rec.area || rec.dept || rec.line || '').trim();
-
-            if (rec.problem) {
-                const match = rec.problem.match(/^On\s+(.*?)\s+(.*?)\s+inform quality problem about\s+(.*?)\s+\/\s+(.*?)\s+(.*?)\s+found defect\s+(.*)$/i);
-                if (match) {
-                    if (!usr) usr = (match[2] || '').trim();
-                    if (!pName) pName = (match[3] || '').trim();
-                    if (!pNo) pNo = (match[4] || '').trim();
-                    if (!sup) sup = (match[5] || '').trim();
-                    if (!def) def = (match[6] || '').trim();
-                } else if (!def) {
-                    def = rec.problem.trim();
-                }
-            }
+            let usr = (rec.user || rec.informer || rec.area || rec.dept || rec.line || parsed.user || '').trim();
 
             if (pNo) {
                 allPartNos.add(pNo);
@@ -11123,6 +11842,41 @@ const WapSupportLogs = (function () {
         }
         if (typeof defectDict === 'object' && defectDict !== null) {
             Object.keys(defectDict).forEach(k => allDefects.add(k.toUpperCase()));
+        }
+
+        // Parse initial problem fields for this record
+        let parsedDateStr = _formatProblemDateStr(r.eventDate);
+        let parsedUser = "";
+        let parsedPart = "";
+        let parsedPartNo = "";
+        let parsedSupplier = "";
+        let parsedDefect = "";
+
+        if (isEdit) {
+            const parsed = parseProblemDetails(r.problem, r);
+            parsedDateStr = parsed.dateStr || parsedDateStr;
+            parsedUser = parsed.user || "";
+            parsedPart = parsed.partName || "";
+            parsedPartNo = parsed.partNo || "";
+            parsedSupplier = parsed.supplier || "";
+            parsedDefect = parsed.defect || "";
+
+            // 4. 🏭 ผู้จำหน่าย (Supplier) ให้แสดงผลตามข้อมูล 🔢 รหัสพาร์ท (Part No.) * ที่เคยมี
+            if (!parsedSupplier && parsedPartNo) {
+                const matchedPack = partMapByNo[parsedPartNo.toLowerCase()];
+                if (matchedPack && matchedPack.supplier) {
+                    parsedSupplier = matchedPack.supplier;
+                } else if (typeof smartMemory === 'object' && smartMemory?.byPartNo?.[parsedPartNo.toLowerCase()]) {
+                    const smPack = typeof getMostFrequentPack === 'function' ? getMostFrequentPack(smartMemory.byPartNo[parsedPartNo.toLowerCase()]) : smartMemory.byPartNo[parsedPartNo.toLowerCase()][0];
+                    if (smPack?.supplier) parsedSupplier = smPack.supplier;
+                }
+            }
+            if (!parsedSupplier && parsedPart) {
+                const matchedPack = partMapByName[parsedPart.toLowerCase()];
+                if (matchedPack && matchedPack.supplier) {
+                    parsedSupplier = matchedPack.supplier;
+                }
+            }
         }
 
         const partnoDatalistOptions = Array.from(allPartNos).sort().map(p => `<option value="${_esc(p)}">`).join('');
@@ -11209,7 +11963,7 @@ const WapSupportLogs = (function () {
     <div>
         <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🏭 ผู้จำหน่าย (Supplier)</label>
         <div style="position:relative;">
-            <input type="text" id="prob-supplier" 
+            <input type="text" id="prob-supplier" name="supplier"
                    value="${parsedSupplier}" 
                    placeholder="พิมพ์ชื่อผู้จำหน่าย..." 
                    class="form-input" 
@@ -11332,6 +12086,41 @@ const WapSupportLogs = (function () {
                             <div>
                                 <label style="font-size:10px; font-weight:800; color:#ef4444; margin-bottom:2px; display:block;">❌ NG QTY (Auto)</label>
                                 <input type="number" id="f-sup-ng" name="ng" value="${r.ng || ''}" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:800; background:#fff1f2; color:#e11d48;" readonly placeholder="0" title="NG Qty" aria-label="NG Qty">
+                            </div>
+                        </div>
+
+                        <!-- Conditional RP Report Row: P/O# & INV.# (แสดงเฉพาะเมื่อเลือก RP Report) -->
+                        <div id="rp-fields-row" style="display:none; grid-template-columns:1fr 1fr; gap:8px; margin-top:2px;">
+                            <!-- 1. P/O# (ก่อน บันทึกเป็นภารกิจพิเศษ) -->
+                            <div id="f-po-input" style="display:none;">
+                                <label style="font-size:10px; font-weight:800; color:#2563eb; margin-bottom:2px; display:flex; align-items:center; gap:4px;">
+                                    <span>📑 P/O# (Purchase Order)</span>
+                                </label>
+                                <div style="position:relative;">
+                                    <input type="text" id="f-sup-po" name="po_no"
+                                           value="${r.po_no || r.po || (r.report_data && r.report_data.vf_data ? r.report_data.vf_data.po_no : '') || ''}" 
+                                           placeholder="ระบุหมายเลข P/O#..." 
+                                           class="form-input" 
+                                           style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" 
+                                           autocomplete="off" 
+                                           title="P/O#" aria-label="P/O#">
+                                </div>
+                            </div>
+
+                            <!-- 2. INV.# (ก่อน เปิดเคสวิเคราะห์ 8D Report) -->
+                            <div id="f-inv-input" style="display:none;">
+                                <label style="font-size:10px; font-weight:800; color:#e11d48; margin-bottom:2px; display:flex; align-items:center; gap:4px;">
+                                    <span>🧾 INV.# (Invoice No.)</span>
+                                </label>
+                                <div style="position:relative;">
+                                    <input type="text" id="f-sup-inv" name="inv_no" 
+                                           value="${r.inv_no || r.inv || (r.report_data && r.report_data.vf_data ? r.report_data.vf_data.inv_no : '') || ''}" 
+                                           placeholder="ระบุหมายเลข INV.#..." 
+                                           class="form-input" 
+                                           style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" 
+                                           autocomplete="off" 
+                                           title="INV.#" aria-label="INV.#">
+                                </div>
                             </div>
                         </div>
 
@@ -11491,7 +12280,11 @@ const WapSupportLogs = (function () {
                         }
                     }
                 }
-                if (matchedPack.user && userInput && !userInput.value) {
+                const reportVal = (modal.querySelector('#f-sup-report')?.value || '').trim().toUpperCase();
+                const isRPForm = reportVal.startsWith('RP') || reportVal.includes('RP');
+                if (isRPForm) {
+                    if (userInput) userInput.value = 'IQC incoming inspection';
+                } else if (matchedPack.user && userInput && !userInput.value) {
                     userInput.value = matchedPack.user;
                 }
                 if (matchedPack.defect && defectInput && !defectInput.value) {
@@ -11568,6 +12361,24 @@ const WapSupportLogs = (function () {
         }
 
         // --- Synchronize Problem Statement Builder ---
+        function toggleRpFieldsVisibility() {
+            const reportField = modal.querySelector('#f-sup-report');
+            const repVal = (reportField ? reportField.value : '').trim().toUpperCase();
+            const isRP = repVal === 'RP' || repVal.startsWith('RP') || repVal.includes('RP');
+            const rpRow = modal.querySelector('#rp-fields-row');
+            const fPoInput = modal.querySelector('#f-po-input');
+            const fInvInput = modal.querySelector('#f-inv-input');
+            if (rpRow) {
+                rpRow.style.display = isRP ? 'grid' : 'none';
+            }
+            if (fPoInput) {
+                fPoInput.style.display = isRP ? 'block' : 'none';
+            }
+            if (fInvInput) {
+                fInvInput.style.display = isRP ? 'block' : 'none';
+            }
+        }
+
         function syncProblemSentence() {
             const dateInputVal = modal.querySelector('#f-sup-date')?.value || r.eventDate;
             const dateStr = _formatProblemDateStr(dateInputVal);
@@ -11577,12 +12388,35 @@ const WapSupportLogs = (function () {
             const supplierVal = (modal.querySelector('#prob-supplier')?.value || '').trim();
             const defectVal = (modal.querySelector('#prob-defect')?.value || '').trim();
 
+            const reportInputVal = (modal.querySelector('#f-sup-report')?.value || '').trim().toUpperCase();
+            const isRP = reportInputVal.startsWith('RP') || reportInputVal.includes('RP') || userVal.toLowerCase().includes('iqc');
+
+            const ngVal = (modal.querySelector('#f-sup-ng')?.value || '').trim();
+            const lotVal = (modal.querySelector('#f-sup-lot')?.value || '').trim();
+
             const dateBadge = modal.querySelector('#prob-date-badge');
             if (dateBadge) dateBadge.textContent = dateStr;
 
             let fullSentence = '';
-            if (userVal || partVal || partNoVal || supplierVal || defectVal) {
-                fullSentence = `On ${dateStr} ${userVal} inform quality problem about ${partVal} / ${partNoVal} ${supplierVal} found defect ${defectVal}`;
+            if (isRP) {
+                const partInfo = (partVal && partNoVal) ? `${partVal} / ${partNoVal}` : (partVal || partNoVal || '');
+                const suppInfo = supplierVal ? ` ${supplierVal}` : '';
+                const defectPart = defectVal ? ` found defect ${defectVal}` : '';
+                const rejectQty = lotVal || (r.lot !== undefined && r.lot !== null && r.lot !== '' ? r.lot : (r.qty || ngVal || '160'));
+                if (partInfo || defectVal || userVal || supplierVal) {
+                    fullSentence = `IQC incoming inspection found problem about ${partInfo}${suppInfo}${defectPart}. IQC judgement rejected q'ty ${rejectQty} pcs (100%).`.replace(/\s+/g, ' ').trim();
+                }
+            } else {
+                if (userVal || partVal || partNoVal || supplierVal || defectVal) {
+                    const partInfo = (partVal && partNoVal) ? `${partVal} / ${partNoVal}` : (partVal || partNoVal || '');
+                    const suppInfo = supplierVal ? ` ${supplierVal}` : '';
+                    const userPrefix = userVal ? `${userVal} ` : '';
+                    fullSentence = `On ${dateStr} ${userPrefix}inform quality problem about ${partInfo}${suppInfo} found defect ${defectVal}`.replace(/\s+/g, ' ').trim();
+                }
+            }
+
+            if (fullSentence) {
+                fullSentence = getCleanProblemTitle(fullSentence);
             }
 
             const hiddenProb = modal.querySelector('#f-sup-problem');
@@ -11595,12 +12429,37 @@ const WapSupportLogs = (function () {
             }
         }
 
-        ['prob-user', 'prob-supplier', 'prob-defect'].forEach(fieldId => {
+        ['prob-user', 'prob-supplier', 'prob-defect', 'prob-part', 'prob-partno', 'f-sup-report', 'f-sup-lot', 'f-sup-ok', 'f-sup-ng', 'f-sup-po', 'f-sup-inv'].forEach(fieldId => {
             const el = modal.querySelector('#' + fieldId);
-            if (el) el.addEventListener('input', syncProblemSentence);
+            if (el) {
+                el.addEventListener('input', syncProblemSentence);
+                el.addEventListener('change', syncProblemSentence);
+                el.addEventListener('blur', syncProblemSentence);
+            }
         });
+
+        const reportFieldEl = modal.querySelector('#f-sup-report');
+        if (reportFieldEl) {
+            const handleReportChange = () => {
+                const val = (reportFieldEl.value || '').toUpperCase();
+                const userInp = modal.querySelector('#prob-user');
+                if (val.includes('RP')) {
+                    if (userInp) userInp.value = 'IQC incoming inspection';
+                }
+                toggleRpFieldsVisibility();
+                syncProblemSentence();
+            };
+            reportFieldEl.addEventListener('input', handleReportChange);
+            reportFieldEl.addEventListener('change', handleReportChange);
+            reportFieldEl.addEventListener('keyup', handleReportChange);
+        }
+
         const dateEl = modal.querySelector('#f-sup-date');
-        if (dateEl) dateEl.addEventListener('change', syncProblemSentence);
+        if (dateEl) {
+            dateEl.addEventListener('change', syncProblemSentence);
+            dateEl.addEventListener('input', syncProblemSentence);
+        }
+        toggleRpFieldsVisibility();
         syncProblemSentence();
 
         // --- Logic: Special Job Toggle Interaction ---
@@ -11777,6 +12636,8 @@ const WapSupportLogs = (function () {
                     eventDate: modal.querySelector('#f-sup-date')?.value || '',
                     action: modal.querySelector('#f-sup-action')?.value || '',
                     report: modal.querySelector('#f-sup-report')?.value || modal.querySelector('select[name="report"]')?.value || '',
+                    po_no: (modal.querySelector('#f-sup-po')?.value || '').trim(),
+                    inv_no: (modal.querySelector('#f-sup-inv')?.value || '').trim(),
                     lot: modal.querySelector('#f-sup-lot')?.value || '',
                     ok: modal.querySelector('#f-sup-ok')?.value || '',
                     ng: modal.querySelector('#f-sup-ng')?.value || '',
@@ -11809,6 +12670,8 @@ const WapSupportLogs = (function () {
                 if (d.eventDate !== undefined && modal.querySelector('#f-sup-date')) modal.querySelector('#f-sup-date').value = d.eventDate;
                 if (d.action !== undefined && modal.querySelector('#f-sup-action')) modal.querySelector('#f-sup-action').value = d.action;
                 if (d.report !== undefined && modal.querySelector('#f-sup-report')) modal.querySelector('#f-sup-report').value = d.report;
+                if (d.po_no !== undefined && modal.querySelector('#f-sup-po')) modal.querySelector('#f-sup-po').value = d.po_no;
+                if (d.inv_no !== undefined && modal.querySelector('#f-sup-inv')) modal.querySelector('#f-sup-inv').value = d.inv_no;
                 if (d.lot !== undefined && modal.querySelector('#f-sup-lot')) modal.querySelector('#f-sup-lot').value = d.lot;
                 if (d.ok !== undefined && modal.querySelector('#f-sup-ok')) modal.querySelector('#f-sup-ok').value = d.ok;
                 if (d.ng !== undefined && modal.querySelector('#f-sup-ng')) modal.querySelector('#f-sup-ng').value = d.ng;
@@ -11829,6 +12692,7 @@ const WapSupportLogs = (function () {
                     const area = document.getElementById('img-preview-area');
                     if (area) area.innerHTML = `<img src="${d.image}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">`;
                 }
+                toggleRpFieldsVisibility();
                 syncProblemSentence();
                 updateSupportFormValidation();
             } catch(e) {
@@ -11927,6 +12791,19 @@ const WapSupportLogs = (function () {
             else if (repVal.toUpperCase().includes('RECORD')) repVal = 'RECORDS';
             else if (repVal.toUpperCase().includes('VF')) repVal = 'VF';
 
+            const suppVal = (fd.get('supplier') || (modal.querySelector('#prob-supplier')?.value) || '').trim();
+            const partNoVal = (modal.querySelector('#prob-partno')?.value || '').trim();
+            const poVal = (fd.get('po_no') || modal.querySelector('#f-sup-po')?.value || '').trim();
+            const invVal = (fd.get('inv_no') || modal.querySelector('#f-sup-inv')?.value || '').trim();
+            const rawRemark = fd.get('remark') || '';
+
+            // บันทึก PO และ INV ลงใน remark metadata เพื่อไม่ให้เกิดข้อผิดพลาดคอลัมน์ใน Supabase support_records
+            let finalRemark = rawRemark;
+            if (poVal || invVal) {
+                const metaTag = `[PO:${poVal || ''}|INV:${invVal || ''}]`;
+                finalRemark = (metaTag + (rawRemark ? ' ' + rawRemark : '')).trim();
+            }
+
             const payload = {
                 id: _editingId || 'SUP-' + Date.now(),
                 user_id: S.currentUser,
@@ -11937,7 +12814,7 @@ const WapSupportLogs = (function () {
                 ok_qty: Number(fd.get('ok')) || 0,
                 ng_qty: Number(fd.get('ng')) || 0,
                 report_type: repVal,
-                remark: fd.get('remark') || '',
+                remark: finalRemark,
                 event_date: fd.get('date'),
                 image_url: currentImage,
                 created_at: originalCreatedAt || new Date().toISOString()
@@ -11963,7 +12840,14 @@ const WapSupportLogs = (function () {
 
                 // STEP 3: ✅ สร้างเคส 8D อัตโนมัติ (SQE DB)
                 if (is8DActive) {
-                    await Wap8DSystem.createNewCase(payload);
+                    await Wap8DSystem.createNewCase({
+                        ...payload,
+                        supplier: suppVal,
+                        part_no: partNoVal,
+                        partNo: partNoVal,
+                        po_no: poVal,
+                        inv_no: invVal
+                    });
                 }
 
                 // ล้างแบบร่าง ล้างฟอร์ม และล้างเอฟเฟกต์ไฮไลต์
@@ -12175,6 +13059,17 @@ function _openViewModal(id) {
         const okVal = parseFloat(String(r.ok_qty ?? r.ok ?? 0).replace(/,/g, '')) || 0;
         const ngVal = parseFloat(String(r.ng_qty ?? r.ng ?? 0).replace(/,/g, '')) || 0;
         const rawImg = r.image_url || r.imageUrl || r.evidence_img || r.image || null;
+        let po_no = r.po_no || r.po || (r.report_data && r.report_data.vf_data ? r.report_data.vf_data.po_no : '') || '';
+        let inv_no = r.inv_no || r.inv || (r.report_data && r.report_data.vf_data ? r.report_data.vf_data.inv_no : '') || '';
+        let cleanRemark = r.remark || '';
+        if (cleanRemark) {
+            const metaMatch = cleanRemark.match(/^\[PO:(.*?)\|INV:(.*?)\]\s*/);
+            if (metaMatch) {
+                if (!po_no) po_no = metaMatch[1];
+                if (!inv_no) inv_no = metaMatch[2];
+                cleanRemark = cleanRemark.replace(metaMatch[0], '');
+            }
+        }
         return {
             id: r.id,
             problem: r.problem || '',
@@ -12184,7 +13079,9 @@ function _openViewModal(id) {
             ok: okVal,
             ng: ngVal,
             report: r.report_type || r.report || 'VF',
-            remark: r.remark || '',
+            po_no: po_no,
+            inv_no: inv_no,
+            remark: cleanRemark,
             eventDate: r.event_date || r.eventDate || '',
             imageUrl: typeof formatImageUrl === 'function' ? formatImageUrl(rawImg) : rawImg,
             _user: r.user_id || r._user || '',
@@ -12788,24 +13685,78 @@ async function submit() {
  */
 const WapSkillMatrix = (function() {
     const TABLE = 'skill_matrix';
-    let _charts = { radar: null, donut: null };
+    let _charts = { radar: null, bar: null, donut: null };
     let _records = [];
+    let _viewMode = 'bar';
+    let _searchQuery = '';
+
+    const DEFAULT_SKILLS = [
+        { skill_name: 'APQP & PPAP Core Tools', skill_value: 85 },
+        { skill_name: '8D Problem Solving & Root Cause Analysis', skill_value: 90 },
+        { skill_name: 'Mold & Tooling Quality Control', skill_value: 80 },
+        { skill_name: 'PCBA & SMT Inspection Process', skill_value: 75 },
+        { skill_name: 'CMM 3D Metrology & Precision Measurement', skill_value: 70 },
+        { skill_name: 'FMEA & Control Plan Risk Analysis', skill_value: 85 },
+        { skill_name: 'MSA & SPC Statistical Quality Control', skill_value: 75 },
+        { skill_name: '5S Workplace Excellence & Auditing', skill_value: 90 },
+        { skill_name: 'Supplier Quality Audit & Assessment', skill_value: 80 },
+        { skill_name: 'GD&T Engineering Drawing Interpretation', skill_value: 70 }
+    ];
+
+    function _esc(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function _getStorageKey(user) {
+        return `wap_skill_records_${user || 'default'}`;
+    }
 
     async function init() {
-        // --- ส่วนที่แก้ไข ---
-        // 1. ถ้ามีข้อมูลเดิมเก็บไว้อยู่แล้ว ให้วาดทันทีไม่ต้องรอโหลด
-        if (_records.length > 0) {
-            renderAll(); 
-        }
+        const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
         
-        // 2. ดึงข้อมูลใหม่จากฐานข้อมูลมาอัปเดต (เบื้องหลัง)
+        // 1. โหลดข้อมูลจากแคชในเครื่องก่อนเพื่อแสดงผลทันที ไม่ให้ตารางว่างหรือหุบ
+        if (_records.length === 0) {
+            try {
+                const cached = localStorage.getItem(_getStorageKey(targetUser));
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        _records = parsed;
+                    }
+                }
+            } catch (e) {
+                console.warn('[SkillMatrix] Cache read error:', e);
+            }
+        }
+
+        // 2. ถ้ายังไม่มีข้อมูลเลย ให้ใช้ชุดทักษะมาตรฐานเริ่มต้น
+        if (_records.length === 0) {
+            _records = DEFAULT_SKILLS.map(s => ({
+                user_id: targetUser || 'SQE_DEFAULT',
+                skill_name: s.skill_name,
+                skill_value: s.skill_value,
+                updated_at: new Date().toISOString()
+            }));
+        }
+
+        renderAll(); 
         await fetchRecords();
     }
 
-async function fetchRecords() {
+    async function fetchRecords() {
         const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
+        if (!targetUser) {
+            renderAll();
+            return;
+        }
+
         if (!navigator.onLine) {
-            // ถ้าออฟไลน์ ให้วาดจากข้อมูลที่มีอยู่เดิม
             renderAll();
             return;
         }
@@ -12818,282 +13769,94 @@ async function fetchRecords() {
                 .order('skill_value', { ascending: false });
 
             if (error) throw error;
-            _records = data || [];
             
-            // วาดข้อมูลใหม่ลงหน้าจอ
+            if (data && data.length > 0) {
+                _records = data;
+                try {
+                    localStorage.setItem(_getStorageKey(targetUser), JSON.stringify(data));
+                } catch(e) {}
+            } else if (_records.length > 0 && targetUser) {
+                // ถ้าใน DB ยังไม่มีข้อมูล ให้บันทึกชุดทักษะเริ่มต้นขึ้นคลาวด์ให้อัตโนมัติ
+                try {
+                    const seedPayload = _records.map(r => ({
+                        user_id: targetUser,
+                        skill_name: r.skill_name,
+                        skill_value: r.skill_value,
+                        updated_at: new Date().toISOString()
+                    }));
+                    await wapClient.from(TABLE).upsert(seedPayload, { onConflict: 'user_id,skill_name' });
+                } catch (seedErr) {
+                    console.warn('[SkillMatrix] Auto seed warning:', seedErr);
+                }
+            }
+            
             renderAll();
         } catch (e) {
             console.error('[SkillMatrix] Fetch error:', e);
+            renderAll();
         }
     }
 
-// ค้นหา return { init, remove, clearAll }; ใน WapSkillMatrix
-// แล้วเปลี่ยนเป็น:
-
     async function submit() {
-        const name = $id('sm-f-name').value.trim();
-        const val = $id('sm-f-value').value;
-        if(!name || val === "") { toast("กรุณากรอกข้อมูลให้ครบ", "error"); return; }
+        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
+        const nameInput = $id('sm-f-name');
+        const valInput = $id('sm-f-value');
+        if (!nameInput || !valInput) return;
         
+        const name = nameInput.value.trim();
+        const val = valInput.value.trim();
+        if(!name || val === "") { toast("⚠️ กรุณากรอกชื่อทักษะและระดับความสามารถ (0-100)", "error"); return; }
+        
+        const numVal = Math.min(100, Math.max(0, parseInt(val) || 0));
+        const targetUser = S.currentUser;
+        
+        const payload = {
+            user_id: targetUser,
+            skill_name: name,
+            skill_value: numVal,
+            updated_at: new Date().toISOString()
+        };
+
+        // อัปเดตในเครื่องทันที (Optimistic update)
+        const existingIdx = _records.findIndex(r => r.skill_name.toLowerCase() === name.toLowerCase());
+        if (existingIdx >= 0) {
+            _records[existingIdx] = { ..._records[existingIdx], ...payload };
+        } else {
+            _records.unshift(payload);
+        }
         try {
-            const payload = {
-                user_id: S.currentUser,
-                skill_name: name,
-                skill_value: parseInt(val),
-                updated_at: new Date().toISOString()
-            };
+            localStorage.setItem(_getStorageKey(targetUser), JSON.stringify(_records));
+        } catch(e) {}
+        renderAll();
+
+        try {
             const { error } = await wapClient.from(TABLE).upsert([payload], { onConflict: 'user_id,skill_name' });
             if (error) throw error;
             
-            toast("อัปเดตทักษะเรียบร้อย", "success");
-            $id('sm-f-name').value = "";
-            $id('sm-f-value').value = "";
+            toast(`✅ บันทึกทักษะ "${name}" (${numVal}%) เรียบร้อย`, "success");
+            nameInput.value = "";
+            valInput.value = "";
             await fetchRecords();
-        } catch (e) { toast("บันทึกล้มเหลว", "error"); }
+        } catch (e) { 
+            console.error('[SkillMatrix Submit Error]:', e);
+            toast("⚠️ บันทึกในเครื่องแล้ว (คลาวด์: " + (e.message || '') + ")", "info"); 
+        }
     }
 
-    return { init, submit, remove, clearAll }; // ส่ง submit ออกไปด้วย
-    function renderAll() {
-        updateKPIs();
-        renderRadar();
-        renderBars();
-        renderDonut();
-    }
-
-function updateKPIs() {
-        const count = _records.length;
-        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
+    function editSkill(skillName, currentVal) {
+        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
         
-        // 1. จัดการส่วนป้ายสถานะ (Badge)
-        const badge = document.getElementById('sm-level-badge');
-        let level = { label: '⚙️ BASIC', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
-        if (avg >= 80) level = { label: '🏆 EXPERT', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-        else if (avg >= 60) level = { label: '🚀 ADVANCED', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
-        else if (avg >= 40) level = { label: '📘 DEVELOPING', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+        const nameInput = $id('sm-f-name');
+        const valInput = $id('sm-f-value');
+        if (nameInput) nameInput.value = skillName;
+        if (valInput) valInput.value = currentVal;
         
-        if (badge) {
-            badge.textContent = level.label;
-            badge.className = `px-4 py-1.5 rounded-full text-[10px] font-black border uppercase tracking-wider ${level.cls}`;
-            // เพิ่มกิมมิก: เด้งป้ายออกมาเบาๆ
-            gsap.fromTo(badge, { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.7)" });
+        if (nameInput) {
+            nameInput.focus();
+            nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-
-        // 2. --- [จุดที่แก้ไข: สั่งรันอนิเมชั่นตัวเลขวิ่ง] ---
-        
-        // คะแนนเฉลี่ย (เช่น 62%)
-        animateValue('sm-kpi-avg', 0, avg, 1200, 0, "%");
-
-        // ทักษะรวม (เช่น 17 Skills)
-        animateValue('sm-kpi-count', 0, count, 1000, 0, " Skills");
-
-        // 3. สำหรับข้อมูลที่เป็นตัวหนังสือ (ทักษะเด่น/จุดอ่อน)
-        const topEl = document.getElementById('sm-kpi-top');
-        if (topEl) {
-            topEl.textContent = _records[0]?.skill_name || '—';
-            // เลื่อนขึ้นนุ่มๆ เวลาเปลี่ยนข้อมูล
-            gsap.fromTo(topEl, { y: 5, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 });
-        }
-
-        const weakEl = document.getElementById('sm-kpi-weak');
-        if (weakEl) {
-            weakEl.textContent = _records[count-1]?.skill_name || '—';
-            // เลื่อนขึ้นนุ่มๆ เวลาเปลี่ยนข้อมูล
-            gsap.fromTo(weakEl, { y: 5, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, delay: 0.1 });
-        }
+        toast(`✏️ โหลดทักษะ "${skillName}" เข้าฟอร์มเพื่อแก้ไขแล้ว (กด "เพิ่ม/อัปเดตทักษะ" เพื่อบันทึก)`, 'info');
     }
-
-    // --- 1. Radar Chart: แผนที่ทักษะแบบ Sci-Fi ---
-    function renderRadar() {
-        const chartEl = document.getElementById('sm-radar-chart');
-        if (!chartEl) return;
-        if (_charts.radar) _charts.radar.destroy();
-
-        if (_records.length < 3) {
-            chartEl.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-300 text-center"><p class="text-[10px] font-bold uppercase tracking-widest">Requires 3+ Skills to Map</p></div>`;
-            return;
-        }
-
-        _charts.radar = new ApexCharts(chartEl, {
-            series: [{ name: 'Proficiency', data: _records.map(r => r.skill_value) }],
-            chart: { 
-                type: 'radar', 
-                height: '100%', 
-                toolbar: { show: false },
-                dropShadow: { enabled: true, blur: 8, left: 1, top: 1, opacity: 0.1 }
-            },
-            colors: ['#3b82f6'],
-            fill: {
-                type: 'gradient',
-                gradient: { shade: 'dark', gradientToColors: ['#6366f1'], shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1 }
-            },
-            markers: { size: 4, colors: ['#fff'], strokeColors: '#3b82f6', strokeWidth: 2, hover: { size: 6 } },
-            plotOptions: {
-                radar: {
-                    polygons: { strokeColors: '#e2e8f0', connectorColors: '#e2e8f0', fill: { colors: ['#f8fafc', '#fff'] } }
-                }
-            },
-            xaxis: {
-                categories: _records.map(r => r.skill_name),
-                labels: { style: { fontSize: '10px', fontWeight: 800, colors: '#64748b' } }
-            },
-            yaxis: { show: false, max: 100, tickAmount: 4 }
-        });
-        _charts.radar.render();
-    }
-
-    // --- 2. Proficiency Bars: รายการทักษะพร้อมแสง Glow ---
-// ============================================================
-    // RENDER NEON SKILL BARS - PREMIUM FUTURISTIC VERSION
-    // ============================================================
-    function renderBars() {
-        const listEl = document.getElementById('sm-bar-list');
-        if (!listEl) return;
-        
-        // กรณีไม่มีข้อมูล ให้แสดงข้อความสถานะแบบคลีนๆ
-        if (_records.length === 0) {
-            listEl.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-full py-10 opacity-20">
-                    <p class="text-[10px] font-black uppercase tracking-widest">No Competency Data Detected</p>
-                </div>`;
-            return;
-        }
-
-        // วาดแถบพลังใหม่โดยใช้ระบบ Class Neon ที่เราตั้งค่าไว้ใน CSS
-        listEl.innerHTML = _records.map(r => {
-            const val = r.skill_value || 0;
-            
-            // ตรรกะการเลือกสีและเงาเรืองแสง (Neon Logic)
-            let colorClass = 'fill-basic';
-            let colorHex = '#94a3b8'; // สีเทาพื้นฐาน
-
-            if (val >= 80) {
-                colorClass = 'fill-expert';
-                colorHex = '#10b981'; // สีเขียวนีออน
-            } else if (val >= 50) {
-                colorClass = 'fill-advanced';
-                colorHex = '#3b82f6'; // สีฟ้านีออน
-            }
-
-            return `
-                <div class="neon-bar-item group">
-                    <div class="neon-bar-label">
-                        <div class="flex items-center gap-2">
-                            <span class="neon-bar-name">${r.skill_name}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <!-- ตัวเลขเปอร์เซ็นต์เรืองแสงตามระดับ -->
-                            <span class="neon-bar-val" style="color:${colorHex}">${val}%</span>
-                            
-                            <!-- ปุ่มลบทักษะที่จะโผล่มาเมื่อเอาเมาส์ไปวาง (Hover) -->
-                            <button  onclick="WapSkillMatrix.remove('${r.skill_name}')" 
-                                    class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all duration-200" title="Wap Skill Matrix.Remove" aria-label="Wap Skill Matrix.Remove">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M18 6L6 18M6 6l12 12"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="neon-bar-bg">
-                        <!-- แถบความคืบหน้าพร้อม Effect เงาเรืองแสง (Box Shadow) -->
-                        <div class="neon-bar-fill ${colorClass}" style="width:${val}%"></div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-function renderDonut() {
-    const chartEl = document.getElementById('sm-donut-chart');
-    const legendEl = document.getElementById('sm-donut-legend');
-    
-    // 1. ตรวจสอบ Legend ก่อน (เพื่อให้วาดแถบด้านล่างได้เสมอ)
-    if (!legendEl) return; 
-
-    const count = _records.length;
-    const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
-
-    const dist = { expert: 0, adv: 0, dev: 0, basic: 0 };
-    _records.forEach(r => {
-        const v = r.skill_value || 0;
-        if (v >= 80) dist.expert++;
-        else if (v >= 60) dist.adv++;
-        else if (v >= 40) dist.dev++;
-        else dist.basic++;
-    });
-
-    const series = [dist.expert, dist.adv, dist.dev, dist.basic];
-    const labels = ['Expert', 'Advanced', 'Developing', 'Basic'];
-    const colors = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8'];
-
-    // 2. [สำคัญ] วาด Legend ก่อน เพื่อไม่ให้หายเวลาเปลี่ยนหน้า
-    legendEl.innerHTML = labels.map((l, i) => {
-        const total = series.reduce((a, b) => a + b, 0);
-        const pct = total > 0 ? ((series[i] / total) * 100).toFixed(0) : 0;
-        return `
-            <div class="legend-pill-cyber flex items-center justify-between p-2 rounded-xl border border-slate-50 mb-2 bg-white shadow-sm">
-                <div class="flex items-center gap-2">
-                    <div class="w-2.5 h-2.5 rounded-full" style="background:${colors[i]}; box-shadow: 0 0 8px ${colors[i]}55"></div>
-                    <div class="flex flex-col leading-none">
-                        <span class="text-[10px] font-black text-slate-600 uppercase tracking-wider">${l}</span>
-                        <span class="text-[8px] font-bold text-slate-300">${pct}% Share</span>
-                    </div>
-                </div>
-                <span class="text-[13px] font-black text-slate-700">${series[i]}</span>
-            </div>
-        `;
-    }).join('');
-
-    // 3. จัดการตัวกราฟ
-    if (!chartEl) return;
-    
-    // ล้างกราฟเก่าทิ้งให้เกลี้ยงก่อนวาดใหม่
-    if (_charts.donut) {
-        _charts.donut.destroy();
-        _charts.donut = null;
-    }
-    chartEl.innerHTML = ''; 
-
-    const options = {
-        series: series,
-        labels: labels,
-        chart: { 
-            type: 'donut', 
-            height: 220, // ล็อคตัวเลขความสูงเป็น Pixel ไม่ใช้ %
-            animations: { enabled: true, speed: 400 } 
-        },
-        colors: colors,
-        stroke: { width: 2, colors: ['#ffffff'] },
-        plotOptions: {
-            pie: {
-                donut: {
-                    size: '75%',
-                    labels: {
-                        show: true,
-                        name: { show: true, fontSize: '10px', fontWeight: 700, color: '#94a3b8', offsetY: -6 },
-                        value: { 
-                            show: true, fontSize: '18px', fontWeight: 900, color: '#1e293b', offsetY: 6,
-                            formatter: (val) => val
-                        },
-                        total: { 
-                            show: true, label: 'AVG', color: '#64748b', fontSize: '8px', fontWeight: 800,
-                            formatter: () => avg + '%'
-                        }
-                    }
-                }
-            }
-        },
-        dataLabels: { enabled: false },
-        legend: { show: false },
-        tooltip: { theme: 'dark', y: { formatter: (val) => val + " ทักษะ" } }
-    };
-
-    _charts.donut = new ApexCharts(chartEl, options);
-    
-    // หน่วงเวลาเล็กน้อย (10ms) เพื่อให้ Container กางเสร็จก่อนวาด
-    setTimeout(() => {
-        if (_charts.donut) _charts.donut.render();
-    }, 10);
-}
 
     async function remove(skillName) {
         if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
@@ -13108,7 +13871,7 @@ function renderDonut() {
             type: "danger",
             details: [
                 { label: "ชื่อทักษะ (Skill Name)", value: skillName || '-' },
-                { label: "ระดับความสามารถ", value: targetSkill ? (targetSkill.level || targetSkill.score || '-') : '-' },
+                { label: "ระดับความสามารถ", value: targetSkill ? (targetSkill.skill_value + '%') : '-' },
                 { label: "ผู้ครอบครองทักษะ", value: targetUser }
             ],
             confirmText: "🗑️ ยืนยันลบทักษะนี้",
@@ -13116,15 +13879,18 @@ function renderDonut() {
             onConfirm: async () => {
                 try {
                     _records = _records.filter(r => r.skill_name !== skillName);
+                    try {
+                        localStorage.setItem(_getStorageKey(targetUser), JSON.stringify(_records));
+                    } catch(e) {}
                     renderAll();
+                    
                     const { error } = await wapClient.from(TABLE).delete().eq('user_id', targetUser).eq('skill_name', skillName);
                     if (error) throw error;
                     toast('ลบทักษะเรียบร้อย', 'success');
                     await fetchRecords();
                 } catch (e) {
                     console.error('[SkillMatrix Delete Error]:', e);
-                    toast('ลบไม่สำเร็จ: ' + (e.message || ''), 'error');
-                    await fetchRecords();
+                    toast('ลบออกจากเครื่องแล้ว', 'info');
                 }
             }
         });
@@ -13132,6 +13898,7 @@ function renderDonut() {
 
     async function clearAll() {
         if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
+        if (!_records || _records.length === 0) { toast('ไม่มีทักษะให้ล้าง', 'info'); return; }
         
         const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
 
@@ -13144,13 +13911,16 @@ function renderDonut() {
             inputPlaceholder: "พิมพ์ 'CLEAR' เพื่อยืนยัน",
             details: [
                 { label: "ผู้ใช้งาน", value: targetUser },
-                { label: "จำนวนทักษะที่จะลบ", value: `${_records ? _records.length : 0} รายการ` }
+                { label: "จำนวนทักษะที่จะลบ", value: `${_records.length} รายการ` }
             ],
             confirmText: "🔥 ยืนยันล้างทักษะทั้งหมด",
             cancelText: "ยกเลิก",
             onConfirm: async () => {
                 try {
                     _records = [];
+                    try {
+                        localStorage.removeItem(_getStorageKey(targetUser));
+                    } catch(e) {}
                     renderAll();
                     const { error } = await wapClient.from(TABLE).delete().eq('user_id', targetUser);
                     if (error) throw error;
@@ -13158,14 +13928,523 @@ function renderDonut() {
                     await fetchRecords();
                 } catch (e) {
                     console.error('[SkillMatrix Clear Error]:', e);
-                    toast('ล้างข้อมูลไม่สำเร็จ: ' + (e.message || ''), 'error');
-                    await fetchRecords();
+                    toast('ล้างข้อมูลในเครื่องเรียบร้อย', 'info');
                 }
             }
         });
     }
 
-    return { init, submit, remove, clearAll };
+    function toggleViewMode(mode) {
+        _viewMode = mode;
+        const btnBar = $id('sm-btn-mode-bar');
+        const btnList = $id('sm-btn-mode-list');
+        const chartBox = $id('sm-bar-chart');
+        const listBox = $id('sm-bar-list');
+
+        if (mode === 'bar') {
+            if (btnBar) btnBar.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transition-all';
+            if (btnList) btnList.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all';
+            if (chartBox) chartBox.classList.remove('hidden');
+            if (listBox) listBox.classList.add('hidden');
+            if (typeof gsap !== 'undefined' && chartBox) {
+                gsap.fromTo(chartBox, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power2.out' });
+            }
+        } else {
+            if (btnList) btnList.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transition-all';
+            if (btnBar) btnBar.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all';
+            if (listBox) listBox.classList.remove('hidden');
+            if (chartBox) chartBox.classList.add('hidden');
+            if (typeof gsap !== 'undefined' && listBox) {
+                gsap.fromTo(listBox, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' });
+            }
+        }
+    }
+
+    function filterTable() {
+        const input = $id('sm-search-input');
+        _searchQuery = input ? input.value.trim().toLowerCase() : '';
+        renderTable();
+    }
+
+    function renderAll() {
+        updateKPIs();
+        renderRadar();
+        renderBarChart();
+        renderBars();
+        renderDonut();
+        renderTable();
+        animateChartEntrances();
+    }
+
+    function animateChartEntrances() {
+        if (typeof gsap === 'undefined') return;
+
+        // 1. Stat cards entrance stagger
+        const statCards = document.querySelectorAll('#skill-matrix-content .glass-stat-card');
+        if (statCards.length > 0) {
+            gsap.fromTo(statCards, 
+                { opacity: 0, y: 18, scale: 0.96 }, 
+                { opacity: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.08, ease: "power2.out" }
+            );
+        }
+
+        // 2. Command console bar slide up
+        const consoleBar = document.querySelector('#skill-matrix-content .sm-console-bar');
+        if (consoleBar) {
+            gsap.fromTo(consoleBar, 
+                { opacity: 0, y: 15 }, 
+                { opacity: 1, y: 0, duration: 0.4, delay: 0.12, ease: "power2.out" }
+            );
+        }
+
+        // 3. Analytics cards entrance stagger
+        const analyticsCards = document.querySelectorAll('#skill-matrix-content .analytics-card');
+        if (analyticsCards.length > 0) {
+            gsap.fromTo(analyticsCards, 
+                { opacity: 0, y: 22, scale: 0.97 }, 
+                { opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, delay: 0.18, ease: "back.out(1.2)" }
+            );
+        }
+
+        // 4. Radar Map chart entrance
+        const radarChart = document.getElementById('sm-radar-chart');
+        if (radarChart) {
+            gsap.fromTo(radarChart, 
+                { opacity: 0, scale: 0.88 }, 
+                { opacity: 1, scale: 1, duration: 0.5, delay: 0.25, ease: "back.out(1.4)" }
+            );
+        }
+
+        // 5. Bar Chart container entrance
+        const barChart = document.getElementById('sm-bar-chart');
+        if (barChart && !barChart.classList.contains('hidden')) {
+            gsap.fromTo(barChart, 
+                { opacity: 0, x: -15 }, 
+                { opacity: 1, x: 0, duration: 0.45, delay: 0.28, ease: "power2.out" }
+            );
+        }
+
+        // 6. Neon Bar list items stagger
+        const barItems = document.querySelectorAll('#sm-bar-list .neon-bar-item');
+        if (barItems.length > 0) {
+            gsap.fromTo(barItems, 
+                { opacity: 0, x: -20 }, 
+                { opacity: 1, x: 0, duration: 0.35, stagger: 0.05, ease: "power2.out" }
+            );
+        }
+
+        // 7. Donut Chart & Legend pills
+        const donutChart = document.getElementById('sm-donut-chart');
+        if (donutChart) {
+            gsap.fromTo(donutChart, 
+                { opacity: 0, scale: 0.82 }, 
+                { opacity: 1, scale: 1, duration: 0.5, delay: 0.25, ease: "back.out(1.5)" }
+            );
+        }
+
+        const legendPills = document.querySelectorAll('#sm-donut-legend > div');
+        if (legendPills.length > 0) {
+            gsap.fromTo(legendPills, 
+                { opacity: 0, y: 10 }, 
+                { opacity: 1, y: 0, duration: 0.35, stagger: 0.06, delay: 0.3, ease: "power2.out" }
+            );
+        }
+
+        // 8. Table rows entrance
+        const tableBody = document.getElementById('sm-table-body');
+        if (tableBody && typeof window.animateTableRows === 'function') {
+            window.animateTableRows(tableBody, { y: 10, duration: 0.35, maxRows: 12, ease: "power2.out" });
+        }
+    }
+
+    function updateKPIs() {
+        const count = _records.length;
+        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
+        
+        const badge = document.getElementById('sm-level-badge');
+        let level = { label: '⚙️ BASIC', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+        if (avg >= 80) level = { label: '🏆 EXPERT', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        else if (avg >= 60) level = { label: '🚀 ADVANCED', cls: 'bg-blue-50 text-blue-700 border-blue-200' };
+        else if (avg >= 40) level = { label: '📘 DEVELOPING', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+        
+        if (badge) {
+            badge.textContent = level.label;
+            badge.className = `px-4 py-1.5 rounded-full text-[10px] font-black border uppercase tracking-wider ${level.cls}`;
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(badge, { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.7)" });
+            }
+        }
+
+        if (typeof animateValue === 'function') {
+            animateValue('sm-kpi-avg', 0, avg, 1200, 0, "%");
+            animateValue('sm-kpi-count', 0, count, 1000, 0, " Skills");
+        } else {
+            const avgEl = document.getElementById('sm-kpi-avg');
+            if (avgEl) avgEl.textContent = avg + '%';
+            const cntEl = document.getElementById('sm-kpi-count');
+            if (cntEl) cntEl.textContent = count + ' Skills';
+        }
+
+        const sorted = [..._records].sort((a, b) => (b.skill_value || 0) - (a.skill_value || 0));
+        const topEl = document.getElementById('sm-kpi-top');
+        if (topEl) {
+            topEl.textContent = sorted[0]?.skill_name || '—';
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(topEl, { y: 5, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 });
+            }
+        }
+
+        const weakEl = document.getElementById('sm-kpi-weak');
+        if (weakEl) {
+            weakEl.textContent = sorted[sorted.length - 1]?.skill_name || '—';
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(weakEl, { y: 5, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, delay: 0.1 });
+            }
+        }
+    }
+
+    function renderRadar() {
+        const chartEl = document.getElementById('sm-radar-chart');
+        if (!chartEl) return;
+        if (_charts.radar) { _charts.radar.destroy(); _charts.radar = null; }
+
+        if (_records.length === 0) {
+            chartEl.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-400 text-center py-6"><p class="text-[10px] font-black uppercase tracking-widest">No Skill Data Available</p></div>`;
+            return;
+        }
+
+        const isDark = document.body.classList.contains('dark-mode');
+        const categories = _records.slice(0, 10).map(r => r.skill_name);
+        const dataVals = _records.slice(0, 10).map(r => r.skill_value || 0);
+
+        const options = {
+            series: [{ name: 'Proficiency Level', data: dataVals }],
+            chart: { 
+                type: 'radar', 
+                height: 320, 
+                toolbar: { show: false },
+                parentHeightOffset: 0
+            },
+            colors: ['#3b82f6'],
+            fill: {
+                type: 'gradient',
+                gradient: { shade: 'dark', gradientToColors: ['#10b981'], shadeIntensity: 1, opacityFrom: 0.5, opacityTo: 0.15 }
+            },
+            markers: { size: 4, colors: ['#2563eb'], strokeColors: '#ffffff', strokeWidth: 2, hover: { size: 6 } },
+            plotOptions: {
+                radar: {
+                    size: 110,
+                    polygons: {
+                        strokeColors: isDark ? '#334155' : '#e2e8f0',
+                        connectorColors: isDark ? '#334155' : '#e2e8f0',
+                        fill: { colors: isDark ? ['#0f172a', '#1e293b'] : ['#f8fafc', '#ffffff'] }
+                    }
+                }
+            },
+            xaxis: {
+                categories: categories,
+                labels: { 
+                    show: true,
+                    style: { fontSize: '9px', fontWeight: 800, colors: isDark ? '#94a3b8' : '#64748b' },
+                    formatter: function(val) {
+                        if (!val) return '';
+                        return val.length > 15 ? val.substring(0, 13) + '…' : val;
+                    }
+                }
+            },
+            yaxis: { show: false, max: 100, tickAmount: 4 },
+            tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (val) => val + "%" } }
+        };
+
+        _charts.radar = new ApexCharts(chartEl, options);
+        setTimeout(() => { if (_charts.radar) _charts.radar.render(); }, 20);
+    }
+
+    function renderBarChart() {
+        const chartEl = document.getElementById('sm-bar-chart');
+        if (!chartEl) return;
+        if (_charts.bar) { _charts.bar.destroy(); _charts.bar = null; }
+
+        if (_records.length === 0) {
+            chartEl.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-400 text-center py-6"><p class="text-[10px] font-black uppercase tracking-widest">No Competency Data</p></div>`;
+            return;
+        }
+
+        const isDark = document.body.classList.contains('dark-mode');
+        const displayRecs = _records.slice(0, 8);
+        const categories = displayRecs.map(r => r.skill_name);
+        const values = displayRecs.map(r => r.skill_value || 0);
+
+        const colors = values.map(v => {
+            if (v >= 80) return '#10b981';
+            if (v >= 60) return '#3b82f6';
+            if (v >= 40) return '#f59e0b';
+            return '#94a3b8';
+        });
+
+        const options = {
+            series: [{ name: 'Proficiency (%)', data: values }],
+            chart: {
+                type: 'bar',
+                height: 310,
+                toolbar: { show: false },
+                parentHeightOffset: 0
+            },
+            plotOptions: {
+                bar: {
+                    borderRadius: 6,
+                    horizontal: true,
+                    distributed: true,
+                    barHeight: '62%',
+                    dataLabels: { position: 'top' }
+                }
+            },
+            colors: colors,
+            dataLabels: {
+                enabled: true,
+                textAnchor: 'start',
+                style: { colors: ['#ffffff'], fontSize: '10px', fontWeight: '900' },
+                formatter: (val) => val + "%",
+                offsetX: 6
+            },
+            xaxis: {
+                categories: categories,
+                max: 100,
+                labels: { style: { colors: isDark ? '#94a3b8' : '#64748b', fontSize: '9px', fontWeight: '700' } },
+                axisBorder: { show: false }
+            },
+            yaxis: {
+                labels: {
+                    maxWidth: 150,
+                    style: { colors: isDark ? '#cbd5e1' : '#334155', fontSize: '9px', fontWeight: '800' },
+                    formatter: function(val) {
+                        if (!val) return '';
+                        return val.length > 20 ? val.substring(0, 18) + '…' : val;
+                    }
+                }
+            },
+            grid: {
+                borderColor: isDark ? '#1e293b' : '#f1f5f9',
+                strokeDashArray: 3,
+                padding: { left: 10, right: 15 }
+            },
+            legend: { show: false },
+            tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (val) => val + "%" } }
+        };
+
+        _charts.bar = new ApexCharts(chartEl, options);
+        setTimeout(() => { if (_charts.bar) _charts.bar.render(); }, 20);
+    }
+
+    function renderBars() {
+        const listEl = document.getElementById('sm-bar-list');
+        if (!listEl) return;
+        
+        if (_records.length === 0) {
+            listEl.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full py-10 opacity-40">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">No Competency Data Detected</p>
+                </div>`;
+            return;
+        }
+
+        listEl.innerHTML = _records.map(r => {
+            const val = r.skill_value || 0;
+            let colorClass = 'fill-basic';
+            let colorHex = '#94a3b8';
+
+            if (val >= 80) { colorClass = 'fill-expert'; colorHex = '#10b981'; }
+            else if (val >= 50) { colorClass = 'fill-advanced'; colorHex = '#3b82f6'; }
+
+            return `
+                <div class="neon-bar-item group p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all">
+                    <div class="neon-bar-label">
+                        <div class="flex items-center gap-2">
+                            <span class="neon-bar-name">${_esc(r.skill_name)}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="neon-bar-val" style="color:${colorHex}">${val}%</span>
+                            <button onclick="WapSkillMatrix.editSkill('${_esc(r.skill_name)}', ${val})" 
+                                    class="text-slate-400 hover:text-blue-500 transition-all p-1" title="Edit Skill" aria-label="Edit Skill">
+                                ✏️
+                            </button>
+                            <button onclick="WapSkillMatrix.remove('${_esc(r.skill_name)}')" 
+                                    class="text-slate-400 hover:text-rose-500 transition-all p-1" title="Delete Skill" aria-label="Delete Skill">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                    <div class="neon-bar-bg">
+                        <div class="neon-bar-fill ${colorClass}" style="width:${val}%"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderDonut() {
+        const chartEl = document.getElementById('sm-donut-chart');
+        const legendEl = document.getElementById('sm-donut-legend');
+        if (!legendEl) return; 
+
+        const count = _records.length;
+        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
+
+        const dist = { expert: 0, adv: 0, dev: 0, basic: 0 };
+        _records.forEach(r => {
+            const v = r.skill_value || 0;
+            if (v >= 80) dist.expert++;
+            else if (v >= 60) dist.adv++;
+            else if (v >= 40) dist.dev++;
+            else dist.basic++;
+        });
+
+        const series = [dist.expert, dist.adv, dist.dev, dist.basic];
+        const labels = ['Expert (80-100%)', 'Advanced (60-79%)', 'Developing (40-59%)', 'Basic (<40%)'];
+        const colors = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8'];
+
+        legendEl.innerHTML = labels.map((l, i) => {
+            const total = series.reduce((a, b) => a + b, 0);
+            const pct = total > 0 ? ((series[i] / total) * 100).toFixed(0) : 0;
+            return `
+                <div class="flex items-center justify-between p-1.5 px-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/80 shadow-xs">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-2.5 rounded-full" style="background:${colors[i]}; box-shadow: 0 0 6px ${colors[i]}55"></div>
+                        <span class="text-[9.5px] font-black text-slate-600 dark:text-slate-300 uppercase">${l}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[9px] font-bold text-slate-400">${pct}%</span>
+                        <span class="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">${series[i]}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (!chartEl) return;
+        if (_charts.donut) { _charts.donut.destroy(); _charts.donut = null; }
+        chartEl.innerHTML = ''; 
+
+        const isDark = document.body.classList.contains('dark-mode');
+
+        const options = {
+            series: series,
+            labels: labels,
+            chart: { 
+                type: 'donut', 
+                height: 190, 
+                animations: { enabled: true, speed: 400 },
+                parentHeightOffset: 0
+            },
+            colors: colors,
+            stroke: { width: 2, colors: [isDark ? '#0f172a' : '#ffffff'] },
+            plotOptions: {
+                pie: {
+                    donut: {
+                        size: '72%',
+                        labels: {
+                            show: true,
+                            name: { show: false },
+                            value: { 
+                                show: true, fontSize: '16px', fontWeight: '900', color: isDark ? '#ffffff' : '#1e293b', offsetY: 6,
+                                formatter: (val) => val
+                            },
+                            total: { 
+                                show: true, label: 'AVG', color: '#64748b', fontSize: '8px', fontWeight: '800',
+                                formatter: () => avg + '%'
+                            }
+                        }
+                    }
+                }
+            },
+            dataLabels: { enabled: false },
+            legend: { show: false },
+            tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (val) => val + " ทักษะ" } }
+        };
+
+        _charts.donut = new ApexCharts(chartEl, options);
+        setTimeout(() => { if (_charts.donut) _charts.donut.render(); }, 20);
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('sm-table-body');
+        const countBadge = document.getElementById('sm-table-count');
+        if (!tbody) return;
+
+        let filtered = _records || [];
+        if (_searchQuery) {
+            filtered = filtered.filter(r => (r.skill_name || '').toLowerCase().includes(_searchQuery));
+        }
+
+        if (countBadge) countBadge.textContent = `${filtered.length} Items`;
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="py-12 text-center text-slate-400 dark:text-slate-500 font-bold text-xs">
+                        <div class="flex flex-col items-center justify-center gap-2">
+                            <span class="text-2xl">⚡</span>
+                            <span>${_searchQuery ? 'ไม่พบทักษะที่ตรงกับคำค้นหา "' + _esc(_searchQuery) + '"' : 'ยังไม่มีข้อมูลทักษะในระบบ (สามารถเพิ่มทักษะผ่านแถบควบคุมด้านบน)'}</span>
+                        </div>
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map((r, index) => {
+            const val = Number(r.skill_value) || 0;
+            let tier = { label: 'BASIC', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700', barCls: 'bg-slate-400' };
+            if (val >= 80) tier = { label: 'EXPERT', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800', barCls: 'bg-emerald-500' };
+            else if (val >= 60) tier = { label: 'ADVANCED', cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800', barCls: 'bg-blue-500' };
+            else if (val >= 40) tier = { label: 'DEVELOPING', cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800', barCls: 'bg-amber-500' };
+
+            return `
+                <tr class="hover:bg-blue-50/40 dark:hover:bg-slate-800/60 transition-colors group">
+                    <td class="py-3 px-4 text-center text-slate-400 font-mono text-xs font-bold">${index + 1}</td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full ${tier.barCls}"></span>
+                            <span class="font-extrabold text-slate-800 dark:text-slate-100 text-xs sm:text-[13px] tracking-tight">${_esc(r.skill_name || '')}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-3">
+                            <span class="font-black text-xs font-mono text-slate-700 dark:text-slate-200 w-10 text-right shrink-0">${val}%</span>
+                            <div class="flex-1 min-w-[80px] h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200/60 dark:border-slate-700/60">
+                                <div class="h-full rounded-full ${tier.barCls} transition-all duration-500 shadow-xs" style="width:${val}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="inline-block px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${tier.cls}">
+                            ${tier.label}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button onclick="WapSkillMatrix.editSkill('${_esc(r.skill_name)}', ${val})" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200/50 dark:border-blue-800/50 text-[11px] font-bold transition-all" title="แก้ไขทักษะ">
+                                ✏️ แก้ไข
+                            </button>
+                            <button onclick="WapSkillMatrix.remove('${_esc(r.skill_name)}')" class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200/50 dark:border-rose-800/50 text-[11px] font-bold transition-all" title="ลบทักษะ">
+                                🗑️ ลบ
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    return { 
+        init, 
+        submit, 
+        editSkill, 
+        remove, 
+        clearAll, 
+        toggleViewMode, 
+        filterTable, 
+        renderAll,
+        animateChartEntrances
+    };
 })();
 window.WapSkillMatrix = WapSkillMatrix;
 let isFormHidden = true;
@@ -17258,6 +18537,570 @@ async function performFullBackup() {
     }
 }
 
+/**
+ * =========================================================================
+ * [MODULE]: LOCAL DATA BACKUP & AUTOMATED DAILY JSON EXPORT SYSTEM
+ * =========================================================================
+ * Automated local data backup that exports current app state to a JSON file
+ * on a daily basis, tracks backup history, supports manual JSON export,
+ * and allows 1-click state restore.
+ */
+const LocalBackupSystem = (function() {
+    const STORAGE_KEY_LAST_DATE = 'carrier_auto_daily_backup_last_date';
+    const STORAGE_KEY_LAST_TIME = 'carrier_auto_daily_backup_last_time';
+    const STORAGE_KEY_ENABLED = 'carrier_auto_daily_backup_enabled';
+    const STORAGE_KEY_HISTORY = 'carrier_daily_backup_history';
+    const STORAGE_KEY_SNAPSHOT = 'carrier_latest_app_state_backup';
+
+    function isAutoBackupEnabled() {
+        const val = localStorage.getItem(STORAGE_KEY_ENABLED);
+        return val === null ? true : val === 'true' || val === '1';
+    }
+
+    function setAutoBackupEnabled(enabled) {
+        localStorage.setItem(STORAGE_KEY_ENABLED, enabled ? 'true' : 'false');
+    }
+
+    function getTodayString() {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function buildAppStateSnapshot() {
+        const now = new Date();
+        const dateStr = getTodayString();
+        
+        // 8D Cases
+        const eightDCases = (S.eightDCases || (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases ? Wap8DSystem.getCases() : [])) || [];
+        
+        // Clean records array
+        const records = Array.isArray(S.records) ? S.records : [];
+        const attLeaveRecords = Array.isArray(S.attLeaveRecords) ? S.attLeaveRecords : [];
+        const wapData = S.wapData || {};
+        
+        const snapshot = {
+            backup_schema: "carrier.app.state.v2",
+            created_at: now.toISOString(),
+            date: dateStr,
+            metadata: {
+                app_id: "sqe-wap-support-portal",
+                app_name: "SQE & WAP Support Portal",
+                version: "2.5.0",
+                environment: "production",
+                user: S.currentUser || "anonymous",
+                user_role: S.userRole || "staff",
+                viewing_user: S.viewingUser || S.currentUser || ""
+            },
+            app_state: {
+                records: records,
+                eight_d_cases: eightDCases,
+                att_leave_records: attLeaveRecords,
+                wap_data: {
+                    achievements: wapData.achievements || [],
+                    attendance: wapData.attendance || [],
+                    score5s: wapData.score5s || [],
+                    skills: wapData.skills || [],
+                    specialJobs: wapData.specialJobs || []
+                },
+                smart_memory: (typeof smartMemory !== 'undefined' ? smartMemory : {}),
+                ai_brain: (typeof aiBrain !== 'undefined' ? aiBrain : {}),
+                preferences: {
+                    activeFilter: S.activeFilter || 'ALL',
+                    selectedShift: S.selectedShift || 'SHIFT A',
+                    theme: localStorage.getItem('carrier_theme') || 'light',
+                    lang: localStorage.getItem('carrier_lang') || 'th'
+                }
+            },
+            statistics: {
+                total_claim_records: records.length,
+                total_8d_cases: eightDCases.length,
+                total_att_records: attLeaveRecords.length,
+                total_wap_support: (wapData.achievements || []).length,
+                total_wap_attendance: (wapData.attendance || []).length,
+                total_wap_5s: (wapData.score5s || []).length,
+                total_wap_skills: (wapData.skills || []).length,
+                total_wap_special_jobs: (wapData.specialJobs || []).length
+            }
+        };
+
+        return snapshot;
+    }
+
+    function downloadJsonBlob(dataObj, fileName) {
+        try {
+            const jsonStr = JSON.stringify(dataObj, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 500);
+            return { success: true, sizeBytes: blob.size };
+        } catch (e) {
+            console.error('[LocalBackupSystem] Download Error:', e);
+            return { success: false, error: e.message };
+        }
+    }
+
+    function recordBackupHistory(entry) {
+        try {
+            let history = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+            if (!Array.isArray(history)) history = [];
+            history.unshift(entry);
+            if (history.length > 20) history = history.slice(0, 20); // Keep last 20 entries
+            localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history));
+        } catch (e) {
+            console.warn('[LocalBackupSystem] History save warning:', e);
+        }
+    }
+
+    function getBackupHistory() {
+        try {
+            const history = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+            return Array.isArray(history) ? history : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    async function executeBackup(isManual = false) {
+        const today = getTodayString();
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString();
+
+        // 1. Build snapshot
+        const snapshot = buildAppStateSnapshot();
+        const totalItems = (snapshot.statistics.total_claim_records || 0) + 
+                           (snapshot.statistics.total_8d_cases || 0) + 
+                           (snapshot.statistics.total_wap_support || 0);
+
+        const fileName = isManual 
+            ? `Carrier_App_State_${today}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.json`
+            : `Carrier_Daily_Backup_${today}.json`;
+
+        // 2. Download JSON File
+        const dlResult = downloadJsonBlob(snapshot, fileName);
+        if (!dlResult.success) {
+            toast("❌ ล้มเหลวในการส่งออกไฟล์ JSON สำรอง", "error");
+            return false;
+        }
+
+        const sizeKb = (dlResult.sizeBytes / 1024).toFixed(1);
+
+        // 3. Save local snapshot cache (small summary or subset to save quota)
+        try {
+            const localSummary = {
+                timestamp: now.toISOString(),
+                date: today,
+                user: S.currentUser,
+                statistics: snapshot.statistics,
+                size_kb: sizeKb
+            };
+            localStorage.setItem(STORAGE_KEY_SNAPSHOT, JSON.stringify(localSummary));
+        } catch (e) {
+            console.warn('[LocalBackupSystem] Snapshot quota warning:', e);
+        }
+
+        // 4. Update timestamps
+        localStorage.setItem(STORAGE_KEY_LAST_DATE, today);
+        localStorage.setItem(STORAGE_KEY_LAST_TIME, now.toISOString());
+
+        // 5. Record in history
+        recordBackupHistory({
+            id: generateUUID ? generateUUID() : 'b-' + Date.now(),
+            timestamp: now.toISOString(),
+            date: today,
+            time: timeStr,
+            filename: fileName,
+            sizeKb: sizeKb + ' KB',
+            type: isManual ? 'manual' : 'auto_daily',
+            user: S.currentUser || 'system',
+            totalRecords: totalItems
+        });
+
+        // 6. Audit & Toast
+        if (typeof writeAuditLog === 'function') {
+            writeAuditLog('BACKUP_JSON', `${isManual ? 'Manual' : 'Automated Daily'} Backup exported: ${fileName} (${sizeKb} KB, ${totalItems} items)`);
+        }
+
+        if (isManual) {
+            toast(`✅ ส่งออกไฟล์ App State สำรองเรียบร้อย (${fileName})`, "success");
+        } else {
+            toast(`💾 สำรองข้อมูลประจำวันอัตโนมัติเรียบร้อย (${fileName})`, "success");
+        }
+
+        // 7. Update UI if modal or Sentinel badge is active
+        updateSentinelBackupBadge();
+
+        return true;
+    }
+
+    async function checkAndRunDailyBackup() {
+        if (!isAutoBackupEnabled()) return;
+        if (!S.isLoggedIn && !S.currentUser) return;
+
+        const today = getTodayString();
+        const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DATE);
+
+        // If today has not been backed up yet
+        if (lastDate !== today) {
+            // Wait slightly for any ongoing data fetch to settle
+            setTimeout(async () => {
+                try {
+                    await executeBackup(false);
+                } catch (err) {
+                    console.error('[LocalBackupSystem] Auto Daily Backup Error:', err);
+                }
+            }, 2500);
+        }
+    }
+
+    function updateSentinelBackupBadge() {
+        const badge = document.getElementById('badge-auto-backup');
+        const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DATE);
+        const today = getTodayString();
+        if (badge) {
+            if (lastDate === today) {
+                badge.className = "text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40";
+                badge.textContent = "DONE TODAY";
+            } else {
+                badge.className = "text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-500/40 animate-pulse";
+                badge.textContent = "PENDING";
+            }
+        }
+    }
+
+    function openBackupModal() {
+        const today = getTodayString();
+        const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DATE) || 'ยังไม่มีการสำรองข้อมูล';
+        const lastTime = localStorage.getItem(STORAGE_KEY_LAST_TIME);
+        const isDoneToday = (lastDate === today);
+        const autoEnabled = isAutoBackupEnabled();
+        const history = getBackupHistory();
+
+        let lastTimeDisplay = '-';
+        if (lastTime) {
+            try {
+                lastTimeDisplay = new Date(lastTime).toLocaleString();
+            } catch (e) {
+                lastTimeDisplay = lastTime;
+            }
+        }
+
+        let historyHtml = '';
+        if (history.length === 0) {
+            historyHtml = `
+                <tr>
+                    <td colspan="4" class="text-center py-4 text-xs text-slate-500 font-bold">
+                        ยังไม่มีประวัติการสำรองข้อมูลในเครื่องนี้
+                    </td>
+                </tr>
+            `;
+        } else {
+            historyHtml = history.map(h => `
+                <tr class="border-b border-slate-800/60 hover:bg-slate-800/40 transition-colors">
+                    <td class="py-2.5 px-3 text-[11px] font-bold text-slate-300">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full ${h.type === 'auto_daily' ? 'bg-cyan-400' : 'bg-amber-400'}"></span>
+                            <span>${h.date} ${h.time || ''}</span>
+                        </div>
+                    </td>
+                    <td class="py-2.5 px-3 text-[10px] font-mono text-cyan-300 truncate max-w-[150px]" title="${h.filename}">
+                        ${h.filename}
+                    </td>
+                    <td class="py-2.5 px-3 text-[10px] font-bold text-slate-400">
+                        <span class="px-2 py-0.5 rounded-full ${h.type === 'auto_daily' ? 'bg-cyan-950 text-cyan-400 border border-cyan-500/30' : 'bg-amber-950 text-amber-400 border border-amber-500/30'}">
+                            ${h.type === 'auto_daily' ? 'Auto Daily' : 'Manual'}
+                        </span>
+                    </td>
+                    <td class="py-2.5 px-3 text-[10px] font-mono text-right text-emerald-400 font-bold">
+                        ${h.sizeKb || '-'}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        const modalHtml = `
+            <div id="local-backup-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 font-sans animate-fade-in">
+                <div class="relative bg-slate-900 border border-cyan-500/40 text-slate-100 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    
+                    <!-- Header Banner -->
+                    <div class="h-1.5 bg-gradient-to-r from-cyan-500 via-emerald-400 to-cyan-500"></div>
+                    <div class="p-5 sm:p-6 pb-4 flex justify-between items-center border-b border-slate-800">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-lg shadow-cyan-500/20">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17 21 17 13 7 13 7 21"/>
+                                    <polyline points="7 3 7 8 15 8"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+                                    <span>Local Data Backup Hub</span>
+                                    <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-500/40">JSON ENGINE</span>
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-0.5">ระบบสำรองข้อมูลสถานะแอปพลิเคชันและกู้คืนข้อมูลแบบอัตโนมัติรายวัน</p>
+                            </div>
+                        </div>
+                        <button onclick="document.getElementById('local-backup-modal').remove()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-rose-950 hover:text-rose-400 text-slate-400 flex items-center justify-center transition-all" title="Close" aria-label="Close">
+                            ✕
+                        </button>
+                    </div>
+
+                    <!-- Modal Body (Scrollable) -->
+                    <div class="p-5 sm:p-6 overflow-y-auto space-y-5">
+                        
+                        <!-- Status Overview Card -->
+                        <div class="bg-black/50 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full ${isDoneToday ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400 shadow-[0_0_8px_#fbbf24] animate-pulse'}"></span>
+                                    <span class="text-xs font-black uppercase tracking-wider ${isDoneToday ? 'text-emerald-400' : 'text-amber-400'}">
+                                        ${isDoneToday ? 'สำรองข้อมูลประจำวันนี้แล้ว (Today\'s Backup Ready)' : 'ยังไม่มีการสำรองข้อมูลของวันนี้ (Pending Daily Backup)'}
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-slate-400 font-mono">
+                                    บันทึกสำรองล่าสุด: <span class="text-slate-200 font-bold">${lastTimeDisplay}</span>
+                                </p>
+                            </div>
+                            
+                            <!-- Auto Backup Toggle -->
+                            <div class="flex items-center gap-3 bg-slate-800/80 px-3.5 py-2 rounded-xl border border-slate-700">
+                                <div class="text-left">
+                                    <span class="text-[10px] font-bold text-slate-300 block uppercase">Auto Daily Export</span>
+                                    <span class="text-[9px] text-slate-500">ดาวน์โหลด JSON อัตโนมัติทุกวัน</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="toggle-auto-backup" class="sr-only peer" ${autoEnabled ? 'checked' : ''} onchange="LocalBackupSystem.handleToggleAutoBackup(this.checked)" title="Auto Backup Toggle">
+                                    <div class="w-10 h-5 bg-slate-900 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600 border border-slate-700"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Action Grid (Export / Import / Excel) -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            
+                            <!-- Button 1: Export JSON Now -->
+                            <button onclick="LocalBackupSystem.executeBackup(true)" class="p-3.5 bg-gradient-to-br from-cyan-950/80 to-slate-900 border border-cyan-500/40 hover:border-cyan-400 rounded-2xl flex flex-col items-center text-center gap-2 group transition-all active:scale-95 shadow-lg shadow-cyan-950/50">
+                                <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                </div>
+                                <div>
+                                    <span class="text-xs font-black text-white group-hover:text-cyan-300 block uppercase tracking-wide">Backup JSON Now</span>
+                                    <span class="text-[9.5px] text-slate-400">ส่งออก State ปัจจุบันเป็น .json ทันที</span>
+                                </div>
+                            </button>
+
+                            <!-- Button 2: Import / Restore JSON -->
+                            <label class="p-3.5 bg-gradient-to-br from-emerald-950/80 to-slate-900 border border-emerald-500/40 hover:border-emerald-400 rounded-2xl flex flex-col items-center text-center gap-2 group transition-all active:scale-95 shadow-lg shadow-emerald-950/50 cursor-pointer">
+                                <input type="file" id="input-restore-json" accept=".json" class="hidden" onchange="LocalBackupSystem.handleRestoreFileInput(this)">
+                                <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                </div>
+                                <div>
+                                    <span class="text-xs font-black text-white group-hover:text-emerald-300 block uppercase tracking-wide">Restore State</span>
+                                    <span class="text-[9.5px] text-slate-400">นำเข้าไฟล์ JSON เพื่อกู้คืน</span>
+                                </div>
+                            </label>
+
+                            <!-- Button 3: Excel Full Backup -->
+                            <button onclick="performFullBackup()" class="p-3.5 bg-gradient-to-br from-purple-950/80 to-slate-900 border border-purple-500/40 hover:border-purple-400 rounded-2xl flex flex-col items-center text-center gap-2 group transition-all active:scale-95 shadow-lg shadow-purple-950/50">
+                                <div class="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                </div>
+                                <div>
+                                    <span class="text-xs font-black text-white group-hover:text-purple-300 block uppercase tracking-wide">Export Excel</span>
+                                    <span class="text-[9.5px] text-slate-400">สำรองทุกตารางเป็น .xlsx</span>
+                                </div>
+                            </button>
+
+                        </div>
+
+                        <!-- Backup History Table -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <h4 class="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                                    <span>📜 ประวัติการสำรองข้อมูล (Backup History)</span>
+                                </h4>
+                                <span class="text-[10px] font-mono text-slate-500">เก็บบันทึกล่าสุด 20 รายการ</span>
+                            </div>
+                            <div class="bg-black/40 border border-slate-800 rounded-2xl overflow-hidden">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="border-b border-slate-800 bg-slate-950/60 text-[9.5px] font-black text-slate-400 uppercase tracking-wider">
+                                            <th class="py-2.5 px-3">Date & Time</th>
+                                            <th class="py-2.5 px-3">File Name</th>
+                                            <th class="py-2.5 px-3">Type</th>
+                                            <th class="py-2.5 px-3 text-right">Size</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${historyHtml}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="p-4 bg-slate-950/80 border-t border-slate-800 flex justify-between items-center">
+                        <div class="text-[10px] text-slate-400 font-mono flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                            Local JSON Storage Ready
+                        </div>
+                        <button onclick="document.getElementById('local-backup-modal').remove()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all" title="Close" aria-label="Close">
+                            ปิดหน้าต่าง
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        `;
+
+        const oldModal = document.getElementById('local-backup-modal');
+        if (oldModal) oldModal.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    function handleToggleAutoBackup(enabled) {
+        setAutoBackupEnabled(enabled);
+        toast(enabled ? "✅ เปิดการดาวน์โหลดสำรองข้อมูลประจำวันอัตโนมัติแล้ว" : "⏸️ ปิดการดาวน์โหลดสำรองข้อมูลประจำวันอัตโนมัติแล้ว", "info");
+    }
+
+    function handleRestoreFileInput(inputEl) {
+        const file = inputEl.files && inputEl.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                restoreFromParsedJson(parsed, file.name);
+            } catch (err) {
+                console.error('[LocalBackupSystem] JSON Parse Error:', err);
+                toast("❌ ไฟล์ JSON ไม่ถูกต้อง หรือโครงสร้างข้อมูลเสียหาย", "error");
+            }
+        };
+        reader.readAsText(file);
+        inputEl.value = ''; // Reset input
+    }
+
+    function restoreFromParsedJson(data, fileName) {
+        if (!data || (!data.app_state && !data.records)) {
+            toast("❌ รูปแบบไฟล์ JSON ไม่ตรงกับโครงสร้างสำรองข้อมูลของระบบ", "error");
+            return;
+        }
+
+        const state = data.app_state || data;
+        const totalClaims = (state.records || []).length;
+        const total8D = (state.eight_d_cases || state.eightDCases || []).length;
+        const totalWap = (state.wap_data?.achievements || state.wapData?.achievements || []).length;
+        const dateStr = data.date || data.created_at || 'Unknown Date';
+
+        showCustomConfirmDialog({
+            title: "ยืนยันการกู้คืนข้อมูล (Restore App State)",
+            subtitle: `คุณกำลังจะนำเข้าและกู้คืนสถานะข้อมูลจากไฟล์ ${fileName}`,
+            badge: "DATA RESTORE",
+            type: "warning",
+            details: [
+                { label: "Backup Date", value: dateStr },
+                { label: "Claim Records", value: `${totalClaims} รายการ` },
+                { label: "8D Cases", value: `${total8D} รายการ` },
+                { label: "WAP Records", value: `${totalWap} รายการ` }
+            ],
+            confirmText: "📥 ยืนยันการกู้คืนข้อมูล",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                try {
+                    toast("⏳ กำลังกู้คืนข้อมูล...", "info");
+
+                    // 1. Restore SQE Records
+                    if (Array.isArray(state.records)) {
+                        S.records = state.records;
+                    }
+
+                    // 2. Restore 8D cases
+                    const cases = state.eight_d_cases || state.eightDCases;
+                    if (Array.isArray(cases)) {
+                        S.eightDCases = cases;
+                    }
+
+                    // 3. Restore WAP Data
+                    if (state.wap_data || state.wapData) {
+                        S.wapData = state.wap_data || state.wapData;
+                    }
+
+                    // 4. Restore Att Leave
+                    if (Array.isArray(state.att_leave_records || state.attLeaveRecords)) {
+                        S.attLeaveRecords = state.att_leave_records || state.attLeaveRecords;
+                    }
+
+                    // 5. Restore Smart Memory & AI Brain
+                    if (state.smart_memory || state.smartMemory) {
+                        smartMemory = state.smart_memory || state.smartMemory;
+                    }
+                    if (state.ai_brain || state.aiBrain) {
+                        aiBrain = state.ai_brain || state.aiBrain;
+                    }
+
+                    // 6. Re-render views
+                    if (typeof renderTable === 'function') renderTable();
+                    if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
+                        Wap8DSystem.fetchCases();
+                    }
+                    if (typeof initExecDashboard === 'function') initExecDashboard();
+
+                    // 7. Audit & Success Toast
+                    if (typeof writeAuditLog === 'function') {
+                        writeAuditLog('RESTORE_JSON', `Restored app state from JSON file: ${fileName}`);
+                    }
+
+                    toast("✅ กู้คืนสถานะข้อมูลแอปพลิเคชันเรียบร้อยแล้ว", "success");
+
+                    // Close backup modal if open
+                    const modal = document.getElementById('local-backup-modal');
+                    if (modal) modal.remove();
+
+                } catch (err) {
+                    console.error('[LocalBackupSystem] Restore Execution Error:', err);
+                    toast("❌ เกิดข้อผิดพลาดในการกู้คืนข้อมูล", "error");
+                }
+            }
+        });
+    }
+
+    return {
+        isAutoBackupEnabled,
+        setAutoBackupEnabled,
+        executeBackup,
+        checkAndRunDailyBackup,
+        openBackupModal,
+        handleToggleAutoBackup,
+        handleRestoreFileInput,
+        updateSentinelBackupBadge,
+        buildAppStateSnapshot,
+        getBackupHistory
+    };
+})();
+
+// ตรวจสอบสำรองข้อมูลประจำวันอัตโนมัติทุกๆ 30 นาที
+setInterval(() => {
+    if (typeof LocalBackupSystem !== 'undefined') {
+        LocalBackupSystem.checkAndRunDailyBackup();
+    }
+}, 1800000);
+
+
 async function performArchive() {
     const year = document.getElementById('archive-year').value;
     if (!year || year.length < 4) return toast("กรุณาระบุปีที่ถูกต้อง", "error");
@@ -17435,6 +19278,7 @@ async function handlePasswordResetSubmit(email) {
     }
 }
 
+
 /**
  * ═══════════════════════════════════════════════════════
  *  PERSONAL SETTINGS & PROFILE MANAGEMENT
@@ -17443,22 +19287,165 @@ async function handlePasswordResetSubmit(email) {
 let currentModalACIndex = -1; 
 let tempAvatarBase64 = null; // ตัวแปรพักรูปภาพ
 
+// เพิ่มฟังก์ชันนี้ใน return ของ Wap8DSystem
+// --- เพิ่มในโมดูล Wap8DSystem ---
+
 function renderModalAC(type, inputEl) {
+    // 1. ตรวจสอบความพร้อมและสถานะ Suppress (กันลูป)
     if (!inputEl || inputEl._suppressAC) return;
+    
+    // ปิดดรอปดาวน์ที่เปิดอยู่ก่อน (Sequential close/open - ต้องปิดช่องแรก ค่อยเปิดช่องที่2)
+    if (currentOpenModalDropdown && currentOpenModalDropdown !== inputEl) {
+        const prevWrap = currentOpenModalDropdown.parentElement;
+        if (prevWrap) {
+            const prevDd = prevWrap.querySelector('.modal-ac-dropdown');
+            if (prevDd) prevDd.style.display = 'none';
+        }
+    }
+
+    // เคลียร์ลายเซ็นถ้าพิมพ์ด้วยตัวเอง (ต้องกดเลือกชื่อจากดรอปดาวน์เท่านั้น ลายเซ็นถึงจะแสดง)
+    if (type === 'staff' && inputEl.id) {
+        const sigContainer = document.getElementById('sig-' + inputEl.id);
+        if (sigContainer) sigContainer.innerHTML = '';
+        if (typeof _currentCase !== 'undefined' && _currentCase && _currentCase.report_data && _currentCase.report_data.vf_data) {
+            if (inputEl.id === 'prob-issue-by') _currentCase.report_data.vf_data.issue_by_sig_active = false;
+            else if (inputEl.id === 'prob-confirm-by') _currentCase.report_data.vf_data.confirm_by_sig_active = false;
+            else if (inputEl.id === 'prob-approved-by') _currentCase.report_data.vf_data.approved_by_sig_active = false;
+        }
+    }
 
     const wrap = inputEl.parentElement;
     if (!wrap) return;
 
+    // 2. จัดการตัว Dropdown (สร้างใหม่ถ้ายังไม่มี)
     let dd = wrap.querySelector('.modal-ac-dropdown');
     if (!dd) {
         dd = document.createElement('div');
         dd.className = 'modal-ac-dropdown';
+        // ตั้งค่าสไตล์ให้ลอยทับตารางเอกสาร (VF Report) ได้แน่นอน
+        dd.style.cssText = `
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            min-width: 230px;
+            max-height: 260px;
+            overflow-y: auto;
+            background: #ffffff;
+            border: 1.5px solid #2563eb;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.18);
+            z-index: 10000;
+            display: none;
+        `;
+        wrap.style.position = 'relative'; // บังคับให้ parent เป็น relative
         wrap.appendChild(dd);
     }
 
     const query = inputEl.value.trim().toLowerCase();
+
+    // 3. จัดการกรณี Staff Sign-off: แสดงแบบแบ่งกลุ่มทีม (Team Group Headers) พร้อมค้นหาเร็ว
+    if (type === 'staff') {
+        let teams = typeof STAFF_TEAMS !== 'undefined' ? STAFF_TEAMS : [
+            { team: "Staff", icon: "👤", members: typeof STAFF_LIST !== 'undefined' ? STAFF_LIST : [] }
+        ];
+
+        let filteredTeamName = null;
+        // หากเป็นช่อง CONFIRM BY ให้ตรวจสอบว่าช่อง ISSUE BY เลือกใครไว้ และอยู่ในทีมใด
+        if (inputEl.id === 'prob-confirm-by') {
+            const issueByVal = document.getElementById('prob-issue-by')?.value?.trim() 
+                || (typeof _currentCase !== 'undefined' && _currentCase?.report_data?.vf_data?.issue_by) 
+                || '';
+            if (issueByVal) {
+                filteredTeamName = typeof getStaffTeamName === 'function' ? getStaffTeamName(issueByVal) : null;
+                if (filteredTeamName) {
+                    const matchedTeam = teams.find(t => t.team.toLowerCase() === filteredTeamName.toLowerCase());
+                    if (matchedTeam) {
+                        teams = [matchedTeam];
+                    }
+                }
+            }
+        }
+
+        let totalMatches = 0;
+        let htmlContent = '';
+        let globalIndex = 0;
+
+        // แสดง Banner ป้ายกำกับแจ้งเตือนเมื่อมีการกรองเฉพาะทีมของ ISSUE BY
+        if (filteredTeamName) {
+            htmlContent += `
+                <div style="padding: 6px 10px; font-size: 9.5px; font-weight: 800; color: #1d4ed8; background: #eff6ff; border-bottom: 1px solid #bfdbfe; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="display: flex; align-items: center; gap: 4px;">
+                        <span>🔒</span>
+                        <span>กรองเฉพาะทีม: <strong style="color: #1e40af;">${filteredTeamName}</strong> (ตาม ISSUE BY)</span>
+                    </span>
+                    <span style="font-size: 8px; color: #3b82f6; background: #dbeafe; padding: 1px 4px; border-radius: 3px;">TEAM LOCKED</span>
+                </div>
+            `;
+        }
+
+        teams.forEach((team) => {
+            const matchedMembers = team.members.filter(m => {
+                if (!query) return true;
+                const cleanM = typeof cleanSignatureName === 'function' ? cleanSignatureName(m).toLowerCase() : m.toLowerCase();
+                return m.toLowerCase().includes(query) || cleanM.includes(query) || team.team.toLowerCase().includes(query);
+            });
+
+            if (matchedMembers.length > 0) {
+                totalMatches += matchedMembers.length;
+                
+                // หัวข้อชื่อทีม (Team Header - กดไม่ได้ / Disabled Header)
+                htmlContent += `
+                    <div class="modal-ac-group-header" 
+                         style="padding: 6px 10px; font-size: 10px; font-weight: 900; color: #334155; background: #f1f5f9; text-transform: uppercase; letter-spacing: 0.05em; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; cursor: default; user-select: none; pointer-events: none; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 2;">
+                        <span style="display: flex; align-items: center; gap: 5px;">
+                            <span>${team.icon || '📁'}</span>
+                            <span style="color: #0f172a; font-weight: 900;">${team.team}</span>
+                        </span>
+                        <span style="font-size: 8px; color: #64748b; font-weight: 800; background: #e2e8f0; padding: 1.5px 5px; border-radius: 4px;">TEAM</span>
+                    </div>
+                `;
+
+                // รายชื่อสมาชิกในทีม (สามารถกดเลือก หรือพิมพ์ค้นหาได้ทันที)
+                matchedMembers.forEach((m) => {
+                    const idx = globalIndex++;
+                    htmlContent += `
+                        <div class="modal-ac-item modal-ac-staff-item" 
+                             style="padding: 7px 12px 7px 18px; font-size: 11px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f8fafc; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between;"
+                             data-index="${idx}" 
+                             data-value="${m.replace(/"/g, '&quot;')}"
+                             onmouseover="this.style.backgroundColor='#eff6ff'; this.style.color='#2563eb'; this.style.paddingLeft='22px';"
+                             onmouseout="this.style.backgroundColor='transparent'; this.style.color='#1e293b'; this.style.paddingLeft='18px';"
+                             onmousedown="event.preventDefault(); applyModalAC('staff', '${m.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                            <span style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 10px; color: #64748b;">👤</span>
+                                <span>${m}</span>
+                            </span>
+                            <span style="font-size: 8.5px; font-weight: 600; color: #94a3b8;">${team.team}</span>
+                        </div>
+                    `;
+                });
+            }
+        });
+
+        if (totalMatches === 0) {
+            dd.innerHTML = `
+                <div style="padding: 12px 14px; font-size: 11px; font-weight: 600; color: #94a3b8; text-align: center;">
+                    🔍 ไม่พบรายชื่อที่ตรงกับ "${query}" ${filteredTeamName ? `ในทีม ${filteredTeamName}` : ''}
+                </div>
+            `;
+            dd.style.display = 'block';
+            return;
+        }
+
+        dd.innerHTML = htmlContent;
+        dd.style.display = 'block';
+        currentOpenModalDropdown = inputEl; // เก็บ reference ของ input ที่ปิด dropdown ไว้
+        currentModalACIndex = -1;
+        return;
+    }
     
-    // ดึงข้อมูลต้นทางตามประเภทที่ส่งมา
+    // 4. ข้อมูลต้นทางสำหรับประเภทอื่นๆ (Part No, Part Name, Supplier, Defect, Category, Action, Report)
     let source = [];
     if (type === 'partno') source = Array.from(smartMemory.values.partNo || []);
     else if (type === 'partname') source = Array.from(smartMemory.values.partName || []);
@@ -17472,30 +19459,20 @@ function renderModalAC(type, inputEl) {
             "Motors", "Electric Controls", "PCBA", "Compressors", "Piping Part", "Printing part"
         ];
         const catSet = new Set(defaultCats);
-        if (smartMemory.values && smartMemory.values.category) {
+        if (smartMemory.values?.category) {
             smartMemory.values.category.forEach(c => { if (c) catSet.add(c); });
         }
         source = Array.from(catSet);
     }
     else if (type === 'action') {
         const defaultActions = [
-            "Rework (แก้ไขงานซ่อม)",
-            "Repair (ซ่อมแซมตามเงื่อนไข)",
-            "Replace (เปลี่ยนชิ้นส่วนใหม่)",
-            "Sorting 100% (คัดแยกชิ้นงาน 100%)",
-            "Screening & Re-inspection (คัดกรองตรวจซ้ำ)",
-            "Use as is / Concession (อนุโลมใช้ตามสภาพ)",
-            "Scrap (ทำลายชิ้นงาน NG)",
-            "RTV (ส่งคืนผู้ขาย/ซัพพลายเออร์)",
-            "Containment / Hold (กักกันชิ้นงานเสี่ยง)",
-            "Engineering Change (EC/ECN)",
-            "Poka-Yoke / Jig Adjustment",
-            "Line Purge & Clean (เคลียร์สายการผลิต)",
-            "Supplier On-site Sorting",
-            "Process Parameter Adjustment"
+            "Rework (แก้ไขงานซ่อม)", "Repair (ซ่อมแซมตามเงื่อนไข)", "Replace (เปลี่ยนชิ้นส่วนใหม่)",
+            "Sorting 100% (คัดแยกชิ้นงาน 100%)", "Screening & Re-inspection", "Use as is / Concession",
+            "Scrap (ทำลายชิ้นงาน NG)", "RTV (ส่งคืนซัพพลายเออร์)", "Containment / Hold",
+            "Engineering Change (EC/ECN)", "Poka-Yoke / Jig Adjustment", "Supplier On-site Sorting"
         ];
         const actSet = new Set(defaultActions);
-        if (smartMemory.values && smartMemory.values.action) {
+        if (smartMemory.values?.action) {
             smartMemory.values.action.forEach(a => { if (a) actSet.add(a); });
         }
         source = Array.from(actSet);
@@ -17504,12 +19481,12 @@ function renderModalAC(type, inputEl) {
         source = ["VF Report", "RP Report", "Records"];
     }
 
-    // Logic การ Filter: ถ้ามีคำค้นให้กรอง ถ้าไม่มีให้โชว์ทั้งหมด
+    // 5. ระบบค้นหาและกรอง (Filtering & Priority Sorting)
     let matched = query 
         ? source.filter(v => v.toLowerCase().includes(query)) 
         : source;
 
-    // เรียงลำดับตัวที่ขึ้นต้นด้วยคำค้นให้มาก่อน (Priority Sorting)
+    // เรียงลำดับ: ตัวที่ขึ้นต้นด้วยคำค้นหาให้มาก่อน
     matched.sort((a, b) => {
         if (!query) return 0;
         const aStart = a.toLowerCase().startsWith(query) ? 0 : 1;
@@ -17517,73 +19494,85 @@ function renderModalAC(type, inputEl) {
         return aStart - bStart || a.localeCompare(b);
     });
 
-    const displayItems = matched.slice(0, 20);
+    // จำกัดการแสดงผล 15 รายการเพื่อความเร็ว
+    const displayItems = matched.slice(0, 15);
 
-    // ปิดดรอปดาวน์ถ้าไม่มีข้อมูลให้แสดง
+    // แสดงผล / ซ่อน Dropdown
     if (displayItems.length === 0) {
         dd.style.display = 'none';
         return;
     }
 
     dd.style.display = 'block';
-    currentModalACIndex = -1; // รีเซ็ตตำแหน่งเลือกคีย์บอร์ด
+    currentOpenModalDropdown = inputEl; // เก็บ reference ของ input ที่ปิด dropdown ไว้
+    currentModalACIndex = -1; // รีเซ็ตตำแหน่งคีย์บอร์ด
 
+    // 6. วาดรายการ Item ลงใน Dropdown
     dd.innerHTML = displayItems.map((v, i) => `
-        <div class="modal-ac-item" data-index="${i}" data-value="${v.replace(/"/g, '&quot;')}">
+        <div class="modal-ac-item" 
+             style="padding: 10px 14px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.2s;"
+             data-index="${i}" 
+             data-value="${v.replace(/"/g, '&quot;')}"
+             onmouseover="this.style.backgroundColor='#eff6ff'; this.style.color='#2563eb'; this.style.paddingLeft='18px';"
+             onmouseout="this.style.backgroundColor='transparent'; this.style.color='#1e293b'; this.style.paddingLeft='14px';"
+             onmousedown="event.preventDefault(); applyModalAC('${type}', '${v.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
             ${v}
         </div>
     `).join('');
-
-    // จัดการ Event สำหรับการเลือกรายการ
-    dd.querySelectorAll('.modal-ac-item').forEach(item => {
-        item.addEventListener('mousedown', (e) => {
-            e.preventDefault(); // ป้องกันช่อง input เสียโฟกัสก่อนได้รับค่า
-            const val = item.getAttribute('data-value');
-            applyModalAC(type, val, inputEl);
-        });
-    });
 }
 
-// ฟังก์ชันเลือกรายการ
 function applyModalAC(type, value, inputEl) {
     if (!inputEl) return;
 
-    // 1. ใส่ค่าที่เลือกลงในช่อง Input
+    // 1. ใส่ค่าที่เลือก (เช่น ชื่อพนักงาน, รหัสพาร์ท) ลงในช่อง Input
     inputEl.value = value;
 
-    // 2. [จุดสำคัญ] สั่งให้ดรอปดาวน์ "หายไป" และ "ล้างข้อมูล" ทันที
+    // 2. ปิดดรอปดาวน์ Autocomplete
     const wrap = inputEl.parentElement;
     const dd = wrap ? wrap.querySelector('.modal-ac-dropdown') : null;
-    if (dd) {
-        dd.style.display = 'none';
-        dd.innerHTML = ''; // ล้างรายการเก่าออกเพื่อไม่ให้ค้างในหน่วยความจำ
+    if (dd) dd.style.display = 'none';
+
+    // 3. บันทึกลง Memory ของ Case (Auto-save) - เก็บเฉพาะชื่อ ไม่เก็บสถานะลายเซ็น
+    if (typeof _currentCase !== 'undefined' && _currentCase) {
+        if (!_currentCase.report_data) _currentCase.report_data = {};
+        if (!_currentCase.report_data.vf_data) _currentCase.report_data.vf_data = {};
+        
+        if (inputEl.id === 'prob-issue-by') {
+            _currentCase.report_data.vf_data.issue_by = value;
+            
+            // ตรวจสอบว่าถ้าช่อง CONFIRM BY มีชื่อเดิมอยู่แล้วแต่ไม่ได้อยู่ในทีมเดียวกับ ISSUE BY ให้รีเซ็ตช่อง CONFIRM BY
+            const confirmInput = document.getElementById('prob-confirm-by');
+            if (confirmInput && confirmInput.value) {
+                const issueTeam = typeof getStaffTeamName === 'function' ? getStaffTeamName(value) : null;
+                const confirmTeam = typeof getStaffTeamName === 'function' ? getStaffTeamName(confirmInput.value) : null;
+                if (issueTeam && confirmTeam && issueTeam !== confirmTeam) {
+                    confirmInput.value = "";
+                    _currentCase.report_data.vf_data.confirm_by = "";
+                    _currentCase.report_data.vf_data.confirm_by_sig_active = false;
+                    _currentCase.report_data.vf_data.confirm_sig_active = false;
+                    const confirmSig = document.getElementById('sig-prob-confirm-by');
+                    if (confirmSig) confirmSig.innerHTML = '';
+                }
+            }
+        } else if (inputEl.id === 'prob-confirm-by') {
+            _currentCase.report_data.vf_data.confirm_by = value;
+        } else if (inputEl.id === 'prob-approved-by') {
+            _currentCase.report_data.vf_data.approved_by = value;
+        }
     }
 
-    // 3. รีเซ็ต Index ของคีย์บอร์ดกลับไปที่ค่าเริ่มต้น
-    currentModalACIndex = -1;
-
-    // 4. ระบุ flag เพื่อป้องกันการเปิดดรอปดาวน์ซ้ำขณะ dispatchEvent
+    // 4. แจ้งระบบอัปเดตสถานะ (Trigger input events)
     inputEl._suppressAC = true;
-
-    // 5. กระตุ้นระบบ Auto-fill และ Sync ช่องอื่นๆ
     inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-
     delete inputEl._suppressAC;
 
-    // 6. อัปเดตไฮไลต์การกรอกข้อมูล
-    if (typeof updateSupportFormValidation === 'function') {
-        updateSupportFormValidation();
+    if (typeof updateSignButtonStates === 'function') {
+        updateSignButtonStates();
     }
 
-    // 7. ย้าย Focus ไปยังช่องถัดไปเพื่อความสะดวก
-    const form = inputEl.closest('form');
-    if (form) {
-        const focusable = Array.from(form.querySelectorAll('input:not([type="hidden"]), select, textarea')).filter(el => !el.disabled && el.offsetParent !== null);
-        const idx = focusable.indexOf(inputEl);
-        if (idx >= 0 && idx < focusable.length - 1) {
-            focusable[idx + 1].focus();
-        }
+    if (typeof updateSupportFormValidation === 'function') {
+        updateSupportFormValidation();
     }
 }
 
@@ -17785,6 +19774,17 @@ const modalHtml = `
                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Display Name</label>
                     <input  type="text" id="set-display-name" class="premium-input !h-12 !rounded-2xl dark:bg-slate-800" value="${displayName}" title="Set Display Name" aria-label="Set Display Name">
                 </div>
+
+                <!-- Quick Backup Center Access -->
+                <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" onclick="document.getElementById('settings-modal').remove(); if(typeof LocalBackupSystem !== 'undefined') LocalBackupSystem.openBackupModal();" class="w-full py-2.5 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 border border-slate-200 dark:border-slate-700 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider transition-all">
+                        <span class="flex items-center gap-2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Data Backup Center
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 font-mono border border-cyan-500/30">JSON AUTO</span>
+                    </button>
+                </div>
             </div>
 
             <!-- ปุ่มดำเนินการ -->
@@ -17960,29 +19960,38 @@ function updateStars() {
 }
 
 // ฟังก์ชันล้างข้อความหัวข้อปัญหาให้กระชับ และแก้ปัญหาวันที่แสดงซ้ำซ้อน
+// ฟังก์ชันล้างข้อความหัวข้อปัญหาให้กระชับ และแก้ปัญหาวันที่แสดงซ้ำซ้อน (ฉบับปรับปรุง V2)
 function getCleanProblemTitle(title) {
     if (!title) return "";
     let str = String(title).trim();
 
-    // 1. แก้ไขปัญหาวันที่ซ้ำกัน (เช่น "10 Aug'26 Aug'26" ให้เหลือแค่ "10 Aug'26")
-    // ค้นหารูปแบบ: วันที่ เดือน'ปี แล้วตามด้วย วันที่ เดือน'ปี อีกรอบ หรือแค่ เดือน'ปี ซ้ำ
-    const fullDatePattern = /(\d{1,2}\s+[A-Za-z']+\d{2})\s+(\d{1,2}\s+[A-Za-z']+\d{2})/i;
-    const partialDatePattern = /(\d{1,2}\s+[A-Za-z']+\d{2})\s+([A-Za-z']+\d{2})/i;
+    // 1. แก้ไขปัญหาวันที่ซ้ำกัน (เช่น "11 Aug'26 Aug'26 Aug'26") 
+    // โดยหา Pattern วันที่แบบ DD Mon'YY แล้วเก็บไว้แค่ตัวเดียวที่ตำแหน่งแรกสุด
+    const dateRegex = /\d{1,2}\s+[A-Za-z']+\d{2}/gi;
+    const datesFound = str.match(dateRegex);
     
-    str = str.replace(fullDatePattern, "$1");
-    str = str.replace(partialDatePattern, "$1");
+    if (datesFound && datesFound.length > 1) {
+        const firstDate = datesFound[0];
+        // ลบวันที่อื่นๆ ที่ซ้ำซ้อนออกทั้งหมด
+        str = str.replace(dateRegex, (match, offset) => {
+            return offset === str.indexOf(firstDate) ? firstDate : "";
+        });
+    }
 
-    // 2. จัดการส่วน "inform quality problem" ไม่ให้ซ้ำซ้อนกรณีมีการต่อประโยคหลายครั้ง
+    // 2. ลบคำว่า "On" ที่อยู่ติดกันหรือซ้ำซ้อน
+    str = str.replace(/\bOn\s+On\b/gi, 'On');
+    
+    // 3. จัดการส่วน "inform quality problem" ไม่ให้ซ้ำซ้อน
     if (/inform quality problem/i.test(str)) {
-        const parts = str.split(/inform quality problem/i);
+        const keyword = "inform quality problem";
+        const parts = str.split(new RegExp(keyword, 'i'));
         if (parts.length > 2) {
-            // ดึงส่วนแรกสุด (Prefix) และส่วนท้ายสุด (ข้อมูลปัญหาจริง) มาประกอบกันใหม่
-            const firstPart = parts[0].trim();
-            const lastPart = parts[parts.length - 1].trim();
-            
-            // ตรวจสอบว่าส่วนแรกมี "On " นำหน้าหรือไม่ ถ้าไม่มีให้เติมให้สมบูรณ์
-            const prefix = firstPart.toLowerCase().startsWith('on') ? firstPart : `On ${firstPart}`;
-            str = `${prefix} inform quality problem ${lastPart}`;
+            // ดึงส่วน Prefix และส่วนข้อมูลปัญหาจริงท้ายสุดมาต่อกัน
+            const prefix = parts[0].trim();
+            const suffix = parts[parts.length - 1].trim();
+            // ตรวจสอบว่ามี "On " นำหน้าหรือไม่
+            const finalPrefix = prefix.toLowerCase().startsWith('on') ? prefix : `On ${prefix}`;
+            str = `${finalPrefix} ${keyword} ${suffix}`;
         }
     }
 
@@ -18051,6 +20060,12 @@ function formatDetailSentence(c) {
 
     const defectStr = parsed.defectName || cleanTitle;
 
+    if (/^IQC incoming inspection/i.test(cleanTitle)) {
+        const iqcMatch = cleanTitle.match(/\.?\s*(IQC judgement rejected q'ty.*?)$/i);
+        const iqcSuffix = iqcMatch ? `. ${iqcMatch[1]}` : '';
+        return `IQC incoming inspection found problem about <span style="color:#2563eb; font-weight: 900;">${partDetail}</span> <span style="color:red; font-weight:900;">${defectStr}</span>${iqcSuffix}`;
+    }
+
     return `On <span style="color:#2563eb; font-weight: 900;">${dateStr}</span> inform quality problem about <span style="color:#2563eb; font-weight: 900;">${partDetail}</span> found defect <span style="color:red; font-weight:900;">${defectStr}</span>`;
 }
 
@@ -18082,14 +20097,24 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
             let beforeDefectStr = restAfterSlash;
             let extractedDefectStr = "";
 
-            if (/found defect/i.test(restAfterSlash)) {
-                const defectSplit = restAfterSlash.split(/found defect/i);
+            // ตัดข้อความส่วน IQC ออกก่อน เพื่อไม่ให้ปนเข้ามาใน defect หรือ supplier
+            if (/IQC/i.test(beforeDefectStr)) {
+                const iqcSplit = beforeDefectStr.split(/\s*IQC/i);
+                beforeDefectStr = iqcSplit[0].trim();
+            }
+
+            if (/found defect/i.test(beforeDefectStr)) {
+                const defectSplit = beforeDefectStr.split(/found defect/i);
                 beforeDefectStr = defectSplit[0].trim();
                 extractedDefectStr = defectSplit.slice(1).join("found defect").trim();
-            } else if (/problem/i.test(restAfterSlash)) {
-                const probSplit = restAfterSlash.split(/problem/i);
+            } else if (/defect/i.test(beforeDefectStr)) {
+                const defectSplit = beforeDefectStr.split(/defect/i);
+                beforeDefectStr = defectSplit[0].trim();
+                extractedDefectStr = defectSplit.slice(1).join("defect").trim();
+            } else if (/problem/i.test(beforeDefectStr)) {
+                const probSplit = beforeDefectStr.split(/problem/i);
                 beforeDefectStr = probSplit[0].trim();
-                extractedDefectStr = probSplit.slice(1).join("problem").trim() || restAfterSlash;
+                extractedDefectStr = probSplit.slice(1).join("problem").trim() || beforeDefectStr;
             }
 
             if (extractedDefectStr) dName = extractedDefectStr;
@@ -18105,8 +20130,12 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
                 }
             }
         } else {
-            if (/found defect/i.test(cleanTitle)) {
-                const parts = cleanTitle.split(/found defect/i);
+            let cleanRest = cleanTitle;
+            if (/IQC/i.test(cleanRest)) {
+                cleanRest = cleanRest.split(/\s*IQC/i)[0].trim();
+            }
+            if (/found defect/i.test(cleanRest)) {
+                const parts = cleanRest.split(/found defect/i);
                 if (parts[1] && parts[1].trim()) {
                     dName = parts[1].trim();
                 }
@@ -18130,9 +20159,37 @@ const Wap8DSystem = (function() {
     let _currentSlide = 0;
     let _isSaving = false;
     let _statFilter = 'all'; // 'all' หรือ 'd1-d3'
+    let _activeSqeTab = '8d'; // '8d' หรือ 'vf'
+    let _isVfView = false;
 
     function filterByStat(mode) {
         _statFilter = mode;
+        renderDashboard();
+    }
+
+    function switchSqeTab(tab) {
+        _activeSqeTab = tab;
+        const btn8d = document.getElementById('btn-sqe-tab-8d');
+        const btnVf = document.getElementById('btn-sqe-tab-vf');
+        const badge = document.getElementById('sqe-tab-badge');
+        const titleHeader = document.querySelector('#eight-d-dashboard h2');
+        const subtitleHeader = document.querySelector('#eight-d-dashboard p');
+
+        if (btn8d && btnVf) {
+            if (tab === '8d') {
+                btn8d.className = "flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider transition-all bg-blue-600 text-white shadow-xs";
+                btnVf.className = "flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider transition-all text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-white";
+                if (badge) badge.textContent = "Quality Incident 8D Registry";
+                if (titleHeader) titleHeader.textContent = "8D CORRECTIVE ACTION";
+                if (subtitleHeader) subtitleHeader.textContent = "Quality Incident Management System";
+            } else {
+                btnVf.className = "flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider transition-all bg-emerald-600 text-white shadow-xs";
+                btn8d.className = "flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider transition-all text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-white";
+                if (badge) badge.textContent = "Vendor Failure Report (VF/RP) Registry";
+                if (titleHeader) titleHeader.textContent = "VENDOR FAILURE REPORT (VF/RP)";
+                if (subtitleHeader) subtitleHeader.textContent = "Carrier Supplier Quality Non-Conformance System";
+            }
+        }
         renderDashboard();
     }
 
@@ -18188,6 +20245,638 @@ async function fetchCases() {
     }
 }
 
+/// --- 1. ฟังก์ชันตัดคำนำหน้าชื่อ (ช่วยให้ลายเซ็นดูสะอาด) ---
+function cleanSignatureName(name) {
+    if (!name) return "";
+    return String(name).trim()
+        .replace(/^(?:mr|ms|mrs|miss|khun|dr|k)\.?\s*/gi, '')
+        .replace(/^(?:นาย|นางสาว|นาง|คุณ)\s*/gi, '')
+        .trim();
+}
+
+// --- 2. ฟังก์ชันกำหนดสไตล์ลายเซ็น (ทำให้แต่ละคนมีฟอนต์ลายมือต่างกันเล็กน้อย) ---
+function getSignatureGimmick(name) {
+    const clean = cleanSignatureName(name);
+    // ใช้ผลรวมตัวอักษรเป็น Seed เพื่อให้คนเดิมได้ฟอนต์เดิมเสมอ
+    const charSum = clean.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const styles = [
+        { font: "'Caveat', cursive", size: "22px", weight: "700" },
+        { font: "'Dancing Script', cursive", size: "20px", weight: "700" },
+        { font: "'Satisfy', cursive", size: "19px", weight: "400" },
+        { font: "'Kalam', cursive", size: "18px", weight: "700" }
+    ];
+    return styles[charSum % styles.length];
+}
+
+function getCaseControlNo(c) {
+    if (!c) return 'PENDING';
+    const d = c.report_data || {};
+    const vf = d.vf_data || {};
+    const reportType = (d.source_report_type || c.report_type || '').toString().toUpperCase();
+    const isRP = (reportType === 'RP' || reportType.includes('RP'));
+
+    // 1. ดึงรายการเคสทั้งหมดมาเรียงลำดับตามเวลาที่สร้าง (Created At) เพื่อหาลำดับที่แท้จริง
+    const allCasesList = (typeof _cases !== 'undefined' && Array.isArray(_cases) && _cases.length > 0)
+        ? _cases
+        : ((typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases) ? Wap8DSystem.getCases() : []);
+
+    if (allCasesList && allCasesList.length > 0) {
+        // กรองเฉพาะประเภทเดียวกัน (VF หรือ RP) แล้วเรียงจากเก่าไปใหม่
+        const sameTypeSorted = allCasesList.filter(item => {
+            const itemType = (item.report_data?.source_report_type || item.report_type || '').toUpperCase();
+            const itemIsRP = (itemType === 'RP' || itemType.includes('RP'));
+            return isRP ? itemIsRP : !itemIsRP;
+        }).sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+
+        // ค้นหาว่าเคสนี้อยู่อันดับที่เท่าไหร่
+        const caseIndexInSorted = sameTypeSorted.findIndex(item => String(item.id) === String(c.id));
+        
+        if (caseIndexInSorted >= 0) {
+            // คืนค่ารูปแบบเดียวกับหน้า RUNNING NUMBER (เช่น QAP-VF-00001)
+            return (isRP ? 'QAP-RP-' : 'QAP-VF-') + String(caseIndexInSorted + 1).padStart(5, '0');
+        }
+    }
+
+    // ถ้ายังหาไม่เจอจริงๆ ให้ส่ง PENDING
+    return isRP ? 'QAP-RP-PENDING' : 'QAP-VF-PENDING';
+}
+
+// --- 3. ฟังก์ชันลงนาม (ที่คุณเขียนไว้ - ปรับปรุงการเซฟข้อมูล) ---
+// --- 1. ฟังก์ชันส่งอีเมล (แบบจำลอง mailto หรือเรียก API) ---
+function triggerVfEmailNotification(slot, staffName, caseData) {
+    const email = STAFF_EMAIL_MAP[staffName];
+    if (!email) return console.warn("No email found for " + staffName);
+
+    const vf = caseData.report_data.vf_data || {};
+    const docNumber = getCaseControlNo(caseData);
+    const subject = `[ACTION REQUIRED] ${slot.toUpperCase()} Signature: ${docNumber}`;
+    
+    // สร้างเนื้อหาอีเมลแบบละเอียด
+    const body = `
+DEAR ${staffName},
+
+PLEASE BE INFORMED THAT A NEW QUALITY RECORD HAS BEEN ${slot.toUpperCase()}ED.
+
+[ RECORD DETAILS ]
+CONTROL NO: ${docNumber}
+CASE ID: ${caseData.id}
+PART NAME: ${caseData.part_name} / ${caseData.part_group}
+DEFECT: ${caseData.defect || 'N/A'}
+TOTAL QTY: ${caseData.lot_no} PCS.
+NG QTY: ${caseData.ng_qty} PCS.
+VENDOR: ${vf.vendor || 'N/A'}
+
+[ STATUS ]
+CURRENT STATUS: ${caseData.status}
+SIGNED BY: ${staffName}
+TIMESTAMP: ${new Date().toLocaleString('en-GB')}
+
+PLEASE REVIEW THE FULL REPORT IN THE SQE PORTAL.
+--------------------------------------------------
+THIS IS AN AUTOMATED SYSTEM NOTIFICATION.
+    `.trim();
+
+    // เปิดหน้าส่งอีเมล (หรือจะเปลี่ยนเป็นเรียก API ส่งเบื้องหลังก็ได้)
+    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+// --- 2. ฟังก์ชันตรวจสอบสถานะ Workflow ---
+function isWorkflowLocked(slot, vfData) {
+    if (slot === 'confirm' && !vfData.issue_sig_active) return true;
+    if (slot === 'approved' && !vfData.confirm_sig_active) return true;
+    return false;
+}
+
+async function signDocument(slot) {
+    const inputId = slot === 'issue' ? 'prob-issue-by' : (slot === 'confirm' ? 'prob-confirm-by' : 'prob-approved-by');
+    const inputEl = document.getElementById(inputId);
+    const staffName = inputEl?.value?.trim() || "";
+    
+    // 1. [บังคับ] ต้องมีการระบุชื่อในช่องนั้นๆ ก่อนกดปุ่ม SIGN
+    if (!staffName) {
+        if (inputEl) {
+            inputEl.style.border = "2px solid #ef4444";
+            shake(inputEl);
+        }
+        return toast("⚠️ กรุณาระบุชื่อผู้ลงนามในช่องนี้ก่อน", "warn");
+    }
+
+    if (!_currentCase) return toast("❌ ไม่พบข้อมูลเคส", "error");
+
+    const vf = _currentCase?.report_data?.vf_data || {};
+
+    // ตรวจสอบลำดับการลงนาม (Workflow Order)
+    if (slot === 'confirm' && !vf.issue_sig_active) {
+        return toast("⚠️ ผู้จัดทำ (ISSUE BY) ต้องลงนามก่อนดำเนินการในขั้นตอนนี้", "warn");
+    }
+    if (slot === 'approved' && !vf.confirm_sig_active) {
+        return toast("⚠️ ผู้ตรวจสอบ (CONFIRM BY) ต้องลงนามก่อนดำเนินการในขั้นตอนนี้", "warn");
+    }
+
+    // 2. เช็คสิทธิ์: ชื่อในช่องต้องตรงกับคนล็อกอิน (เช็คผ่าน Email)
+    const myEmail = S.currentUser.toLowerCase();
+    const selectedStaffEmail = getEmailByStaffName(staffName).toLowerCase();
+    const isMasterAdmin = (myEmail === 'natthawut.chaising@carrier.com'); // สิทธิ์ Admin สูงสุด
+
+    if (myEmail !== selectedStaffEmail && !isMasterAdmin) {
+        if (inputEl) shake(inputEl);
+        return toast(`🚫 คุณสามารถลงนามในชื่อของตัวเองเท่านั้น (ล็อกอินด้วย: ${myEmail})`, "error");
+    }
+
+    // 3. ตรวจสอบเงื่อนไขลำดับงาน (Workflow) แบบยืดหยุ่น
+    // หากเซ็นช่องแรก (ISSUE BY) ต้องระบุคนช่องสอง (CONFIRM BY)
+    if (slot === 'issue') {
+        const nextInput = document.getElementById('prob-confirm-by');
+        if (!nextInput?.value?.trim()) {
+            if (nextInput) { nextInput.style.border = "2px solid #f97316"; shake(nextInput); }
+            return toast("⚠️ โปรดระบุชื่อผู้ตรวจสอบ (CONFIRM BY) ก่อนดำเนินการ", "warn");
+        }
+    } 
+
+    // รีเซ็ตขอบแดงถ้าข้อมูลครบถ้วนแล้ว
+    if (inputEl) inputEl.style.border = "";
+
+    // 4. แสดง Popup พิจารณาผล (Accept/Reject)
+    showApprovalPopup(slot, staffName);
+}
+
+// ฟังก์ชันสร้าง Popup เลือก อนุมัติ/ไม่อนุมัติ
+function showApprovalPopup(slot, staffName) {
+    const isDark = document.body.classList.contains('dark-mode');
+    const modalId = 'approval-decision-modal';
+    
+    // ลบ Modal เก่าถ้ามีค้างอยู่
+    const existing = document.getElementById(modalId);
+    if (existing) existing.remove();
+
+    const modalHtml = `
+        <div id="${modalId}" class="fixed inset-0 z-[11000] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden p-7 space-y-6">
+                
+                <!-- Icon & Header -->
+                <div class="text-center">
+                    <div class="w-14 h-14 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                        <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0"/></svg>
+                    </div>
+                    <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">พิจารณาผลการตรวจสอบ</h3>
+                    <p class="text-xs text-slate-500 mt-1">ลงนามโดย: <span class="font-bold text-blue-600">${staffName}</span></p>
+                </div>
+
+                <!-- Decision Buttons -->
+                <div class="grid grid-cols-2 gap-4">
+                    <button id="btn-approve-yes" class="group py-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 text-slate-400 font-black text-xs hover:border-emerald-500 hover:text-emerald-600 transition-all flex flex-col items-center gap-2 cursor-pointer">
+                        <span class="text-2xl group-hover:scale-110 transition-transform">✅</span> อนุมัติ (ACCEPT)
+                    </button>
+                    <button id="btn-approve-no" class="group py-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 text-slate-400 font-black text-xs hover:border-rose-500 hover:text-rose-600 transition-all flex flex-col items-center gap-2 cursor-pointer">
+                        <span class="text-2xl group-hover:scale-110 transition-transform">❌</span> ไม่อนุมัติ (REJECT)
+                    </button>
+                </div>
+
+                <!-- Remark Box -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label id="remark-label" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">หมายเหตุ (Remark)</label>
+                        <span id="remark-required" class="text-[9px] font-bold text-rose-500 hidden">* จำเป็นต้องระบุเหตุผลในการส่งกลับไปแก้ไข</span>
+                    </div>
+                    <textarea id="approve-remark" 
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none" 
+                        rows="3" 
+                        placeholder="ระบุเหตุผล / สิ่งที่ต้องการให้แก้ไข..."></textarea>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="flex items-center gap-3 pt-2">
+                    <button onclick="document.getElementById('${modalId}').remove()" class="flex-1 py-4 text-slate-400 hover:text-slate-600 font-bold text-sm transition-colors cursor-pointer">ยกเลิก</button>
+                    <button id="btn-confirm-approval" class="flex-[2] py-4 bg-slate-200 text-slate-400 rounded-2xl font-black text-sm uppercase tracking-widest cursor-not-allowed transition-all" disabled>ยืนยันการลงนาม</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const modal = document.getElementById(modalId);
+    const btnYes = modal.querySelector('#btn-approve-yes');
+    const btnNo = modal.querySelector('#btn-approve-no');
+    const btnConfirm = modal.querySelector('#btn-confirm-approval');
+    const remarkInput = modal.querySelector('#approve-remark');
+    const remarkLabel = modal.querySelector('#remark-label');
+    const remarkRequired = modal.querySelector('#remark-required');
+    
+    let decision = null;
+
+    // ฟังก์ชันตรวจสอบความพร้อมของปุ่มยืนยัน
+    const validateForm = () => {
+        const remark = remarkInput.value.trim();
+        const isReady = decision === 'Accepted' || (decision === 'Rejected' && remark.length > 0);
+        
+        btnConfirm.disabled = !isReady;
+        if (decision === 'Rejected') {
+            btnConfirm.innerHTML = '↩️ ส่งกลับไปแก้ไข';
+            if (isReady) {
+                btnConfirm.className = "flex-[2] py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-rose-600/30 active:scale-95 transition-all cursor-pointer";
+            } else {
+                btnConfirm.className = "flex-[2] py-4 bg-slate-200 dark:bg-slate-800 text-slate-400 rounded-2xl font-black text-sm uppercase tracking-widest cursor-not-allowed transition-all";
+            }
+        } else if (decision === 'Accepted') {
+            btnConfirm.innerHTML = '✅ ยืนยันการลงนาม';
+            if (isReady) {
+                btnConfirm.className = "flex-[2] py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-blue-600/30 active:scale-95 transition-all cursor-pointer";
+            } else {
+                btnConfirm.className = "flex-[2] py-4 bg-slate-200 dark:bg-slate-800 text-slate-400 rounded-2xl font-black text-sm uppercase tracking-widest cursor-not-allowed transition-all";
+            }
+        } else {
+            btnConfirm.innerHTML = 'ยืนยันการลงนาม';
+            btnConfirm.className = "flex-[2] py-4 bg-slate-200 dark:bg-slate-800 text-slate-400 rounded-2xl font-black text-sm uppercase tracking-widest cursor-not-allowed transition-all";
+        }
+    };
+
+    btnYes.onclick = () => {
+        decision = 'Accepted';
+        btnYes.className = "py-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 font-black text-xs transition-all flex flex-col items-center gap-2 shadow-sm cursor-pointer";
+        btnNo.className = "py-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 text-slate-400 font-black text-xs transition-all flex flex-col items-center gap-2 cursor-pointer";
+        remarkLabel.className = "text-[10px] font-black text-slate-400 uppercase tracking-widest";
+        remarkRequired.classList.add('hidden');
+        validateForm();
+    };
+
+    btnNo.onclick = () => {
+        decision = 'Rejected';
+        btnNo.className = "py-4 rounded-2xl border-2 border-rose-500 bg-rose-50 dark:bg-rose-900/10 text-rose-600 font-black text-xs transition-all flex flex-col items-center gap-2 shadow-sm cursor-pointer";
+        btnYes.className = "py-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 text-slate-400 font-black text-xs transition-all flex flex-col items-center gap-2 cursor-pointer";
+        remarkLabel.className = "text-[10px] font-black text-rose-500 uppercase tracking-widest";
+        remarkRequired.classList.remove('hidden');
+        validateForm();
+    };
+
+    remarkInput.oninput = validateForm;
+
+    btnConfirm.onclick = () => {
+        if (decision === 'Accepted' && slot === 'confirm') {
+            const nextInput = document.getElementById('prob-approved-by');
+            if (!nextInput?.value?.trim()) {
+                if (nextInput) { nextInput.style.border = "2px solid #f97316"; shake(nextInput); }
+                return toast("⚠️ โปรดเลือกหรือระบุชื่อผู้อนุมัติ (APPROVED BY) ก่อนยืนยันการอนุมัติส่งต่อ", "warn");
+            }
+        }
+        const remarkText = remarkInput.value.trim();
+        modal.remove();
+        // ส่งค่า Remark กลับไปที่ processSignature
+        processSignature(slot, staffName, decision, remarkText);
+    };
+}
+
+
+// --- ฟังก์ชันส่งอีเมลขออนุมัติ (ฉบับอัปเกรดเพื่อขออนุมัติจาก CONFIRM BY หรือ APPROVED BY) ---
+async function sendApprovalRequestEmail(currentSlot, nextSignerName, caseData, decision = "Accepted", remark = "-") {
+    // 1. ค้นหาอีเมลของผู้รับหลัก (To)
+    const targetEmail = getEmailByStaffName(nextSignerName);
+    if (!targetEmail) return toast("❌ ไม่พบที่อยู่อีเมลของ " + nextSignerName, "error");
+
+    const vf = caseData.report_data?.vf_data || {};
+    const d = caseData.report_data || {};
+
+    // 2. คำนวณ Control No. (docNumber) ให้ตรงกับฐานข้อมูล
+    const docNumber = getCaseControlNo(caseData);
+    const isRP = docNumber.includes('RP');
+
+    // 3. สร้าง Deep Link สำหรับผู้รับ (แนบอีเมลเจ้าตัวไปเพื่อ Auto-login)
+    const baseUrl = window.location.origin + window.location.pathname;
+    const reportMode = (caseData.report_data?.source_report_type || "VF").toLowerCase();
+    const deepLink = `${baseUrl}?caseId=${caseData.id}&mode=${reportMode}&email=${encodeURIComponent(targetEmail)}&ctrl=${encodeURIComponent(docNumber)}`;
+
+    // 4. จัดรูปแบบข้อมูลพื้นฐาน
+    const emailPrefix = (S.currentUser || '').split('@')[0];
+    const formattedSigner = emailPrefix.replace(/\./g, ' ').toUpperCase();
+
+    const issueDate = caseData.created_at
+        ? new Date(caseData.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-')
+        : "-";
+
+    const parsedData = (typeof parseProblemTitleForD2 === 'function') ? parseProblemTitleForD2(caseData.problem_title, caseData) : {};
+    const partInfo = `${(parsedData.partName || caseData.part_name || "N/A").toUpperCase()} / ${(vf.drawing_no || parsedData.drawingNo || caseData.part_no || "N/A").toUpperCase()}`;
+    const supplierName = (vf.vendor || caseData.supplier || "N/A").toUpperCase();
+
+    let subject = "";
+    let body = "";
+
+    if (currentSlot === 'issue') {
+        subject = `[ACTION REQUIRED] Review & Confirmation Request: ${docNumber} - ${supplierName}`;
+        body = `
+Dear ${nextSignerName.toUpperCase()} (Reviewer / Confirmer)
+
+Please be informed that the Quality Report has been issued by ${formattedSigner} and is now awaiting your review and confirmation.
+
+[ REPORT DETAILS ]
+Document number        :  ${vf.control_no || docNumber}
+Supplier name          :  ${supplierName}
+Issue date             :  ${issueDate}
+Part name / Part no.   :  ${partInfo}
+Lot total Q'ty         :  ${caseData.lot_no || 0} Pcs.
+Total NG Q'ty          :  ${caseData.ng_qty || 0} Pcs.
+
+Problem Statement:
+${(typeof getCleanProblemTitle === 'function') ? getCleanProblemTitle(caseData.problem_title || '') : (caseData.problem_title || '')}
+
+--------------------------------------------------
+🚀 [ ACTION REQUIRED: CLICK TO OPEN & CONFIRM ]
+--------------------------------------------------
+<${deepLink}>
+--------------------------------------------------
+
+* This link will automatically Login and navigate to the case.
+* When opened, please locate the "CONFIRM BY" slot and click "SIGN".
+--------------------------------------------------
+THIS IS AN AUTOMATED SYSTEM NOTIFICATION.
+        `.trim();
+    } else {
+        // currentSlot === 'confirm' -> send to APPROVED BY
+        subject = `[ACTION REQUIRED] Final Approval Request: ${docNumber} - ${supplierName}`;
+        body = `
+Dear ${nextSignerName.toUpperCase()} (Final Approver)
+
+Please be informed that the Quality Report has been reviewed and confirmed by ${formattedSigner} and is now awaiting your final approval.
+
+[ REVIEW SUMMARY ]
+Review Status          :  ${decision.toUpperCase()} (BY ${formattedSigner})
+Reviewer Remark        :  ${remark || '-'}
+
+[ RECORD DETAILS ]
+Document number        :  ${vf.control_no || docNumber}
+Supplier name          :  ${supplierName}
+Issue date             :  ${issueDate}
+Part name / Part no.   :  ${partInfo}
+Lot total Q'ty         :  ${caseData.lot_no || 0} Pcs.
+Total NG Q'ty          :  ${caseData.ng_qty || 0} Pcs.
+
+Problem Statement:
+${(typeof getCleanProblemTitle === 'function') ? getCleanProblemTitle(caseData.problem_title || '') : (caseData.problem_title || '')}
+
+--------------------------------------------------
+🚀 [ FINAL ACTION: CLICK TO OPEN & APPROVE ]
+--------------------------------------------------
+<${deepLink}>
+--------------------------------------------------
+
+* This link will automatically Login and navigate to the case.
+* When opened, please locate the "APPROVED BY" slot and click "SIGN".
+--------------------------------------------------
+THIS IS AN AUTOMATED SYSTEM NOTIFICATION.
+        `.trim();
+    }
+
+    // 7. สั่งเปิดโปรแกรมเมล์ (To: Target, CC: Sender)
+    const ccEmail = S.currentUser;
+    const mailtoUrl = `mailto:${targetEmail}?cc=${ccEmail}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    try {
+        const a = document.createElement('a');
+        a.href = mailtoUrl;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 300);
+    } catch (e) {
+        window.location.href = mailtoUrl;
+    }
+}
+
+// --- ฟังก์ชันส่งอีเมลแจ้งส่งกลับไปแก้ไข (REJECT & RETURN FOR REVISION) ---
+async function sendRejectionEmail(rejectedBySlot, targetName, rejecterStaffName, caseData, remark, ccName = "") {
+    const targetEmail = getEmailByStaffName(targetName);
+    if (!targetEmail) return toast("❌ ไม่พบที่อยู่อีเมลของ " + targetName, "error");
+
+    const ccEmail = ccName ? getEmailByStaffName(ccName) : "";
+    const vf = caseData.report_data?.vf_data || {};
+    const docNumber = getCaseControlNo(caseData);
+    const reportMode = (caseData.report_data?.source_report_type || "VF").toLowerCase();
+    const baseUrl = window.location.origin + window.location.pathname;
+    const deepLink = `${baseUrl}?caseId=${caseData.id}&mode=${reportMode}&email=${encodeURIComponent(targetEmail)}&ctrl=${encodeURIComponent(docNumber)}`;
+
+    const supplierName = (vf.vendor || caseData.supplier || "N/A").toUpperCase();
+    const roleLabel = rejectedBySlot === 'confirm' ? 'CONFIRM BY (Reviewer)' : 'APPROVED BY (Final Approver)';
+
+    const subject = `[ACTION REQUIRED - REJECTED] Quality Report Returned for Revision: ${docNumber} - ${supplierName}`;
+
+    const body = `
+Dear ${targetName.toUpperCase()},
+
+Please be informed that the Quality Report (${docNumber}) has been REJECTED and RETURNED FOR REVISION by ${rejecterStaffName.toUpperCase()} (${roleLabel}).
+
+[ REJECTION DETAILS ]
+Document Number        :  ${docNumber}
+Supplier Name          :  ${supplierName}
+Reviewed / Rejected By :  ${rejecterStaffName.toUpperCase()} (${roleLabel})
+Decision Status        :  REJECTED / RETURNED FOR REVISION
+
+[ REVISION REMARKS / FEEDBACK ]
+"${remark || 'Please review the case details, revise the report, and re-submit for approval.'}"
+
+--------------------------------------------------
+🚀 [ CLICK TO OPEN, REVISE & RE-SUBMIT ]
+--------------------------------------------------
+<${deepLink}>
+--------------------------------------------------
+
+* This link will automatically login and open the case for you to revise and re-sign.
+--------------------------------------------------
+THIS IS AN AUTOMATED SYSTEM NOTIFICATION.
+    `.trim();
+
+    const mailtoUrl = `mailto:${targetEmail}?${ccEmail ? 'cc=' + encodeURIComponent(ccEmail) + '&' : ''}subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    try {
+        const a = document.createElement('a');
+        a.href = mailtoUrl;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 300);
+    } catch (e) {
+        window.location.href = mailtoUrl;
+    }
+}
+
+
+async function processSignature(slot, staffName, decision, remark) {
+    if (!_currentCase.report_data) _currentCase.report_data = {};
+    if (!_currentCase.report_data.vf_data) _currentCase.report_data.vf_data = {};
+
+    const vf = _currentCase.report_data.vf_data;
+    const timestamp = new Date().toLocaleString('en-GB', { 
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+    });
+
+    if (decision === 'Rejected') {
+        // --- กรณีปฏิเสธ / ส่งกลับไปแก้ไข (REJECT / RETURN FOR REVISION) ---
+        // ส่งอีเมลแจ้งเตือนเหตุผล และรีเซ็ตกระบวนการอนุมัติทั้งหมดกลับมาเริ่มต้นใหม่ที่ ISSUE BY ทันที
+        const issuerName = vf.issue_by || "";
+        const confirmerName = vf.confirm_by || "";
+
+        if (slot === 'confirm') {
+            if (issuerName) {
+                sendRejectionEmail('confirm', issuerName, staffName, _currentCase, remark);
+            }
+            toast(`↩️ ส่งกลับเอกสารไปให้ผู้จัดทำ (${issuerName || 'ISSUE BY'}) เริ่มต้นใหม่เรียบร้อยแล้ว`, "warn");
+        } 
+        else if (slot === 'approved') {
+            if (issuerName) {
+                sendRejectionEmail('approved', issuerName, staffName, _currentCase, remark, confirmerName);
+            }
+            toast(`↩️ ส่งกลับเอกสารไปให้ผู้จัดทำ (${issuerName || 'ISSUE BY'}) เริ่มต้นใหม่เรียบร้อยแล้ว`, "warn");
+        }
+
+        // รีเซ็ตสถานะการอนุมัติทั้งหมดกลับมาเริ่มต้นใหม่ที่ ISSUE BY ทันที
+        vf.issue_sig_active = false;
+        vf.issue_status = 'Returned';
+        vf.issue_remark = remark;
+        vf.issue_timestamp = '';
+
+        vf.confirm_by = "";
+        vf.confirm_sig_active = false;
+        vf.confirm_status = "";
+        vf.confirm_remark = "";
+        vf.confirm_timestamp = "";
+
+        vf.approved_by = "";
+        vf.approved_sig_active = false;
+        vf.approved_status = "";
+        vf.approved_remark = "";
+        vf.approved_timestamp = "";
+
+        _currentCase.status = 'Draft';
+    } else {
+        // --- กรณีอนุมัติ / ออกเอกสาร (ACCEPTED / ISSUED) ---
+        // 1. บันทึกข้อมูลการเซ็นช่องปัจจุบัน
+        vf[`${slot}_sig_active`] = true;
+        vf[`${slot}_by`] = staffName;
+        vf[`${slot}_status`] = decision;
+        vf[`${slot}_remark`] = remark;
+        vf[`${slot}_timestamp`] = timestamp;
+
+        // 2. จัดการส่งเมลตามลำดับ Workflow
+        if (slot === 'issue') {
+            const nextPerson = document.getElementById('prob-confirm-by')?.value?.trim() || vf.confirm_by || "";
+            if (nextPerson) {
+                sendApprovalRequestEmail(slot, nextPerson, _currentCase, decision, remark);
+            }
+            // ล้าง/ซ่อนชื่อใน CONFIRM BY และ APPROVED BY เพื่อให้ผู้ตรวจและผู้อนุมัติต้องพิมพ์/เลือกชื่อตนเองเมื่อเปิดเข้ามา
+            vf.confirm_by = "";
+            vf.confirm_sig_active = false;
+            vf.approved_by = "";
+            vf.approved_sig_active = false;
+        } 
+        else if (slot === 'confirm') {
+            const targetApproverName = document.getElementById('prob-approved-by')?.value?.trim() || vf.approved_by || "";
+            if (targetApproverName) {
+                sendApprovalRequestEmail(slot, targetApproverName, _currentCase, decision, remark);
+            }
+            // ล้าง/ซ่อนชื่อใน APPROVED BY เพื่อให้ผู้อนุมัติต้องพิมพ์/เลือกชื่อตนเองเมื่อเปิดเข้ามา
+            vf.approved_by = "";
+            vf.approved_sig_active = false;
+        }
+        else if (slot === 'approved') {
+            // เมื่อคนสุดท้ายเซ็น ให้ส่งเมลผลอนุมัติกลับหาคนออกรายงาน (Issuer) และ CC คนตรวจ
+            const issuerName = vf.issue_by;
+            if (issuerName) {
+                sendFinalStatusEmail(issuerName, vf.confirm_by, staffName, _currentCase, decision, remark);
+            }
+        }
+        toast(`✅ บันทึกและส่งเมลเรียบร้อย`, "success");
+    }
+
+    // 3. บันทึกลง Cloud และวาดหน้าจอใหม่
+    try {
+        await sqeClient.from('eight_d_reports')
+            .update({ report_data: _currentCase.report_data, status: _currentCase.status })
+            .eq('id', _currentCase.id);
+
+        toast(`✅ บันทึกและส่งเมลเรียบร้อย`, "success");
+        renderSlide();
+        if (typeof updateExportAndEmailButtons === 'function') {
+            updateExportAndEmailButtons();
+        }
+    } catch (err) { toast("Error: " + err.message, "error"); }
+}
+
+async function sendFinalStatusEmail(issuerName, confirmerName, approverName, caseData, decision, remark) {
+    const targetEmail = getEmailByStaffName(issuerName); // ส่งกลับหาคนออกรายงาน
+    const ccEmail = getEmailByStaffName(confirmerName); // CC หาคนตรวจสอบ
+    
+    if (!targetEmail) return;
+
+    const vf = caseData.report_data?.vf_data || {};
+    const d = caseData.report_data || {};
+
+    // --- 1. เตรียมข้อมูลสำหรับสร้าง Deep Link ---
+    const baseUrl = window.location.origin + window.location.pathname;
+    const reportMode = (caseData.report_data?.source_report_type || "VF").toLowerCase();
+
+    // --- 2. คำนวณเลขที่เอกสาร (Control No.) ---
+    const docNumber = getCaseControlNo(caseData);
+    const isRP = docNumber.includes('RP');
+
+    // --- 3. สร้าง URL ลิงก์ตรง (แนบอีเมลคนรับไปเพื่อ Auto-login) ---
+    const deepLink = `${baseUrl}?caseId=${caseData.id}&mode=${reportMode}&email=${encodeURIComponent(targetEmail)}&ctrl=${encodeURIComponent(docNumber)}`;
+
+    const subject = `[${decision.toUpperCase()}] Final Status: ${docNumber} - ${vf.vendor || 'Supplier'}`;
+    
+    const body = `
+Dear ${issuerName.toUpperCase()},
+
+The Quality Report has completed its final review stage.
+
+[ FINAL DECISION ]
+Final Status           :  ${decision.toUpperCase()}
+Signed By (Approver)   :  ${approverName.toUpperCase()}
+Approver Remark        :  ${remark || '-'}
+
+[ RECORD DETAILS ]
+Document Number        :  ${docNumber}
+Supplier Name          :  ${vf.vendor || '-'}
+Part Name              :  ${caseData.part_name || '-'}
+
+Status Update: This case is now ${decision === 'Accepted' ? 'CLOSED' : 'RETURNED FOR REVIEW'}.
+
+--------------------------------------------------
+🚀 [ CLICK TO OPEN FULL REPORT ]
+--------------------------------------------------
+<${deepLink}>
+--------------------------------------------------
+
+* You can view and download the official PDF from this link.
+--------------------------------------------------
+THIS IS AN AUTOMATED SYSTEM NOTIFICATION.
+    `.trim();
+
+    window.location.href = `mailto:${targetEmail}?cc=${ccEmail}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function checkDeepLinkParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const caseId = urlParams.get('caseId');
+    const mode = urlParams.get('mode'); // 'vf' หรือ '8d'
+
+    if (caseId) {
+        console.log(`🔗 Deep Link Detected: ID=${caseId}, Mode=${mode}`);
+        return { caseId, mode };
+    }
+    return null;
+}
+
+// --- 4. ฟังก์ชันยกเลิกลายเซ็น (กรณีเซ็นผิดคน) ---
+async function removeSignature(slot) {
+    if (!_currentCase || !_currentCase.report_data.vf_data) return;
+    
+    _currentCase.report_data.vf_data[`${slot}_sig_active`] = false;
+
+    try {
+        await sqeClient.from('eight_d_reports')
+            .update({ report_data: _currentCase.report_data })
+            .eq('id', _currentCase.id);
+        renderSlide();
+        toast("🗑️ ลบลายเซ็นเรียบร้อย", "info");
+    } catch (err) { console.error(err); }
+}
+
+
     // 2. ฟังก์ชันดูดข้อมูลจากช่อง ContentEditable
     function _collectDataFromUI() {
         const slideData = {};
@@ -18198,23 +20887,1559 @@ async function fetchCases() {
         return slideData;
     }
 
+// --- ฟังก์ชันสร้างกิมมิกสไตล์ลายเซ็นเฉพาะบุคคล (ตรงตามชื่อ สไตล์ปากกาลายเซ็นสีน้ำเงิน) ---
+function getSignatureGimmick(name) {
+    const clean = cleanSignatureName(name);
+    const charSum = clean.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    
+    const styles = [
+        { font: "'Comic Neue', 'Caveat', 'Segoe Print', 'Comic Sans MS', 'Patrick Hand', cursive", rotate: "0deg", spacing: "0.2px", weight: "700", size: "18.5px" },
+        { font: "'Caveat', 'Comic Neue', 'Segoe Print', 'Patrick Hand', cursive", rotate: "-1deg", spacing: "0.3px", weight: "700", size: "21px" },
+        { font: "'Patrick Hand', 'Comic Neue', 'Segoe Print', 'Comic Sans MS', cursive", rotate: "0deg", spacing: "0.2px", weight: "700", size: "18px" },
+        { font: "'Kalam', 'Segoe Print', 'Comic Sans MS', cursive", rotate: "0deg", spacing: "0.2px", weight: "700", size: "17.5px" },
+        { font: "'Comic Neue', 'Segoe Print', 'Comic Sans MS', cursive", rotate: "0deg", spacing: "0.3px", weight: "700", size: "19px" }
+    ];
+
+    return styles[charSum % styles.length];
+}
+
+// --- ฟังก์ชันอัปเดตสีและสถานะปุ่ม SIGN แบบเรียลไทม์ (เมื่อเลือกชื่อผู้รับในช่องถัดไป ปุ่มจะเปลี่ยนเป็นสีเขียวทันที) ---
+function updateSignButtonStates() {
+    const confirmInput = document.getElementById('prob-confirm-by');
+    const approvedInput = document.getElementById('prob-approved-by');
+
+    const issueSignBtn = document.getElementById('btn-sign-issue');
+    const confirmSignBtn = document.getElementById('btn-sign-confirm');
+    const approvedSignBtn = document.getElementById('btn-sign-approved');
+
+    const vf = (_currentCase && _currentCase.report_data && _currentCase.report_data.vf_data) ? _currentCase.report_data.vf_data : {};
+
+    // 1. ช่อง ISSUE BY: ถ้าเลือกชื่อ CONFIRM BY แล้ว ปุ่ม SIGN จะเปลี่ยนเป็นสีเขียวเพื่อเตรียมส่งเมล
+    if (issueSignBtn) {
+        const hasConfirmName = Boolean((confirmInput && confirmInput.value.trim()) || vf.confirm_by);
+        if (hasConfirmName) {
+            issueSignBtn.style.background = '#16a34a';
+            issueSignBtn.style.boxShadow = '0 2px 6px rgba(22,163,74,0.4)';
+            issueSignBtn.innerHTML = '✉️ SIGN & SEND';
+            issueSignBtn.title = 'พร้อมลงนามและเปิดโปรแกรมเมลส่งไปยัง CONFIRM BY';
+        } else {
+            issueSignBtn.style.background = '#2563eb';
+            issueSignBtn.style.boxShadow = '0 2px 4px rgba(37,99,235,0.2)';
+            issueSignBtn.innerHTML = 'SIGN';
+            issueSignBtn.title = 'กรุณาเลือกชื่อ CONFIRM BY เพื่อเปิดใช้งานการส่งเมล';
+        }
+    }
+
+    // 2. ช่อง CONFIRM BY: ถ้าเลือกชื่อ APPROVED BY แล้ว ปุ่ม SIGN จะเปลี่ยนเป็นสีเขียว
+    if (confirmSignBtn) {
+        const hasApprovedName = Boolean((approvedInput && approvedInput.value.trim()) || vf.approved_by);
+        if (hasApprovedName) {
+            confirmSignBtn.style.background = '#16a34a';
+            confirmSignBtn.style.boxShadow = '0 2px 6px rgba(22,163,74,0.4)';
+            confirmSignBtn.innerHTML = '✉️ SIGN & SEND';
+            confirmSignBtn.title = 'พร้อมลงนามและเปิดโปรแกรมเมลส่งไปยัง APPROVED BY';
+        } else {
+            confirmSignBtn.style.background = '#2563eb';
+            confirmSignBtn.style.boxShadow = '0 2px 4px rgba(37,99,235,0.2)';
+            confirmSignBtn.innerHTML = 'SIGN';
+            confirmSignBtn.title = 'คลิกเพื่อลงนามพิจารณา (อนุมัติ/ส่งกลับแก้ไข)';
+        }
+    }
+
+    // 3. ช่อง APPROVED BY: เมื่อกรอก/มีชื่อผู้อนุมัติ ปุ่มจะเป็นสีเขียวเพื่ออนุมัติรอบสุดท้าย
+    if (approvedSignBtn) {
+        const hasMyName = Boolean((approvedInput && approvedInput.value.trim()) || vf.approved_by);
+        if (hasMyName) {
+            approvedSignBtn.style.background = '#16a34a';
+            approvedSignBtn.style.boxShadow = '0 2px 6px rgba(22,163,74,0.4)';
+            approvedSignBtn.innerHTML = '✅ SIGN & APPROVE';
+            approvedSignBtn.title = 'อนุมัติขั้นสุดท้ายและส่งผลกลับหาผู้เกี่ยวข้อง';
+        } else {
+            approvedSignBtn.style.background = '#2563eb';
+            approvedSignBtn.style.boxShadow = '0 2px 4px rgba(37,99,235,0.2)';
+            approvedSignBtn.innerHTML = 'SIGN';
+        }
+    }
+}
+window.updateSignButtonStates = updateSignButtonStates;
+
+const renderSigCell = (slot, displayName, sigActive, timestamp) => {
+    const cleanName = cleanSignatureName(displayName);
+    const isSigned = Boolean(sigActive && cleanName);
+
+    const vf = _currentCase?.report_data?.vf_data || {};
+    const isIssueSigned = Boolean(vf.issue_sig_active && vf.issue_by);
+    const isConfirmSigned = Boolean(vf.confirm_sig_active && vf.confirm_by);
+    const isApprovedSigned = Boolean(vf.approved_sig_active && vf.approved_by);
+
+    const myEmail = ((typeof S !== 'undefined' && S.currentUser) ? S.currentUser : '').toLowerCase();
+    const isMasterAdmin = (myEmail === 'natthawut.chaising@carrier.com');
+    const isLinkSession = Boolean(typeof S !== 'undefined' && S.isLinkSession);
+
+    // --- Logic จัดการปุ่มลบ (Locked เมื่อเปิดจากลิงก์) ---
+    let showRemoveBtn = false;
+    if (isSigned) {
+        const isSelf = myEmail && getEmailByStaffName(displayName).toLowerCase() === myEmail;
+        if (slot === 'issue' && !isLinkSession && !isConfirmSigned && !isApprovedSigned && (isSelf || isMasterAdmin)) showRemoveBtn = true;
+        else if (slot === 'confirm' && !isLinkSession && !isApprovedSigned && (isSelf || isMasterAdmin)) showRemoveBtn = true;
+        else if (slot === 'approved' && !isLinkSession && (isSelf || isMasterAdmin)) showRemoveBtn = true;
+    }
+
+    if (isSigned) {
+        const sigImgUrl = getStaffSignatureImage(displayName);
+
+        return `
+            <div class="vf-sig-cell-container" style="display: flex; align-items: center; justify-content: flex-start; height: 32px; width: 100%; position: relative; padding: 0 4px; box-sizing: border-box; background: transparent; overflow: visible;">
+                
+                <!-- 1. ส่วนรูปภาพลายเซ็น (Fixed Width เพื่อความนิ่งของตาราง) -->
+                <div class="vf-sig-holder" style="flex: 0 0 100px; display: flex; align-items: center; justify-content: center; height: 100%; text-align: left;">
+                    <img src="${sigImgUrl}" 
+                         alt="${cleanName}" 
+                         class="vf-sig-img" 
+                         style="height: 28px; width: auto; max-width: 100px; object-fit: contain; display: block; image-rendering: auto;"
+                         onerror="this.style.display='none';">
+                </div>
+                
+                <!-- 2. ส่วนข้อมูลกำกับดิจิทัล (Digitally Signed) -->
+                <div class="hide-on-export" style="display: flex; align-items: center; height: 100%; padding-right: 2px; flex: 1; min-width: 80px; border-left: 1px solid #dbeafe; margin-left: 8px; padding-left: 8px;">
+                    <div style="display: flex; flex-direction: column; line-height: 1.0; justify-content: center;">
+                        <div style="color: #3b82f6; font-size: 6.5px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.3px;">DIGITALLY SIGNED</div>
+                        <div style="color: #64748b; font-size: 7.5px; font-weight: 700; white-space: nowrap; margin-top: 2px;">${timestamp || ''}</div>
+                    </div>
+                </div>
+
+                <!-- 3. ปุ่มลบ (✕) -->
+                ${showRemoveBtn ? `
+                    <button class="hide-on-export" onclick="event.stopPropagation(); Wap8DSystem.removeSignature('${slot}')" 
+                            style="background: #f1f5f9; border: none; color: #94a3b8; cursor: pointer; font-size: 11px; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s; margin-left: 4px;" 
+                            onmouseover="this.style.color='#ef4444'; this.style.background='#fee2e2';" 
+                            onmouseout="this.style.color='#94a3b8'; this.style.background='#f1f5f9';"
+                            title="Remove Signature">✕</button>
+                ` : ''}
+            </div>
+        `;
+    } else {
+        // --- ส่วนสถานะยังไม่ได้เซ็น (เหมือนเดิมแต่ปรับปรุงสไตล์ปุ่ม) ---
+        let canSignNow = false;
+        let placeholder = 'Select Name...';
+        if (slot === 'issue') canSignNow = true;
+        else if (slot === 'confirm') { canSignNow = isIssueSigned; if(!isIssueSigned) placeholder = 'Wait Issue...'; }
+        else if (slot === 'approved') { canSignNow = isIssueSigned && isConfirmSigned; if(!isConfirmSigned) placeholder = 'Wait Confirm...'; }
+
+        return `
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%; padding: 0 4px; box-sizing: border-box;">
+                <input type="text" id="prob-${slot}-by" class="vf-name-input"
+                       value="${displayName || ''}" 
+                       style="width: ${canSignNow ? '62%' : '100%'}; border: none; font-size: 11px; font-weight: 700; color: #1e293b; outline: none; background: transparent;" 
+                       onfocus="renderModalAC('staff', this)" 
+                       oninput="renderModalAC('staff', this);" 
+                       placeholder="${placeholder}"
+                       autocomplete="off">
+                
+                ${canSignNow ? `
+                    <button id="btn-sign-${slot}" onclick="Wap8DSystem.signDocument('${slot}')" 
+                            style="padding: 2px 8px; font-size: 8.5px; font-weight: 900; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; transition: 0.2s;">
+                        SIGN
+                    </button>
+                ` : ''}
+            </div>
+        `;
+    }
+};
+
+// --- ฟังก์ชันดึงอีเมลจากชื่อพนักงาน (ฉบับเสถียรที่สุด) ---
+function getEmailByStaffName(inputName) {
+    if (!inputName) return (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : "natthawutchaising271166@gmail.com";
+
+    if (String(inputName).includes('@')) return String(inputName).trim();
+
+    // ฟังก์ชันย่อยสำหรับ "ล้างชื่อ" ให้เหลือแต่เนื้อเน้นๆ เพื่อใช้เทียบ
+    const normalize = (name) => {
+        return cleanSignatureName(name) // ตัด Mr. Ms. ออก
+            .replace(/\./g, '')         // ตัดจุดออก
+            .replace(/\s+/g, '')        // ตัดช่องว่างออกให้หมด
+            .toUpperCase();             // ทำเป็นตัวพิมพ์ใหญ่
+    };
+
+    const cleanInput = normalize(inputName);
+
+    // ค้นหาใน STAFF_EMAIL_MAP (เทียบชื่อที่ล้างแล้วเหมือนกัน)
+    const foundKey = Object.keys(STAFF_EMAIL_MAP).find(key => normalize(key) === cleanInput || normalize(key).includes(cleanInput) || cleanInput.includes(normalize(key)));
+    if (foundKey && STAFF_EMAIL_MAP[foundKey]) return STAFF_EMAIL_MAP[foundKey];
+
+    // สร้าง Carrier อีเมลอัตโนมัติตามชื่อถ้ายังไม่พบ
+    const cleaned = cleanSignatureName(inputName).toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/g, '');
+    if (cleaned && cleaned.length >= 3) return `${cleaned}@carrier.com`;
+
+    return (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : "natthawutchaising271166@gmail.com";
+}
+
+// --- ฟังก์ชันอัปเดตสถานะปุ่ม EXPORT และปุ่มส่งอีเมล (แสดงเฉพาะเมื่อเซ็นครบทุกคนและอนุมัติเสร็จสิ้น) ---
+function updateExportAndEmailButtons() {
+    const exportBtn = document.getElementById('eight-d-export-btn');
+    const exportBtnLabel = document.getElementById('eight-d-export-btn-label');
+    const emailBtn = document.getElementById('eight-d-email-btn');
+
+    if (!_currentCase) return;
+    const srcType = (_currentCase?.report_data?.source_report_type || _currentCase?.report_type || '').toString().toUpperCase();
+    const isRP = srcType === 'RP' || srcType.includes('RP');
+
+    if (exportBtn) {
+        if (_isVfView) {
+            if (exportBtnLabel) exportBtnLabel.textContent = isRP ? "Export RP Report (PDF)" : "Export VF Report (PDF)";
+            exportBtn.className = `px-4 py-2 ${isRP ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-1.5 active:scale-95 cursor-pointer`;
+            exportBtn.onclick = () => exportVFReport();
+        } else {
+            if (exportBtnLabel) exportBtnLabel.textContent = "Export to PowerPoint";
+            exportBtn.className = "px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-200 flex items-center gap-1.5 active:scale-95 cursor-pointer";
+            exportBtn.onclick = () => exportToPPTX();
+        }
+    }
+
+    if (emailBtn) {
+        const vf = _currentCase?.report_data?.vf_data || {};
+        const isIssueSigned = Boolean(vf.issue_sig_active === true && vf.issue_by);
+        const isConfirmSigned = Boolean(vf.confirm_sig_active === true && vf.confirm_by);
+        const isApprovedSigned = Boolean(vf.approved_sig_active === true && vf.approved_by);
+        const isAllSigned = isIssueSigned && isConfirmSigned && isApprovedSigned;
+
+        if (isAllSigned) {
+            emailBtn.classList.remove('hidden');
+            emailBtn.style.display = 'inline-flex';
+        } else {
+            emailBtn.classList.add('hidden');
+            emailBtn.style.display = 'none';
+        }
+    }
+}
+
+// --- ฟังก์ชันส่งอีเมลแจ้งเตือนเมื่อเซ็นครบหมดแล้ว (ส่งไปยัง ISSUE BY) ---
+function sendIssueByEmail() {
+    if (!_currentCase) return toast("❌ ไม่พบข้อมูลเคส", "error");
+    // บังคับเซฟข้อมูลที่กำลังพิมพ์ค้างอยู่ก่อนแนบไฟล์ในอีเมล เพื่อให้ตรงกับ export ปกติเสมอ
+    if (!_isVfView) saveCurrentProgress();
+    const c = _currentCase;
+    const d = c.report_data || {};
+    const vf = d.vf_data || {};
+
+    const issueByName = vf.issue_by || document.getElementById('prob-issue-by')?.value || '';
+    const targetEmail = getEmailByStaffName(issueByName) || (typeof S !== 'undefined' && S.currentUser) || "natthawutchaising271166@gmail.com";
+
+    const docNumber = getCaseControlNo(c);
+    const reportType = (d.source_report_type || c.report_type || "VF").toUpperCase();
+    const isRP = reportType === 'RP' || reportType.includes('RP') || docNumber.includes('RP');
+
+    const parsedData = (typeof parseProblemTitleForD2 === 'function') ? parseProblemTitleForD2(c.problem_title, c) : {};
+    const supplierName = (vf.vendor || c.supplier || parsedData.supplier || "TTS PLASTIC CO.,LTD.").toUpperCase();
+
+    // Defect Name
+    let defectName = vf.criteria_defect || vf.defect || parsedData.defectName || c.defect_name || "Deformed";
+    defectName = defectName.replace(/^[:\s-]+/, '').replace(/\.$/, '').trim();
+
+    // Issue Date (format: DD-Mon-YY เช่น 16-Aug-26)
+    let rawIssueDate = vf.issued_date || c.date || d.event_date || (c.created_at ? c.created_at.split('T')[0] : '');
+    let issueDate = "16-Aug-26";
+    if (rawIssueDate) {
+        const dObj = new Date(rawIssueDate);
+        if (!isNaN(dObj.getTime())) {
+            const day = String(dObj.getDate()).padStart(2, '0');
+            const mon = dObj.toLocaleString('en-GB', { month: 'short' });
+            const yr = dObj.toLocaleDateString('en-GB', { year: '2-digit' });
+            issueDate = `${day}-${mon}-${yr}`;
+        } else if (typeof rawIssueDate === 'string' && rawIssueDate.includes('-')) {
+            issueDate = rawIssueDate;
+        }
+    }
+
+    // Part Name / Part No. (สกัด Part Name จริงที่ไม่ใช่หมวดหมู่ Commodity เช่น COVER-MOTOR)
+    const isCategoryOrGeneric = (name) => {
+        if (!name || name === '-' || name === 'N/A') return true;
+        const n = String(name).toLowerCase().trim();
+        return n.includes('resin') || n.includes('mold part') || n.includes('sheet metal') || 
+               n.includes('packaging') || n.includes('commodity') || n.includes('category') || 
+               n.includes('assy');
+    };
+
+    let extPartName = "";
+    if (parsedData.partName && !isCategoryOrGeneric(parsedData.partName)) {
+        extPartName = parsedData.partName;
+    } else if (vf.part_name && !isCategoryOrGeneric(vf.part_name)) {
+        extPartName = vf.part_name;
+    } else if (c.part_name && !isCategoryOrGeneric(c.part_name)) {
+        extPartName = c.part_name;
+    } else {
+        extPartName = parsedData.partName || vf.part_name || c.part_name || "COVER-MOTOR";
+    }
+    extPartName = extPartName.toUpperCase().trim();
+
+    const extDrawingNo = (vf.drawing_no || parsedData.drawingNo || c.part_no || c.drawing_no || "1129810601").toUpperCase().trim();
+    const partInfo = `${extPartName} / ${extDrawingNo}`;
+
+    // Found Location
+    const foundLocation = isRP ? "QAP Incoming inspection" : (vf.defect_location || "Production Line");
+
+    // Informant or Inspector (เช่น CHAISING, NATTHAWUT)
+    const emailPrefix = ((typeof S !== 'undefined' && S.currentUser) ? S.currentUser : 'natthawut.chaising').split('@')[0];
+    const nameParts = emailPrefix.split('.');
+    const formattedInspector = nameParts.length > 1 
+        ? `${nameParts[1].toUpperCase()}, ${nameParts[0].toUpperCase()}` 
+        : (vf.informant || vf.issue_by || emailPrefix || "CHAISING, NATTHAWUT").toUpperCase();
+
+    // Quantities
+    const lotTotal = (c.lot_no || (Number(c.ok_qty || 0) + Number(c.ng_qty || 0)) || vf.total_qty || "100").toString().replace(/[^0-9]/g, '') || "100";
+    const ngTotal = (c.ng_qty || vf.ng_qty || "6").toString().replace(/[^0-9]/g, '') || "6";
+
+    // PO & INV & Replacement Qty for RP
+    const poNo = (vf.po_no && vf.po_no !== '-') ? vf.po_no : (c.po_no || c.po || '');
+    const invNo = (vf.inv_no && vf.inv_no !== '-') ? vf.inv_no : (c.inv_no || c.inv || '');
+    let poInvDisplay = '-';
+    if (poNo && invNo) {
+        poInvDisplay = `${poNo} / ${invNo}`;
+    } else if (poNo) {
+        poInvDisplay = poNo;
+    } else if (invNo) {
+        poInvDisplay = invNo;
+    } else {
+        poInvDisplay = '-';
+    }
+    const replacementQty = vf.request_replacement || vf.replacement_qty || c.replacement_qty || lotTotal || '176';
+
+    // Summary Problem Line (ข้อความแจ้งปัญหาแบบไม่มี : Part defect total)
+    let rawProbTitle = (typeof getCleanProblemTitle === 'function') ? getCleanProblemTitle(c.problem_title || '') : (c.problem_title || '');
+    let summaryProblemLine = rawProbTitle;
+    if (summaryProblemLine.includes(' : Part defect total =')) {
+        summaryProblemLine = summaryProblemLine.split(' : Part defect total =')[0].trim();
+    } else if (summaryProblemLine.includes(': Part defect total')) {
+        summaryProblemLine = summaryProblemLine.split(': Part defect total')[0].trim();
+    } else if (summaryProblemLine.includes('Part defect total =')) {
+        summaryProblemLine = summaryProblemLine.split('Part defect total =')[0].trim();
+    }
+    summaryProblemLine = summaryProblemLine.replace(/[:\s-]+$/, '').trim();
+
+    if (isRP) {
+        summaryProblemLine = `IQC incoming inspection found problem about ${partInfo} ${supplierName} found defect ${defectName}. IQC judgement rejected q'ty ${lotTotal} pcs (100%).`;
+    } else if (!summaryProblemLine || summaryProblemLine === '-') {
+        summaryProblemLine = `On ${issueDate} ${foundLocation} inform quality problem about ${partInfo} ${supplierName} found defect ${defectName}`;
+    }
+
+    // Problem Details (พร้อมข้อความแสดงจำนวนชิ้นงาน NG / Total)
+    const problemDetails = `${summaryProblemLine} : Part defect total = ${ngTotal} / ${lotTotal} Pcs.`;
+
+    // Sender Name (จากอีเมลผู้ส่ง)
+    const senderName = nameParts.length > 1 
+        ? `${nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1)} ${nameParts[1].charAt(0).toUpperCase() + nameParts[1].slice(1)}` 
+        : ((typeof S !== 'undefined' && S.currentUser) ? S.currentUser : 'Natthawut Chaising');
+
+// --- แก้ไขจุดสกัดชื่อพาร์ทจริง ---
+const parsedForName = parseProblemTitleForD2(c.problem_title, c);
+// ใช้ชื่อที่สกัดได้จริง (เช่น COVER-MOTOR) แทนชื่อกลุ่มพาร์ท
+const finalPartName = (parsedForName.partName && parsedForName.partName !== '-') 
+                      ? parsedForName.partName.toUpperCase() 
+                      : (c.part_name || "PART").toUpperCase();
+
+const safePartName = finalPartName.replace(/[\/\\?%*:|"<>]/g, '-');
+const safeSupplier = supplierName.replace(/[\/\\?%*:|"<>]/g, '-');
+
+const fullBaseName = `${docNumber} - ${safePartName} - ${extDrawingNo} ${safeSupplier}`;
+
+const vfFileName = `${isRP ? 'RP' : 'VF'}_Report_${fullBaseName}.pdf`;
+const pptxFileName = `8D_Report_${fullBaseName}.pptx`;
+// ------------------------------------------
+    const ccEmail = (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : '';
+
+    // 2nd Follow up Date (คำนวณตามสูตรเดียวกับ RUNNING NUMBER: target_date หรือ report_date + 14 วัน)
+    let followUpDateFormatted = "30 Aug’26";
+    let reportDate = c.date || d.event_date || (c.created_at ? c.created_at.split('T')[0] : '');
+    let baseDateForFollowUp = (vf.target_date && vf.target_date !== '-') ? vf.target_date : reportDate;
+    if (baseDateForFollowUp && baseDateForFollowUp !== '-') {
+        const tDate = new Date(baseDateForFollowUp);
+        if (!isNaN(tDate.getTime())) {
+            tDate.setDate(tDate.getDate() + 14);
+            const day = tDate.getDate();
+            const month = tDate.toLocaleString('en-GB', { month: 'short' });
+            const year = tDate.toLocaleDateString('en-GB', { year: '2-digit' });
+            followUpDateFormatted = `${day} ${month}’${year}`;
+        }
+    }
+
+    let vendorFormatted = (supplierName || 'TTS PLASTIC CO.,LTD.').toUpperCase().trim();
+    if (!vendorFormatted.startsWith('V.') && !vendorFormatted.startsWith('VENDOR')) {
+        vendorFormatted = `V.${vendorFormatted}`;
+    }
+
+    const reportTag = isRP ? 'RP' : 'VF';
+    const baseSubject = `Inform ${reportTag} report no : ${docNumber} - ${extPartName}/${extDrawingNo} found ${defectName} of ${vendorFormatted}`;
+
+    const introStatement = isRP
+        ? `I would like to inform quality problem and issue Rejected Report No. ${docNumber} - ${extPartName}/${extDrawingNo} found ${defectName} delivery of ${vendorFormatted}`
+        : `I would like to inform quality problem and issue Vendor Failure Report No. : ${docNumber} - ${extPartName}/${extDrawingNo} found ${defectName} delivery of ${vendorFormatted}`;
+
+    // แสดง Modal พรีวิวรายละเอียด พร้อมปุ่มติ๊กเลือกไฟล์ที่จะ Export และแนบใน Subject
+    showEmailDispatchModalWithAttachments({
+        caseData: c,
+        targetEmail,
+        ccEmail,
+        docNumber,
+        supplierName,
+        defectName,
+        issueDate,
+        partInfo,
+        extPartName,
+        extDrawingNo,
+        vendorFormatted,
+        baseSubject,
+        foundLocation,
+        formattedInspector,
+        lotTotal,
+        ngTotal,
+        poInvDisplay,
+        replacementQty,
+        summaryProblemLine,
+        problemDetails,
+        introStatement,
+        senderName,
+        isRP,
+        followUpDateFormatted,
+        vfFileName,
+        pptxFileName
+    });
+}
+
+/**
+ * 📧 ฟังก์ชันแสดง Modal พรีวิวส่งอีเมล (Full Integration)
+ * รองรับ: Auto-Export PDF/PPTX, Preview/Download ก่อนส่ง, และแนบไฟล์จริงลงใน .eml
+ */
+function showEmailDispatchModalWithAttachments(params) {
+    const {
+        caseData,
+        targetEmail,
+        ccEmail,
+        docNumber,
+        supplierName,
+        defectName,
+        issueDate,
+        partInfo,
+        extPartName,
+        extDrawingNo,
+        vendorFormatted,
+        baseSubject: customBaseSubject,
+        foundLocation,
+        formattedInspector,
+        lotTotal,
+        ngTotal,
+        poInvDisplay: customPoInvDisplay,
+        replacementQty: customReplacementQty,
+        summaryProblemLine,
+        problemDetails,
+        introStatement,
+        senderName,
+        isRP,
+        followUpDateFormatted,
+        vfFileName,
+        pptxFileName
+    } = params;
+
+    const modalId = 'eight-d-email-preview-modal';
+    const existing = document.getElementById(modalId);
+    if (existing) existing.remove();
+
+    const reportTag = isRP ? 'RP' : 'VF';
+    const finalVendor = vendorFormatted || (supplierName?.toUpperCase().startsWith('V.') ? supplierName.toUpperCase() : `V.${supplierName || 'TTS PLASTIC CO.,LTD.'}`);
+    
+    // 1. ตั้งค่าหัวข้ออีเมล
+    const baseSubject = customBaseSubject || `Inform ${reportTag} report no : ${docNumber} - ${(extPartName || 'COVER-MOTOR')}/${(extDrawingNo || '1129810601')} found ${defectName || 'Deformed'} of ${finalVendor}`;
+
+    const defaultIntro = introStatement || (isRP
+        ? `I would like to inform quality problem and issue Rejected Report No. ${docNumber} - ${extPartName || 'COVER-MOTOR'}/${extDrawingNo || '1129810601'} found ${defectName || 'Deformed'} delivery of ${finalVendor}`
+        : `I would like to inform quality problem and issue Vendor Failure Report No. : ${docNumber} - ${extPartName || 'COVER-MOTOR'}/${extDrawingNo || '1129810601'} found ${defectName || 'Deformed'} delivery of ${finalVendor}`);
+
+    const defaultSummaryProblem = summaryProblemLine || (isRP
+        ? `IQC incoming inspection found problem about ${partInfo} ${supplierName} found defect ${defectName}. IQC judgement rejected q'ty ${lotTotal} pcs (100%).`
+        : `On ${issueDate} ${foundLocation} inform quality problem about ${partInfo} ${supplierName} found defect ${defectName}`);
+
+    const poInvDisplay = customPoInvDisplay || '-';
+    const replacementQty = customReplacementQty || lotTotal || '176';
+
+    // 2. ฟังก์ชันสร้างเนื้อหาอีเมลตัวอักษรตามเงื่อนไข (Plain Text)
+    const generateEmailBodyText = (include8d = false) => {
+        const reportTypeLabel = isRP ? "RP - Report" : "VF - Report";
+        const eightDLabel = include8d ? " and 8D report" : "";
+        const targetFollowUpDate = followUpDateFormatted || "30 Aug’26";
+
+        if (isRP) {
+            return `Dear ${supplierName}
+${defaultIntro}
+
+${defaultSummaryProblem}
+
+Document number\t:\t${docNumber}
+Supplier name\t:\t${supplierName}
+Defect name\t:\t${defectName}
+Issue date\t:\t${issueDate}
+Part name / Part no.\t:\t${partInfo}
+Found location\t:\t${foundLocation}
+Informant or inspector\t:\t${formattedInspector}
+PO / INV\t:\t${poInvDisplay}
+Lot total Q'ty\t:\t${lotTotal} Pcs.
+Total NG Q'ty\t:\t${ngTotal} Pcs.
+Request parts replacement\t:\t${replacementQty} Pcs.
+
+CTC Requirement
+1.Could you please do an investigation and permanent solution and send ${reportTypeLabel}${eightDLabel} to us within ${targetFollowUpDate}
+2.Could you make sure your stock part 100% inspection for confirm and no escape to CTC
+3.We would like to see the permanent improve after got your answer with official document.
+Thank you and best regards
+${senderName}`;
+        }
+
+        return `Dear ${supplierName}
+${defaultIntro}
+
+Problem Details:
+${defaultSummaryProblem}
+
+Document number\t:\t${docNumber}
+Supplier name\t:\t${supplierName}
+Defect name\t:\t${defectName}
+Issue date\t:\t${issueDate}
+Part name / Part no.\t:\t${partInfo}
+Found location\t:\t${foundLocation}
+Informant or inspector\t:\t${formattedInspector}
+Lot total Q'ty\t:\t${lotTotal} Pcs.
+Total NG Q'ty\t:\t${ngTotal} Pcs.
+
+CTC Requirement
+1.Could you please do an investigation and permanent solution and send ${reportTypeLabel}${eightDLabel} to us within ${targetFollowUpDate}
+2.Could you make sure your stock part 100% inspection for confirm and no escape to CTC
+3.We would like to see the permanent improve after got your answer with official document.
+Thank you and best regards
+${senderName}`;
+    };
+
+    // 2.1 ดึงรูปภาพจากกล่อง NON - CONFORMANCE DETAILS
+    const evidenceImg = caseData.report_data?.evidence_img || caseData.evidence_img || caseData.image_url || '';
+    let cachedImgBase64 = null;
+
+    // 2.2 ฟังก์ชันสร้างเนื้อหาอีเมลแบบ HTML สำหรับ Outlook / Mail App พร้อมฝังรูปภาพ Inline (CID)
+    const generateEmailHtmlBody = (include8d = false, hasInlineImg = false) => {
+        const reportTypeLabel = isRP ? "RP - Report" : "VF - Report";
+        const eightDLabel = include8d ? " and 8D report" : "";
+        const targetFollowUpDate = followUpDateFormatted || "30 Aug’26";
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body, p, table, td, tr, div, span { font-family: Calibri, 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 11pt; color: #000000; line-height: 1.45; }
+body { margin: 0; padding: 12px; }
+p { margin: 0 0 10pt 0; }
+.info-table { border-collapse: collapse; margin-top: 8pt; margin-bottom: 12pt; }
+.info-table td { padding: 1.5px 8px 1.5px 0; vertical-align: top; white-space: nowrap; font-size: 11pt; }
+.info-table td.label-col { width: 210px; color: #000000; }
+.info-table td.colon { width: 14px; padding: 1.5px 6px; text-align: center; }
+.info-table td.val { font-weight: bold; color: #000000; }
+.section-title { font-weight: bold; margin-top: 10pt; margin-bottom: 3pt; font-size: 11pt; color: #000000; }
+.img-box { margin: 10pt 0 14pt 0; max-width: 680px; width: 100%; }
+.img-box img { width: 100%; max-width: 680px; height: auto; display: block; border: 1.5px solid #000; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<p>Dear ${supplierName}<br>
+${defaultIntro}</p>
+
+${isRP ? `
+<p style="margin-bottom: 10pt;">${defaultSummaryProblem}</p>
+` : `
+<div class="section-title">Problem Details:</div>
+<p style="margin-bottom: 10pt;">${defaultSummaryProblem}</p>
+`}
+
+${hasInlineImg ? `
+<div class="img-box" style="margin: 10pt 0 14pt 0; max-width: 680px; width: 100%;">
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; width: 100%; max-width: 680px;">
+        <tr>
+            <td style="padding: 0;">
+                <img src="cid:non_conformance_img" width="680" style="width: 100%; max-width: 680px; height: auto; display: block; border: 1.5px solid #000; box-sizing: border-box;" alt="Non-conformance Evidence Photo" />
+            </td>
+        </tr>
+    </table>
+</div>
+` : ''}
+
+<table class="info-table">
+<tr><td class="label-col">Document number</td><td class="colon">:</td><td class="val">${docNumber}</td></tr>
+<tr><td class="label-col">Supplier name</td><td class="colon">:</td><td class="val">${supplierName}</td></tr>
+<tr><td class="label-col">Defect name</td><td class="colon">:</td><td>${defectName}</td></tr>
+<tr><td class="label-col">Issue date</td><td class="colon">:</td><td>${issueDate}</td></tr>
+<tr><td class="label-col">Part name / Part no.</td><td class="colon">:</td><td>${partInfo}</td></tr>
+<tr><td class="label-col">Found location</td><td class="colon">:</td><td>${foundLocation}</td></tr>
+<tr><td class="label-col">Informant or inspector</td><td class="colon">:</td><td>${formattedInspector}</td></tr>
+${isRP ? `<tr><td class="label-col">PO / INV</td><td class="colon">:</td><td>${poInvDisplay}</td></tr>` : ''}
+<tr><td class="label-col">Lot total Q'ty</td><td class="colon">:</td><td>${lotTotal} Pcs.</td></tr>
+<tr><td class="label-col">Total NG Q'ty</td><td class="colon">:</td><td>${ngTotal} Pcs.</td></tr>
+${isRP ? `<tr><td class="label-col">Request parts replacement</td><td class="colon">:</td><td>${replacementQty} Pcs.</td></tr>` : ''}
+</table>
+
+<div class="section-title">CTC Requirement</div>
+<p style="margin-bottom: 14pt;">
+1.Could you please do an investigation and permanent solution and send ${reportTypeLabel}${eightDLabel} to us within ${targetFollowUpDate}<br>
+2.Could you make sure your stock part 100% inspection for confirm and no escape to CTC<br>
+3.We would like to see the permanent improve after got your answer with official document.
+</p>
+
+<p style="margin-top: 16pt;">
+Thank you and best regards<br>
+<strong>${senderName}</strong>
+</p>
+</body>
+</html>`;
+    };
+
+    // 3. สร้างโครงสร้าง UI Modal
+    const modalHtml = `
+        <div id="${modalId}" class="fixed inset-0 z-[12000] flex items-center justify-center bg-slate-950/80 backdrop-blur-xs p-3 sm:p-4 animate-fade-in">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+                
+                <!-- Modal Header -->
+                <div class="p-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-between shadow-md">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl shadow-inner">✉️</div>
+                        <div>
+                            <h3 class="text-base font-black uppercase tracking-tight">พรีวิวและส่งอีเมล (Send Email Preview)</h3>
+                            <p class="text-[11px] text-blue-100 font-semibold">${docNumber} • ${supplierName}</p>
+                        </div>
+                    </div>
+                    <button onclick="document.getElementById('${modalId}').remove()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer text-sm">✕</button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-5 overflow-y-auto space-y-4 text-xs">
+                    
+                    <!-- ส่วนข้อมูลผู้รับ -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">ส่งถึง (To)</span>
+                            <span class="font-bold text-blue-600 dark:text-blue-400 select-all break-all">${targetEmail}</span>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">สำเนาถึง (CC)</span>
+                            <span class="font-bold text-slate-700 dark:text-slate-200 select-all break-all">${ccEmail || '-'}</span>
+                        </div>
+                    </div>
+
+                    <!-- ส่วนเลือกไฟล์แนบ (Attachment Selector) -->
+                    <div class="bg-blue-50/70 dark:bg-slate-800/80 p-4 rounded-2xl border border-blue-200/80 dark:border-slate-700 space-y-2.5">
+                        <span class="text-[11px] font-black text-blue-900 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">📎 เลือกไฟล์แนบ (Export & Attach)</span>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                            <!-- ช่องไฟล์ PDF -->
+                            <div class="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col gap-2">
+                                <label class="flex items-start gap-3 cursor-pointer select-none">
+                                    <input type="checkbox" id="chk-attach-vf" checked class="w-4 h-4 mt-0.5 rounded text-blue-600">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-bold text-slate-800">📄 รายงาน ${reportTag} (PDF)</div>
+                                        <div class="text-[10px] text-slate-400 truncate font-mono">${vfFileName}</div>
+                                    </div>
+                                </label>
+                                <div id="vf-file-action-container" class="pt-1.5 border-t border-slate-50 flex items-center justify-between">
+                                    <span class="text-[10px] text-blue-600 animate-pulse">⏳ กำลังเตรียมไฟล์...</span>
+                                </div>
+                            </div>
+
+                            <!-- ช่องไฟล์ PPTX (8D) -->
+                            <div class="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col gap-2">
+                                <label class="flex items-start gap-3 cursor-pointer select-none">
+                                    <input type="checkbox" id="chk-attach-8d" class="w-4 h-4 mt-0.5 rounded text-blue-600">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-bold text-slate-800">📊 รายงาน 8D (PowerPoint)</div>
+                                        <div class="text-[10px] text-slate-400 truncate font-mono">${pptxFileName}</div>
+                                    </div>
+                                </label>
+                                <div id="eightd-file-action-container" class="pt-1.5 border-t border-slate-50 flex items-center justify-between">
+                                    <span class="text-[10px] text-slate-400">ติ๊กเพื่อแนบรายงาน 8D</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ส่วนพรีวิวเนื้อหาอีเมล -->
+                    <div class="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">หัวข้ออีเมล (Subject)</span>
+                        <div id="email-preview-subject" class="font-bold text-slate-800 dark:text-slate-100 select-all leading-snug break-words">${baseSubject}</div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <span>📧 พรีวิวหน้าอีเมล (Email Preview & Inline Photo)</span>
+                            </label>
+                            <button id="btn-copy-body-text" class="text-[10px] font-bold text-blue-600 hover:underline transition-all">คัดลอกข้อความ</button>
+                        </div>
+                        
+                        <!-- Rich Preview Box with Inline Evidence Photo -->
+                        <div class="w-full bg-slate-900 text-slate-100 font-sans text-xs p-4 rounded-2xl border border-slate-700 leading-relaxed overflow-x-auto max-h-80 overflow-y-auto space-y-3 font-normal">
+                            <div id="email-preview-pre-photo" class="whitespace-pre-wrap text-slate-200"></div>
+                            
+                            <!-- Non-Conformance Photo Preview Box -->
+                            <div id="email-preview-photo-box" class="p-2 bg-slate-950/80 rounded-xl border border-slate-700/80 block w-full max-w-[680px]">
+                                <div class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                    <span>📸 NON - CONFORMANCE DETAILS PHOTO</span>
+                                </div>
+                                <div id="email-preview-photo-img-container" class="flex items-center justify-center bg-black/40 rounded-lg p-1 min-h-[90px] w-full">
+                                    <span class="text-[10px] text-slate-500">⏳ กำลังโหลดรูปภาพ...</span>
+                                </div>
+                            </div>
+
+                            <div id="email-preview-post-photo" class="whitespace-pre-wrap text-slate-200"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer และปุ่มส่งออก -->
+                <div class="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 flex items-center justify-between">
+                    <button onclick="document.getElementById('${modalId}').remove()" class="px-4 py-2.5 text-slate-500 font-bold text-xs hover:text-slate-700 transition-colors">ยกเลิก</button>
+                    <button id="btn-confirm-export-send" class="px-7 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 flex items-center gap-2 cursor-pointer transition-all">
+                        <span>🚀</span> <span id="btn-confirm-export-send-label">ส่งออกอีเมล (.eml)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // 4. ประกาศตัวแปรเก็บข้อมูลไฟล์ (Cache) เพื่อดึงไปแนบในเมลได้ทันที
+    const modalEl = document.getElementById(modalId);
+    const chkVf = modalEl.querySelector('#chk-attach-vf');
+    const chk8d = modalEl.querySelector('#chk-attach-8d');
+    const vfActionContainer = modalEl.querySelector('#vf-file-action-container');
+    const eightdActionContainer = modalEl.querySelector('#eightd-file-action-container');
+    const btnSend = modalEl.querySelector('#btn-confirm-export-send');
+    const btnSendLabel = modalEl.querySelector('#btn-confirm-export-send-label');
+
+    let cachedVf = null; // เก็บ { blob, base64, filename }
+    let cached8d = null; // เก็บ { blob, base64, filename }
+
+    // ฟังก์ชันรีเฟรชข้อความใน Preview ตามสถานะติ๊ก 8D
+    const refreshBodyPreview = () => {
+        const preEl = modalEl.querySelector('#email-preview-pre-photo');
+        const postEl = modalEl.querySelector('#email-preview-post-photo');
+        const is8d = chk8d ? chk8d.checked : false;
+        const reportTypeLabel = isRP ? "RP - Report" : "VF - Report";
+        const eightDLabel = is8d ? " and 8D report" : "";
+        const targetFollowUpDate = followUpDateFormatted || "30 Aug’26";
+
+        if (preEl) {
+            if (isRP) {
+                preEl.textContent = `Dear ${supplierName}
+${defaultIntro}
+
+${defaultSummaryProblem}`;
+            } else {
+                preEl.textContent = `Dear ${supplierName}
+${defaultIntro}
+
+Problem Details:
+${defaultSummaryProblem}`;
+            }
+        }
+
+        if (postEl) {
+            if (isRP) {
+                postEl.textContent = `Document number        :  ${docNumber}
+Supplier name          :  ${supplierName}
+Defect name            :  ${defectName}
+Issue date             :  ${issueDate}
+Part name / Part no.   :  ${partInfo}
+Found location         :  ${foundLocation}
+Informant or inspector :  ${formattedInspector}
+PO / INV               :  ${poInvDisplay}
+Lot total Q'ty         :  ${lotTotal} Pcs.
+Total NG Q'ty          :  ${ngTotal} Pcs.
+Request parts replacement :  ${replacementQty} Pcs.
+
+CTC Requirement
+1.Could you please do an investigation and permanent solution and send ${reportTypeLabel}${eightDLabel} to us within ${targetFollowUpDate}
+2.Could you make sure your stock part 100% inspection for confirm and no escape to CTC
+3.We would like to see the permanent improve after got your answer with official document.
+Thank you and best regards
+${senderName}`;
+            } else {
+                postEl.textContent = `Document number        :  ${docNumber}
+Supplier name          :  ${supplierName}
+Defect name            :  ${defectName}
+Issue date             :  ${issueDate}
+Part name / Part no.   :  ${partInfo}
+Found location         :  ${foundLocation}
+Informant or inspector :  ${formattedInspector}
+Lot total Q'ty         :  ${lotTotal} Pcs.
+Total NG Q'ty          :  ${ngTotal} Pcs.
+
+CTC Requirement
+1.Could you please do an investigation and permanent solution and send ${reportTypeLabel}${eightDLabel} to us within ${targetFollowUpDate}
+2.Could you make sure your stock part 100% inspection for confirm and no escape to CTC
+3.We would like to see the permanent improve after got your answer with official document.
+Thank you and best regards
+${senderName}`;
+            }
+        }
+    };
+
+    // โหลดรูปภาพ Non-conformance details มาแสดงใน Preview
+    const loadEvidenceImagePreview = async () => {
+        const imgContainer = modalEl.querySelector('#email-preview-photo-img-container');
+        const photoBox = modalEl.querySelector('#email-preview-photo-box');
+        if (!evidenceImg) {
+            if (photoBox) photoBox.style.display = 'none';
+            return;
+        }
+        try {
+            cachedImgBase64 = await _pptGetImageDataUrl(evidenceImg);
+            if (cachedImgBase64 && imgContainer) {
+                imgContainer.innerHTML = `<img src="${cachedImgBase64}" style="max-height: 240px; width: 100%; max-width: 680px; object-fit: contain; border-radius: 4px; border: 1px solid #475569; display: block;" alt="Non-conformance Photo" />`;
+            } else if (imgContainer) {
+                imgContainer.innerHTML = `<span class="text-[10px] text-amber-400">ไม่สามารถแปลงไฟล์รูปภาพได้</span>`;
+            }
+        } catch (e) {
+            if (imgContainer) imgContainer.innerHTML = `<span class="text-[10px] text-rose-400">โหลดภาพไม่สำเร็จ</span>`;
+        }
+    };
+
+    refreshBodyPreview();
+    loadEvidenceImagePreview();
+
+const refreshSlotUI = (container, res, label) => {
+    if (!container) return;
+    
+    // ตรวจสอบว่ามีข้อมูลไฟล์ (res.blob) จริงๆ หรือไม่
+    if (res && res.blob) {
+        const url = URL.createObjectURL(res.blob);
+        container.innerHTML = `
+            <span class="text-[10px] text-emerald-600 font-black flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                พร้อมแนบ
+            </span>
+            <a href="${url}" target="_blank" download="${res.filename}" 
+               class="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg font-bold text-[9px] flex items-center gap-1 transition-all hover:bg-blue-200">
+                <span>👁️</span> ดูไฟล์
+            </a>
+        `;
+    } else {
+        // กรณีไม่ได้ติ๊ก หรือไฟล์ยังไม่มา
+        container.innerHTML = `<span class="text-[10px] text-slate-400 font-bold">ติ๊กเพื่อแนบ${label}</span>`;
+    }
+};
+
+// --- ส่วนที่ต้องแก้ไขใน showEmailDispatchModalWithAttachments ---
+
+// 1. ปรับปรุงการเตรียม PDF (VF/RP)
+const prepareVfAuto = async () => {
+    if (!cachedVf) {
+        // แสดงสถานะกำลังโหลด
+        vfActionContainer.innerHTML = `<span class="text-[10px] text-blue-600 animate-pulse font-bold">⏳ กำลังเตรียม PDF...</span>`;
+        
+        const result = await generateVFPdfBlob(caseData.id);
+        
+        if (result) {
+            cachedVf = result;
+            // เมื่อได้ไฟล์แล้ว และถ้ายังติ๊กอยู่ ให้สั่งอัปเดต UI ทันทีเป็นสีเขียว
+            if (chkVf.checked) {
+                refreshSlotUI(vfActionContainer, cachedVf, `รายงาน ${reportTag}`);
+            }
+        } else {
+            vfActionContainer.innerHTML = `<span class="text-[10px] text-rose-500 font-bold">❌ สร้าง PDF ไม่สำเร็จ</span>`;
+        }
+    } else {
+        // ถ้ามีไฟล์ใน Cache อยู่แล้ว แต่อาจจะเพิ่งติ๊กใหม่
+        if (chkVf.checked) refreshSlotUI(vfActionContainer, cachedVf, `รายงาน ${reportTag}`);
+    }
+};
+
+// 2. ปรับปรุงการเตรียม PPTX (8D)
+const prepare8dAuto = async () => {
+    if (!cached8d) {
+        eightdActionContainer.innerHTML = `<span class="text-[10px] text-blue-600 animate-pulse font-bold">⏳ กำลังสร้าง PPTX...</span>`;
+        
+        const result = await generate8dPptxBlob(caseData.id);
+        
+        if (result) {
+            cached8d = result;
+            // เมื่อได้ไฟล์แล้ว และถ้ายังติ๊กอยู่ ให้สั่งอัปเดต UI ทันทีเป็นสีเขียว
+            if (chk8d.checked) {
+                refreshSlotUI(eightdActionContainer, cached8d, 'รายงาน 8D');
+            }
+        } else {
+            eightdActionContainer.innerHTML = `<span class="text-[10px] text-rose-500 font-bold">❌ สร้าง PPTX ไม่สำเร็จ</span>`;
+        }
+    } else {
+        if (chk8d.checked) refreshSlotUI(eightdActionContainer, cached8d, 'รายงาน 8D');
+    }
+};
+
+    // รันเตรียม PDF ทันทีที่เปิดหน้าจอ
+    prepareVfAuto();
+
+    // 6. ผูกเหตุการณ์เมื่อติ๊ก Checkbox
+    chkVf.onchange = () => {
+        if (chkVf.checked) prepareVfAuto();
+        else refreshSlotUI(vfActionContainer, null, `รายงาน ${reportTag}`);
+        refreshBodyPreview();
+    };
+
+    chk8d.onchange = () => {
+        if (chk8d.checked) prepare8dAuto();
+        else refreshSlotUI(eightdActionContainer, null, 'รายงาน 8D');
+        refreshBodyPreview();
+    };
+
+    // ปุ่มคัดลอกข้อความ Body
+    modalEl.querySelector('#btn-copy-body-text').onclick = () => {
+        const is8d = chk8d ? chk8d.checked : false;
+        const bodyText = generateEmailBodyText(is8d);
+        navigator.clipboard.writeText(bodyText).then(() => toast("📋 คัดลอกข้อความสำเร็จ", "success"));
+    };
+
+    btnSend.onclick = async () => {
+        // ตรวจสอบก่อนว่ามีการติ๊กเลือก แต่ไฟล์ยังเตรียมไม่เสร็จหรือไม่
+        if ((chkVf.checked && !cachedVf) || (chk8d.checked && !cached8d)) {
+            toast("⚠️ ระบบกำลังเตรียมไฟล์แนบ กรุณารอเข็มขัดเขียวขึ้นก่อนกดส่ง", "warn");
+            return;
+        }
+
+        btnSend.disabled = true;
+        btnSendLabel.textContent = "กำลังรวบรวมไฟล์แนบและรูปภาพ...";
+
+        try {
+            const attachments = [];
+
+            // ✅ ใช้ก้อนข้อมูลที่แสดงผลในปุ่ม "เปิดดู" (ก้อนเดียวกับพรีวิว)
+            if (chkVf.checked && cachedVf) {
+                attachments.push({
+                    filename: cachedVf.filename,
+                    mimeType: 'application/pdf',
+                    base64: cachedVf.base64 // ดึงจาก Memory ตรงๆ ไม่ไปสร้างใหม่
+                });
+            }
+
+            if (chk8d.checked && cached8d) {
+                attachments.push({
+                    filename: cached8d.filename,
+                    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                    base64: cached8d.base64 // ดึงจาก Memory ตรงๆ
+                });
+            }
+
+            // รวบรวมรูปภาพหลักจาก NON - CONFORMANCE DETAILS
+            if (evidenceImg && !cachedImgBase64) {
+                cachedImgBase64 = await _pptGetImageDataUrl(evidenceImg);
+            }
+
+            const inlineImages = [];
+            if (cachedImgBase64) {
+                inlineImages.push({
+                    cid: 'non_conformance_img',
+                    base64: cachedImgBase64,
+                    mimeType: 'image/jpeg',
+                    filename: 'non_conformance_details.jpg'
+                });
+            }
+
+            const is8dChecked = chk8d ? chk8d.checked : false;
+
+            // สร้างก้อนข้อมูลอีเมล .eml พร้อมข้อความ Body และ HTML + Inline Image + ไฟล์แนบ
+            const emlBlob = generateEmlBlob({
+                to: targetEmail,
+                cc: ccEmail,
+                subject: baseSubject,
+                body: generateEmailBodyText(is8dChecked),
+                htmlBody: generateEmailHtmlBody(is8dChecked, inlineImages.length > 0),
+                attachments: attachments,
+                inlineImages: inlineImages
+            });
+
+            // ดาวน์โหลดไฟล์ .eml ไปเปิดใน Outlook
+            const a = document.createElement('a');
+            const safeDoc = docNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+            a.href = URL.createObjectURL(emlBlob);
+            a.download = `Email_${safeDoc}.eml`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            toast("✅ ดึงไฟล์แนบและสร้างร่างอีเมลสำเร็จ!", "success");
+            setTimeout(() => modalEl.remove(), 500);
+
+        } catch (err) {
+            console.error("Email Attachment Error:", err);
+            toast("❌ การแนบไฟล์ขัดข้อง", "error");
+            btnSend.disabled = false;
+            btnSendLabel.textContent = "ส่งออกอีเมล (.eml)";
+        }
+    };
+}
+
+    // Render Carrier Official Vendor Failure Report (VF/RP)
+    function renderVfReportDocument(c) {
+        if (!c) return '';
+        const d = c.report_data || {};
+        const vf = d.vf_data || {};
+        const completeDateVal = vf.complete_date || ''; // ดึงค่าวันที่ที่เคยบันทึกไว้
+        const formattedDate = c.created_at ? new Date(c.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : '15 Jul 26';
+        
+        const rawProblemTitle = c.problem_title || '';
+        const problemTitleClean = getCleanProblemTitle(rawProblemTitle || 'Missing part');
+        const partName = c.part_name || 'ASM-PL-COVER';
+        const drawingNo = vf.drawing_no || '1112886101';
+        const partGroup = c.part_group || 'Steel';
+        const supplierName = vf.vendor || 'THRIVE PRECISION INDUSTRY CO., LTD';
+        const vendorCode = vf.vendor_code || 'LT0004';
+        const ngQty = Number(c.ng_qty) || 8;
+        const okQty = Number(c.ok_qty) || 44;
+        const totalQty = Number(c.lot_no) || (okQty + ngQty) || 52;
+        const imgUrl = d.evidence_img || c.image_url || '';
+
+        
+// --- Logic: ดึงชื่อพื้นที่/ผู้แจ้ง มาใส่ใน SUBJ. ---
+    let extSubj = "OSA"; // ค่าเริ่มต้นถ้าหาไม่เจอ
+    // ใช้ Regex ค้นหาคำที่อยู่หลังรูปแบบ On DD Mon'YY และอยู่หน้าคำว่า inform
+    const subjMatch = problemTitleClean.match(/On\s+\d{1,2}\s+[A-Za-z']+\d{2}\s+(.*?)\s+inform/i);
+    if (subjMatch && subjMatch[1]) {
+        extSubj = subjMatch[1].trim().toUpperCase();
+    }
+        // Requirement 2: Extract defect string after "defect" for CRITERIA OF VENDOR FAILURE
+        let criteriaDefectText = '';
+        if (/defect/i.test(rawProblemTitle)) {
+            const parts = rawProblemTitle.split(/defect/i);
+            let rawDefect = parts[parts.length - 1].trim();
+            // ตัดข้อความส่วน IQC ออก ให้สิ้นสุดแค่ Defect เช่น Deformed.
+            if (/IQC/i.test(rawDefect)) {
+                const iqcParts = rawDefect.split(/\s*IQC/i);
+                rawDefect = iqcParts[0].trim();
+            }
+            criteriaDefectText = rawDefect;
+        } else {
+            const parsedD2 = parseProblemTitleForD2(rawProblemTitle, c);
+            let rawDefect = parsedD2.defectName || c.defect_mode || 'Deformed';
+            if (/IQC/i.test(rawDefect)) {
+                const iqcParts = rawDefect.split(/\s*IQC/i);
+                rawDefect = iqcParts[0].trim();
+            }
+            criteriaDefectText = rawDefect;
+        }
+        criteriaDefectText = criteriaDefectText.replace(/^[:\s-]+/, '').trim() || 'Deformed';
+
+        // Requirement 3: NON - CONFORMANCE DETAILS pulls exact problem text from 8D (Image 2)
+        const nonConformanceText = problemTitleClean || `On ${formattedDate} B1 inform quality problem about ${partName} / ${drawingNo} ${supplierName} found defect ${criteriaDefectText}`;
+        const correctiveText = vf.corrective_action || '';
+
+const reportType = (d.source_report_type || c.report_type || '').toString().toUpperCase();
+        const isRP = (reportType === 'RP' || reportType.includes('RP'));
+
+        // --- เริ่มส่วน Logic จัดการเลข Control No. ---
+        const allCasesForRunning = _cases || [];
+        
+        // --- เริ่มส่วน Logic จัดการเลข Control No. ---
+        const currentControlNo = getCaseControlNo(c);
+        // --- จบส่วน Logic จัดการเลข Control No. ---
+
+        const cyanBg = 'background: #cff4fc;';
+        const yellowBg = 'background: #ffff99;';
+// --- Logic การดึงข้อมูลจากประโยคปัญหา (Smart Parsing) ---
+    const problemText = problemTitleClean; // "On 10 Aug'26 ... about GUARD-FAN / 1118000102 PARADISE PLASTIC..."
+    let extAreaDept = "OSA"; // ค่าเริ่มต้นถ้าหาไม่เจอ
+    let extPartName = (c.part_name || "-").toUpperCase();
+    let extDrawingNo = vf.drawing_no || d.part_no || c.part_no || "-";
+    let extVendor = (vf.vendor || d.supplier || c.supplier || "-").toUpperCase();
+    let extVendorCode = c.vendor_code || vf.vendor_code || "LT0004";
+
+
+    if (problemText.includes("about")) {
+        try {
+            // 1. ตัดคำหลัง "about"
+            const parts = problemText.split(/about/i);
+            const afterAbout = parts[1].trim();
+            
+            // 2. แยก Part Name (ก่อนเครื่องหมาย /)
+            const slashSplit = afterAbout.split("/");
+            extPartName = slashSplit[0].trim().toUpperCase();
+
+            // 3. แยก Drawing No และ Vendor (หลังเครื่องหมาย / จนถึงคำว่า found defect)
+            const rest = slashSplit[1].trim();
+            const defectSplit = rest.split(/found defect/i);
+            const chunk = defectSplit[0].trim(); // จะได้ "1118000102 PARADISE PLASTIC CO., LTD."
+
+            const words = chunk.split(" ");
+            extDrawingNo = words[0]; // คำแรกคือ Drawing No
+            const parsedVendor = words.slice(1).join(" ").trim(); // คำที่เหลือทั้งหมดคือ Vendor
+            if (parsedVendor && !isRP && (!vf.vendor && !d.supplier && !c.supplier)) {
+                extVendor = parsedVendor;
+            }
+
+            // ถ้าเป็น RP หรือมีการระบุ supplier มา ให้ใช้ supplier ที่ระบุ
+            const directSupplier = vf.vendor || d.supplier || c.supplier;
+            if (directSupplier) {
+                extVendor = directSupplier.toUpperCase();
+            } else if (parsedVendor) {
+                extVendor = parsedVendor.toUpperCase();
+            }
+
+            // 4. ค้นหา Vendor Code จาก VENDOR_MASTER (ถ้ามี)
+            if (typeof VENDOR_MASTER !== 'undefined') {
+                const foundKey = Object.keys(VENDOR_MASTER).find(key => 
+                    VENDOR_MASTER[key].toUpperCase().includes(extVendor.toUpperCase()) ||
+                    extVendor.toUpperCase().includes(VENDOR_MASTER[key].toUpperCase())
+                );
+                if (foundKey) extVendorCode = foundKey;
+            }
+        } catch (e) {
+            console.warn("Parsing Problem Statement failed, using default values.");
+        }
+    }
+
+    if (extVendor && extVendor !== '-' && typeof VENDOR_MASTER !== 'undefined') {
+        const foundKey = Object.keys(VENDOR_MASTER).find(key => 
+            VENDOR_MASTER[key].toUpperCase().includes(extVendor.toUpperCase()) ||
+            extVendor.toUpperCase().includes(VENDOR_MASTER[key].toUpperCase())
+        );
+        if (foundKey) extVendorCode = foundKey;
+    }
+
+    const formatHeaderText = isRP 
+        ? 'Format-1 (TS0-60-07): Incoming Inspection Rejection Report' 
+        : 'Format-2 (150-60-07): Vendor Failure Report';
+    
+    const mainBannerHeadline = isRP 
+        ? 'INCOMING INSPECTION REJECTION REPORT' 
+        : 'VENDOR FAILURE REPORT';
+    
+    const mainBannerSubtitle = isRP
+        ? 'CARRIER AIR CONDITIONING (THAILAND) CO., LTD'
+        : 'CARRIER AIR CONDITIONING (THAILAND) CO., LTD.';
+    
+    const formatFooterText = isRP 
+        ? 'Format-1 (TS0-60-07): Incoming Inspection Rejection Report' 
+        : 'Format-2 (150-60-07): Vendor Failure Report';
+
+    const defaultSubj = isRP ? 'QAP Incoming inspection' : extSubj;
+    const subjDisplay = vf.subj || defaultSubj;
+    const defectLocationDisplay = vf.defect_location || defaultSubj;
+
+    const getSignatureImageHtml = (name, isSigActive) => {
+        if (!isSigActive) return "";
+        const sigUrl = getStaffSignatureImage(name);
+        if (!sigUrl) return "";
+        return `
+            <div style="height: 28px; display: flex; align-items: center; margin-left: 8px; background: transparent; padding: 0 4px; border-radius: 2px;">
+                <img src="${sigUrl}" alt="Signature" style="height: 26px; width: auto; max-width: 130px; object-fit: contain; display: block; border: none; background: transparent; image-rendering: auto;" onerror="this.style.display='none'">
+            </div>
+        `;
+    };
+
+    // --- [เริ่มส่วนแก้ไข: Production Type Selection - Checkbox Style] ---
+        const currentProdType = vf.production_type || 'mass'; 
+const drawCyberCheck = (typeKey, labelText) => {
+    const isChecked = (currentProdType === typeKey);
+    return `
+        <div style="display: flex; align-items: center; cursor: pointer; user-select: none; gap: 0px;" 
+             onclick="Wap8DSystem.updateProdType('${c.id}', '${typeKey}')">
+            <!-- วงเล็บเปิด -->
+            <span style="font-size: 14px; font-weight: 900; color: #000;">(</span>
+            
+            <!-- พื้นที่เครื่องหมายถูก: กังขจัด Border และพื้นหลังออกทั้งหมด -->
+            <div style="width: 22px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #000; border: none; background: transparent;">
+                ${isChecked ? '✓' : '&nbsp;'}
+            </div>
+            
+            <!-- วงเล็บปิด -->
+            <span style="font-size: 14px; font-weight: 900; color: #000; margin-right: 6px;">)</span>
+
+            <!-- ข้อความ Label -->
+            <span style="font-size: 10.5px; font-weight: 900; color: #000;">${labelText}</span>
+        </div>
+    `;
+};
+
+const productionTypeRowHtml = `
+    <div style="border: 1.5px solid #000; padding: 8px 15px; margin-bottom: 8px; display: flex; justify-content: space-around; align-items: center; background: #fff; width: 100%; box-sizing: border-box;">
+        ${drawCyberCheck('mass', 'MASS PRODUCTION')}
+        ${drawCyberCheck('trial', 'TRIAL MASS PRODUCTION')}
+        ${drawCyberCheck('service', 'SERVICE, SALE PARTS')}
+    </div>
+`;
+        // --- [จบส่วนแก้ไข] ---
+
+return `
+<div id="vf-paper-doc" class="vf-official-document" style="width: 100%; max-width: 900px; margin: 0 auto; background: #ffffff; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15); font-family: Arial, sans-serif; color: #000000; box-sizing: border-box; padding: 10px 20px; position: relative;">
+    <div style="border: 4px solid #000000; padding: 12px; box-sizing: border-box;">      
+        
+        <!-- Top Doc Header Bar (ปรับปรุงเพื่อให้กึ่งกลาง 100%) -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #000; padding-bottom: 8px; margin-bottom: 10px; font-size: 11px; font-weight: bold;">
+            <div style="display: flex; align-items: center;">
+                <span style="font-weight: 900; letter-spacing: 0.2px;">${formatHeaderText}</span>
+            </div>
+            
+            <!-- ชุดกล่อง Retention: ใช้ Flex Centering และ Fixed Height ป้องกันการเพี้ยน -->
+            <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                <div style="border: 1.5px solid #000; width: 90px; height: 28px; display: flex; align-items: center; justify-content: center; background: #fff; box-sizing: border-box;">
+                    <span style="font-size: 11px; font-weight: 900; color: #000; line-height: 1; text-transform: capitalize;">Retention</span>
+                </div>
+                <div contenteditable="true" style="border: 1.5px solid #000; width: 75px; height: 28px; display: flex; align-items: center; justify-content: center; background: #fff; box-sizing: border-box; outline: none;">
+                    <span style="font-size: 11px; font-weight: 900; color: #000; line-height: 1;">5 Year</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- หลังจากนี้เป็นส่วน Banner Title และตารางข้อมูลอื่นๆ ตามลำดับเดิม -->
+
+                <!-- Main Banner Title -->
+                <div style="text-align: center; margin-bottom: 8px; border-bottom: 2.5px solid #000; padding-bottom: 6px;">
+                    <h1 contenteditable="true" style="font-size: 22px; font-weight: 900; margin: 0; letter-spacing: 0.5px; text-transform: uppercase;">
+                        ${mainBannerHeadline}
+                    </h1>
+                    <p contenteditable="true" style="font-size: 11.5px; font-weight: 800; margin: 2px 0 0 0; color: #000; letter-spacing: 0.3px;">${mainBannerSubtitle}</p>
+                </div>
+
+<!-- Meta Information Table -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 10px; font-weight: bold; border: 1.5px solid #000; table-layout: fixed;">
+                <colgroup>
+                    <col style="width: 18%;" />
+                    <col style="width: 32%;" />
+                    <col style="width: 22%;" />
+                    <col style="width: 28%;" />
+                </colgroup>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">TO</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px;" contenteditable="true">${vf.to || 'K.Mathira Ch--> VENDOR'}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">CONTROL NO.</td>
+                    <td id="vf-doc-control-no" style="border: 1px solid #000; padding: 4px 6px;" contenteditable="true">${currentControlNo}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">FROM</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px;" contenteditable="true">${vf.from || '[ SQ ] / SQE'}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">ISSUED DATE</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px;" contenteditable="true">${vf.issued_date || formattedDate}</td>
+                </tr>
+ <tr>
+        <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">SUBJ.</td>
+        <td style="border: 1px solid #000; padding: 4px 6px;" contenteditable="true">${subjDisplay}</td>
+        <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">ISSUE BY</td>
+        <td style="border: 1px solid #000; padding: 0 4px; position: relative; height: 32px; vertical-align: middle; text-align: left;">
+            ${renderSigCell('issue', vf.issue_by, vf.issue_sig_active, vf.issue_timestamp)}
+        </td>
+    </tr>
+
+    <!-- แถว CC. และ CONFIRM BY -->
+    <tr>
+        <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">CC.</td>
+        <td style="border: 1px solid #000; padding: 4px 6px;" contenteditable="true">${vf.cc || 'K.Duangjai S. ( PD1 )'}</td>
+        <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">CONFIRM BY</td>
+        <td style="border: 1px solid #000; padding: 0 4px; position: relative; height: 32px; vertical-align: middle; text-align: left;">
+            ${renderSigCell('confirm', vf.confirm_by, vf.confirm_sig_active, vf.confirm_timestamp)}
+        </td>
+    </tr>
+
+    <!-- แถว APPROVED BY -->
+    <tr>
+        <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}"></td>
+        <td style="border: 1px solid #000; padding: 4px 6px;"></td>
+        <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">APPROVED BY</td>
+        <td style="border: 1px solid #000; padding: 0 4px; position: relative; height: 32px; vertical-align: middle; text-align: left;">
+            ${renderSigCell('approved', vf.approved_by, vf.approved_sig_active, vf.approved_timestamp)}
+        </td>
+    </tr>
+            </table>
+
+            ${productionTypeRowHtml}
+
+            <!-- Parts & Defect Details Table (Smart Mapped from Problem Statement) -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 9.5px; border: 1.5px solid #000; border-bottom: 2.5px solid #000; table-layout: fixed;">
+                <colgroup>
+                    <col style="width: 18%;" />
+                    <col style="width: 32%;" />
+                    <col style="width: 22%;" />
+                    <col style="width: 28%;" />
+                </colgroup>
+                
+                <!-- 1. MODEL -->
+                <tr style="border-bottom: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">MODEL</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; background: #fff;" contenteditable="true">${vf.model || '-'}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">Q'TY. TOTAL</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; background: #fff; font-weight: bold;" contenteditable="true">${totalQty} PCS.</td>
+                </tr>
+
+                <!-- 2. PART NAME (ดึงจากคำหลัง about) -->
+                <tr style="border-bottom: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">PART NAME</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extPartName}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">Q'TY SAMPLING SIZE</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px;" contenteditable="true">${vf.sampling_qty || '0 PCS.'}</td>
+                </tr>
+
+                <!-- 3. DRAWING NO. (ดึงจากหลัง /) -->
+                <tr style="border-bottom: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">DRAWING NO.</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extDrawingNo}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">Q'TY DEFECT</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; color: red;" contenteditable="true">${ngQty} PCS.</td>
+                </tr>
+
+                <!-- 4. PART GROUP -->
+                <tr style="border-bottom: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">PART GROUP</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px;" contenteditable="true">${c.part_group || '-'}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">LOT. JUDGMENT Q'TY</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${ngQty} PCS.</td>
+                </tr>
+
+                <!-- 5. VENDOR (ดึงจากหลัง Drawing No) -->
+                <tr style="border-bottom: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">VENDOR</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; color: #0000FF;" contenteditable="true">${extVendor}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">TROUBLE RANK</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; color: red;" contenteditable="true">B</td>
+                </tr>
+
+                <!-- 6. VENDOR CODE (ดึงจากฐานข้อมูลเทียบชื่อ) -->
+                <tr style="border-bottom: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">VENDOR CODE</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-family: monospace;" contenteditable="true">${extVendorCode}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">RECEIVED DATE</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px;" contenteditable="true">${formattedDate}</td>
+                </tr>
+
+                <!-- 7. P/O# & INS. DATE -->
+                <tr style="border-bottom: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">P/O#</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px;" contenteditable="true">${vf.po_no || '-'}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">INS. DATE</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${formattedDate}</td>
+                </tr>
+
+                <!-- 8. INV.# & PRODUCTION DATE -->
+                <tr style="border-bottom: 1px solid #000;">
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">INV.#</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px;" contenteditable="true">${vf.inv_no || '-'}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">PRODUCTION DATE</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px;" contenteditable="true">${formattedDate}</td>
+                </tr>
+
+                <!-- 9. DEFECTIVE MODE -->
+<tr>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">DEFECTIVE MODE</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">Appearance</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">DEFECT FOUND LOCATION</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px;" contenteditable="true">${defectLocationDisplay}</td> 
+                </tr>
+            </table>
+
+            <!-- CRITERIA OF VENDOR FAILURE -->
+            <div style="margin-bottom: 8px;">
+                <div style="font-size: 10.5px; font-weight: 900; text-transform: uppercase; margin-bottom: 3px;">
+                    <span style="border-bottom: 2px solid #000; padding-bottom: 1px;">CRITERIA OF VENDOR FAILURE</span>
+                </div>
+                <div contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 5px 8px; font-size: 11px; font-weight: 900; color: #dc2626; border-radius: 1px;">
+                    ${criteriaDefectText}
+                </div>
+            </div>
+
+            <!-- NON - CONFORMANCE DETAILS -->
+            <div style="margin-bottom: 8px;">
+                <div style="font-size: 10.5px; font-weight: 900; text-transform: uppercase; margin-bottom: 3px;">
+                    <span style="border-bottom: 2px solid #000; padding-bottom: 1px;">NON - CONFORMANCE DETAILS</span>
+                </div>
+                <div contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 6px 8px; font-size: 10.5px; font-weight: 800; color: #000; border-radius: 1px; line-height: 1.35;">
+                    ${nonConformanceText}
+                </div>
+            </div>
+
+            <!-- Single Photo Evidence Box (From D2-Define the Problem) -->
+            <div style="border: 2px solid #000; height: 180px; width: 100%; background: #ffffff; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 10px; position: relative; border-bottom: 2.5px solid #000;">
+                ${imgUrl 
+                    ? `<img src="${imgUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto;" alt="D2 Problem Photo" />` 
+                    : `<div style="color:#94a3b8; font-size:11px; font-weight:bold;">PHOTO AREA (FROM D2)</div>`}
+            </div>
+
+            <!-- CORRECTIVE ACTION RESPONSE (Filled out by supplier) -->
+            <div style="border-top: 2.5px solid #000; padding-top: 8px; margin-bottom: 10px;">
+                <div style="text-align: center; margin-bottom: 8px;">
+                    <span style="font-size: 11px; font-weight: 900; color: #0000ff; border-bottom: 2px solid #0000ff; padding-bottom: 1px; text-transform: uppercase;">
+                        CORRECTIVE ACTION RESPONSE (Filled out by supplier)
+                    </span>
+                </div>
+                
+<!-- 1) Root cause -->
+<div style="margin-bottom: 8px;">
+    <div style="font-size: 10px; font-weight: 950; margin-bottom: 5px;">
+        <span style="border-bottom: 2px solid #000; padding-bottom: 3px; display: inline-block; line-height: 1;">
+            1) Root cause of Nonconformity or defect
+        </span>
+    </div>
+    <div contenteditable="true" style="border-bottom: 1px solid #000; min-height: 20px; font-size: 10px; padding: 2px 0;">${vf.root_cause || ''}</div>
+</div>
+
+<!-- 2) Corrective Action -->
+<div style="margin-bottom: 8px;">
+    <div style="font-size: 10px; font-weight: 950; margin-bottom: 5px;">
+        <span style="border-bottom: 2px solid #000; padding-bottom: 3px; display: inline-block; line-height: 1;">
+            2) Corrective Action
+        </span>
+    </div>
+    <div contenteditable="true" style="border-bottom: 1px solid #000; min-height: 20px; font-size: 10px; font-weight: bold; padding: 2px 0;">${correctiveText}</div>
+</div>
+
+<!-- 3) Preventive Action -->
+<div style="margin-bottom: 8px;">
+    <div style="font-size: 10px; font-weight: 950; margin-bottom: 5px;">
+        <span style="border-bottom: 2px solid #000; padding-bottom: 3px; display: inline-block; line-height: 1;">
+            3) Preventive Action
+        </span>
+    </div>
+    <div contenteditable="true" style="border-bottom: 1px solid #000; min-height: 20px; font-size: 10px; padding: 2px 0;">${vf.preventive_action || ''}</div>
+</div>
+
+<!-- Evidence Checkboxes (Full Width Rows with Perfect Alignment) -->
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 9.5px; font-weight: bold; margin-top: 10px; margin-bottom: 10px; width: 100%;">
+    
+    <!-- แถวที่ 1 -->
+    <div style="display: grid; grid-template-columns: 160px 50px 1fr 50px; align-items: center; width: 100%;">
+        <span style="white-space: nowrap;">Evidence for Acceptance 1 st :</span>
+        <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" style="width: 12px; height: 12px; margin: 0;" /> Yes
+        </label>
+        <span contenteditable="true" style="border-bottom: 1px solid #000; margin: 0 15px; display: inline-block;">&nbsp;</span>
+        <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer; justify-self: end;">
+            <input type="checkbox" style="width: 12px; height: 12px; margin: 0;" /> No
+        </label>
+    </div>
+
+    <!-- แถวที่ 2 -->
+    <div style="display: grid; grid-template-columns: 160px 50px 1fr 50px; align-items: center; width: 100%;">
+        <span style="white-space: nowrap;">Evidence for Acceptance 2 nd :</span>
+        <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
+            <input type="checkbox" style="width: 12px; height: 12px; margin: 0;" /> Yes
+        </label>
+        <span contenteditable="true" style="border-bottom: 1px solid #000; margin: 0 15px; display: inline-block;">&nbsp;</span>
+        <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer; justify-self: end;">
+            <input type="checkbox" style="width: 12px; height: 12px; margin: 0;" /> No
+        </label>
+    </div>
+</div>
+
+                <!-- Reported 1st / 2nd by lines (Matching Image 1) -->
+                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 9.5px; font-weight: bold; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; width: 100%; gap: 10px;">
+                        <span style="white-space: nowrap; width: 100px;">Reported 1 st by</span>
+                        <span contenteditable="true" style="border-bottom: 1px solid #000; flex: 1.5; display: inline-block;">&nbsp;</span>
+                        <span style="white-space: nowrap; margin-left: 10px;">Section</span>
+                        <span contenteditable="true" style="border-bottom: 1px solid #000; flex: 1; display: inline-block;">&nbsp;</span>
+                        <span style="white-space: nowrap; margin-left: 10px;">Date</span>
+                        <span contenteditable="true" style="border-bottom: 1px solid #000; flex: 1; display: inline-block;">&nbsp;</span>
+                    </div>
+                    <div style="display: flex; align-items: center; width: 100%; gap: 10px;">
+                        <span style="white-space: nowrap; width: 100px;">Reported 2 nd by</span>
+                        <span contenteditable="true" style="border-bottom: 1px solid #000; flex: 1.5; display: inline-block;">&nbsp;</span>
+                        <span style="white-space: nowrap; margin-left: 10px;">Section</span>
+                        <span contenteditable="true" style="border-bottom: 1px solid #000; flex: 1; display: inline-block;">&nbsp;</span>
+                        <span style="white-space: nowrap; margin-left: 10px;">Date</span>
+                        <span contenteditable="true" style="border-bottom: 1px solid #000; flex: 1; display: inline-block;">&nbsp;</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section: ACCEPTANCE OF CORRECTIVE ACTION/COMMENTS (Filled out by CTC) -->
+            <div style="border-top: 2.5px solid #000; padding-top: 8px; margin-bottom: 10px;">
+                <div style="text-align: center; margin-bottom: 8px;">
+                    <span style="font-size: 11px; font-weight: 900; color: #0000ff; border-bottom: 2px solid #0000ff; padding-bottom: 1px; text-transform: uppercase;">
+                        ACCEPTANCE OF CORRECTIVE ACTION/COMMENTS (Filled out by CTC)
+                    </span>
+                </div>
+                
+<!-- แถวที่ 1 -->
+<div style="display: grid; grid-template-columns: 210px 1fr 100px 120px; align-items: center; font-size: 9.5px; font-weight: bold; margin-bottom: 6px; width: 100%;">
+    <span style="white-space: nowrap;">Action Taken 1 st Verification Date</span>
+    <span contenteditable="true" style="border-bottom: 1px solid #000; margin-right: 15px; display: inline-block;">&nbsp;</span> 
+    <label style="cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px;">
+        <input type="checkbox" style="width: 12px; height: 12px; margin: 0;" /> Acceptance
+    </label> 
+    <label style="cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px;">
+        <input type="checkbox" style="width: 12px; height: 12px; margin: 0;" /> Non Acceptance
+    </label>
+</div>
+
+<!-- แถวที่ 2 -->
+<div style="display: grid; grid-template-columns: 210px 1fr 100px 120px; align-items: center; font-size: 9.5px; font-weight: bold; margin-bottom: 8px; width: 100%;">
+    <span style="white-space: nowrap;">Action Taken 2 nd Verification Date</span>
+    <span contenteditable="true" style="border-bottom: 1px solid #000; margin-right: 15px; display: inline-block;">&nbsp;</span> 
+    <label style="cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px;">
+        <input type="checkbox" style="width: 12px; height: 12px; margin: 0;" /> Acceptance
+    </label> 
+    <label style="cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px;">
+        <input type="checkbox" style="width: 12px; height: 12px; margin: 0;" /> Non Acceptance
+    </label>
+</div>
+
+                <!-- Comments -->
+                <div style="margin-bottom: 8px;">
+                    <div style="font-size: 9.5px; font-weight: 900; margin-bottom: 3px;">
+                        <span style="border-bottom: 2px solid #000; padding-bottom: 1px;">Comments</span>
+                    </div>
+                    <div contenteditable="true" style="border-bottom: 1px solid #000; min-height: 18px; font-size: 9.5px; padding: 1px 0;">${vf.comments || ''}</div>
+                    <div contenteditable="true" style="border-bottom: 1px solid #000; min-height: 18px; font-size: 9.5px; padding: 1px 0;"></div>
+                    <div contenteditable="true" style="border-bottom: 1px solid #000; min-height: 18px; font-size: 9.5px; padding: 1px 0;"></div>
+                </div>
+            </div>
+
+
+            <div style="border-top: 1.5px solid #000; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: bold; margin-bottom: 5px;">
+                <div>Corrective Action Close Out Date : <span contenteditable="true" style="border-bottom: 1px solid #000; display: inline-block; width: 110px;">&nbsp;</span></div>
+                <div>Investigated by : <span contenteditable="true" style="border-bottom: 1px solid #000; display: inline-block; width: 110px;">&nbsp;</span></div>
+                <div>Approved by : <span contenteditable="true" style="border-bottom: 1px solid #000; display: inline-block; width: 110px;">&nbsp;</span></div>
+            </div>
+
+        </div> 
+        <!-- ปิดกรอบเส้นดำหนา (4px) ตรงนี้ เพื่อให้เส้นขอบขยับขึ้นและเนื้อหาถัดไปอยู่นอกกรอบ -->
+
+        <!-- Bottom Page Subtext (อยู่นอกกรอบเส้นดำด้านล่าง) -->
+        <div style="display: flex; justify-content: space-between; font-size: 8.5px; color: #000; margin-top: 5px; font-weight: bold; padding: 0 5px;">
+            <span>Revision No.00: 1/07/2024</span>
+            <span>${formatFooterText}</span>
+        </div>
+
+    </div> <!-- ปิดแผ่นกระดาษขาว vf-paper-doc -->
+    `;
+ }
+
     // 3. บันทึกลง Cloud Auto-Save (ใช้ sqeClient)
     async function saveCurrentProgress() {
         if (!_currentCase || S.userRole === 'supervisor' || _isSaving) return;
         _isSaving = true;
         
-        const currentData = _collectDataFromUI();
         const updatedReportData = { ...(_currentCase.report_data || {}) };
-        updatedReportData[`slide_${_currentSlide}`] = currentData;
+
+        if (_isVfView) {
+            const vfDoc = document.getElementById('vf-paper-doc');
+            if (vfDoc) {
+                const editables = vfDoc.querySelectorAll('[contenteditable="true"]');
+                const vfData = updatedReportData.vf_data || {};
+                editables.forEach((el, index) => {
+                    vfData[`vf_field_${index}`] = el.innerHTML;
+                });
+                updatedReportData.vf_data = vfData;
+            }
+        } else {
+            const currentData = _collectDataFromUI();
+            updatedReportData[`slide_${_currentSlide}`] = currentData;
+        }
 
         try {
-            // ✅ เปลี่ยนเป็น sqeClient
             await sqeClient.from(TABLE).update({ 
                 report_data: updatedReportData,
                 updated_at: new Date().toISOString()
             }).eq('id', _currentCase.id);
             _currentCase.report_data = updatedReportData; 
-            console.log("✅ 8D Cloud Synchronized");
+            console.log("✅ SQE Cloud Synchronized");
         } catch (e) { console.error("Save failed:", e); }
         finally { _isSaving = false; }
     }
@@ -18222,6 +22447,23 @@ async function fetchCases() {
     // 4. หยอดข้อมูลกลับเข้าช่อง (Re-hydration)
     function _rehydrateUI() {
         if (!_currentCase || !_currentCase.report_data) return;
+
+        if (_isVfView) {
+            const vfData = _currentCase.report_data.vf_data;
+            if (!vfData) return;
+            requestAnimationFrame(() => {
+                const vfDoc = document.getElementById('vf-paper-doc');
+                if (!vfDoc) return;
+                const editables = vfDoc.querySelectorAll('[contenteditable="true"]');
+                editables.forEach((el, index) => {
+                    if (vfData[`vf_field_${index}`] !== undefined) {
+                        el.innerHTML = vfData[`vf_field_${index}`];
+                    }
+                });
+            });
+            return;
+        }
+
         const savedData = _currentCase.report_data[`slide_${_currentSlide}`];
         if (!savedData) return;
 
@@ -18262,16 +22504,61 @@ async function fetchCases() {
         }
     }
 
-    async function openReport(id) {
-        _currentCase = _cases.find(x => x.id === id);
-        _currentSlide = 0;
-        document.getElementById('eight-d-dashboard').classList.add('hidden');
-        document.getElementById('eight-d-report-view').classList.remove('hidden');
-        renderSlide();
-        _rehydrateUI();
-        setTimeout(fitSlideToContainer, 30);
+    async function openReport(id, forceVf = false) {
+    // 1. ตรวจสอบความถูกต้องของข้อมูลก่อนเริ่มวาด
+    _currentCase = _cases.find(x => String(x.id) === String(id));
+
+    // Fallback: หากหาเคสในหน่วยความจำไม่เจอ (เช่น เปิดจากลิงก์โดยตรง) ให้ดึงข้อมูลใหม่ทันที
+    if (!_currentCase) {
+        console.log("🛠️ Case not found in memory, re-fetching records...");
+        await fetchCases(); // บังคับดึงข้อมูลเคสจาก Server ใหม่
+        _currentCase = _cases.find(x => String(x.id) === String(id));
     }
 
+    if (!_currentCase) {
+        toast("❌ ไม่พบข้อมูลรายงานที่ระบุในระบบ", "error");
+        return;
+    }
+
+    // 2. ตั้งค่าสถานะเริ่มต้นของรายงาน
+    _currentSlide = 0;
+    
+    // ตัดสินโหมดการแสดงผล (VF/RP Document หรือ 8D Slides)
+    // หากเรียกผ่าน Deep Link จะส่งค่า forceVf มาเป็น true เสมอตาม Case Profile
+    _isVfView = (forceVf === true) || (_activeSqeTab === 'vf');
+
+    // 3. จัดการสลับหน้าจอ UI (ซ่อน Dashboard / แสดง Report View)
+    const dash = document.getElementById('eight-d-dashboard');
+    const rptView = document.getElementById('eight-d-report-view');
+    if (dash) dash.classList.add('hidden');
+    if (rptView) rptView.classList.remove('hidden');
+
+    // จัดการแถบควบคุมหน้าสไลด์ (ถ้าเป็นหน้าเอกสารใบเดียวแบบ VF จะซ่อนไว้)
+    const slideNav = document.querySelector('#eight-d-report-view .bg-slate-100.p-1.rounded-xl');
+    if (slideNav) {
+        slideNav.style.display = _isVfView ? 'none' : 'flex';
+    }
+
+    // 4. อัปเดตสถานะปุ่ม Export และปุ่มส่งอีเมลให้ตรงตามประเภทเคสและสถานะการเซ็น
+    updateExportAndEmailButtons();
+
+    // 5. >>> [จุดสำคัญ]: บังคับวาดหน้าจอทันที (Force Render) <<<
+    // ขั้นตอนนี้จะเปลี่ยนหน้าสีเทาเป็นเอกสารสีขาวทันที
+    renderSlide();
+
+    // 6. หยอดข้อมูลคืน (Rehydrate) และปรับขนาดให้พอดีหน้าจอ
+    // ใช้ setTimeout เพื่อให้มั่นใจว่า HTML ถูกวาดลง DOM เสร็จก่อนเริ่มหยอดข้อมูลลงช่อง ContentEditable
+    setTimeout(() => {
+        _rehydrateUI(); 
+        fitSlideToContainer();
+        
+        // เลื่อน Scroll กลับขึ้นไปบนสุดเพื่อให้เห็นหัวเอกสาร
+        const scrollArea = document.getElementById('eight-d-presentation-container');
+        if (scrollArea) scrollArea.scrollTop = 0;
+        
+        console.log(`✅ Case ${id} rendered successfully in ${_isVfView ? 'VF-Mode' : '8D-Mode'}`);
+    }, 150);
+}
 async function createNewCase(supportData) {
     const newId = '8D-' + Date.now();
     
@@ -18281,6 +22568,30 @@ async function createNewCase(supportData) {
 
     // ดึงรูปจาก Support
     const evidenceImg = supportData.image_url || supportData.imageUrl || null;
+
+    let supp = supportData.supplier || '';
+    let partNo = supportData.part_no || supportData.partNo || '';
+    let poNo = supportData.po_no || supportData.po || '';
+    let invNo = supportData.inv_no || supportData.inv || '';
+
+    if ((!poNo || !invNo) && supportData.remark) {
+        const metaMatch = String(supportData.remark).match(/\[PO:(.*?)\|INV:(.*?)\]/);
+        if (metaMatch) {
+            if (!poNo) poNo = metaMatch[1];
+            if (!invNo) invNo = metaMatch[2];
+        }
+    }
+
+    // ถ้าไม่มี supplier หรือ partNo ให้พยายาม parse จากประโยคปัญหา
+    if ((!supp || !partNo) && supportData.problem) {
+        const parsed = parseProblemTitleForD2(supportData.problem, supportData);
+        if (!supp && parsed.supplier && parsed.supplier !== 'OSA' && parsed.supplier !== '-') supp = parsed.supplier;
+        if (!partNo && parsed.drawingNo && parsed.drawingNo !== '-') partNo = parsed.drawingNo;
+    }
+
+    const rawReportType = (supportData.report_type || supportData.report || '').toString().trim().toUpperCase();
+    const isRP = rawReportType === 'RP' || rawReportType.startsWith('RP') || rawReportType.includes('RP') || rawReportType.includes('IQC');
+    const assignedReportType = isRP ? 'RP' : 'VF';
 
     const payload = {
         id: newId,
@@ -18294,9 +22605,22 @@ async function createNewCase(supportData) {
         ng_qty: ng,
         status: 'D1_OPEN',
         // ✅ เก็บข้อมูลรูปภาพและหมายเหตุไว้ใน JSON เพื่อนำไปใช้ในสไลด์อัตโนมัติ
-    report_data: {
-        source_report_type: supportData.report_type || supportData.report, // เก็บค่า 'RP', 'VF' หรือ 'RECORDS'
-        evidence_img: supportData.image_url || null,
+        report_data: {
+            source_report_type: assignedReportType, // เก็บค่า 'RP' หรือ 'VF'
+            evidence_img: evidenceImg,
+            supplier: supp,
+            part_no: partNo,
+            po_no: poNo,
+            inv_no: invNo,
+            vf_data: {
+                vendor: supp,
+                drawing_no: partNo,
+                po_no: poNo,
+                inv_no: invNo,
+                control_no: "PENDING", // ให้ใส่ PENDING ไว้ เพื่อให้ระบบคำนวณ Running No. ตามคิวที่บันทึก
+                subj: isRP ? 'QAP Incoming inspection' : 'OSA',
+                defect_location: isRP ? 'QAP Incoming inspection' : 'OSA'
+            }
         },
         created_at: new Date().toISOString()
     };
@@ -18305,7 +22629,7 @@ async function createNewCase(supportData) {
         const { error } = await sqeClient.from('eight_d_reports').insert([payload]);
         if (error) throw error;
 
-        toast("✅ สร้างเคส 8D พร้อมเชื่อมโยงข้อมูลสำเร็จ", "success");
+        toast(`✅ สร้างเคส ${assignedReportType} / 8D เรียบร้อยแล้ว`, "success");
         await fetchCases(); 
         renderDashboard();
 
@@ -18434,6 +22758,38 @@ async function _pptGetImageDataUrl(imgSrc) {
     return null;
 }
 
+// Reliable image → base64 converter using fetch+blob (works around CORS taint issues)
+async function fetchImageAsDataURL(url) {
+    if (!url) return null;
+    if (url.startsWith('data:')) return url; // already safe
+    try {
+        const res = await fetch(url, { mode: 'cors', cache: 'no-store' });
+        if (!res.ok) throw new Error('Fetch failed: ' + res.status);
+        const blob = await res.blob();
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.warn('[fetchImageAsDataURL] Could not convert (likely no CORS on source):', url, e);
+        return null; // caller should handle gracefully (e.g. drop the image)
+    }
+}
+
+function _blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const dataUrl = reader.result || '';
+            const base64 = String(dataUrl).split(',')[1] || '';
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
 // ✅ Helper: แปลง SVG Element เป็น DataURL
 async function _pptSvgToDataUrl(svgElement) {
     if (!svgElement) return null;
@@ -18507,7 +22863,8 @@ async function createSlide0_Cover(pptx, caseData) {
     slide.addText("8D Report", { x: 0.3, y: 0.35, w: 7.8, h: 0.6, fontSize: 38, fontFace: 'Arial Black', color: '000000', wrap: false, valign: 'bottom' });
     slide.addText("Suppliers can use any format of the report as long as all mandatory information is present.", { x: 8.2, y: 0.35, w: 4.8, h: 0.6, fontSize: 9, color: 'FF0000', fill: { color: 'FFFF99' }, align: 'center', border: { pt: 1, color: 'FFCC00' } });
     slide.addShape(pptx.ShapeType.line, { x: 0.3, y: 1.0, w: 12.8, h: 0, line: { color: '003366', width: 6.0 } });
-    const isRP = caseData.report_data?.source_report_type === 'RP';
+    const srcType = (caseData.report_data?.source_report_type || caseData.report_type || '').toString().toUpperCase();
+    const isRP = srcType === 'RP' || srcType.includes('RP');
     slide.addShape(pptx.ShapeType.rect, { x: 8.0, y: 1.45, w: 0.3, h: 0.3, fill: isRP ? { color: '000000' } : null, line: { color: '000000' } });
     slide.addText("[IQC Rejected, RP]", { x: 8.4, y: 1.45, fontSize: 12, bold: true });
     slide.addShape(pptx.ShapeType.rect, { x: 10.6, y: 1.45, w: 0.3, h: 0.3, fill: !isRP ? { color: '000000' } : null, line: { color: '000000' } });
@@ -18517,14 +22874,9 @@ async function createSlide0_Cover(pptx, caseData) {
     addStandardFooter(pptx, slide, 1);
 }
 
-async function exportToPPTX(targetCaseId) {
-    let caseData = _cases.find(x => x.id === targetCaseId) || _currentCase;
-    if (!caseData) return toast("❌ ไม่พบข้อมูลเคส", "error");
-
+async function buildPptxPresentation(caseData) {
     const PptxConstructor = window.PptxGenJS || window.pptxgen;
-    if (!PptxConstructor) return toast("❌ ไม่พบไลบรารี PptxGenJS", "error");
-
-    toast("⏳ กำลังจัดทำรายงาน D1-D8 รายละเอียดสูง...", "info");
+    if (!PptxConstructor) throw new Error("ไม่พบไลบรารี PptxGenJS");
 
     const pptx = new PptxConstructor();
     pptx.layout = 'LAYOUT_WIDE'; 
@@ -18547,7 +22899,8 @@ async function exportToPPTX(targetCaseId) {
     });
     slide1.addShape(pptx.ShapeType.line, { x: 0.3, y: 1.0, w: 12.8, h: 0, line: { color: '003366', width: 6.0 } });
 
-    const isRP = caseData.report_data?.source_report_type === 'RP';
+    const srcType = (caseData.report_data?.source_report_type || caseData.report_type || '').toString().toUpperCase();
+    const isRP = srcType === 'RP' || srcType.includes('RP');
     slide1.addShape(pptx.ShapeType.rect, { x: 8.0, y: 1.45, w: 0.25, h: 0.25, fill: isRP ? { color: '000000' } : null, line: { color: '000000' } });
     slide1.addText("[IQC Rejected, RP]", { x: 8.3, y: 1.45, fontSize: 11, bold: true });
     slide1.addShape(pptx.ShapeType.rect, { x: 10.6, y: 1.45, w: 0.25, h: 0.25, fill: !isRP ? { color: '000000' } : null, line: { color: '000000' } });
@@ -18575,36 +22928,6 @@ async function exportToPPTX(targetCaseId) {
 
     const s1Data = caseData.report_data?.slide_1 || {};
 
-    // First, scan DOM for D1 table data if present on the screen
-    const domD1Data = { tctc: [], supplier: [] };
-    try {
-        const tables = document.querySelectorAll('table');
-        tables.forEach(tbl => {
-            const th = tbl.querySelector('th');
-            if (!th) return;
-            const thText = (th.textContent || '').toUpperCase();
-            if (thText.includes('TCTC') || thText.includes('SUPPLIER')) {
-                const isSupp = thText.includes('SUPPLIER');
-                const targetArr = isSupp ? domD1Data.supplier : domD1Data.tctc;
-                const rows = tbl.querySelectorAll('tbody tr');
-                for (let i = 0; i < 6; i++) {
-                    const trName = rows[i * 2];
-                    const trRole = rows[i * 2 + 1];
-                    let name = "", role = "";
-                    if (trName) {
-                        const nameTd = trName.querySelector('td[contenteditable="true"]') || trName.querySelectorAll('td')[2];
-                        if (nameTd) name = (nameTd.textContent || '').replace(/<[^>]*>?/gm, '').trim();
-                    }
-                    if (trRole) {
-                        const roleTd = trRole.querySelector('td[contenteditable="true"]') || trRole.querySelectorAll('td')[1];
-                        if (roleTd) role = (roleTd.textContent || '').replace(/<[^>]*>?/gm, '').trim();
-                    }
-                    targetArr[i] = { name, role };
-                }
-            }
-        });
-    } catch (e) { console.error("DOM D1 Extract Error", e); }
-
     const buildD1Rows = (isSupplier) => {
         let rows = [[{ 
             text: isSupplier ? "SUPPLIER NAME MEMBER" : "TCTC MEMBER", 
@@ -18620,8 +22943,6 @@ async function exportToPPTX(targetCaseId) {
             return !blacklist.some(word => lower.includes(word.toLowerCase()));
         };
 
-        const domArr = isSupplier ? domD1Data.supplier : domD1Data.tctc;
-
         for (let i = 1; i <= 6; i++) {
             const baseIdx = isSupplier ? (i + 5) * 2 : (i - 1) * 2;
             
@@ -18633,21 +22954,14 @@ async function exportToPPTX(targetCaseId) {
                 if (i === 2) { defaultName = "Mr.Komsan N."; defaultRole = "Senior Engineer (QAP)"; }
             }
 
-            // 1. Try DOM
-            let nameVal = domArr[i - 1]?.name || "";
-            let roleVal = domArr[i - 1]?.role || "";
+            // ใช้ข้อมูลที่บันทึกไว้ (report_data.slide_1) เป็นแหล่งเดียวเสมอ ไม่ดึงจาก DOM อีกต่อไป
+            let s1Name = (s1Data[`f_${baseIdx}`] || "").replace(/<[^>]*>?/gm, '').trim();
+            let nameVal = isCleanVal(s1Name) ? s1Name : "";
 
-            // 2. If DOM empty or invalid, try s1Data
-            if (!isCleanVal(nameVal)) {
-                let s1Name = (s1Data[`f_${baseIdx}`] || "").replace(/<[^>]*>?/gm, '').trim();
-                nameVal = isCleanVal(s1Name) ? s1Name : "";
-            }
-            if (!isCleanVal(roleVal)) {
-                let s1Role = (s1Data[`f_${baseIdx + 1}`] || "").replace(/<[^>]*>?/gm, '').trim();
-                roleVal = isCleanVal(s1Role) ? s1Role : "";
-            }
+            let s1Role = (s1Data[`f_${baseIdx + 1}`] || "").replace(/<[^>]*>?/gm, '').trim();
+            let roleVal = isCleanVal(s1Role) ? s1Role : "";
 
-            // 3. If still empty, fallback to defaultName / defaultRole
+            // ถ้ายังว่าง ให้ fallback เป็นค่า default
             if (!nameVal) nameVal = defaultName;
             if (!roleVal) roleVal = defaultRole;
 
@@ -19830,9 +24144,347 @@ async function exportToPPTX(targetCaseId) {
     });
 
     addFooter(slide16, 16);
+    return pptx;
+}
 
-    await pptx.writeFile({ fileName: `8D_Full_Report_${caseData.id}.pptx` });
-    toast("✅ ส่งออกรายงาน 8D สำเร็จ!", "success");
+
+
+async function generate8dPptxBlob(targetCaseId) {
+    let caseData = targetCaseId ? (_cases.find(x => String(x.id) === String(targetCaseId))) : _currentCase;
+    if (!caseData) return null;
+
+    const vf = caseData.report_data?.vf_data || {};
+    const docNumber = getCaseControlNo(caseData);
+    const parsed = parseProblemTitleForD2(caseData.problem_title, caseData);
+
+    const pName = (parsed.partName && parsed.partName !== '-') ? parsed.partName : (caseData.part_name || "Part");
+    const safePName = pName.replace(/[\/\\?%*:|"<>]/g, '-').trim().toUpperCase();
+    const safePNo = (vf.drawing_no || caseData.part_no || "No").replace(/[\/\\?%*:|"<>]/g, '-').trim();
+    const safeVName = (vf.vendor || caseData.supplier || "Supplier").replace(/[\/\\?%*:|"<>]/g, '-').trim().toUpperCase();
+
+    const filename = `${docNumber} - ${safePName} - ${safePNo} ${safeVName}.pptx`;
+
+    const pptx = await buildPptxPresentation(caseData);
+    const blob = await pptx.write({ outputType: 'blob' }); // ✅ write() ครั้งเดียวเท่านั้น
+    const base64 = await _blobToBase64(blob);               // ✅ แปลงจาก blob เดิม ไม่เรียก write ซ้ำ
+
+    return { pptx, blob, base64, filename, docNumber };
+}
+
+async function exportToPPTX(targetCaseId) {
+    let caseData = _cases.find(x => x.id === targetCaseId) || _currentCase;
+    if (!caseData) return toast("❌ ไม่พบข้อมูลเคส", "error");
+
+    // บังคับเซฟข้อมูลที่กำลังพิมพ์ค้างอยู่ในสไลด์ปัจจุบันก่อน export เพื่อไม่ให้ข้อมูล D1 หลุดหาย
+    if (_currentCase && String(_currentCase.id) === String(caseData.id) && !_isVfView) {
+        await saveCurrentProgress();
+    }
+
+    toast("⏳ กำลังจัดทำรายงาน D1-D8 รายละเอียดสูง...", "info");
+
+    try {
+        const pptx = await buildPptxPresentation(caseData);
+        const vf = caseData.report_data?.vf_data || {};
+        
+        // 1. ดึงเลขรันนิ่ง (00001) และสกัดชื่อพาร์ทจริง
+        const docNumber = getCaseControlNo(caseData); 
+        const parsed = parseProblemTitleForD2(caseData.problem_title, caseData);
+        const pName = (parsed.partName && parsed.partName !== '-') ? parsed.partName : (caseData.part_name || "Part");
+
+        // 2. ล้างอักขระพิเศษ
+        const safePName = pName.replace(/[\/\\?%*:|"<>]/g, '-').trim().toUpperCase();
+        const safePNo = (vf.drawing_no || caseData.part_no || "No").replace(/[\/\\?%*:|"<>]/g, '-').trim();
+        const safeVName = (vf.vendor || caseData.supplier || "Supplier").replace(/[\/\\?%*:|"<>]/g, '-').trim().toUpperCase();
+
+        // ✨ แก้ไขชื่อไฟล์: เริ่มต้นด้วย QAP-xx-xxxxx ทันทีตามความต้องการล่าสุด
+        const finalFileName = `${docNumber} - ${safePName} - ${safePNo} ${safeVName}.pptx`;
+        
+        await pptx.writeFile({ fileName: finalFileName });
+        toast("✅ ส่งออกรายงาน 8D สำเร็จ!", "success");
+    } catch (err) {
+        console.error("Export Error:", err);
+        toast("❌ เกิดข้อผิดพลาดในการสร้างไฟล์", "error");
+    }
+}
+
+async function generateVFPdfBlob(targetCaseId) {
+    // 1. ดึงรายการเคสทั้งหมดผ่าน Module
+    const allCases = Wap8DSystem.getCases();
+    
+    // 2. หาข้อมูลเคสที่ต้องการ (ถ้าไม่ส่ง ID มา ให้เอาเคสปัจจุบันที่เปิดอยู่)
+    let caseData = targetCaseId 
+        ? (allCases.find(x => String(x.id) === String(targetCaseId))) 
+        : Wap8DSystem.getCurrentCase();
+    
+    if (!caseData) {
+        console.error("PDF Generation Fail: No case data found.");
+        return null;
+    }
+
+    const vf = caseData.report_data?.vf_data || {};
+    const controlNo = getCaseControlNo(caseData); 
+    const srcType = (caseData.report_data?.source_report_type || caseData.report_type || '').toString().toUpperCase();
+    const isRP = (srcType === 'RP' || srcType.includes('RP'));
+
+    const parsed = parseProblemTitleForD2(caseData.problem_title, caseData);
+    const pName = (parsed.partName && parsed.partName !== '-') ? parsed.partName : (caseData.part_name || "Part");
+    const safePName = pName.replace(/[\/\\?%*:|"<>]/g, '-').trim().toUpperCase();
+    const safePNo = (vf.drawing_no || caseData.part_no || "No").replace(/[\/\\?%*:|"<>]/g, '-').trim();
+    const safeVName = (vf.vendor || caseData.supplier || "Supplier").replace(/[\/\\?%*:|"<>]/g, '-').trim().toUpperCase();
+
+    const filename = `${controlNo} - ${safePName} - ${safePNo} ${safeVName}.pdf`;
+
+    let elemToCapture = null;
+    let isTempContainerCreated = false;
+
+    // 3. เช็คว่ากำลังเปิดหน้ารายงานนี้อยู่หรือไม่
+    const isCurrentlyViewing = (Wap8DSystem.isVfView() && Wap8DSystem.getCurrentCase() && String(Wap8DSystem.getCurrentCase().id) === String(caseData.id));
+
+    if (isCurrentlyViewing) {
+        if (typeof Wap8DSystem.saveCurrentProgress === 'function') {
+            try { await Wap8DSystem.saveCurrentProgress(); } catch(e) {}
+        }
+        elemToCapture = document.getElementById('vf-paper-doc'); 
+    }
+
+    // กรณีไม่ได้เปิดหน้าจอรายงานอยู่ หรือหา Element ไม่เจอ ให้สร้างตัวจำลองขึ้นมาวาด
+    if (!elemToCapture || elemToCapture.offsetHeight === 0) {
+        isTempContainerCreated = true;
+        const tempDiv = document.createElement('div');
+        tempDiv.id = 'temp-vf-export-container';
+        // ตั้งค่าให้อยู่นอกจอแต่ต้อง Render จริงเพื่อให้ html2canvas จับภาพได้
+        tempDiv.style.cssText = 'position: fixed; left: -10000px; top: 0; width: 850px; background: #ffffff; padding: 20px;';
+        
+        tempDiv.innerHTML = Wap8DSystem.renderVfReportDocument(caseData);
+        document.body.appendChild(tempDiv);
+        elemToCapture = tempDiv.querySelector('#vf-paper-doc') || tempDiv;
+
+        if (caseData.report_data && caseData.report_data.vf_data) {
+            const vfData = caseData.report_data.vf_data;
+            const editables = tempDiv.querySelectorAll('[contenteditable="true"]');
+            editables.forEach((el, index) => {
+                if (vfData[`vf_field_${index}`] !== undefined) el.innerHTML = vfData[`vf_field_${index}`];
+            });
+        }
+    }
+
+    try {
+        // 4. ใช้ html2canvas จับภาพ (ปรับปรุงส่วน CORS และ Signature)
+        const canvas = await html2canvas(elemToCapture, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: false,           // force failure to surface instead of silently tainting
+    backgroundColor: '#ffffff',
+    logging: false,
+    onclone: async (clonedDoc) => {
+        // Hide UI-only elements
+        clonedDoc.querySelectorAll('.hide-on-export, button, .row-actions').forEach(el => el.style.display = 'none');
+
+        // Render checkboxes as text symbols
+        clonedDoc.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            const span = clonedDoc.createElement('span');
+            span.innerHTML = cb.checked ? "☑" : "☐";
+            span.style.cssText = "font-size: 14px; margin-right: 4px; vertical-align: middle; color: #000;";
+            cb.parentNode.insertBefore(span, cb);
+            cb.style.display = 'none';
+        });
+
+        // 🔒 Convert every <img> src to a safe base64 data-URI BEFORE the canvas is drawn
+        const imgs = Array.from(clonedDoc.querySelectorAll('img'));
+        await Promise.all(imgs.map(async (img) => {
+            const src = img.getAttribute('src') || '';
+            if (!src || src.startsWith('data:')) return; // already safe
+            const dataUrl = await fetchImageAsDataURL(src);
+            if (dataUrl) {
+                img.src = dataUrl;
+            } else {
+                // If it can't be fetched safely (e.g. cross-origin blocked), remove it
+                // rather than letting it silently taint the whole export.
+                img.style.display = 'none';
+            }
+        }));
+
+        clonedDoc.querySelectorAll('.vf-sig-img').forEach(img => {
+            img.style.display = img.getAttribute('src') ? 'block' : 'none';
+            img.style.visibility = 'visible';
+            img.style.maxWidth = '120px';
+        });
+    }
+});
+
+        // 5. แปลง Canvas เป็นไฟล์ PDF
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const JsPdfConstructor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+
+        if (JsPdfConstructor) {
+            const pdf = new JsPdfConstructor('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 10;
+            const maxW = pageWidth - (margin * 2);
+            const maxH = pageHeight - (margin * 2);
+            
+            let finalW = maxW;
+            let finalH = (canvas.height * maxW) / canvas.width;
+
+            if (finalH > maxH) {
+                finalH = maxH;
+                finalW = (canvas.width * maxH) / canvas.height;
+            }
+
+            const xPos = (pageWidth - finalW) / 2;
+            pdf.addImage(imgData, 'JPEG', xPos, margin, finalW, finalH);
+            
+            const blob = pdf.output('blob');            
+            const base64 = await _blobToBase64(blob);   
+
+            return { pdf, blob, base64, filename, isRP, controlNo };
+        }
+        return null;
+    } catch (e) {
+        console.error("PDF Generation Critical Error:", e);
+        return null;
+    } finally {
+        // ลบตัวจำลองทิ้งเพื่อคืน Memory
+        if (isTempContainerCreated) {
+            const container = document.getElementById('temp-vf-export-container');
+            if (container) container.remove();
+        }
+    }
+}
+
+async function exportVFReport(targetCaseId) {
+    let caseData = targetCaseId ? (_cases ? _cases.find(x => String(x.id) === String(targetCaseId)) : null) : null;
+    if (!caseData) caseData = _currentCase;
+    if (!caseData) return toast("❌ ไม่พบข้อมูลเคส", "error");
+
+    toast("⏳ กำลังจัดทำรายงานความละเอียดสูง (A4 Professional)...", "info");
+    try {
+        const res = await generateVFPdfBlob(targetCaseId);
+        if (res && res.pdf) {
+            res.pdf.save(res.filename);
+            toast(`✅ ส่งออก ${res.isRP ? 'RP' : 'VF'} Report (PDF) สำเร็จ!`, "success");
+        } else {
+            toast("❌ ไม่สามารถสร้างไฟล์ PDF ได้", "error");
+        }
+    } catch (e) {
+        console.error("Export Error:", e);
+        toast("❌ ส่งออกผิดพลาด: " + e.message, "error");
+    }
+}
+
+// 🛡️ Helper สร้างไฟล์ร่างอีเมล (.eml) พร้อมฝังไฟล์แนบจริงแบบ MIME Multipart สำหรับเปิดใน Outlook / Mail App
+function generateEmlBlob({ to, cc, subject, body, htmlBody, attachments, inlineImages }) {
+    const mixedBoundary = "----=_Part_Mixed_" + Math.random().toString(36).substring(2) + "_" + Date.now();
+    const relatedBoundary = "----=_Part_Related_" + Math.random().toString(36).substring(2) + "_" + Date.now();
+    const altBoundary = "----=_Part_Alt_" + Math.random().toString(36).substring(2) + "_" + Date.now();
+
+    // RFC 2047 Header encoding for UTF-8 compatibility with Outlook
+    const encodeHeader = (str) => {
+        if (!str) return '';
+        if (/[\u0080-\uFFFF]/.test(str)) {
+            try {
+                const bytes = new TextEncoder().encode(str);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                return `=?UTF-8?B?${btoa(binary)}?=`;
+            } catch(e) { return str; }
+        }
+        return str;
+    };
+
+    let eml = "";
+    eml += `To: ${to || ''}\r\n`;
+    if (cc) eml += `Cc: ${cc}\r\n`;
+    eml += `Subject: ${encodeHeader(subject || '')}\r\n`;
+    eml += `X-Unsent: 1\r\n`;
+    eml += `MIME-Version: 1.0\r\n`;
+
+    const hasAttachments = attachments && attachments.length > 0;
+    const hasInlineImages = inlineImages && inlineImages.length > 0;
+    const hasHtml = Boolean(htmlBody);
+
+    if (hasAttachments || hasInlineImages || hasHtml) {
+        eml += `Content-Type: multipart/mixed; boundary="${mixedBoundary}"\r\n\r\n`;
+
+        // Part 1: Start Related (or Alternative)
+        eml += `--${mixedBoundary}\r\n`;
+        if (hasInlineImages) {
+            eml += `Content-Type: multipart/related; boundary="${relatedBoundary}"\r\n\r\n`;
+            eml += `--${relatedBoundary}\r\n`;
+        }
+
+        // Alternative (Plain text & HTML)
+        if (hasHtml) {
+            eml += `Content-Type: multipart/alternative; boundary="${altBoundary}"\r\n\r\n`;
+
+            // Plain Text Version
+            eml += `--${altBoundary}\r\n`;
+            eml += `Content-Type: text/plain; charset="UTF-8"\r\n`;
+            eml += `Content-Transfer-Encoding: 8bit\r\n\r\n`;
+            eml += `${body || ''}\r\n\r\n`;
+
+            // HTML Version
+            eml += `--${altBoundary}\r\n`;
+            eml += `Content-Type: text/html; charset="UTF-8"\r\n`;
+            eml += `Content-Transfer-Encoding: 8bit\r\n\r\n`;
+            eml += `${htmlBody}\r\n\r\n`;
+
+            eml += `--${altBoundary}--\r\n\r\n`;
+        } else {
+            eml += `Content-Type: text/plain; charset="UTF-8"\r\n`;
+            eml += `Content-Transfer-Encoding: 8bit\r\n\r\n`;
+            eml += `${body || ''}\r\n\r\n`;
+        }
+
+        // Inline Images within Multipart/Related
+        if (hasInlineImages) {
+            for (const img of inlineImages) {
+                if (!img || !img.base64) continue;
+                const cleanBase64 = img.base64.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+                const filename = img.filename || 'evidence.jpg';
+                const mimeType = img.mimeType || 'image/jpeg';
+                const cid = img.cid || 'non_conformance_img';
+
+                eml += `--${relatedBoundary}\r\n`;
+                eml += `Content-Type: ${mimeType}; name="${encodeHeader(filename)}"\r\n`;
+                eml += `Content-Disposition: inline; filename="${encodeHeader(filename)}"\r\n`;
+                eml += `Content-ID: <${cid}>\r\n`;
+                eml += `Content-Transfer-Encoding: base64\r\n\r\n`;
+
+                const chunks = cleanBase64.match(/.{1,76}/g) || [];
+                eml += chunks.join('\r\n') + '\r\n\r\n';
+            }
+            eml += `--${relatedBoundary}--\r\n\r\n`;
+        }
+
+        // Part 2+: Binary Attachments (PDF, PPTX)
+        if (hasAttachments) {
+            for (const att of attachments) {
+                if (!att || !att.base64) continue;
+                const cleanBase64 = att.base64.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+                const filename = att.filename || 'attachment.bin';
+                const mimeType = att.mimeType || 'application/octet-stream';
+                const encodedFilename = encodeHeader(filename);
+
+                eml += `--${mixedBoundary}\r\n`;
+                eml += `Content-Type: ${mimeType}; name="${encodedFilename}"\r\n`;
+                eml += `Content-Disposition: attachment; filename="${encodedFilename}"\r\n`;
+                eml += `Content-Transfer-Encoding: base64\r\n\r\n`;
+
+                const chunks = cleanBase64.match(/.{1,76}/g) || [];
+                eml += chunks.join('\r\n') + '\r\n\r\n';
+            }
+        }
+
+        eml += `--${mixedBoundary}--\r\n`;
+    } else {
+        eml += `Content-Type: text/plain; charset="UTF-8"\r\n`;
+        eml += `Content-Transfer-Encoding: 8bit\r\n\r\n`;
+        eml += `${body || ''}\r\n\r\n`;
+    }
+
+    return new Blob([eml], { type: 'message/rfc822' });
 }
 
 
@@ -19847,12 +24499,51 @@ function renderDashboard() {
 
     const now = new Date();
 
+    // ดึงค่าตัวกรองวันที่และ Vendor จาก Header
+    const startDateStr = (typeof claimDashFilterDate !== 'undefined' && claimDashFilterDate.start) || document.getElementById('cd-start-date')?.value || '';
+    const endDateStr = (typeof claimDashFilterDate !== 'undefined' && claimDashFilterDate.end) || document.getElementById('cd-end-date')?.value || '';
+    const vendorSelectEl = document.getElementById('claim-vendor-filter');
+    const vendorVal = (vendorSelectEl && !vendorSelectEl.classList.contains('hidden') && vendorSelectEl.value !== 'ALL') ? vendorSelectEl.value.trim().toUpperCase() : '';
+
+    // กรองตาม Tab (8D vs VF/RP), วันที่ (Date Range), และ Vendor
+    const tabCases = _cases.filter(c => {
+        // 1. กรอง Tab
+        const srcType = (c.report_data?.source_report_type || c.report_type || '').toString().toUpperCase();
+        const isVf = (srcType === 'VF' || srcType === 'RP');
+        if (_activeSqeTab === 'vf') {
+            // Show all or explicit VF/RP cases
+        }
+
+        // 2. กรองช่วงวันที่ (Date Range)
+        if (startDateStr || endDateStr) {
+            let caseDateStr = '';
+            if (c.created_at) {
+                caseDateStr = String(c.created_at).slice(0, 10);
+            } else if (c.report_data?.occurrence_date) {
+                caseDateStr = String(c.report_data.occurrence_date).slice(0, 10);
+            } else if (c.date) {
+                caseDateStr = String(c.date).slice(0, 10);
+            }
+
+            if (startDateStr && caseDateStr && caseDateStr < startDateStr) return false;
+            if (endDateStr && caseDateStr && caseDateStr > endDateStr) return false;
+        }
+
+        // 3. กรอง Vendor
+        if (vendorVal) {
+            const vendorName = (c.vendor_name || c.supplier || c.vendor || c.report_data?.vendor_name || c.report_data?.supplier || c.report_data?.vf_data?.vendor || '').trim().toUpperCase();
+            if (!vendorName.includes(vendorVal)) return false;
+        }
+
+        return true;
+    });
+
     // 1. คำนวณตัวเลข Quick Stats (Total Cases, D1-D3 Open และ Overdue >15d)
-    const totalCount = _cases.length;
+    const totalCount = tabCases.length;
     let d1ToD3Count = 0;
     let overdueCount = 0;
 
-    _cases.forEach(c => {
+    tabCases.forEach(c => {
         const s = (c.status || '').toUpperCase();
         const isClosed = s.includes('D8') || s.includes('CLOSED') || s.includes('COMPLETE');
         const createdAt = c.created_at ? new Date(c.created_at) : now;
@@ -19877,29 +24568,30 @@ function renderDashboard() {
     if (statPending) statPending.textContent = d1ToD3Count;
     if (statOverdue) statOverdue.textContent = overdueCount;
 
-    // 2. ปรับแต่ง UI ของ Stat Cards ปุ่มที่เลือกอยู่
+    // 2. ปรับแต่ง UI ของ Stat Cards ปุ่มที่เลือกอยู่ (แสดงผลเส้นขอบสีเด่นชัดเจนตามภาพ)
     const cardTotal = document.getElementById('card-stat-8d-total');
     const cardPending = document.getElementById('card-stat-8d-pending');
     const cardOverdue = document.getElementById('card-stat-8d-overdue');
+    
     if (cardTotal) {
         if (_statFilter === 'all') {
-            cardTotal.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50/50');
+            cardTotal.className = "bg-blue-50/90 dark:bg-blue-900/40 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-blue-600 dark:border-blue-400 ring-3 ring-blue-400/40 shadow-md text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95 scale-[1.02]";
         } else {
-            cardTotal.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50/50');
+            cardTotal.className = "bg-blue-50/30 hover:bg-blue-50/70 dark:bg-blue-950/20 dark:hover:bg-blue-950/40 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-blue-500/80 hover:border-blue-600 dark:border-blue-500/80 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95";
         }
     }
     if (cardPending) {
         if (_statFilter === 'd1-d3') {
-            cardPending.classList.add('ring-2', 'ring-orange-500', 'bg-orange-50/50');
+            cardPending.className = "bg-orange-50/90 dark:bg-orange-900/40 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-orange-500 dark:border-orange-400 ring-3 ring-orange-400/40 shadow-md text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95 scale-[1.02]";
         } else {
-            cardPending.classList.remove('ring-2', 'ring-orange-500', 'bg-orange-50/50');
+            cardPending.className = "bg-orange-50/30 hover:bg-orange-50/70 dark:bg-orange-950/20 dark:hover:bg-orange-950/40 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-orange-400/80 hover:border-orange-500 dark:border-orange-500/80 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95";
         }
     }
     if (cardOverdue) {
         if (_statFilter === 'overdue') {
-            cardOverdue.classList.add('ring-2', 'ring-rose-500', 'bg-rose-50/50');
+            cardOverdue.className = "bg-rose-50/90 dark:bg-rose-900/40 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-rose-600 dark:border-rose-400 ring-3 ring-rose-400/40 shadow-md text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95 scale-[1.02]";
         } else {
-            cardOverdue.classList.remove('ring-2', 'ring-rose-500', 'bg-rose-50/50');
+            cardOverdue.className = "bg-rose-50/30 hover:bg-rose-50/70 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-rose-400/80 hover:border-rose-500 dark:border-rose-500/80 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95";
         }
     }
 
@@ -19918,7 +24610,7 @@ function renderDashboard() {
     const query = searchInput ? (searchInput.value || '').trim().toLowerCase() : '';
 
     // 4. กรองรายการเคสตาม Filter และ Search Query
-    const filteredCases = _cases.filter(c => {
+    const filteredCases = tabCases.filter(c => {
         const s = (c.status || '').toUpperCase();
         const isClosed = s.includes('D8') || s.includes('CLOSED') || s.includes('COMPLETE');
         const createdAt = c.created_at ? new Date(c.created_at) : now;
@@ -19941,7 +24633,11 @@ function renderDashboard() {
         const titleStr = (c.problem_title || '').toLowerCase();
         const partStr = (c.part_name || '').toLowerCase();
         const statusStr = (c.status || '').toLowerCase();
-        return idStr.includes(query) || titleStr.includes(query) || partStr.includes(query) || statusStr.includes(query);
+        const srcType = (c.report_data?.source_report_type || c.report_type || '').toString().toUpperCase();
+        const isRP = (srcType === 'RP' || srcType.includes('RP'));
+        const cleanNum = idStr.replace(/^8d-/, '').replace(/^qap-(?:vf|rp)-/i, '');
+        const ctrlStr = (c.report_data?.vf_data?.control_no || (isRP ? 'qap-rp-' : 'qap-vf-') + cleanNum).toLowerCase();
+        return idStr.includes(query) || ctrlStr.includes(query) || titleStr.includes(query) || partStr.includes(query) || statusStr.includes(query);
     });
 
     function _build8DRow(c) {
@@ -19961,6 +24657,7 @@ function renderDashboard() {
         const isOverdue8D = !isD8Closed && openDays >= 15;
         const isOverdue3D = !isD8Closed && stepNum <= 3 && (openDays >= 1 || openHours >= 24);
         const isWarning10D = !isD8Closed && openDays >= 10 && openDays < 15;
+
 
         let rowClass = "group transition-all duration-300";
         let barColor = "from-blue-400 to-blue-600";
@@ -19988,26 +24685,60 @@ function renderDashboard() {
 
         let agingBadgeHtml = "";
         if (isD8Closed) {
-            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Closed (${openDays}d)</span>`;
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[9.5px] font-black text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-300/80 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Closed (${openDays}d)</span>`;
         } else if (isOverdue8D) {
-            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-300 shadow-2xs animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span> 🚨 Open ${openDays} Days (Overdue >15d)</span>`;
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[9.5px] font-black text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-full border border-rose-300/80 shadow-2xs animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span> 🚨 Open ${openDays} Days (Overdue >15d)</span>`;
         } else if (isOverdue3D) {
-            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> ⏰ 3D Overdue (${openDays === 0 ? openHours + 'h' : openDays + 'd'})</span>`;
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[9.5px] font-black text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-300/80 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> ⏰ 3D Overdue (${openDays === 0 ? openHours + 'h' : openDays + 'd'})</span>`;
         } else if (isWarning10D) {
-            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-black text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full border border-orange-300 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> ⚠️ Open ${openDays} Days</span>`;
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[9.5px] font-black text-orange-700 bg-orange-100/80 px-2 py-0.5 rounded-full border border-orange-300/80 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> ⚠️ Open ${openDays} Days</span>`;
         } else {
-            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">⏱️ Open ${openDays > 0 ? openDays + ' Days' : openHours + ' Hours'}</span>`;
+            agingBadgeHtml = `<span class="inline-flex items-center gap-1 text-[9.5px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">⏱️ Open ${openDays > 0 ? openDays + ' Days' : openHours + ' Hours'}</span>`;
         }
 
         const displayTitle = c.problem_title || 'Untitled Report';
-        
+        const isVfTab = _activeSqeTab === 'vf';
+        const srcType = (c.report_data?.source_report_type || c.report_type || '').toString().toUpperCase();
+        const isRP = (srcType === 'RP' || srcType.includes('RP'));
+
+// --- ส่วนที่แก้ไข: คำนวณเลข Running No. ให้ตรงกับหน้ารวม Registry ---
+const allCases = _cases || [];
+// กรองเฉพาะเคสประเภทเดียวกัน (RP หรือ VF) และเรียงตามวันที่สร้างจากเก่าไปใหม่เพื่อหาลำดับ
+const sameTypeAll = allCases.filter(item => {
+    const itemType = (item.report_data?.source_report_type || item.report_type || '').toUpperCase();
+    const itemIsRP = (itemType === 'RP' || itemType.includes('RP'));
+    return isRP ? itemIsRP : !itemIsRP;
+}).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+// หาลำดับของเคสปัจจุบันในรายการทั้งหมด
+const globalIdx = sameTypeAll.findIndex(item => item.id === c.id);
+const runningNo = globalIdx + 1;
+const controlNo = (isRP ? 'QAP-RP-' : 'QAP-VF-') + String(runningNo).padStart(5, '0');
+// -------------------------------------------------------------
+
+        let badgeHtml = '';
+        if (isRP) {
+            badgeHtml = `<button onclick="event.stopPropagation(); Wap8DSystem.toggleCaseType('${c.id}', event)" 
+                                 class="text-[10.5px] font-black text-rose-700 bg-rose-100 hover:bg-rose-200 border border-rose-300 px-2.5 py-0.5 rounded-md w-fit tracking-tight flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                                 title="Case Profile: RP (IQC Rejected) - คลิกเพื่อสลับเป็น VF">
+                            <span>RP (IQC)</span>
+                            <svg width="9" height="9" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M19 9l-7 7-7-7"/></svg>
+                         </button>`;
+        } else {
+            badgeHtml = `<button onclick="event.stopPropagation(); Wap8DSystem.toggleCaseType('${c.id}', event)" 
+                                 class="text-[10.5px] font-black text-sky-700 bg-sky-100 hover:bg-sky-200 border border-sky-300 px-2.5 py-0.5 rounded-md w-fit tracking-tight flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                                 title="Case Profile: VF (Line Claim) - คลิกเพื่อสลับเป็น RP">
+                            <span>VF (Line)</span>
+                            <svg width="9" height="9" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M19 9l-7 7-7-7"/></svg>
+                         </button>`;
+        }
+
         return `
         <tr class="${rowClass}" data-rid="${c.id}">
             <td class="px-6 py-5">
                 <div class="flex flex-col gap-1.5">
-                    <span class="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md w-fit tracking-tighter">CASE ID</span>
-                    <span class="font-mono text-[11px] text-slate-500 font-bold">${c.id}</span>
-                    <div class="mt-0.5">${agingBadgeHtml}</div>
+                    ${badgeHtml}
+                    <span class="font-mono text-[11px] text-slate-600 font-bold tracking-tight">${controlNo}</span>
                 </div>
             </td>
 
@@ -20021,7 +24752,7 @@ function renderDashboard() {
                            style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-break: break-word;">
                             ${displayTitle}
                         </p>
-                        <div class="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
+                        <div class="flex flex-wrap items-center gap-2 sm:gap-2.5 mt-1">
                             <span class="text-[10px] font-bold text-slate-400 flex items-center gap-1 shrink-0">
                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                 ${c.part_name || 'Generic Part'}
@@ -20031,6 +24762,10 @@ function renderDashboard() {
                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                 ${new Date(c.created_at).toLocaleDateString()}
                             </span>
+                            <span class="text-[10px] font-bold text-slate-300 shrink-0">|</span>
+                            <div class="inline-flex items-center shrink-0">
+                                ${agingBadgeHtml}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -20050,23 +24785,23 @@ function renderDashboard() {
 
             <td class="px-6 py-5 text-right">
                 <div class="flex justify-end gap-2">
-                    <button  onclick="Wap8DSystem.openReport('${c.id}')" 
-                            class="h-9 px-4 bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-sm" title="Wap8 D System.Open Report" aria-label="Wap8 D System.Open Report">
-                        OPEN REPORT
+                    <button onclick="Wap8DSystem.openReport('${c.id}', ${_activeSqeTab === 'vf'})" 
+                            class="h-9 px-4 bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-sm" title="Open Report" aria-label="Open Report">
+                        OPEN ${isVfTab ? (isRP ? 'RP REPORT' : 'VF REPORT') : 'REPORT'}
                     </button>
 
-                    <button  onclick="Wap8DSystem.exportToPPTX('${c.id}')" 
-                            class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-md shadow-emerald-100 flex items-center gap-1.5"
-                            title="Export 8D PowerPoint 100%" aria-label="Wap8 D System.Export To P P T X">
+                    <button onclick="${isVfTab ? `Wap8DSystem.exportVFReport('${c.id}')` : `Wap8DSystem.exportToPPTX('${c.id}')`}" 
+                            class="h-9 px-3.5 ${isVfTab ? (isRP ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-100' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100') : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100'} text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 shadow-md flex items-center gap-1.5"
+                            title="${isVfTab ? (isRP ? 'Export RP Report (PDF)' : 'Export VF Report (PDF)') : 'Export PowerPoint'}" aria-label="Export Report">
                         <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                             <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span>EXPORT PPTX</span>
+                        <span>EXPORT ${isVfTab ? (isRP ? 'RP' : 'VF') : '8D'}</span>
                     </button>
 
-                    <button  onclick="Wap8DSystem.deleteCase('${c.id}')" 
+                    <button onclick="Wap8DSystem.deleteCase('${c.id}')" 
                             class="h-9 w-9 flex items-center justify-center bg-white border-2 border-slate-200 text-slate-400 hover:border-rose-500 hover:text-rose-500 rounded-xl transition-all duration-200 active:scale-95 shadow-sm"
-                            title="Delete Report" aria-label="Wap8 D System.Delete Case">
+                            title="Delete Report" aria-label="Delete Case">
                         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                             <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
@@ -20085,7 +24820,7 @@ function renderDashboard() {
             rowHeight: 88,
             columnsCount: 4,
             rowBuilder: _build8DRow,
-            emptyHtml: `<tr><td colspan="4" class="py-20 text-center text-slate-400"><div class="text-4xl mb-3 opacity-20">📂</div><p class="text-[11px] font-black uppercase tracking-widest italic">${_cases.length === 0 ? 'No 8D Reports Found' : 'No Matching 8D Reports'}</p></td></tr>`,
+            emptyHtml: `<tr><td colspan="4" class="py-20 text-center text-slate-400"><div class="text-4xl mb-3 opacity-20">📂</div><p class="text-[11px] font-black uppercase tracking-widest italic">${tabCases.length === 0 ? 'No Reports Found' : 'No Matching Reports'}</p></td></tr>`,
             onRenderComplete: () => {
                 if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
             }
@@ -20101,13 +24836,68 @@ function renderDashboard() {
     function renderSlide() {
         const container = document.getElementById('eight-d-slide-content');
         const indexText = document.getElementById('slide-index-display');
-        indexText.textContent = `PAGE ${_currentSlide + 1} / 16`;
         const c = _currentCase;
-        const d2 = c.d2_data || {};
+container.innerHTML = '<div style="padding:40px; text-align:center; color:#64748b;">⏳ Generating Document...</div>'; 
+        if (_isVfView) {
+            const srcType = (c?.report_data?.source_report_type || c?.report_type || '').toString().toUpperCase();
+            const isRP = (srcType === 'RP');
+            if (indexText) indexText.textContent = `VENDOR FAILURE REPORT (${isRP ? 'RP - IQC REJECTED' : 'VF - LINE CLAIM'})`;
+
+            const presContainer = document.getElementById('eight-d-presentation-container');
+            if (presContainer) {
+                presContainer.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: flex-start;
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    padding: 24px 16px 40px 16px;
+                    background: #cbd5e1;
+                    width: 100%;
+                    height: 100%;
+                    box-sizing: border-box;
+                `;
+            }
+
+            const slideWrapper = document.getElementById('eight-d-slide-wrapper');
+            if (slideWrapper) {
+                slideWrapper.style.cssText = `
+                    width: 100%;
+                    max-width: 900px;
+                    margin: 0 auto;
+                    display: flex;
+                    justify-content: center;
+                    align-items: flex-start;
+                    position: relative;
+                `;
+            }
+
+            container.innerHTML = '';
+            container.style.cssText = `
+                width: 100%;
+                max-width: 880px;
+                margin: 0 auto;
+                box-sizing: border-box; 
+                display: flex; 
+                flex-direction: column; 
+                padding: 0; 
+                background: transparent;
+                position: relative;
+            `;
+            container.className = 'slide-page-paper slide-fade-in';
+            container.innerHTML = renderVfReportDocument(c);
+            updateExportAndEmailButtons();
+            if (typeof updateSignButtonStates === 'function') updateSignButtonStates();
+            return;
+        }
+
+        if (indexText) indexText.textContent = `PAGE ${_currentSlide + 1} / 16`;
+        updateExportAndEmailButtons();
+        const d2 = c ? (c.d2_data || {}) : {};
 
         // ล้างค่าเก่าและตั้งค่า Container หลักให้เป็น Flex Column ความสูงเต็ม
         container.innerHTML = '';
-// ค้นหาบรรทัดนี้ในฟังก์ชัน renderSlide()
         container.style.cssText = `
             width: 960px;
             height: 600px;
@@ -20160,9 +24950,9 @@ function renderDashboard() {
 // ==========================================
 if (_currentSlide === 0) {
     // 1. ดึงประเภท Report จากฐานข้อมูล (ตรวจสอบค่า RP, VF หรือ RECORDS)
-    const reportType = c.report_data?.source_report_type || "";
-    const isRP = reportType === 'RP';
-    const isVF = reportType === 'VF' || reportType === 'RECORDS';
+    const reportType = (c.report_data?.source_report_type || c.report_type || "").toString().toUpperCase();
+    const isRP = reportType === 'RP' || reportType.includes('RP');
+    const isVF = !isRP;
 
     // 2. ฟังก์ชันสร้างกล่อง (เพิ่มกิมมิกให้ขนาดคงที่และจัดกึ่งกลางตัว X)
     const check = (active) => active 
@@ -20186,11 +24976,11 @@ if (_currentSlide === 0) {
             <!-- 2. ส่วนเลือกประเภท (Checkboxes) - แก้ไข: เพิ่มกรอบดำและจัดระดับข้อความให้ตรงกล่อง -->
             <div style="display: flex; justify-content: flex-end; margin-bottom: 15px; flex-shrink: 0;">
                 <div style="border: 1.5px solid #000; padding: 8px 20px; display: flex; gap: 40px; font-weight: 900; font-size: 15px; background:#fff; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;" onclick="Wap8DSystem.setCaseType('${c.id}', 'RP')" title="Click to set as RP (IQC Rejected)">
                         ${check(isRP)}
                         <span style="color:#000; line-height: 1;">[IQC Rejected, RP]</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;" onclick="Wap8DSystem.setCaseType('${c.id}', 'VF')" title="Click to set as VF (Line claim)">
                         ${check(isVF)}
                         <span style="color:#000; line-height: 1;">[Line claim, VF]</span>
                     </div>
@@ -21327,6 +26117,8 @@ else if (_currentSlide === 15) {
         if (_currentSlide === 5) {
             setTimeout(adjustD4ConnectorLine, 20);
             setTimeout(adjustD4ConnectorLine, 100);
+            _rehydrateUI();
+            return;
         }
     }
 
@@ -21372,6 +26164,28 @@ else if (_currentSlide === 15) {
         const slide = document.getElementById('eight-d-slide-content');
         if (!container || !wrapper || !slide) return;
 
+        if (_isVfView) {
+            if (container) {
+                container.style.overflowY = 'auto';
+                container.style.overflowX = 'auto';
+                container.style.display = 'flex';
+                container.style.flexDirection = 'column';
+                container.style.alignItems = 'center';
+                container.style.justifyContent = 'flex-start';
+                container.style.padding = '24px 16px 40px 16px';
+            }
+            wrapper.style.width = '100%';
+            wrapper.style.maxWidth = '900px';
+            wrapper.style.margin = '0 auto';
+            wrapper.style.height = 'auto';
+            slide.style.width = '100%';
+            slide.style.maxWidth = '880px';
+            slide.style.margin = '0 auto';
+            slide.style.height = 'auto';
+            slide.style.transform = 'none';
+            return;
+        }
+
         const availW = Math.max(100, container.clientWidth - 32);
         const availH = Math.max(100, container.clientHeight - 32);
 
@@ -21408,15 +26222,114 @@ else if (_currentSlide === 15) {
         `;
     }
 
-// --- บรรทัดสุดท้ายของโมดูล Wap8DSystem ---
+    async function setCaseType(id, type) {
+        const c = _cases ? _cases.find(x => String(x.id) === String(id)) : null;
+        if (!c) return;
+        if (!c.report_data) c.report_data = {};
+        c.report_data.source_report_type = type;
+        c.report_type = type;
+
+        if (c.report_data.vf_data) {
+            delete c.report_data.vf_data.control_no;
+            delete c.report_data.vf_data.subj;
+            delete c.report_data.vf_data.defect_location;
+            Object.keys(c.report_data.vf_data).forEach(k => {
+                if (k.startsWith('vf_field_')) delete c.report_data.vf_data[k];
+            });
+        }
+
+        toast(`✅ อัปเดตประเภทรายงานเป็น ${type}`, "success");
+
+        try {
+            await sqeClient.from('eight_d_reports').update({
+                report_data: c.report_data
+            }).eq('id', c.id);
+        } catch (err) {
+            console.error("Error updating report_data type:", err);
+        }
+
+        renderDashboard();
+        if (_currentCase && String(_currentCase.id) === String(c.id)) {
+            renderSlide();
+        }
+    }
+
+    async function toggleCaseType(id, event) {
+        if (event) event.stopPropagation();
+        const c = _cases ? _cases.find(x => String(x.id) === String(id)) : null;
+        if (!c) return;
+        const currentType = (c.report_data?.source_report_type || c.report_type || '').toString().toUpperCase();
+        const newType = (currentType === 'RP') ? 'VF' : 'RP';
+        await setCaseType(id, newType);
+    }
+// ฟังก์ชันสำหรับเปลี่ยนจุดติ๊ก Production Type และบันทึกลง Cloud
+    async function updateProdType(caseId, typeValue) {
+        if (S.userRole === 'supervisor') return;
+
+        // 1. ค้นหาเคสที่เลือก
+        const targetCase = _cases.find(x => String(x.id) === String(caseId));
+        if (!targetCase) return;
+
+        // 2. อัปเดตข้อมูลใน Memory
+        if (!targetCase.report_data) targetCase.report_data = {};
+        if (!targetCase.report_data.vf_data) targetCase.report_data.vf_data = {};
+        targetCase.report_data.vf_data.production_type = typeValue;
+
+        // 3. สั่งวาดหน้าสไลด์ใหม่ทันที (Visual Update)
+        renderSlide(); 
+
+        // 4. บันทึกลงฐานข้อมูลจริง
+        try {
+            await sqeClient.from('eight_d_reports')
+                .update({ report_data: targetCase.report_data })
+                .eq('id', caseId);
+            toast("✅ อัปเดตประเภทการผลิตเรียบร้อย", "success");
+        } catch (e) {
+            console.error("Update Prod Type Error:", e);
+        }
+    }
+// --- แก้ไขส่วน Return ของ Wap8DSystem (ประมาณบรรทัด 3430) ---
 return { 
-    init, createNewCase, openReport, nextSlide, prevSlide, openHistoryPicker, pickRecord, deleteCase, exportToPPTX, filterByStat, fetchCases,
+    init, 
+    createNewCase, 
+    openReport, 
+    nextSlide, 
+    prevSlide, 
+    openHistoryPicker, 
+    pickRecord, 
+    deleteCase, 
+    exportToPPTX, 
+    exportVFReport, 
+    filterByStat, 
+    renderDashboard,
+    fetchCases, 
+    switchSqeTab, 
+    setCaseType, 
+    toggleCaseType,
+    updateProdType,
+    
+    // ระบบ Sign-off และ Email
+    signDocument, 
+    removeSignature,
+    sendIssueByEmail,
+    updateExportAndEmailButtons,
+
+    // >>> ฟังก์ชันที่เพิ่มใหม่เพื่อให้ภายนอกมองเห็นข้อมูล <<<
+    renderVfReportDocument, 
+    saveCurrentProgress,    
+    getCurrentCase: () => _currentCase, 
+    isVfView: () => _isVfView,          
+    
     getCases: () => _cases,
     getCaseBySupportId: (supId) => _cases.find(c => String(c.support_id) === String(supId) || String(c.report_data?.record_id) === String(supId)),
     showDashboard: () => {
         saveCurrentProgress();
         document.getElementById('eight-d-dashboard').classList.remove('hidden');
         document.getElementById('eight-d-report-view').classList.add('hidden');
+        const presContainer = document.getElementById('eight-d-presentation-container');
+        if (presContainer) {
+            presContainer.style.cssText = '';
+        }
     }
 };
 })();
@@ -21471,7 +26384,13 @@ if (typeof window !== 'undefined') {
         openHistoryPicker: Wap8DSystem.openHistoryPicker, 
         pickRecord: Wap8DSystem.pickRecord,
 
+        // --- ระบบ Local Data Backup Hub ---
+        LocalBackupSystem,
+
         updateAllModuleFilters, showPartAC, selectPartAC, calcNG,
+        signDocument: Wap8DSystem.signDocument,
+        removeSignature: Wap8DSystem.removeSignature,
+        sendIssueByEmail: Wap8DSystem.sendIssueByEmail,
     });
 }
 // เพิ่มตัวแปรสำหรับ Analytics Charts
@@ -21678,11 +26597,334 @@ if (qtyInput) {
     });
 }
 
+/**
+ * ═══════════════════════════════════════════════════════
+ *  WAP RUNNING NUMBER SYSTEM (MASTER MAPPED VERSION)
+ * ═══════════════════════════════════════════════════════
+ */
+const WapRNSystem = (function() {
+    let _activeTab = 'vf'; 
+    
+    function init() {
+        renderTable();
+    }
+
+    function switchRnTab(tab) {
+        _activeTab = tab;
+        const btnVf = document.getElementById('btn-rn-tab-vf');
+        const btnRp = document.getElementById('btn-rn-tab-rp');
+        const accent = document.getElementById('rn-table-accent');
+        const title = document.getElementById('rn-table-title');
+
+        if (tab === 'vf') {
+            if(btnVf) btnVf.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all bg-blue-600 text-white shadow-sm";
+            if(btnRp) btnRp.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-blue-600";
+            if(accent) accent.className = "h-1.5 w-full bg-blue-600 transition-all duration-500";
+            if(title) title.textContent = "VF Running Number Registry";
+        } else {
+            if(btnRp) btnRp.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all bg-rose-600 text-white shadow-sm";
+            if(btnVf) btnVf.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-rose-600";
+            if(accent) accent.className = "h-1.5 w-full bg-rose-600 transition-all duration-500";
+            if(title) title.textContent = "RP Running Number Registry";
+        }
+        renderTable();
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('rn-table-body');
+        const headerRow = document.getElementById('rn-table-header');
+        if (!tbody || !headerRow) return;
+
+        const headerColor = _activeTab === 'vf' ? '#2563eb' : '#e11d48';
+        headerRow.querySelectorAll('th').forEach(th => {
+            th.style.backgroundColor = headerColor;
+            th.style.color = '#ffffff';
+        });
+
+        const allCases = (typeof Wap8DSystem !== 'undefined') ? Wap8DSystem.getCases() : [];
+        const filteredCases = allCases.filter(c => {
+            const type = (c.report_data?.source_report_type || c.report_type || '').toUpperCase();
+            return _activeTab === 'vf' ? (type === 'VF') : (type === 'RP');
+        }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+        if (document.getElementById('rn-record-count')) {
+            document.getElementById('rn-record-count').textContent = `${filteredCases.length} Records`;
+        }
+
+        if (filteredCases.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="29" class="py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No Data Logged for ${_activeTab.toUpperCase()}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filteredCases.map((c, index) => {
+            const d = c.report_data || {};
+            const vf = d.vf_data || {};
+            const completeDateVal = vf.complete_date || '';
+            const ppmVal = vf.count_ppm || 'NO';
+            // 1. ดึงวันที่รายงาน
+            let reportDate = '-';
+            if (c.date) reportDate = c.date;
+            else if (d.event_date) reportDate = d.event_date;
+            else if (c.created_at) reportDate = c.created_at.split('T')[0];
+
+            // 2. ดึงข้อมูลพาร์ทและอาการเสีย
+            const parsedInfo = (typeof parseProblemTitleForD2 === 'function') 
+                               ? parseProblemTitleForD2(c.problem_title, c) 
+                               : { partName: c.part_name || '-', defectName: '-', supplier: '-' };
+            
+            const displayPartName = (parsedInfo.partName && parsedInfo.partName !== '-') ? parsedInfo.partName : (c.part_name || '-');
+            const displayDefect = (parsedInfo.defectName && parsedInfo.defectName !== '-') ? parsedInfo.defectName : 'Deformed';
+
+            // 3. --- [ดึงชื่อ Supplier และ ค้นหา Vendor Code อัตโนมัติ] ---
+            const vendorName = (vf.vendor || d.supplier || c.supplier || parsedInfo.supplier || '-').trim();
+            let vendorCode = vf.vendor_code || '-';
+
+            // ถ้าในเคสไม่มีรหัสส่งมา ให้ค้นหาจาก VENDOR_MASTER (Reverse Lookup)
+            if ((!vendorCode || vendorCode === '-') && vendorName !== '-' && typeof VENDOR_MASTER !== 'undefined') {
+                const searchName = vendorName.toUpperCase();
+                const foundEntry = Object.entries(VENDOR_MASTER).find(([code, name]) => 
+                    name.toUpperCase() === searchName || name.toUpperCase().includes(searchName) || searchName.includes(name.toUpperCase())
+                );
+                if (foundEntry) vendorCode = foundEntry[0]; // เก็บ Key (รหัสพาร์ทเนอร์)
+            }
+
+            const rowNo = index + 1;
+            const refPrefix = _activeTab === 'vf' ? 'QAP-VF-' : 'QAP-RP-';
+            const refVendor = refPrefix + String(rowNo).padStart(5, '0');
+// --- แก้ไขจุดคำนวณ 2nd Follow up Date ---
+let secondFollowUp = '-';
+// ใช้ target_date ถ้ามี ถ้าไม่มีให้ใช้วันที่ออกรายงาน (reportDate) เป็นเกณฑ์ตั้งต้น
+let baseDateForFollowUp = (vf.target_date && vf.target_date !== '-') ? vf.target_date : reportDate;
+
+if (baseDateForFollowUp && baseDateForFollowUp !== '-') {
+    const tDate = new Date(baseDateForFollowUp);
+    if (!isNaN(tDate.getTime())) {
+        // บวกเพิ่ม 14 วันตามระเบียบระบบคุณภาพ
+        tDate.setDate(tDate.getDate() + 14); 
+        secondFollowUp = tDate.toISOString().split('T')[0]; // แสดงผลรูปแบบ YYYY-MM-DD
+    }
+}
+
+// --- ส่วน Logic กำหนดสีใน renderTable (วางก่อน return `...`) ---
+const statusRaw = (c.status || 'OPEN').toUpperCase();
+// ตรวจเช็คว่าเป็นสถานะปิดงานหรือไม่ (D8 หรือ CLOSED)
+const isClosed = statusRaw.includes('D8') || statusRaw === 'CLOSED' || statusRaw === 'COMPLETE';
+// --- ส่วน Logic กำหนดสี Progress (วางใน loop map ของ renderTable) ---
+const currentPg = (c.status || 'OPEN').toUpperCase();
+let pgStyle = "";
+
+// เงื่อนไขสี: D1-D3 (ส้ม) / D4-D7 (ฟ้า) / D8-CLOSED (เขียว)
+if (currentPg.match(/D[1-3]/) || currentPg === 'OPEN') {
+    pgStyle = "background: #fff7ed; color: #c2410c; border: 1px solid #fdba74;"; // ส้มเข้ม
+} else if (currentPg.match(/D[4-7]/)) {
+    pgStyle = "background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;"; // ฟ้า
+} else {
+    pgStyle = "background: #dcfce7; color: #15803d; border: 1px solid #86efac;"; // เขียว
+}
+// กำหนดสไตล์: OPEN (เหลือง) / CLOSED (เขียว)
+let stStyle = isClosed 
+    ? "background: #dcfce7; color: #15803d; border: 1px solid #86efac;" // สีเขียว
+    : "background: #fef9c3; color: #854d0e; border: 1px solid #fde047;"; // สีเหลือง
+
+const statusDropdown = `
+    <select onchange="WapRNSystem.updateStatus('${c.id}', this.value)" 
+            style="${stStyle} padding: 2px 8px; border-radius: 6px; font-size: 9px; font-weight: 900; outline: none; cursor: pointer; appearance: none; text-align: center; width: 70px;">
+        <option value="OPEN" ${!isClosed ? 'selected' : ''}>OPEN</option>
+        <option value="D8_CLOSED" ${isClosed ? 'selected' : ''}>CLOSED</option>
+    </select>
+`;
+
+// สร้าง Dropdown สำหรับ Count PPM
+const ppmDropdown = `
+    <select onchange="WapRNSystem.updatePPMCount('${c.id}', this.value)" 
+            style="border: 1px solid #cbd5e1; border-radius: 4px; font-size: 10px; padding: 2px; width: 55px; font-weight: bold; cursor: pointer; outline: none; 
+            background: ${ppmVal === 'YES' ? '#dcfce7' : '#fff'}; 
+            color: ${ppmVal === 'YES' ? '#15803d' : '#1e293b'};">
+        <option value="YES" ${ppmVal === 'YES' ? 'selected' : ''}>YES</option>
+        <option value="NO" ${ppmVal === 'NO' ? 'selected' : ''}>NO</option>
+    </select>
+`;
+const completeDateInput = `
+    <input type="date" 
+           value="${completeDateVal}" 
+           onchange="WapRNSystem.updateCompleteDate('${c.id}', this.value)"
+           style="border: 1px solid #cbd5e1; border-radius: 4px; font-size: 10px; padding: 2px; width: 105px; outline: none; font-weight: bold; color: #1e293b;">
+`;
+const progressDropdown = `
+    <select onchange="WapRNSystem.updateStatus('${c.id}', this.value)" 
+            style="${stStyle} padding: 2px 8px; border-radius: 6px; font-size: 9px; font-weight: 900; outline: none; cursor: pointer; appearance: none; text-align: center; width: 70px;">
+        <option value="OPEN" ${!isClosed ? 'selected' : ''}>OPEN</option>
+        <option value="D8_CLOSED" ${isClosed ? 'selected' : ''}>CLOSED</option>
+    </select>
+`;
+
+            return `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                    <td class="px-2 py-3 text-center border-r border-slate-100 dark:border-slate-800">${rowNo}</td>
+                    <td class="px-2 py-3 font-mono text-blue-600">${refVendor}</td>
+                    <td class="px-2 py-3">${reportDate}</td>
+                    <td class="px-2 py-3">${reportDate}</td>
+                    <td class="px-2 py-3 font-mono">${vf.drawing_no || c.part_no || '-'}</td>
+                    <td class="px-2 py-3">${displayPartName.toUpperCase()}</td>
+                    <td class="px-2 py-3 text-rose-600">${displayDefect.toUpperCase()}</td>
+                    <td class="px-2 py-3" 
+    style="min-width: 350px; white-space: normal; word-break: break-word; line-height: 1.5; text-align: left; vertical-align: top; color: #334155; font-size: 10px;">
+    ${(c.problem_title || '-').toUpperCase()}
+</td>
+                    <td class="px-2 py-3">${(vf.defective_mode || 'Appearance').toUpperCase()}</td>
+                    <td class="px-2 py-3 font-mono text-blue-600">${vendorCode.toUpperCase()}</td> <!-- ช่อง Vendor Code ที่แก้ไข -->
+                    <td class="px-2 py-3">${vendorName.toUpperCase()}</td>
+                    <td class="px-2 py-3 text-center">-</td>
+                    <td class="px-2 py-3">${(c.part_group || '-').toUpperCase()}</td>
+                    <td class="px-2 py-3 text-center">${vf.total_qty || c.lot_no || '0'}</td>
+                    <td class="px-2 py-3 text-center text-rose-500">${c.ng_qty || '0'}</td>
+                    <td class="px-2 py-3 text-center text-rose-500">${c.ng_qty || '0'}</td>
+                    <td class="px-2 py-3">${(vf.model || '-').toUpperCase()}</td>
+                    <td class="px-2 py-3">${(vf.issue_by || c.user_id || '-').split('@')[0].toUpperCase()}</td>
+                    <td class="px-2 py-3">${(vf.approved_by || vf.response || '-').toUpperCase()}</td> 
+                    <td class="px-2 py-3">${reportDate}</td>
+                    <td class="px-2 py-3">${secondFollowUp}</td>
+                    <td class="px-2 py-3 text-center">${_activeTab.toUpperCase()}</td>
+<td class="px-2 py-3 text-center">
+    ${statusDropdown}
+</td>
+                    <td class="px-2 py-3">
+    ${completeDateInput}
+</td>
+                    <td class="px-2 py-3 text-center">
+    ${ppmDropdown}
+</td>
+                    <td class="px-2 py-3">-</td>
+                    <td class="px-2 py-3" style="white-space:normal;">${c.remark || '-'}</td>
+                    <td class="px-2 py-3">-</td>
+<td class="px-2 py-3 text-center">
+    ${progressDropdown}
+</td>
+                </tr>
+            `;
+        }).reverse().join('');
+
+        if(typeof window.animateTableRows === 'function') {
+            window.animateTableRows(tbody, { y: 4, duration: 0.3, stagger: 0.01 });
+        }
+    }
+
+    // และเพิ่มชื่อฟังก์ชันลงในส่วน return { ... } ของโมดูล
+return { 
+    init, 
+    switchRnTab, 
+    updateStatus, 
+    updateCompleteDate,
+    updatePPMCount // เพิ่มบรรทัดนี้
+};
+})();
+
+async function updateStatus(caseId, newStatus) {
+    if (S.userRole === 'supervisor') {
+        toast("⚠️ Supervisor ไม่สามารถแก้ไขสถานะได้", "error");
+        renderTable(); 
+        return;
+    }
+
+    try {
+        toast("⏳ กำลังบันทึกสถานะ...", "info");
+        
+        const { error } = await sqeClient
+            .from('eight_d_reports')
+            .update({ status: newStatus })
+            .eq('id', caseId);
+
+        if (error) throw error;
+
+        toast("✅ อัปเดตสถานะเป็น " + (newStatus === 'OPEN' ? 'OPEN' : 'CLOSED') + " เรียบร้อย", "success");
+        
+        // เรียก fetchCases จากโมดูล Wap8DSystem เพื่ออัปเดตข้อมูล Global
+        await Wap8DSystem.fetchCases(); 
+        
+        // วาดตารางใหม่เพื่อให้สีเปลี่ยนทันที
+        renderTable(); 
+    } catch (e) {
+        console.error("Update Status Error:", e);
+        toast("❌ เกิดข้อผิดพลาด: " + e.message, "error");
+    }
+}
+async function updateCompleteDate(caseId, newDate) {
+    if (S.userRole === 'supervisor') {
+        toast("⚠️ Supervisor ไม่สามารถแก้ไขวันที่ได้", "error");
+        renderTable();
+        return;
+    }
+
+    // 1. หาข้อมูลเคสปัจจุบันในเครื่อง
+    const targetCase = Wap8DSystem.getCases().find(x => String(x.id) === String(caseId));
+    if (!targetCase) return;
+
+    // 2. เตรียมโครงสร้าง JSON
+    if (!targetCase.report_data) targetCase.report_data = {};
+    if (!targetCase.report_data.vf_data) targetCase.report_data.vf_data = {};
+    
+    // บันทึกวันที่ใหม่ลงใน Object
+    targetCase.report_data.vf_data.complete_date = newDate;
+
+    try {
+        toast("⏳ กำลังบันทึกวันที่...", "info");
+        const { error } = await sqeClient
+            .from('eight_d_reports')
+            .update({ report_data: targetCase.report_data })
+            .eq('id', caseId);
+
+        if (error) throw error;
+
+        toast("✅ บันทึก Complete Date เรียบร้อย", "success");
+        
+        // อัปเดตข้อมูล Global และวาดตารางใหม่
+        await Wap8DSystem.fetchCases();
+        renderTable();
+    } catch (e) {
+        console.error("Update Complete Date Error:", e);
+        toast("❌ ไม่สามารถบันทึกวันที่ได้: " + e.message, "error");
+    }
+}
+async function updatePPMCount(caseId, newValue) {
+    if (S.userRole === 'supervisor') {
+        toast("⚠️ Supervisor ไม่สามารถแก้ไขข้อมูลได้", "error");
+        renderTable();
+        return;
+    }
+
+    const targetCase = Wap8DSystem.getCases().find(x => String(x.id) === String(caseId));
+    if (!targetCase) return;
+
+    if (!targetCase.report_data) targetCase.report_data = {};
+    if (!targetCase.report_data.vf_data) targetCase.report_data.vf_data = {};
+    
+    // บันทึกค่า YES/NO ลงใน JSON
+    targetCase.report_data.vf_data.count_ppm = newValue;
+
+    try {
+        toast("⏳ กำลังอัปเดต PPM Status...", "info");
+        const { error } = await sqeClient
+            .from('eight_d_reports')
+            .update({ report_data: targetCase.report_data })
+            .eq('id', caseId);
+
+        if (error) throw error;
+
+        toast(`✅ อัปเดต Count PPM เป็น ${newValue} แล้ว`, "success");
+        
+        // รีโหลดข้อมูลและวาดตารางใหม่
+        await Wap8DSystem.fetchCases();
+        renderTable();
+    } catch (e) {
+        console.error("Update PPM Count Error:", e);
+        toast("❌ บันทึกไม่สำเร็จ: " + e.message, "error");
+    }
+}
 document.addEventListener('keydown', (e) => {
     const activeEl = document.activeElement;
     
-    // [จุดที่ปรับปรุง] เพิ่ม ID ของช่อง Category, Action, Report เข้าไปในรายการตรวจสอบ
-    const acInputIds = ['prob-partno', 'prob-part', 'prob-supplier', 'prob-defect', 'prob-user', 'f-sup-part-cat', 'f-sup-action', 'f-sup-report'];
+    // [จุดที่ปรับปรุง] เพิ่ม ID ของช่อง Sign-off และ Category, Action, Report เข้าไปในรายการตรวจสอบ
+    const acInputIds = ['prob-issue-by', 'prob-confirm-by', 'prob-approved-by', 'prob-partno', 'prob-part', 'prob-supplier', 'prob-defect', 'prob-user', 'f-sup-part-cat', 'f-sup-action', 'f-sup-report'];
     const isACInput = acInputIds.includes(activeEl.id);
     
     if (isACInput) {
@@ -21711,6 +26953,9 @@ document.addEventListener('keydown', (e) => {
                     
                     // [จุดที่ปรับปรุง] เพิ่มการ Map ค่า ID ใหม่ให้ตรงกับ Type ข้อมูล
                     const typeMap = {
+                        'prob-issue-by': 'staff',
+                        'prob-confirm-by': 'staff',
+                        'prob-approved-by': 'staff',
                         'prob-partno': 'partno',
                         'prob-part': 'partname',
                         'prob-supplier': 'supplier',
@@ -21739,7 +26984,25 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
+function resolveCaseIdByControlNo(controlNo) {
+    if (!controlNo) return null;
+    const upper = controlNo.toUpperCase();
+    const isRP = upper.includes('-RP-') || upper.includes('RP-');
 
+    const allCases = (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases) ? Wap8DSystem.getCases() : [];
+    const sameType = allCases.filter(item => {
+        const t = (item.report_data?.source_report_type || item.report_type || '').toUpperCase();
+        const itemIsRP = (t === 'RP' || t.includes('RP'));
+        return isRP ? itemIsRP : !itemIsRP;
+    }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    const match = upper.match(/(\d+)$/); // ดึงเลขท้าย เช่น 00001
+    if (!match) return null;
+    const runningNo = parseInt(match[1], 10);
+    const target = sameType[runningNo - 1];
+    return target ? target.id : null;
+}
+window.resolveCaseIdByControlNo = resolveCaseIdByControlNo;
 // --- ส่วนเชื่อมต่อฟังก์ชันจากภายในสคริปต์ ออกไปให้ปุ่มใน HTML ใช้งานได้ ---
 
 // 1. ฟังก์ชันปลดล็อคหน้าบำรุงรักษา (แก้ปุ่ม Admin Access)

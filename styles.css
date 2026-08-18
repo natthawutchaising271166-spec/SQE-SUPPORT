@@ -9222,10 +9222,23 @@ body.dark-mode .dock-item:hover .dock-label {
 }
 
 .kpi-v2-val {
-    font-size: 28px;
+    font-size: clamp(20px, 1.8vw, 28px);
     font-weight: 900;
     color: #1e293b;
     line-height: 1;
+    white-space: nowrap;
+}
+
+#kpi-total-sparkline {
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 1;
+}
+
+#kpi-total-sparkline svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 .ppm-bar-v2 {
@@ -11542,23 +11555,33 @@ body.dark-mode .float-toggle {
    ============================================================ */
 
 /* 1. คอนเทนเนอร์หลัก */
+#skill-matrix-content {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box;
+}
+
 #skill-matrix-content:not(.hidden-view) .sm-ultra-layout {
-    height: calc(100vh - 64px) !important;
+    width: 100% !important;
+    min-height: 100%;
     display: flex !important;
     flex-direction: column !important;
-    padding: 10px 14px;
-    gap: 12px !important;
-    overflow: hidden !important;
-    box-sizing: border-box;
+    padding: 14px 18px;
+    gap: 16px !important;
+    box-sizing: border-box !important;
     background-color: #f8fafc;
 }
 
 /* 2. Glass KPI Cards */
 .sm-top-kpis {
+    width: 100% !important;
     display: grid !important;
     grid-template-columns: repeat(4, 1fr) !important;
-    gap: 12px;
+    gap: 14px;
     flex-shrink: 0;
+    box-sizing: border-box !important;
 }
 
 .glass-stat-card {
@@ -11572,6 +11595,8 @@ body.dark-mode .float-toggle {
     display: flex;
     align-items: center;
     gap: 15px;
+    width: 100% !important;
+    box-sizing: border-box !important;
 }
 
 /* Glowing Border Bottom */
@@ -11608,19 +11633,47 @@ body.dark-mode .float-toggle {
 
 /* 3. Console Bar (Input) */
 .sm-console-bar {
+    width: 100% !important;
     background: #111827; /* Dark Gray-Blue */
     border-radius: 24px;
-    padding: 3px;
+    padding: 4px;
     flex-shrink: 0;
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    box-sizing: border-box !important;
+}
+
+.console-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.console-input {
+    width: 100%;
+    height: 42px;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 14px;
+    padding: 0 14px;
+    color: #f3f4f6;
+    font-size: 12px;
+    font-weight: 700;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.console-input:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
 }
 
 .input-tag {
     font-size: 7.5px; font-weight: 900; color: #4b5563; text-transform: uppercase; position: absolute; top: -12px; left: 5px;
 }
-
-
-
 
 .btn-sm-trigger {
     height: 42px; padding: 0 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -11633,26 +11686,35 @@ body.dark-mode .float-toggle {
 
 /* 4. Analytics Grid */
 .sm-analytics-grid {
-    display: flex !important;
-    gap: 12px;
-    flex: 1 !important;
-    min-height: 0;
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 14px;
     margin-bottom: 5px;
+    box-sizing: border-box !important;
 }
 
 .analytics-card {
+    width: 100% !important;
     background: #ffffff;
     border-radius: 24px;
     border: 1px solid #f1f5f9;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+    box-sizing: border-box !important;
 }
 
-
-
-
-
+.analytics-card .card-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
 
 /* 5. Neon Skill Bars */
 .neon-bar-item {
@@ -11694,6 +11756,9 @@ body.dark-mode #skill-matrix-content .sm-ultra-layout {
 body.dark-mode .glass-stat-card, body.dark-mode .analytics-card {
     background-color: #0f172a !important; border-color: #1e293b !important;
 }
+body.dark-mode .analytics-card .card-head {
+    border-bottom-color: #1e293b !important;
+}
 body.dark-mode .stat-val, body.dark-mode .card-head h3, body.dark-mode .neon-bar-name {
     color: #fff !important;
 }
@@ -11701,7 +11766,68 @@ body.dark-mode .neon-bar-bg {
     background: #1e293b;
 }
 
-/* 7. Invisible Scroll */
+/* 7. Tablet & Mobile Responsive Layout Rules */
+@media (max-width: 1024px) {
+    .sm-top-kpis {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px;
+    }
+    .sm-analytics-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 14px;
+    }
+    .sm-analytics-grid > .analytics-card:nth-child(3) {
+        grid-column: span 2 !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .sm-top-kpis {
+        grid-template-columns: 1fr !important;
+    }
+    .sm-analytics-grid {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    .sm-analytics-grid > .analytics-card {
+        width: 100% !important;
+        grid-column: auto !important;
+    }
+}
+
+/* 7. Skill Competency Matrix Table Card & Container Expansion */
+.sm-table-card {
+    width: 100% !important;
+    background: #ffffff;
+    border-radius: 24px;
+    border: 1px solid #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+}
+
+.sm-table-container {
+    width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+}
+
+.sm-table-container table {
+    width: 100% !important;
+    border-collapse: collapse;
+}
+
+body.dark-mode .sm-table-card {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode .sm-table-card .card-head {
+    border-bottom-color: #1e293b !important;
+}
 
 
 
@@ -16076,5 +16202,30 @@ div[class*="overflow-x"] {
     width: 100%;
     display: block;
     -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Print Optimization for Vendor Failure Report (A4 Fit) */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #vf-paper-doc, #vf-paper-doc * {
+    visibility: visible !important;
+  }
+  #vf-paper-doc {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 5mm;
   }
 }
