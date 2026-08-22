@@ -50,18 +50,43 @@ window.SVG_IMAGE_ERROR_PLACEHOLDER = 'data:image/svg+xml;utf8,<svg xmlns="http:/
 
 window.handleImgError = function handleImgError(img) {
     if (!img) return;
-    img.onerror = null;
-    
+
     // ตรวจสอบว่าถ้าเป็นรูปในรายงาน (ลายเซ็น) ให้ทำพื้นหลังใส
     if (img.classList.contains('vf-sig-img')) {
+        img.onerror = null;
         img.style.opacity = '0'; // ซ่อนรูปที่เสีย
         const parent = img.parentElement;
         if (parent) {
             parent.style.borderBottom = "1px dashed #cbd5e1"; // แสดงเส้นประแทน
         }
-    } else {
-        img.src = window.SVG_IMAGE_ERROR_PLACEHOLDER;
+        return;
     }
+
+    // Smart Retry: ลองค้นหารูปแบบ Path สำรองก่อนถ้ายังไม่ได้ลอง
+    const curSrc = img.getAttribute('src') || '';
+    const retryCount = parseInt(img.dataset.retried || '0', 10);
+    if (retryCount === 0 && curSrc && !curSrc.startsWith('data:') && !curSrc.startsWith('http')) {
+        img.dataset.retried = '1';
+        if (curSrc.startsWith('./')) {
+            img.src = curSrc.replace(/^\.\//, '/');
+            return;
+        } else if (curSrc.startsWith('/')) {
+            img.src = '.' + curSrc;
+            return;
+        } else {
+            img.src = './' + curSrc;
+            return;
+        }
+    } else if (retryCount === 1 && curSrc && !curSrc.startsWith('data:') && !curSrc.startsWith('http')) {
+        img.dataset.retried = '2';
+        if (!curSrc.startsWith('/') && !curSrc.startsWith('./')) {
+            img.src = '/' + curSrc;
+            return;
+        }
+    }
+
+    img.onerror = null;
+    img.src = window.SVG_IMAGE_ERROR_PLACEHOLDER;
 };
 
 window.formatImageUrl = function formatImageUrl(url) {
@@ -83,6 +108,15 @@ window.formatImageUrl = function formatImageUrl(url) {
         trimmed = 'https://' + trimmed.slice(7);
     }
     
+    // 3. Local file protocol resolver
+    if (trimmed.startsWith('assetsinstruments/') || trimmed.startsWith('./assetsinstruments/') || trimmed.startsWith('signatures/') || trimmed.startsWith('./signatures/')) {
+        try {
+            if (window.location && window.location.protocol === 'file:') {
+                return new URL(trimmed.startsWith('./') ? trimmed : './' + trimmed, window.location.href).href;
+            }
+        } catch (e) {}
+    }
+
     return trimmed;
 };
 
@@ -204,6 +238,12 @@ window.VirtualTableScroller = class VirtualTableScroller {
         if (typeof this.onRenderComplete === 'function') {
             this.onRenderComplete(startIdx, endIdx);
         }
+    }
+
+    refresh() {
+        this.prevStart = -1;
+        this.prevEnd = -1;
+        this.render();
     }
 };
 
@@ -4101,6 +4141,438 @@ function getStaffSignatureImage(name) {
 }
 window.getStaffSignatureImage = getStaffSignatureImage;
 window.SIG_LIBRARY = SIG_LIBRARY;
+
+// ============================================================
+// CALIBRATION INSTRUMENT IMAGE DATABASE (Auto-Fetch from assetsinstruments/)
+// ============================================================
+const resolveInstrumentAssetUrl = (assetPath) => {
+    if (!assetPath || typeof assetPath !== 'string') return '';
+    const trimmed = assetPath.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('data:') || /^https?:\/\//i.test(trimmed)) return trimmed;
+
+    try {
+        if (window.location && window.location.protocol === 'file:') {
+            return new URL(trimmed.startsWith('./') ? trimmed : './' + trimmed, window.location.href).href;
+        }
+    } catch (err) {
+        console.warn('[Instrument Asset Resolver]', err);
+    }
+
+    return trimmed;
+};
+
+const INSTRUMENT_IMAGE_MAP = {
+    // ============================================================
+    // 1. DIAL GAUGES / PROBES / BASIC MEASUREMENT
+    // ============================================================
+    "DG-12M-003": "./assetsinstruments/DG-12M-003.png",
+    "DG-12M-004": "./assetsinstruments/DG-12M-004.png",
+    "DG-12M-006": "./assetsinstruments/DG-12M-006.png",
+    "DG-12M-007": "./assetsinstruments/DG-12M-007.png",
+    "DG-12M-008": "./assetsinstruments/DG-12M-008.png",
+    "DG-1MM-004": "./assetsinstruments/DG-1MM-004.png",
+
+    // ============================================================
+    // 2. PIN GAUGES / PLUG GAUGES (QAP-109 / 111)
+    // ============================================================
+    "QAP-109-039": "./assetsinstruments/QAP-109-039.png",
+    "QAP-109-040": "./assetsinstruments/QAP-109-040.png",
+    "QAP-109-041": "./assetsinstruments/QAP-109-041.png",
+    "QAP-109-042": "./assetsinstruments/QAP-109-039.png", // Mapped to 039
+    "QAP-109-043": "./assetsinstruments/QAP-109-039.png", // Mapped to 039
+    "QAP-111-001": "./assetsinstruments/QAP-111-001.png",
+
+    // ============================================================
+    // 3. THICKNESS & FEELER GAUGES (QAP-118)
+    // ============================================================
+    "QAP-118-005": "./assetsinstruments/QAP-118-005.png",
+    "FEELER GAUGE": "./assetsinstruments/QAP-118-005.png",
+    "FEELER GAUGE SET": "./assetsinstruments/QAP-118-005.png",
+    "THICKNESS GAUGE": "./assetsinstruments/QAP-118-005.png",
+    "THICKNESS GAUGE(FEELER)": "./assetsinstruments/QAP-118-005.png",
+    "THICKNESS GAUGE (FEELER)": "./assetsinstruments/QAP-118-005.png",
+    "QAP-118-007": "./assetsinstruments/QAP-118-007.png",
+    "QAP-118-008": "./assetsinstruments/QAP-118-008.png",
+    "QAP-118-009": "./assetsinstruments/QAP-118-007.png",
+    "CU-THICKNESS-STANDARD": "./assetsinstruments/QAP-118-007.png",
+    "CU THICKNESS STANDARD": "./assetsinstruments/QAP-118-007.png",
+    "FABRIC THICKNESS GAUGE": "./assetsinstruments/QAP-118-008.png",
+
+    // ============================================================
+    // 4. RADIUS GAUGES (QAP-122 / 123)
+    // ============================================================
+    "QAP-122-003": "./assetsinstruments/QAP-122-003.png",
+    "QAP-122-004": "./assetsinstruments/QAP-122-003.png",
+    "QAP-122-005": "./assetsinstruments/QAP-122-003.png",
+    "QAP-122-006": "./assetsinstruments/QAP-122-003.png",
+    "QAP-122-007": "./assetsinstruments/QAP-122-003.png",
+    "RADIUS GAUGE SET": "./assetsinstruments/QAP-122-003.png",
+    "RADIUS GAUGE": "./assetsinstruments/QAP-122-003.png",
+    "QAP-123-001": "./assetsinstruments/QAP-123-001.png",
+    "QAP-123-002": "./assetsinstruments/QAP-123-002.png",
+    "QAP-123-003": "./assetsinstruments/QAP-123-003.png",
+    "QAP-123-004": "./assetsinstruments/QAP-123-004.png",
+    "QAP-123-005": "./assetsinstruments/QAP-123-005.png",
+    "QAP-123-006": "./assetsinstruments/QAP-123-006.png",
+    "QAP-123-007": "./assetsinstruments/QAP-123-007.png",
+    "QAP-123-008": "./assetsinstruments/QAP-123-008.png",
+    "QAP-123-009": "./assetsinstruments/QAP-123-009.png",
+    "QAP-123-010": "./assetsinstruments/QAP-123-010.png",
+    "QAP-123-011": "./assetsinstruments/QAP-123-011.png",
+    "QAP-123-012": "./assetsinstruments/QAP-123-012.png",
+    "QAP-123-013": "./assetsinstruments/QAP-123-013.png",
+
+    // ============================================================
+    // 5. SPECIALIZED INSPECTION (QAP 103, 108, 140, 146 SERIES)
+    // ============================================================
+    "QAP-103-001": "./assetsinstruments/QAP-103-001.png",
+    "QAP-103-002": "./assetsinstruments/QAP-103-002.png",
+    "QAP-108-015": "./assetsinstruments/QAP-108-015.png",
+    "QAP-108-016": "./assetsinstruments/QAP-108-016.png",
+    "QAP-108-018": "./assetsinstruments/QAP-108-018.png",
+    "QAP-108-022": "./assetsinstruments/QAP-108-022.png",
+    "QAP-108-027": "./assetsinstruments/QAP-108-027.png",
+    "QAP-108-028": "./assetsinstruments/QAP-108-028.png",
+    "QAP-140-001": "./assetsinstruments/QAP-140-001.png",
+    "QAP-140-002": "./assetsinstruments/QAP-140-002.png",
+    "QAP-140-003": "./assetsinstruments/QAP-140-003.png",
+    "QAP-140-004": "./assetsinstruments/QAP-140-004.png",
+    "QAP-140-005": "./assetsinstruments/QAP-140-005.png",
+    "QAP-140-006": "./assetsinstruments/QAP-140-006.png",
+    "QAP-140-007": "./assetsinstruments/QAP-140-007.png",
+    "QAP-140-008": "./assetsinstruments/QAP-140-008.png",
+    "QAP-140-009": "./assetsinstruments/QAP-140-009.png",
+    "QAP-140-010": "./assetsinstruments/QAP-140-010.png",
+    "QAP-140-011": "./assetsinstruments/QAP-140-011.png",
+    "QAP-140-012": "./assetsinstruments/QAP-140-012.png",
+    "QAP-140-013": "./assetsinstruments/QAP-140-013.png",
+    "QAP-146-002": "./assetsinstruments/QAP-146-002.png",
+    "QAP-146-003": "./assetsinstruments/QAP-146-003.png",
+    "QAP-146-004": "./assetsinstruments/QAP-146-004.png",
+
+    // ============================================================
+    // 6. HIGH PRECISION (QAP-145 SERIES 001-029)
+    // ============================================================
+    "QAP-145-001": "./assetsinstruments/QAP-145-001.png",
+    "QAP-145-002": "./assetsinstruments/QAP-145-002.png",
+    "QAP-145-003": "./assetsinstruments/QAP-145-003.png",
+    "QAP-145-004": "./assetsinstruments/QAP-145-004.png",
+    "QAP-145-005": "./assetsinstruments/QAP-145-005.png",
+    "QAP-145-006": "./assetsinstruments/QAP-145-006.png",
+    "QAP-145-007": "./assetsinstruments/QAP-145-007.png",
+    "QAP-145-008": "./assetsinstruments/QAP-145-008.png",
+    "QAP-145-009": "./assetsinstruments/QAP-145-009.png",
+    "QAP-145-010": "./assetsinstruments/QAP-145-010.png",
+    "QAP-145-011": "./assetsinstruments/QAP-145-011.png",
+    "QAP-145-012": "./assetsinstruments/QAP-145-012.png",
+    "QAP-145-013": "./assetsinstruments/QAP-145-013.png",
+    "QAP-145-014": "./assetsinstruments/QAP-145-014.png",
+    "QAP-145-015": "./assetsinstruments/QAP-145-015.png",
+    "QAP-145-016": "./assetsinstruments/QAP-145-016.png",
+    "QAP-145-017": "./assetsinstruments/QAP-145-017.png",
+    "QAP-145-018": "./assetsinstruments/QAP-145-018.png",
+    "QAP-145-019": "./assetsinstruments/QAP-145-019.png",
+    "QAP-145-020": "./assetsinstruments/QAP-145-020.png",
+    "QAP-145-021": "./assetsinstruments/QAP-145-021.png",
+    "QAP-145-022": "./assetsinstruments/QAP-145-022.png",
+    "QAP-145-023": "./assetsinstruments/QAP-145-023.png",
+    "QAP-145-024": "./assetsinstruments/QAP-145-024.png",
+    "QAP-145-025": "./assetsinstruments/QAP-145-025.png",
+    "QAP-145-026": "./assetsinstruments/QAP-145-026.png",
+    "QAP-145-027": "./assetsinstruments/QAP-145-027.png",
+    "QAP-145-028": "./assetsinstruments/QAP-145-028.png",
+    "QAP-145-029": "./assetsinstruments/QAP-145-029.png",
+
+    // ============================================================
+    // 7. VERNIER & DIGITAL CALIPERS (VCD / OCC SERIES)
+    // ============================================================
+    "OCC-160-001": "./assetsinstruments/OCC-160-001.png",
+    "VCD-150-019": "./assetsinstruments/VCD-150-019.png",
+    "VCD-150-050": "./assetsinstruments/VCD-150-050.png",
+    "VCD-150-069": "./assetsinstruments/VCD-150-069.png",
+    "VCD-150-073": "./assetsinstruments/VCD-150-073.png",
+    "VCD-150-089": "./assetsinstruments/VCD-150-089.png",
+    "VCD-150-090": "./assetsinstruments/VCD-150-090.png",
+    "VCD-150-098": "./assetsinstruments/VCD-150-098.png",
+    "VCD-150-105": "./assetsinstruments/VCD-150-105.png",
+    "VCD-150-106": "./assetsinstruments/VCD-150-106.png",
+    "VCD-150-107": "./assetsinstruments/VCD-150-107.png",
+    "VCD-150-108": "./assetsinstruments/VCD-150-108.png",
+    "VCD-1M-004": "./assetsinstruments/VCD-1M-004.png",
+    "VCD-300-008": "./assetsinstruments/VCD-300-008.png",
+    "VCD-300-020": "./assetsinstruments/VCD-300-020.png",
+    "VCD-300-022": "./assetsinstruments/VCD-300-022.png",
+    "VCD-300-024": "./assetsinstruments/VCD-300-024.png",
+    "VCD-600-001": "./assetsinstruments/VCD-600-001.png",
+
+    // ============================================================
+    // 8. OTHER QAP SERIES (160, 201, 205, 206, 207, 212, 217, 226, 251, 311, 400+)
+    // ============================================================
+    "QAP-160-001": "./assetsinstruments/QAP-160-001.png",
+    "QAP-160-002": "./assetsinstruments/QAP-160-002.png",
+    "QAP-160-003": "./assetsinstruments/QAP-160-003.png",
+    "QAP-201-004": "./assetsinstruments/QAP-201-004.png",
+    "QAP-201-005": "./assetsinstruments/QAP-201-005.png",
+    "QAP-201-006": "./assetsinstruments/QAP-201-006.png",
+    "QAP-201-007": "./assetsinstruments/QAP-201-007.png",
+    "QAP-205-001": "./assetsinstruments/QAP-205-001.png",
+    "QAP-205-002": "./assetsinstruments/QAP-205-002.png",
+    "QAP-205-003": "./assetsinstruments/QAP-205-003.png",
+    "QAP-205-004": "./assetsinstruments/QAP-205-004.png",
+    "QAP-205-005": "./assetsinstruments/QAP-205-005.png",
+    "QAP-205-006": "./assetsinstruments/QAP-205-006.png",
+    "QAP-206-001": "./assetsinstruments/QAP-206-001.png",
+    "QAP-207-001": "./assetsinstruments/QAP-207-001.png",
+    "QAP-212-001": "./assetsinstruments/QAP-212-001.png",
+    "QAP-217-001": "./assetsinstruments/QAP-217-001.png",
+    "QAP-226-003": "./assetsinstruments/QAP-226-003.png",
+    "QAP-226-004": "./assetsinstruments/QAP-226-004.png",
+    "QAP-226-005": "./assetsinstruments/QAP-226-005.png",
+    "QAP-226-006": "./assetsinstruments/QAP-226-006.png",
+    "QAP-226-007": "./assetsinstruments/QAP-226-007.png",
+    "QAP-226-008": "./assetsinstruments/QAP-226-008.png",
+    "QAP-226-009": "./assetsinstruments/QAP-226-009.png",
+    "QAP-251-001": "./assetsinstruments/QAP-251-001.png",
+    "QAP-311-002": "./assetsinstruments/QAP-311-002.png",
+    "QAP-311-003": "./assetsinstruments/QAP-311-003.png",
+    "QAP-311-004": "./assetsinstruments/QAP-311-004.png",
+    "QAP-402-001": "./assetsinstruments/QAP-402-001.png",
+    "QAP-402-002": "./assetsinstruments/QAP-402-002.png",
+    "QAP-418-001": "./assetsinstruments/QAP-418-001.png",
+    "QAP-418-002": "./assetsinstruments/QAP-418-002.png",
+    "QAP-427-001": "./assetsinstruments/QAP-427-001.png",
+    "QAP-430-001": "./assetsinstruments/QAP-430-001.png",
+    "QAP-432-001": "./assetsinstruments/QAP-432-001.png",
+    "QAP-432-002": "./assetsinstruments/QAP-432-002.png",
+    "QAP-433-001": "./assetsinstruments/QAP-433-001.png",
+    "QAP NO. 002": "./assetsinstruments/QAP NO. 002.png",
+    "QAP NO.002": "./assetsinstruments/QAP NO. 002.png",
+    "QAP NO 002": "./assetsinstruments/QAP NO. 002.png",
+    "QAP-NO-002": "./assetsinstruments/QAP-NO-002.png",
+    "QAP-NO.-002": "./assetsinstruments/QAP-NO-002.png",
+    "QAP-002": "./assetsinstruments/QAP-002.png",
+    "QAP002": "./assetsinstruments/QAP-002.png",
+    "QAP 002": "./assetsinstruments/QAP-002.png",
+    "MVB-385SD": "./assetsinstruments/MVB-385SD.png",
+    "MVB385SD": "./assetsinstruments/MVB-385SD.png",
+    "VIBRATION DATA RECORDER": "./assetsinstruments/QAP-NO-002.png",
+    "VIBRATION RECORDER": "./assetsinstruments/QAP-NO-002.png",
+    "VIBRATION METER": "./assetsinstruments/QAP-NO-002.png",
+    // ============================================================
+    // 9. MICROMETERS (OM) & HARDNESS (HLD) & OTHER TOOLS
+    // ============================================================
+    "OM-025-059": "./assetsinstruments/OM-025-059.png",
+    "OM-025-060": "./assetsinstruments/OM-025-060.png",
+    "OM-050-013": "./assetsinstruments/OM-050-013.png",
+    "OM-075-004": "./assetsinstruments/OM-075-004.png",
+    "HLD-010-081": "./assetsinstruments/HLD-010-081.png",
+    "HLD-239-001": "./assetsinstruments/HLD-239-001.png",
+    "GR-0M3-001": "./assetsinstruments/GR-0M3-001.png",
+    "GR-0M3-002": "./assetsinstruments/GR-0M3-002.png",
+    "GR-0M4-001": "./assetsinstruments/GR-0M4-001.png",
+    "GR-0M4-002": "./assetsinstruments/GR-0M4-002.png",
+    "GR-0M6-001": "./assetsinstruments/GR-0M6-001.png",
+    "GR-0M6-002": "./assetsinstruments/GR-0M6-002.png",
+    "GS-0M3-001": "./assetsinstruments/GS-0M3-001.png",
+    "GS-0M4-001": "./assetsinstruments/GS-0M4-001.png",
+    "GS-0M6-001": "./assetsinstruments/GS-0M6-001.png",
+    "OS-2.5G-001": "./assetsinstruments/OS-2.5G-001.png",
+    "SLM-130-007": "./assetsinstruments/SLM-130-007.png",
+    "VC-1M-002": "./assetsinstruments/VC-1M-002.png",
+    "AA-05A-001": "./assetsinstruments/AA-05A-001.png",
+    "CMO-5KV-114": "./assetsinstruments/CMO-5KV-114.png",
+
+    // ============================================================
+    // 10. ELECTRONIC BALANCES / SCALES (EB SERIES)
+    // ============================================================
+    "EB-15K-012": "./assetsinstruments/EB-15K-012.png",
+    "EB-500-001": "./assetsinstruments/EB-500-001.png",
+    "EB-120-001": "./assetsinstruments/EB-120-001.png",
+
+    // ============================================================
+    // 11. SPECIAL CASE NAMES
+    // ============================================================
+    // ============================================================
+    // 12. TORQUE, FORCE, CALIBRATORS & ELECTRICAL
+    // ============================================================
+    "TCS2-127": "./assetsinstruments/TCS2-127.png",
+    "TCS2-128": "./assetsinstruments/TCS2-128.png",
+    "TCS2-129": "./assetsinstruments/TCS2-129.png",
+    "DHG-600-004": "./assetsinstruments/DHG-600-004.png",
+    "DHG-1M-001": "./assetsinstruments/DHG-1M-001.png",
+    "DIGIMATIC HEIGHT GAUGE": "./assetsinstruments/DHG-600-004.png",
+    "DIGIMATIC HEIGHT GAGE": "./assetsinstruments/DHG-600-004.png",
+    "HEIGHT GAUGE": "./assetsinstruments/DHG-600-004.png",
+    "HEIGHT GAGE": "./assetsinstruments/DHG-600-004.png",
+    "DHG": "./assetsinstruments/DHG-600-004.png",
+    "DMO-1KV-003": "./assetsinstruments/DMO-1KV-003.png",
+    "DMO-1KV-018": "./assetsinstruments/DMO-1KV-018.png",
+    "DMO-1KV-024": "./assetsinstruments/DMO-1KV-024.png",
+    "CSS-10K-056": "./assetsinstruments/CSS-10K-056.png",
+    "QAP-104-001": "./assetsinstruments/QAP-104-001.png",
+   "QAP-108-001": "./assetsinstruments/QAP-108-001.png",
+   "QAP-108-023": "./assetsinstruments/QAP-108-023.png",
+   "QAP-108-025": "./assetsinstruments/QAP-108-025.png",
+   "QAP-108-019": "./assetsinstruments/QAP-108-019.png",
+   "QAP-108-020": "./assetsinstruments/QAP-108-020.png",
+   "QAP-108-021": "./assetsinstruments/QAP-108-021.png",
+   "DBD-025-001": "./assetsinstruments/DBD-025-001.png",
+   "QAP-108-026": "./assetsinstruments/QAP-108-026.png"
+};
+
+function getInstrumentImageUrl(item) {
+    if (!item) return "";
+    
+    // หากส่งเข้ามาเป็น string (เช่น Code หรือ Path)
+    if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (!trimmed) return "";
+        if (INSTRUMENT_IMAGE_MAP[trimmed]) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP[trimmed]);
+        const directKey = Object.keys(INSTRUMENT_IMAGE_MAP).find(k => k.toLowerCase() === trimmed.toLowerCase());
+        if (directKey) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP[directKey]);
+        return resolveInstrumentAssetUrl(trimmed);
+    }
+
+    // หาก item มี imageUrl ที่เป็น base64 หรือ URL อื่นๆ ที่กำหนดไว้ชัดเจน
+    if (item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim() !== "") {
+        const urlTrimmed = item.imageUrl.trim();
+        if (urlTrimmed.startsWith('data:') || /^https?:\/\//i.test(urlTrimmed) || urlTrimmed.startsWith('assetsinstruments/') || urlTrimmed.startsWith('./assetsinstruments/')) {
+            return resolveInstrumentAssetUrl(urlTrimmed);
+        }
+    }
+
+    const clean = (val) => String(val || "").trim().toUpperCase();
+    const normalize = (val) => clean(val).replace(/[^A-Z0-9]/g, "");
+
+    const codeNo = clean(item.code_no);
+    const id = clean(item.id);
+    const barcode = clean(item.code_barcode);
+    const model = clean(item.model);
+    const serial = clean(item.serial);
+    const name = clean(item.name);
+
+    // 1. ตรวจสอบกับ INSTRUMENT_IMAGE_MAP แบบจับคู่ตรงเป๊ะ (Exact or Normalized Key)
+    const imgMapEntries = (typeof INSTRUMENT_IMAGE_MAP !== 'undefined' && INSTRUMENT_IMAGE_MAP) ? Object.entries(INSTRUMENT_IMAGE_MAP) : [];
+    for (const [key, path] of imgMapEntries) {
+        const kUpper = key.toUpperCase();
+        const kNorm = normalize(key);
+        if (
+            (codeNo && (codeNo === kUpper || normalize(codeNo) === kNorm)) ||
+            (id && (id === kUpper || normalize(id) === kNorm)) ||
+            (barcode && (barcode === kUpper || normalize(barcode) === kNorm)) ||
+            (model && (model === kUpper || normalize(model) === kNorm)) ||
+            (serial && (serial === kUpper || normalize(serial) === kNorm))
+        ) {
+            return resolveInstrumentAssetUrl(path);
+        }
+    }
+
+    // 2. ตรวจสอบแบบมี Substring ใน Code No, ID, Barcode, Serial, หรือ Model
+    for (const [key, path] of imgMapEntries) {
+        const kUpper = key.toUpperCase();
+        if (
+            (codeNo && codeNo.includes(kUpper)) ||
+            (id && id.includes(kUpper)) ||
+            (barcode && barcode.includes(kUpper)) ||
+            (model && model.includes(kUpper)) ||
+            (serial && serial.includes(kUpper))
+        ) {
+            return resolveInstrumentAssetUrl(path);
+        }
+    }
+
+    // 3. Fallback: RADIUS GAUGE SET / RADIUS GAUGE / QAP-122-003 -> QAP-122-003.png
+    if (
+        name.includes("RADIUS GAUGE") ||
+        name.includes("RADIUS") ||
+        codeNo.includes("QAP-122-003") || id.includes("QAP-122-003") ||
+        codeNo.includes("122-003") || id.includes("122-003") ||
+        codeNo.startsWith("QAP-122") || id.startsWith("QAP-122")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-122-003"] || "./assetsinstruments/QAP-122-003.png");
+    }
+
+    // 4. Fallback: CU THICKNESS STANDARD / COATING THICKNESS GAUGE -> QAP-118-007.png
+    if (
+        name.includes("CU THICKNESS") ||
+        name.includes("CU-THICKNESS") ||
+        name.includes("THICKNESS STANDARD") ||
+        name.includes("COATING") ||
+        codeNo.includes("QAP-118-007") || id.includes("QAP-118-007") ||
+        codeNo.includes("QAP-118-009") || id.includes("QAP-118-009") ||
+        codeNo.includes("118-007") || id.includes("118-007") ||
+        codeNo.includes("118-009") || id.includes("118-009")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-118-007"] || "./assetsinstruments/QAP-118-007.png");
+    }
+
+    // 4. Fallback: FABRIC THICKNESS GAUGE / QAP-118-008 -> QAP-118-008.png
+    if (
+        name.includes("FABRIC") ||
+        codeNo.includes("QAP-118-008") || id.includes("QAP-118-008") ||
+        codeNo.includes("118-008") || id.includes("118-008")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-118-008"] || "./assetsinstruments/QAP-118-008.png");
+    }
+
+    // 5. Fallback: THICKNESS GAUGE(FEELER) / FEELER GAUGE / กลุ่ม QAP-118 -> QAP-118-005.png
+    if (
+        name.includes("THICKNESS GAUGE") || 
+        name.includes("FEELER") || 
+        name.includes("THICKNESS") ||
+        codeNo.startsWith("QAP-118") || 
+        id.startsWith("QAP-118")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-118-005"] || "./assetsinstruments/QAP-118-005.png");
+    }
+
+    // 5. Fallback: PIN GAUGE หรือกลุ่ม QAP-109
+    if (name.includes("PIN GAUGE") || name.includes("PINGAUGE") || codeNo.startsWith("QAP-109") || id.startsWith("QAP-109")) {
+        if (codeNo.includes("040") || id.includes("040")) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-109-040"]);
+        if (codeNo.includes("041") || id.includes("041")) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-109-041"]);
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-109-039"] || "./assetsinstruments/QAP-109-039.png");
+    }
+
+    // 6. Fallback: DIGIMATIC HEIGHT GAUGE / HEIGHT GAUGE / DHG
+    if (
+        name.includes("DIGIMATIC HEIGHT") ||
+        name.includes("HEIGHT GAUGE") ||
+        name.includes("HEIGHT GAGE") ||
+        name.includes("DHG") ||
+        codeNo.startsWith("DHG") ||
+        id.startsWith("DHG")
+    ) {
+        if (codeNo.includes("1M") || id.includes("1M") || name.includes("1M") || name.includes("1000")) {
+            return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["DHG-1M-001"] || "./assetsinstruments/DHG-1M-001.png");
+        }
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["DHG-600-004"] || "./assetsinstruments/DHG-600-004.png");
+    }
+
+    // 7. Fallback: QAP NO. 002 / VIBRATION DATA RECORDER / LUTRON MVB-385SD
+    if (
+        codeNo.includes("QAP NO. 002") || id.includes("QAP NO. 002") ||
+        codeNo.includes("QAP NO.002") || id.includes("QAP NO.002") ||
+        codeNo.includes("QAP NO 002") || id.includes("QAP NO 002") ||
+        codeNo.includes("QAP-NO-002") || id.includes("QAP-NO-002") ||
+        codeNo.includes("QAP-NO.-002") || id.includes("QAP-NO.-002") ||
+        codeNo.includes("QAP-002") || id.includes("QAP-002") ||
+        codeNo.includes("QAP002") || id.includes("QAP002") ||
+        codeNo.includes("NO. 002") || id.includes("NO. 002") ||
+        codeNo.includes("NO.002") || id.includes("NO.002") ||
+        model.includes("MVB-385SD") || model.includes("MVB385SD") || model.includes("MVB-385") || model.includes("MVB") ||
+        name.includes("VIBRATION DATA RECORDER") || name.includes("VIBRATION RECORDER") || name.includes("VIBRATION") ||
+        name.includes("SD CARD DATA LOGGER")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP NO. 002"] || "./assetsinstruments/QAP-NO-002.png");
+    }
+
+    return item.imageUrl ? resolveInstrumentAssetUrl(item.imageUrl) : "";
+}
+
+window.INSTRUMENT_IMAGE_MAP = INSTRUMENT_IMAGE_MAP;
+window.getInstrumentImageUrl = getInstrumentImageUrl;
+window.resolveInstrumentAssetUrl = resolveInstrumentAssetUrl;
 // --- ฟังก์ชันทำความสะอาดชื่อ (ลบ Mr. Ms. ฯลฯ) ---
 function cleanSignatureName(name) {
     if (!name) return "";
@@ -4115,7 +4587,7 @@ function getStaffTeamName(inputName) {
     if (!inputName) return null;
     const clean = typeof cleanSignatureName === 'function' ? cleanSignatureName(inputName).toLowerCase().trim() : String(inputName).toLowerCase().trim();
     if (!clean) return null;
-    const teams = typeof STAFF_TEAMS !== 'undefined' ? STAFF_TEAMS : [];
+    const teams = (typeof STAFF_TEAMS !== 'undefined' && Array.isArray(STAFF_TEAMS)) ? STAFF_TEAMS : [];
     for (const t of teams) {
         if (t.members && t.members.some(m => {
             const cleanM = typeof cleanSignatureName === 'function' ? cleanSignatureName(m).toLowerCase().trim() : m.toLowerCase().trim();
@@ -4211,10 +4683,12 @@ const isOnline = () => navigator.onLine;
 // ตั้งค่าฐานข้อมูลในเครื่อง (ขยายขอบเขตให้ครอบคลุมทุกโมดูล)
 const localDB = new Dexie("CarrierOfflineDB");
 
+// แก้ไขจากเดิม ให้มีบรรทัดล่างสุดเพิ่มเข้าไป
 localDB.version(2).stores({
     pendingClaims: "id, date, sync_status",
-    pendingOT: "id, date, sync_status", // เพิ่มบรรทัดนี้
-    pending5S: "id, month, sync_status" // เพิ่มบรรทัดนี้
+    pendingOT: "id, date, sync_status",
+    pending5S: "id, month, sync_status",
+    calibrationMaster: "id, name, next_due" // <--- เพิ่มบรรทัดนี้
 });
 
 // ฟังก์ชันตรวจสอบสถานะเน็ตแบบ Real-time
@@ -4438,9 +4912,11 @@ async function handleLogin() {
     errEl.classList.add('hidden');
     if (!email) { showLoginError("กรุณากรอกอีเมล"); return; }
     if (!email.includes('@')) { showLoginError("โปรดระบุอีเมลองค์กรที่ถูกต้อง"); return; }
+    
+    // 1. กรองเบื้องต้น: เฉพาะ Staff เท่านั้นที่บังคับกรอกรหัสผ่านในหน้านี้ (Supervisor ตรวจสอบใน DB)
     if (S.loginRole === 'staff' && !pass) { showLoginError("กรุณากรอก Security Key"); return; }
 
-    // --- ตรวจสอบ MAINTENANCE MODE ---
+    // --- ตรวจสอบ MAINTENANCE MODE (โหมดปิดปรับปรุง) ---
     try {
         const sb = getSupabase();
         const { data: mtxStatus } = await sb.from('system_settings').select('is_maintenance_active').eq('id', 'global_config').single();
@@ -4459,57 +4935,63 @@ async function handleLogin() {
         const sb = getSupabase();
         if (!sb) throw new Error('NO_CLIENT');
 
+        // 2. ดึงข้อมูล User (Strict Mode: ไม่มีการแอดเพิ่มอัตโนมัติ)
         const { data: userData, error: userErr } = await sb.from('users').select('*').eq('email', email).single();
-        if (userErr && userErr.code !== 'PGRST116') throw userErr;
+        
+        // หากไม่พบข้อมูล (error code PGRST116 คือไม่พบแถวข้อมูล)
+        if (userErr && userErr.code === 'PGRST116') throw new Error('NOT_REGISTERED');
+        if (userErr) throw userErr;
+        if (!userData) throw new Error('NOT_REGISTERED');
 
-        let finalUserData = userData;
+        // 3. ตรวจสอบสถานะบัญชี (ถ้า Admin ปิดการใช้งาน)
+        if (userData.status === 'inactive') throw new Error('ACCOUNT_DISABLED');
 
-        if (userData) {
-            if (userData.role !== S.loginRole) throw new Error('ROLE_MISMATCH');
-            if (S.loginRole === 'staff' && userData.password && userData.password !== pass) {
-                throw new Error('WRONG_PASSWORD');
-            }
-        } else {
-            const { data: newUser, error: insertErr } = await sb.from('users').insert([
-                { email, password: S.loginRole === 'staff' ? pass : 'supervisor', role: S.loginRole }
-            ]).select().single();
-            if (insertErr) throw insertErr;
-            finalUserData = newUser;
+        // 4. ตรวจสอบสิทธิ์ (Role) ให้ตรงกับปุ่มที่เลือก (SQE Support vs Supervisor)
+        if (userData.role !== S.loginRole) throw new Error('ROLE_MISMATCH');
+
+        // 5. ตรวจสอบรหัสผ่าน (เฉพาะ Staff)
+        if (S.loginRole === 'staff' && userData.password !== pass) {
+            throw new Error('WRONG_PASSWORD');
         }
 
-        // ============================================================
-        // >>> ส่วนที่เพิ่ม: ตรวจสอบ FORCE RESET <<<
-        // ============================================================
-        if (finalUserData && finalUserData.force_reset) {
-            // อัปเดตเวลาเข้าใช้งานครั้งล่าสุดแม้จะโดนบังคับเปลี่ยนรหัส
-            await sqeClient.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
-            
-            // เรียก UI ตั้งรหัสผ่านใหม่
+        // 6. ตรวจสอบการ FORCE RESET (บังคับเปลี่ยนรหัสผ่านครั้งแรก)
+        if (userData.force_reset) {
+            await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
             showPasswordResetUI(email); 
-            
-            // สำคัญ: ต้อง return เพื่อไม่ให้ finalizeLoginProcess ทำงาน (ไม่ให้เข้า Dashboard)
             return; 
         }
-        // ============================================================
 
+        // 7. จัดการเพิ่มเติมกรณี Supervisor
         if (S.loginRole === 'supervisor') {
-            await checkSupervisorRole(finalUserData.email); 
+            await checkSupervisorRole(userData.email); 
         }
 
-        // อัปเดตสถานะออนไลน์และเข้าสู่ระบบตามปกติ
-        await sqeClient.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
+        // --- ผ่านทุกเงื่อนไข: เข้าสู่ระบบสำเร็จ ---
+        await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
+        
         finalizeLoginProcess(email, S.loginRole, rememberMe);
         writeAuditLog('LOGIN', `ผู้ใช้งาน ${email} เข้าสู่ระบบสำเร็จ`);
 
     } catch (err) {
         let msg = 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
-        if (err.message === 'WRONG_PASSWORD') msg = 'Security Key ไม่ถูกต้อง';
-        else if (err.message === 'ROLE_MISMATCH') msg = 'สิทธิ์ไม่ตรงกับประเภทที่เลือก';
-        else if (err.message === 'NO_CLIENT' || !navigator.onLine) { 
+        
+        // แยกกรณี Error ให้พนักงานทราบเหตุผลชัดเจน
+        if (err.message === 'NOT_REGISTERED') {
+            msg = '❌ ไม่พบข้อมูลในระบบ โปรดติดต่อ Admin เพื่อลงทะเบียนใช้งาน';
+        } else if (err.message === 'ACCOUNT_DISABLED') {
+            msg = '🚫 บัญชีนี้ถูกระงับการใช้งานชั่วคราว โปรดติดต่อ Admin';
+        } else if (err.message === 'WRONG_PASSWORD') {
+            msg = '🔑 Security Key ไม่ถูกต้อง';
+        } else if (err.message === 'ROLE_MISMATCH') {
+            msg = '⚠️ ประเภทสิทธิ์ไม่ตรงกับบัญชีของคุณ';
+        } else if (err.message === 'NO_CLIENT' || !navigator.onLine) { 
+            // กรณีออฟไลน์ (ให้เข้าใช้งานได้ถ้ามีข้อมูลจำไว้)
             finalizeLoginProcess(email, S.loginRole, rememberMe);
             return;
         }
+        
         showLoginError(msg);
+        console.error("Login Error:", err.message);
     } finally {
         btnText.classList.remove('hidden');
         btnSpinner.classList.add('hidden');
@@ -5652,43 +6134,122 @@ function openReportFromRecord(caseId) {
     }, 200);
 }
 
+// Helper ป้องกัน LocalStorage เต็ม (QuotaExceededError) โดยตัดข้อมูลรูป Base64 ขนาดใหญ่ออกและบีบอัดจำนวนแถว
+function cleanRecordForStorage(r) {
+    if (!r) return null;
+    const clone = { ...r };
+    // ถ้า imageUrl หรือ evidence เป็น base64 data URL ขนาดใหญ่ (>200 chars) ให้ตัดออกเพื่อไม่ให้เปลืองพื้นที่ LocalStorage
+    if (typeof clone.imageUrl === 'string' && clone.imageUrl.startsWith('data:')) {
+        clone.imageUrl = null;
+    }
+    if (typeof clone.image_url === 'string' && clone.image_url.startsWith('data:')) {
+        clone.image_url = null;
+    }
+    if (typeof clone.evidence_img === 'string' && clone.evidence_img.startsWith('data:')) {
+        clone.evidence_img = null;
+    }
+    if (typeof clone.image === 'string' && clone.image.startsWith('data:')) {
+        clone.image = null;
+    }
+    return clone;
+}
+
+// ล้างแคชขยะเก่าๆ จาก LocalStorage ทันทีที่เปิดโปรแกรม เพื่อคืนโควต้าความจุ 5MB ให้สะอาดเสมอ
+(function cleanupOldLocalStorageBloat() {
+    try {
+        const keysToPurge = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (!k) continue;
+            // ล้างแคชตัวเดิมที่เคยเก็บข้อมูลใหญ่เกินจำเป็น
+            if (k.startsWith('wap_support_cache_') || k.startsWith('carrier_records_backup_')) {
+                const val = localStorage.getItem(k);
+                // หากข้อมูลมีขนาดเกิน 100KB หรือมี data:image ให้ลบออก
+                if (val && (val.length > 100000 || val.includes('data:image/'))) {
+                    keysToPurge.push(k);
+                }
+            }
+        }
+        keysToPurge.forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+})();
+
+function safeLocalStorageSet(key, value) {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e) {
+        // หาก Quota เต็ม ให้ล้าง cache ข้อมูลสำรองเก่าๆ ที่ไม่จำเป็นออกเพื่อคืนพื้นที่
+        try {
+            const keysToPurge = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && (k.startsWith('wap_support_cache_') || k.startsWith('carrier_records_backup_') || k.startsWith('sqe_draft_'))) {
+                    keysToPurge.push(k);
+                }
+            }
+            keysToPurge.forEach(k => {
+                if (k !== key) localStorage.removeItem(k);
+            });
+            localStorage.setItem(key, value);
+        } catch (retryErr) {
+            console.warn('[safeLocalStorageSet] Quota exceeded even after purge:', retryErr.message);
+        }
+    }
+}
+
 async function loadRecords() {
-    // ดักจับ Target User: ถ้าเป็นหัวหน้าให้ดูคนที่เลือก (viewingUser) ถ้าเป็นพนักงานให้ดูตัวเอง (currentUser)
+    // 1. ระบุ Target User (สำหรับแสดงผลในตารางงานของตัวเอง)
     const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
     if (!targetUser) return;
 
     const sb = getSupabase();
     if (sb && navigator.onLine) {
         try {
-            // ดึงข้อมูล Claim โดยกรองจากชื่อผู้ตรวจ (inspector)
-            const { data, error } = await sb.from('records')
-                .select('*')
-                .eq('inspector', targetUser)
-                .order('created_at', { ascending: false });
+            // [จุดสำคัญ] ดึงข้อมูล 2 ชุดพร้อมกันเพื่อความรวดเร็วและฉลาดขึ้น
+            const [myRes, globalRes] = await Promise.all([
+                // ชุดที่ 1: ข้อมูลเฉพาะของตัวเอง (My History) เพื่อโชว์ในตาราง
+                sb.from('records')
+                  .select('*')
+                  .eq('inspector', targetUser)
+                  .order('created_at', { ascending: false }),
 
-            if (error) throw error;
-            
-            // อัปเดตข้อมูลลง Global State
-            const normalized = (data || []).map(normalizeRecord);
-            S.records = normalized;
+                // ชุดที่ 2: ข้อมูลจากพนักงาน "ทุกคน" (Global Knowledge) 
+                // เพื่อส่งให้สมอง AI เรียนรู้ โดยดึงเฉพาะหัวข้อที่จำเป็นต่อการ Auto-complete
+                sb.from('records')
+                  .select('partNo, partName, supplier, line, defect, unit, judgment')
+                  .limit(3000) // จำกัด 3,000 รายการล่าสุดเพื่อประสิทธิภาพสูงสุด
+            ]);
 
-            // สำรองข้อมูลลง Local Storage เพื่อรองรับอุปกรณ์หรือเครือข่ายที่มีปัญหา
+            if (myRes.error) throw myRes.error;
+            if (globalRes.error) console.warn("⚠️ ไม่สามารถดึงข้อมูลส่วนกลางได้", globalRes.error);
+
+            // A. อัปเดตตารางด้วยข้อมูลของตัวเอง
+            const normalizedMyData = (myRes.data || []).map(normalizeRecord);
+            S.records = normalizedMyData;
+
+            // B. เตรียมข้อมูลส่วนกลาง (Global Data)
+            // ถ้าดึง global ไม่ได้ ให้ใช้ข้อมูลตัวเองแก้ขัดไปก่อน
+            const globalData = globalRes.data && globalRes.data.length > 0 
+                ? globalRes.data.map(normalizeRecord) 
+                : normalizedMyData;
+
+            // C. [จุดเปลี่ยนระบบ] สั่งให้สมอง AI เรียนรู้จากข้อมูลของพนักงาน "ทุกคน"
+            rebuildSmartMemory(globalData); 
+            updateAIBrain(globalData);
+
+            // สำรองข้อมูลลง Local Storage (เฉพาะข้อมูลตัวเอง)
             try {
-                localStorage.setItem(`carrier_records_backup_${targetUser}`, JSON.stringify(normalized.slice(0, 300)));
+                const stripped = normalizedMyData.slice(0, 150).map(cleanRecordForStorage);
+                safeLocalStorageSet(`carrier_records_backup_${targetUser}`, JSON.stringify(stripped));
             } catch (err) {
-                console.warn('[LocalStorage Backup Quota Exceeded]', err);
+                console.warn('[LocalStorage Backup]', err.message);
             }
 
-            // ดึงข้อมูลเคส 8D ล่าสุดเพื่อเทียบสถานะ
+            // ดึงเคส 8D (คงเดิม)
             if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
                 await Wap8DSystem.fetchCases();
             }
             
-            // สั่งให้สมอง AI เรียนรู้ข้อมูลของคนนี้ใหม่
-            rebuildSmartMemory();
-            updateAIBrain();
-            
-            // วาดตารางใหม่
             renderTable();
             return;
         } catch (e) {
@@ -5697,21 +6258,22 @@ async function loadRecords() {
         }
     }
 
-    // กรณีออฟไลน์ เกิด Network Error หรือ Supabase โดนบล็อกในเครื่องนั้นๆ: ดึงจาก Backup Memory
+    // --- กรณีออฟไลน์ (Offline Fallback) ---
     try {
         const backupStr = localStorage.getItem(`carrier_records_backup_${targetUser}`);
         if (backupStr) {
             const backupData = JSON.parse(backupStr);
             if (Array.isArray(backupData) && backupData.length > 0) {
                 S.records = backupData;
-                toast('📦 โหลดข้อมูลเคสจากหน่วยความจำสำรองในเครื่องเรียบร้อย', 'info');
+                // ออฟไลน์: เรียนรู้จากสิ่งที่จำได้ในเครื่องไปก่อน
+                rebuildSmartMemory(backupData);
+                updateAIBrain(backupData);
+                toast('📦 โหลดข้อมูลสำรอง (Offline Mode)', 'info');
                 renderTable();
                 return;
             }
         }
-    } catch (e) {
-        console.warn('[Backup Load Error]', e);
-    }
+    } catch (e) { console.warn('[Backup Load Error]', e); }
 
     S.records = [];
     renderTable();
@@ -6256,13 +6818,21 @@ setTimeout(() => {
 async function backgroundSync() {
     if (!navigator.onLine) return; // เปลี่ยนจาก isOnline() เป็น navigator.onLine
 
-    const pending = await localDB.pendingClaims.toArray();
-    if (pending.length === 0) return;
+    let pending = [];
+    try {
+        if (typeof localDB !== 'undefined' && localDB.pendingClaims) {
+            pending = await localDB.pendingClaims.toArray();
+        }
+    } catch(e) {
+        pending = [];
+    }
+    if (!Array.isArray(pending) || pending.length === 0) return;
 
     console.log(`[Sync] พบข้อมูลค้างซิงค์ ${pending.length} รายการ...`);
 
     for (const row of pending) {
         try {
+            if (!row) continue;
             // ใช้ฟังก์ชันแปลงข้อมูลของคุณ
             const { error } = await sqeClient.from('records').upsert([formToSupabase(row)]);
             if (!error) {
@@ -6272,7 +6842,7 @@ async function backgroundSync() {
                 if (idx !== -1) S.records[idx].sync_status = 'synced';
             }
         } catch (e) {
-            console.error('[Sync] รายการนี้ซิงค์ไม่สำเร็จ:', row.ref);
+            console.error('[Sync] รายการนี้ซิงค์ไม่สำเร็จ:', row?.ref);
         }
     }
     
@@ -6321,16 +6891,23 @@ async function syncAllPendingData() {
     let totalSuccess = 0;
 
     try {
-        for (const config of syncConfigs) {
+        const activeConfigs = Array.isArray(syncConfigs) ? syncConfigs : [];
+        for (const config of activeConfigs) {
             // ตรวจสอบว่าตารางในเครื่องมีอยู่จริง
-            if (!config.dexieTable) continue;
+            if (!config || !config.dexieTable) continue;
 
-            const pendingItems = await config.dexieTable.toArray();
-            if (pendingItems.length === 0) continue;
+            let pendingItems = [];
+            try {
+                pendingItems = await config.dexieTable.toArray();
+            } catch(dexErr) {
+                pendingItems = [];
+            }
+            if (!Array.isArray(pendingItems) || pendingItems.length === 0) continue;
 
             console.log(`🔄 [Sync] Starting ${config.label}: ${pendingItems.length} items found.`);
 
             for (const item of pendingItems) {
+                if (!item) continue;
                 try {
                     // กรองฟิลด์ที่ไม่เกี่ยวข้องกับฐานข้อมูลบน Cloud ออก (เช่น sync_status)
                     const { sync_status, ...uploadData } = item;
@@ -6608,6 +7185,7 @@ function showCustomConfirmDialog(options = {}) {
     });
 
     const closeDialog = (confirmed = false) => {
+        document.removeEventListener('keydown', handleKeyDown);
         card.classList.remove('scale-100', 'opacity-100');
         card.classList.add('scale-95', 'opacity-0');
         setTimeout(() => {
@@ -6658,9 +7236,11 @@ function showCustomConfirmDialog(options = {}) {
         if (e.key === 'Escape') {
             document.removeEventListener('keydown', handleKeyDown);
             closeDialog(false);
-        } else if (e.key === 'Enter' && !confirmBtn.hasAttribute('disabled')) {
-            document.removeEventListener('keydown', handleKeyDown);
-            confirmBtn.click();
+        } else if (e.key === 'Enter') {
+            if (confirmBtn && !confirmBtn.hasAttribute('disabled') && typeof confirmBtn.click === 'function') {
+                document.removeEventListener('keydown', handleKeyDown);
+                confirmBtn.click();
+            }
         }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -7250,7 +7830,7 @@ function renderTable() {
         virtualTableState.prevEnd = -1;
         virtualTableState.isFreshRender = true;
 
-        const useVirtual = total > 150;
+        const useVirtual = total > 100; // เปลี่ยนเป็น 100 ให้ตรงกับระบบคำนวณการเลื่อน
         const runwayStyle = useVirtual ? `position: relative; width: 100%; height: ${total * FIXED_ROW_HEIGHT + HEADER_HEIGHT}px;` : 'position: relative; width: 100%; height: auto;';
         const wrapperStyle = useVirtual ? 'position: absolute; top: 0; left: 0; right: 0;' : 'position: relative; width: 100%;';
 
@@ -7550,14 +8130,14 @@ function switchPage(name, el) {
         el.appendChild(indicator);
     }
 
-    // --- STEP 3: HIDE ALL PAGE CONTAINERS ---
-    const allPages = [
-        'entry-terminal-content', 'overview-cockpit-content', 'exec-dashboard-content',
-        'attendance-logs', 'line-support-logs-content', 'five-s-content',
-        'skill-matrix-content', 'special-jobs-content', 'ot-management-content',
-        'admin-console-content', 'eight-d-content',
-    'rn-management-content'
-    ];
+const allPages = [
+    'entry-terminal-content', 'overview-cockpit-content', 'exec-dashboard-content',
+    'attendance-logs', 'line-support-logs-content', 'five-s-content',
+    'skill-matrix-content', 'special-jobs-content', 'ot-management-content',
+    'admin-console-content', 'eight-d-content',
+    'rn-management-content',
+    'calibration-content' // <--- เพิ่ม ID นี้เข้าไปเพื่อให้ระบบสั่งซ่อนหน้าจอนี้เวลาสลับไปหน้าอื่น
+];
     allPages.forEach(id => {
         const pageEl = document.getElementById(id);
         if (pageEl) pageEl.classList.add('hidden-view');
@@ -7651,7 +8231,8 @@ function switchPage(name, el) {
         '8D REPORT': 'eight-d-content',
         'SQE EN': 'eight-d-content',
         'SME RECEIVABLES': 'eight-d-content',
-        'RUNNING NUMBER': 'rn-management-content'
+        'RUNNING NUMBER': 'rn-management-content',
+        'CALIBRATION': 'calibration-content'
     };
 
 if (pageNameUpper === 'RUNNING NUMBER') {
@@ -7682,6 +8263,10 @@ switch(pageNameUpper) {
     case 'SQE EN':
     case 'SME RECEIVABLES':
         Wap8DSystem.init(); break;
+
+    case 'CALIBRATION': 
+    WapCalibrationSystem.init(); 
+    break;
     case 'ADMIN CONSOLE': 
         if (typeof WapAdminSystem !== 'undefined') WapAdminSystem.init(); 
         break;
@@ -7828,13 +8413,26 @@ function toggleSidebar(forceState = null) {
     }, 400); // 400ms คือเวลาที่เท่ากับ CSS Transition
 }
 
-function rebuildSmartMemory() {
+/**
+ * ฟังก์ชันสร้างหน่วยความจำสำหรับ Auto-complete
+ * @param {Array} customData - ชุดข้อมูลที่จะให้เรียนรู้ (ถ้าไม่ส่งมาจะใช้ S.records ของตัวเอง)
+ */
+function rebuildSmartMemory(customData = null) {
+    // เลือกชุดข้อมูล: ถ้ามีข้อมูลส่วนกลางส่งมาให้ใช้ตัวนั้น ถ้าไม่มีให้ใช้ข้อมูลตัวเอง
+    const dataToLearn = customData || S.records;
+
     smartMemory = {
-        values: { partNo: new Set(), partName: new Set(), supplier: new Set(), line: new Set(), defect: new Set(), category: new Set(), action: new Set(), report: new Set() },
+        values: { 
+            partNo: new Set(), partName: new Set(), supplier: new Set(), 
+            line: new Set(), defect: new Set(), category: new Set(), 
+            action: new Set(), report: new Set() 
+        },
         byPartNo: {}, byPartName: {}, bySupplier: {}, byLine: {}
     };
 
-    S.records.forEach(r => {
+    if (!Array.isArray(dataToLearn)) return;
+
+    dataToLearn.forEach(r => {
         const partNo = (r.partNo || '').trim();
         const partName = (r.partName || '').trim();
         const supplier = (r.supplier || '').trim();
@@ -7844,6 +8442,7 @@ function rebuildSmartMemory() {
         const action = (r.action || '').trim();
         const report = (r.report_type || r.report || '').trim();
 
+        // เก็บค่าที่ไม่ซ้ำกันลงใน Sets สำหรับโชว์เป็นตัวเลือก Dropdown
         if (partNo) smartMemory.values.partNo.add(partNo);
         if (partName) smartMemory.values.partName.add(partName);
         if (supplier) smartMemory.values.supplier.add(supplier);
@@ -7853,12 +8452,28 @@ function rebuildSmartMemory() {
         if (action) smartMemory.values.action.add(action);
         if (report) smartMemory.values.report.add(report);
 
+        // จัดกลุ่มข้อมูล (Packs) เพื่อใช้สำหรับ Auto-fill (พิมพ์ PN แล้วชื่อพาร์ทเด้งมาเอง)
         const pack = { partNo, partName, supplier, line, defect, unit: r.unit || 'PCS', judgment: r.judgment || '' };
-        if (partNo) { const k = partNo.toLowerCase(); (smartMemory.byPartNo[k] = smartMemory.byPartNo[k] || []).push(pack); }
-        if (partName) { const k = partName.toLowerCase(); (smartMemory.byPartName[k] = smartMemory.byPartName[k] || []).push(pack); }
-        if (supplier) { const k = supplier.toLowerCase(); (smartMemory.bySupplier[k] = smartMemory.bySupplier[k] || []).push(pack); }
-        if (line) { const k = line.toLowerCase(); (smartMemory.byLine[k] = smartMemory.byLine[k] || []).push(pack); }
+        
+        if (partNo) { 
+            const k = partNo.toLowerCase(); 
+            (smartMemory.byPartNo[k] = smartMemory.byPartNo[k] || []).push(pack); 
+        }
+        if (partName) { 
+            const k = partName.toLowerCase(); 
+            (smartMemory.byPartName[k] = smartMemory.byPartName[k] || []).push(pack); 
+        }
+        if (supplier) { 
+            const k = supplier.toLowerCase(); 
+            (smartMemory.bySupplier[k] = smartMemory.bySupplier[k] || []).push(pack); 
+        }
+        if (line) { 
+            const k = line.toLowerCase(); 
+            (smartMemory.byLine[k] = smartMemory.byLine[k] || []).push(pack); 
+        }
     });
+    
+    console.log(`🧠 Smart Memory Rebuilt: Learned from ${dataToLearn.length} records.`);
 }
 
 function getMostFrequentPack(list) {
@@ -7874,41 +8489,102 @@ function getMostFrequentPack(list) {
     return best;
 }
 
-function updateAIBrain() {
-    aiBrain = { partNoMap: {}, partNameMap: {}, defectToRemarkMap: {}, supplierPartMap: {} };
-    const rows = S.records;
-    if (!rows.length) return;
+/**
+ * ฟังก์ชันวิเคราะห์สถิติความสัมพันธ์ของข้อมูล (AI Brain)
+ * ทำหน้าที่หาค่าที่ "พบบ่อยที่สุด" (Mode) เพื่อใช้ในระบบ Auto-fill
+ * @param {Array} customData - ชุดข้อมูลที่ต้องการให้ AI เรียนรู้ (ถ้าไม่ส่งมาจะใช้ S.records)
+ */
+function updateAIBrain(customData = null) {
+    // 1. ล้างสมองเดิมก่อนเริ่มเรียนรู้ใหม่
+    aiBrain = { 
+        partNoMap: {}, 
+        partNameMap: {}, 
+        defectToRemarkMap: {}, 
+        supplierPartMap: {} 
+    };
+
+    // เลือกชุดข้อมูล: ถ้าเป็นพนักงานใหม่ S.records จะว่าง ให้ใช้ข้อมูลที่ดึงมาจากฐานข้อมูลกลาง (customData)
+    const dataToLearn = customData || S.records;
+    if (!dataToLearn || dataToLearn.length === 0) return;
 
     const tempStore = {};
     const defectTempStore = {};
+
+    // --- Helper Function: หาค่าที่พบบ่อยที่สุด (Mode) แบบสะอาด ---
     const getMode = (arr) => {
-        if (!arr.length) return null;
-        const counts = {}; let max = 0, res = null;
-        arr.forEach(v => { counts[v] = (counts[v] || 0) + 1; if (counts[v] > max) { max = counts[v]; res = v; } });
-        return res;
+        if (!arr || arr.length === 0) return null;
+        const counts = {}; 
+        let maxCount = 0;
+        let modeValue = null;
+
+        arr.forEach(v => { 
+            if (!v || v === '-' || v === 'N/A' || String(v).trim() === '') return;
+            const val = String(v).trim();
+            counts[val] = (counts[val] || 0) + 1; 
+            if (counts[val] > maxCount) { 
+                maxCount = counts[val]; 
+                modeValue = val; 
+            } 
+        });
+        return modeValue;
     };
 
-    rows.forEach(r => {
+    // 2. รวบรวมสถิติจากรายการทั้งหมด
+    dataToLearn.forEach(r => {
         const pNo = (r.partNo || '').trim();
         const pName = (r.partName || '').trim();
         const def = (r.defect || '').trim().toLowerCase();
         const rem = (r.remark || '').trim();
         const supp = (r.supplier || '').trim();
 
-        if (pNo) (tempStore[pNo.toLowerCase()] = tempStore[pNo.toLowerCase()] || []).push(r);
-        if (pName) (tempStore[pName.toLowerCase()] = tempStore[pName.toLowerCase()] || []).push(r);
-        if (def && rem) (defectTempStore[def] = defectTempStore[def] || []).push(rem);
-        if (pNo && supp) { if (!aiBrain.supplierPartMap[pNo]) aiBrain.supplierPartMap[pNo] = new Set(); aiBrain.supplierPartMap[pNo].add(supp); }
+        // เก็บข้อมูลดิบลง Store ชั่วคราวแยกตาม ID (รหัสพาร์ท หรือ ชื่อพาร์ท)
+        if (pNo) {
+            const key = pNo.toLowerCase();
+            (tempStore[key] = tempStore[key] || []).push(r);
+            
+            // เก็บความสัมพันธ์ รหัสพาร์ท vs ผู้ขาย
+            if (supp) {
+                if (!aiBrain.supplierPartMap[pNo]) aiBrain.supplierPartMap[pNo] = new Set();
+                aiBrain.supplierPartMap[pNo].add(supp);
+            }
+        }
+        
+        if (pName) {
+            const key = pName.toLowerCase();
+            (tempStore[key] = tempStore[key] || []).push(r);
+        }
+
+        // เก็บสถิติ อาการเสีย vs หมายเหตุที่มักจะพิมพ์
+        if (def && rem) {
+            (defectTempStore[def] = defectTempStore[def] || []).push(rem);
+        }
     });
 
+    // 3. ประมวลผลขั้นสุดท้าย (วิเคราะห์ Mode)
     for (const key in tempStore) {
         const list = tempStore[key];
-        const mode = (k) => getMode(list.map(x => x[k]).filter(v => v && v !== '-'));
-        const data = { supplier: mode('supplier'), partNo: mode('partNo'), partName: mode('partName'), line: mode('line'), defect: mode('defect'), judgment: mode('judgment'), unit: mode('unit') };
-        aiBrain.partNoMap[key] = data;
-        aiBrain.partNameMap[key] = data;
+        
+        // วิเคราะห์หาค่าที่ "น่าจะเป็นไปได้มากที่สุด" สำหรับพาร์ทนี้
+        const statisticalMatch = { 
+            supplier: getMode(list.map(x => x.supplier)), 
+            partNo: getMode(list.map(x => x.partNo)), 
+            partName: getMode(list.map(x => x.partName)), 
+            line: getMode(list.map(x => x.line)), 
+            defect: getMode(list.map(x => x.defect)), 
+            judgment: getMode(list.map(x => x.judgment)), 
+            unit: getMode(list.map(x => x.unit)) 
+        };
+
+        aiBrain.partNoMap[key] = statisticalMatch;
+        aiBrain.partNameMap[key] = statisticalMatch;
     }
-    for (const dKey in defectTempStore) aiBrain.defectToRemarkMap[dKey] = getMode(defectTempStore[dKey]);
+
+    // วิเคราะห์หมายเหตุ (Remark) ที่พบบ่อยสำหรับแต่ละอาการเสีย
+    for (const dKey in defectTempStore) {
+        aiBrain.defectToRemarkMap[dKey] = getMode(defectTempStore[dKey]);
+    }
+
+    console.log(`🧠 AI Brain Sync: Learned from ${dataToLearn.length} global records.`);
 }
 
 function autoFillFromPack(pack) {
@@ -7959,7 +8635,8 @@ function translateDefectToRemark() {
         translated = aiBrain.defectToRemarkMap[defVal];
     } else {
         // ถ้าไม่เจอ ให้หาจากพจนานุกรมคำหลัก (Keyword)
-        for (const [key, t] of Object.entries(defectDict)) {
+        const dEntries = (typeof defectDict !== 'undefined' && defectDict) ? Object.entries(defectDict) : [];
+        for (const [key, t] of dEntries) {
             if (defVal.includes(key)) {
                 translated = t;
                 break;
@@ -8284,7 +8961,9 @@ function getActiveTableContext() {
         { id: 'admin-console-content', type: 'admin', tbodyId: 'admin-table-body', containerId: 'admin-db-table-container' }
     ];
 
-    for (const page of pageTargets) {
+    const validPages = Array.isArray(pageTargets) ? pageTargets : [];
+    for (const page of validPages) {
+        if (!page || !page.id) continue;
         const pageEl = document.getElementById(page.id);
         if (pageEl && !pageEl.classList.contains('hidden-view') && pageEl.style.display !== 'none' && pageEl.offsetWidth > 0) {
             const tbody = document.getElementById(page.tbodyId);
@@ -8489,9 +9168,9 @@ function triggerSelectedRowAction(ctx) {
 
         if (tr) {
             const primaryBtn = tr.querySelector('button.act-btn-view, button.act-btn-edit, button.row-btn-edit, button.row-btn-clone, button:not(.act-btn-del):not(.row-btn-del)');
-            if (primaryBtn) {
+            if (primaryBtn && typeof primaryBtn.click === 'function') {
                 primaryBtn.click();
-            } else {
+            } else if (typeof tr.click === 'function') {
                 tr.click();
             }
         }
@@ -8622,9 +9301,10 @@ function handleGlobalTableKeydown(e) {
 
         // ตรวจสอบว่ามี Modal แสดงอยู่หรือไม่
         const visibleModals = Array.from(document.querySelectorAll('.modal, .modal-card, [id*="modal"], [id*="Modal"], [id*="dialog"]'))
-            .filter(m => m.offsetWidth > 0 && m.offsetHeight > 0 && !m.classList.contains('hidden') && getComputedStyle(m).display !== 'none');
+            .filter(m => m && m.offsetWidth > 0 && m.offsetHeight > 0 && !m.classList.contains('hidden') && getComputedStyle(m).display !== 'none');
 
-        for (const m of visibleModals) {
+        for (const m of (visibleModals || [])) {
+            if (!m) continue;
             const submitBtn = m.querySelector('button[type="submit"], #btn-sup-submit, #btn-save-8d, .btn-submit, .btn-save, #btn-commit, button.bg-blue-600, button.bg-emerald-600');
             if (submitBtn && !submitBtn.disabled) {
                 submitBtn.click();
@@ -9370,14 +10050,18 @@ function refreshClaimDashboard() {
 
     // --- [4. Trend Stats & Charts] ---
     const monthStats = new Array(12).fill(0);
-    filtered.forEach(r => {
-        if (!r.date) return;
-        const m = new Date(r.date).getMonth();
-        monthStats[m] += (parseFloat(r.qty) || 0);
-    });
+    if (Array.isArray(filtered)) {
+        filtered.forEach(r => {
+            if (!r || !r.date) return;
+            const m = new Date(r.date).getMonth();
+            if (m >= 0 && m < 12) {
+                monthStats[m] += (parseFloat(r.qty) || 0);
+            }
+        });
+    }
     
     const activeMonths = monthStats.filter(v => v > 0);
-    animateValue('trend-max', 0, Math.max(...monthStats, 0), 1000);
+    animateValue('trend-max', 0, monthStats.length ? Math.max(...monthStats, 0) : 0, 1000);
     animateValue('trend-min', 0, activeMonths.length ? Math.min(...activeMonths) : 0, 1000);
     animateValue('trend-avg', 0, activeMonths.length ? Math.round(activeMonths.reduce((a, b) => a + b, 0) / activeMonths.length) : 0, 1000);
 
@@ -9418,8 +10102,9 @@ function renderKpiTotalSparkline(records) {
     if (!container._sparklineObserverAttached && typeof ResizeObserver !== 'undefined') {
         container._sparklineObserverAttached = true;
         const ro = new ResizeObserver(entries => {
-            for (let entry of entries) {
-                if (entry.contentRect && entry.contentRect.width > 0) {
+            const entryList = entries ? Array.from(entries) : [];
+            for (let entry of entryList) {
+                if (entry && entry.contentRect && entry.contentRect.width > 0) {
                     clearTimeout(sparklineResizeTimer);
                     sparklineResizeTimer = setTimeout(() => {
                         renderKpiTotalSparkline();
@@ -10346,7 +11031,10 @@ function renderExecTrends(actData, s5Data) {
     });
 
     // 6. คำนวณค่าสูงสุด (Dynamic Y-Axis)
-    const maxVal = Math.max(...supportData, ...s5CalculatedData, ...specialJobsData, 5);
+    const sData = Array.isArray(supportData) ? supportData : [];
+    const s5DataArr = Array.isArray(s5CalculatedData) ? s5CalculatedData : [];
+    const sjData = Array.isArray(specialJobsData) ? specialJobsData : [];
+    const maxVal = Math.max(...sData, ...s5DataArr, ...sjData, 5);
     const dynamicMax = Math.ceil(maxVal / 5) * 5 + 5;
 
     // 7. วาดกราฟใหม่
@@ -11377,14 +12065,18 @@ const WapSupportLogs = (function () {
             if (myToken !== _fetchToken || !_alive) return;
             _records = (data || []).map(_fromDb);
 
-            // สำรองข้อมูลลง LocalStorage เพื่อป้องกันปัญหาการเชื่อมต่อบนบางเครื่อง
+            // สำรองข้อมูลลง IndexedDB และ LocalStorage อย่างปลอดภัย (ตัดรูป Base64 ออก ป้องกัน Quota Exceeded)
             try {
                 if (_records.length > 0) {
-                    if (_user) localStorage.setItem(`wap_support_cache_${_user}`, JSON.stringify(_records.slice(0, 300)));
-                    localStorage.setItem(`wap_support_cache_last`, JSON.stringify(_records.slice(0, 300)));
+                    const stripped = _records.slice(0, 150).map(cleanRecordForStorage);
+                    if (_user) safeLocalStorageSet(`wap_support_cache_${_user}`, JSON.stringify(stripped));
+                    safeLocalStorageSet(`wap_support_cache_last`, JSON.stringify(stripped));
+                    if (window.SQEIndexedDBManager && typeof SQEIndexedDBManager.saveTableCache === 'function') {
+                        SQEIndexedDBManager.saveTableCache(`wap_support_${_user}`, stripped);
+                    }
                 }
             } catch (err) {
-                console.warn('[WapSupportCache Error]', err);
+                console.warn('[WapSupportCache Error]', err.message);
             }
 
             applyDateFilter();
@@ -11404,7 +12096,20 @@ const WapSupportLogs = (function () {
                         }
                     }
                 } catch (err) {
-                    console.warn('[Cache Restore Error]', err);
+                    console.warn('[Cache Restore Error]', err.message);
+                }
+
+                if (!restored && window.SQEIndexedDBManager && typeof SQEIndexedDBManager.getTableCache === 'function') {
+                    try {
+                        const idbData = await SQEIndexedDBManager.getTableCache(`wap_support_${_user}`);
+                        if (Array.isArray(idbData) && idbData.length > 0) {
+                            _records = idbData.map(_fromDb);
+                            restored = true;
+                            toast('📦 โหลดรายงานผลิตจากหน่วยความจำสำรอง IndexedDB เรียบร้อย', 'info');
+                        }
+                    } catch (idbErr) {
+                        console.warn('[IDB Cache Restore Error]', idbErr.message);
+                    }
                 }
 
                 if (!restored) {
@@ -11430,7 +12135,7 @@ const WapSupportLogs = (function () {
         }
         const start = document.getElementById('cd-start-date')?.value;
         const end = document.getElementById('cd-end-date')?.value;
-        let temp = [..._records];
+        let temp = Array.isArray(_records) ? [..._records] : [];
 
         if (start && end) {
             temp = temp.filter(r => r.eventDate && r.eventDate >= start && r.eventDate <= end);
@@ -12409,55 +13114,57 @@ const WapSupportLogs = (function () {
             }
         }
 
-        function syncProblemSentence() {
-            const dateInputVal = modal.querySelector('#f-sup-date')?.value || r.eventDate;
-            const dateStr = _formatProblemDateStr(dateInputVal);
-            const userVal = (modal.querySelector('#prob-user')?.value || '').trim();
-            const partVal = (modal.querySelector('#prob-part')?.value || '').trim();
-            const partNoVal = (modal.querySelector('#prob-partno')?.value || '').trim();
-            const supplierVal = (modal.querySelector('#prob-supplier')?.value || '').trim();
-            const defectVal = (modal.querySelector('#prob-defect')?.value || '').trim();
+// --- แก้ไขฟังก์ชัน syncProblemSentence ให้ตรวจจับการเปลี่ยนประเภทรายงานได้ดีขึ้น ---
+function syncProblemSentence() {
+    const dateInputVal = modal.querySelector('#f-sup-date')?.value || r.eventDate;
+    const dateStr = _formatProblemDateStr(dateInputVal);
+    const userVal = (modal.querySelector('#prob-user')?.value || '').trim();
+    const partVal = (modal.querySelector('#prob-part')?.value || '').trim();
+    const partNoVal = (modal.querySelector('#prob-partno')?.value || '').trim();
+    const supplierVal = (modal.querySelector('#prob-supplier')?.value || '').trim();
+    const defectVal = (modal.querySelector('#prob-defect')?.value || '').trim();
 
-            const reportInputVal = (modal.querySelector('#f-sup-report')?.value || '').trim().toUpperCase();
-            const isRP = reportInputVal.startsWith('RP') || reportInputVal.includes('RP') || userVal.toLowerCase().includes('iqc');
+    // ดึงค่าจากช่องประเภทรายงาน
+    const reportInputVal = (modal.querySelector('#f-sup-report')?.value || '').trim().toUpperCase();
+    
+    // ✅ ปรับ Logic การเช็คว่าเป็น RP หรือไม่ (ให้ครอบคลุมชื่อที่แสดงใน Autocomplete)
+    const isRP = reportInputVal.includes('RP') || reportInputVal.includes('IQC');
 
-            const ngVal = (modal.querySelector('#f-sup-ng')?.value || '').trim();
-            const lotVal = (modal.querySelector('#f-sup-lot')?.value || '').trim();
+    const lotVal = (modal.querySelector('#f-sup-lot')?.value || '').trim();
+    const ngVal = (modal.querySelector('#f-sup-ng')?.value || '').trim();
 
-            const dateBadge = modal.querySelector('#prob-date-badge');
-            if (dateBadge) dateBadge.textContent = dateStr;
+    const dateBadge = modal.querySelector('#prob-date-badge');
+    if (dateBadge) dateBadge.textContent = dateStr;
 
-            let fullSentence = '';
-            if (isRP) {
-                const partInfo = (partVal && partNoVal) ? `${partVal} / ${partNoVal}` : (partVal || partNoVal || '');
-                const suppInfo = supplierVal ? ` ${supplierVal}` : '';
-                const defectPart = defectVal ? ` found defect ${defectVal}` : '';
-                const rejectQty = lotVal || (r.lot !== undefined && r.lot !== null && r.lot !== '' ? r.lot : (r.qty || ngVal || '160'));
-                if (partInfo || defectVal || userVal || supplierVal) {
-                    fullSentence = `IQC incoming inspection found problem about ${partInfo}${suppInfo}${defectPart}. IQC judgement rejected q'ty ${rejectQty} pcs (100%).`.replace(/\s+/g, ' ').trim();
-                }
-            } else {
-                if (userVal || partVal || partNoVal || supplierVal || defectVal) {
-                    const partInfo = (partVal && partNoVal) ? `${partVal} / ${partNoVal}` : (partVal || partNoVal || '');
-                    const suppInfo = supplierVal ? ` ${supplierVal}` : '';
-                    const userPrefix = userVal ? `${userVal} ` : '';
-                    fullSentence = `On ${dateStr} ${userPrefix}inform quality problem about ${partInfo}${suppInfo} found defect ${defectVal}`.replace(/\s+/g, ' ').trim();
-                }
-            }
+    let fullSentence = '';
+    if (isRP) {
+        // 🔹 รูปแบบประโยคสำหรับ RP Report (IQC Rejected)
+        const partInfo = (partVal && partNoVal) ? `${partVal} / ${partNoVal}` : (partVal || partNoVal || '');
+        const suppInfo = supplierVal ? ` ${supplierVal}` : '';
+        const defectPart = defectVal ? ` found defect ${defectVal}` : '';
+        const rejectQty = lotVal || '0';
+        
+        fullSentence = `IQC incoming inspection found problem about ${partInfo}${suppInfo}${defectPart}. IQC judgement rejected q'ty ${rejectQty} pcs (100%).`;
+    } else {
+        // 🔹 รูปแบบประโยคสำหรับ VF Report (Line Claim)
+        const partInfo = (partVal && partNoVal) ? `${partVal} / ${partNoVal}` : (partVal || partNoVal || '');
+        const suppInfo = supplierVal ? ` ${supplierVal}` : '';
+        const userPrefix = userVal ? `${userVal} ` : '';
+        fullSentence = `On ${dateStr} ${userPrefix}inform quality problem about ${partInfo}${suppInfo} found defect ${defectVal}`;
+    }
 
-            if (fullSentence) {
-                fullSentence = getCleanProblemTitle(fullSentence);
-            }
+    // ล้างข้อความส่วนเกินผ่าน Utility
+    fullSentence = getCleanProblemTitle(fullSentence);
 
-            const hiddenProb = modal.querySelector('#f-sup-problem');
-            if (hiddenProb) hiddenProb.value = fullSentence;
+    const hiddenProb = modal.querySelector('#f-sup-problem');
+    if (hiddenProb) hiddenProb.value = fullSentence;
 
-            const previewText = modal.querySelector('#prob-preview-text');
-            if (previewText) {
-                previewText.textContent = fullSentence || 'ระบุรายละเอียดปัญหาเพื่อสร้าง Problem Statement';
-                previewText.style.color = fullSentence ? (isDark ? '#f8fafc' : '#0f172a') : (isDark ? '#64748b' : '#94a3b8');
-            }
-        }
+    const previewText = modal.querySelector('#prob-preview-text');
+    if (previewText) {
+        previewText.textContent = fullSentence;
+        previewText.style.color = isDark ? '#f8fafc' : '#0f172a';
+    }
+}
 
         ['prob-user', 'prob-supplier', 'prob-defect', 'prob-part', 'prob-partno', 'f-sup-report', 'f-sup-lot', 'f-sup-ok', 'f-sup-ng', 'f-sup-po', 'f-sup-inv'].forEach(fieldId => {
             const el = modal.querySelector('#' + fieldId);
@@ -12468,21 +13175,33 @@ const WapSupportLogs = (function () {
             }
         });
 
-        const reportFieldEl = modal.querySelector('#f-sup-report');
-        if (reportFieldEl) {
-            const handleReportChange = () => {
-                const val = (reportFieldEl.value || '').toUpperCase();
-                const userInp = modal.querySelector('#prob-user');
-                if (val.includes('RP')) {
-                    if (userInp) userInp.value = 'IQC incoming inspection';
-                }
-                toggleRpFieldsVisibility();
-                syncProblemSentence();
-            };
-            reportFieldEl.addEventListener('input', handleReportChange);
-            reportFieldEl.addEventListener('change', handleReportChange);
-            reportFieldEl.addEventListener('keyup', handleReportChange);
+// --- แก้ไข Event Listener ของช่องประเภทรายงาน ---
+const reportFieldEl = modal.querySelector('#f-sup-report');
+if (reportFieldEl) {
+    const handleReportChange = () => {
+        const val = (reportFieldEl.value || '').toUpperCase();
+        const userInp = modal.querySelector('#prob-user');
+
+        if (val.includes('RP')) {
+            // ถ้าเลือก RP ให้เปลี่ยนผู้แจ้งเป็น IQC อัตโนมัติ
+            if (userInp) userInp.value = 'IQC incoming inspection';
+        } else {
+            // ถ้าไม่ใช่ RP และค่าเดิมเป็น IQC ให้ล้างออกเพื่อให้ User กรอกชื่อไลน์
+            if (userInp && userInp.value === 'IQC incoming inspection') {
+                userInp.value = ''; 
+            }
         }
+        
+        toggleRpFieldsVisibility();
+        // สั่งให้ Preview อัปเดตทันที
+        syncProblemSentence(); 
+    };
+
+    // ผูก Event ให้ครอบคลุมทั้งการพิมพ์, การเลือกจาก List, และการเสียโฟกัส
+    reportFieldEl.addEventListener('input', handleReportChange);
+    reportFieldEl.addEventListener('change', handleReportChange);
+    reportFieldEl.addEventListener('blur', handleReportChange);
+}
 
         const dateEl = modal.querySelector('#f-sup-date');
         if (dateEl) {
@@ -12571,8 +13290,9 @@ const WapSupportLogs = (function () {
             }
             const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
             if (items) {
-                for (let item of items) {
-                    if (item.type && item.type.indexOf('image') === 0) {
+                const itemList = Array.from(items);
+                for (let item of itemList) {
+                    if (item && item.type && item.type.indexOf('image') === 0) {
                         const blob = item.getAsFile();
                         handleImageFile(blob);
                         if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ', 'success');
@@ -13326,7 +14046,7 @@ function applyDateFilter() {
                 return recordMonth >= filterStart && recordMonth <= filterEnd;
             });
         } else {
-            _filteredRecords = [..._allRecords];
+            _filteredRecords = Array.isArray(_allRecords) ? [..._allRecords] : [];
         }
         
         renderAll(); // วาดหน้าจอใหม่ทันที
@@ -14115,7 +14835,7 @@ const WapSkillMatrix = (function() {
             if (cntEl) cntEl.textContent = count + ' Skills';
         }
 
-        const sorted = [..._records].sort((a, b) => (b.skill_value || 0) - (a.skill_value || 0));
+        const sorted = (Array.isArray(_records) ? [..._records] : []).sort((a, b) => (b.skill_value || 0) - (a.skill_value || 0));
         const topEl = document.getElementById('sm-kpi-top');
         if (topEl) {
             topEl.textContent = sorted[0]?.skill_name || '—';
@@ -14812,8 +15532,12 @@ function calcHours() {
     }
 
     // 2. แปลงเวลาเป็นนาที
-    const [sh, sm] = start.split(':').map(Number);
-    let [eh, em] = end.split(':').map(Number);
+    const startParts = (start || "00:00").split(':').map(Number);
+    const endParts = (end || "00:00").split(':').map(Number);
+    const sh = startParts[0] || 0;
+    const sm = startParts[1] || 0;
+    let eh = endParts[0] || 0;
+    let em = endParts[1] || 0;
 
     // ถ้าจบที่ 00:00 ให้ถือว่าเป็น 24:00 (ข้ามวัน)
     if (eh === 0 && em === 0) eh = 24;
@@ -14942,9 +15666,9 @@ function calcHours() {
         const end = $id('cd-end-date')?.value;
 
         if (start && end) {
-            _filteredRecords = _allRecords.filter(r => r.date >= start && r.date <= end);
+            _filteredRecords = (_allRecords || []).filter(r => r.date >= start && r.date <= end);
         } else {
-            _filteredRecords = [..._allRecords];
+            _filteredRecords = Array.isArray(_allRecords) ? [..._allRecords] : [];
         }
         updateUI();
     }
@@ -15118,7 +15842,7 @@ function updateUI() {
 // ฟังก์ชันคำนวณ step ใช้ร่วมกัน
 function calcYStep(yMax) {
     const steps = [5, 10, 20, 25, 50];
-    for (const s of steps) {
+    for (const s of (steps || [])) {
         if (yMax % s === 0 && (yMax / s) <= 10 && (yMax / s) >= 4) return s;
     }
     return 20;
@@ -16138,7 +16862,12 @@ function exportToCSV() {
 // --- Import ข้อมูลจาก JSON ---
 function triggerImport() {
     if (S.userRole === 'supervisor') return toast("Supervisor ไม่สามารถนำเข้าข้อมูลได้", "error");
-    $id('import-hidden-input').click();
+    const inp = $id('import-hidden-input');
+    if (inp && typeof inp.click === 'function') {
+        inp.click();
+    } else {
+        toast("❌ ไม่พบช่องทางนำเข้าไฟล์", "error");
+    }
 }
 
 // --- ล้างข้อมูลทั้งหมด ---
@@ -16202,9 +16931,10 @@ function findBestMatch(headerName) {
     if (!headerName) return null;
     const cleanHeader = String(headerName).toLowerCase().replace(/[^a-z0-9ก-๙]/gi, '').trim();
     
-    for (const [key, aliases] of Object.entries(fieldAliases)) {
-        for (const alias of aliases) {
-            const cleanAlias = alias.toLowerCase().replace(/[^a-z0-9ก-๙]/gi, '').trim();
+    const faEntries = (typeof fieldAliases !== 'undefined' && fieldAliases) ? Object.entries(fieldAliases) : [];
+    for (const [key, aliases] of faEntries) {
+        for (const alias of (aliases || [])) {
+            const cleanAlias = String(alias).toLowerCase().replace(/[^a-z0-9ก-๙]/gi, '').trim();
             if (cleanHeader === cleanAlias) return key; // ตรงเป๊ะ
         }
     }
@@ -16957,11 +17687,12 @@ const SQEIndexedDBManager = (function() {
 
             await new Promise((res) => { txIndices.oncomplete = res; txIndices.onerror = res; });
 
-            const allIndices = allIndicesReq.result || [];
+            const allIndices = Array.isArray(allIndicesReq.result) ? allIndicesReq.result : [];
             const txIndicesClean = db.transaction('stale_indices', 'readwrite');
             const indexStoreClean = txIndicesClean.objectStore('stale_indices');
 
             for (const idx of allIndices) {
+                if (!idx) continue;
                 if (idx.lastAccessed < cutoffTime || idx.status === 'stale' || !idx.lastAccessed || options.maxAgeMs === 0) {
                     indexStoreClean.delete(idx.indexKey);
                     staleIndicesRemoved++;
@@ -16977,13 +17708,14 @@ const SQEIndexedDBManager = (function() {
 
             await new Promise((res) => { txTable.oncomplete = res; txTable.onerror = res; });
 
-            const allRecords = allTableReq.result || [];
+            const allRecords = Array.isArray(allTableReq.result) ? allTableReq.result : [];
             const activeRecords = [];
 
             const txTableClean = db.transaction('table_cache', 'readwrite');
             const tableStoreClean = txTableClean.objectStore('table_cache');
 
             for (const item of allRecords) {
+                if (!item) continue;
                 if ((item.updatedAt < cutoffTime && options.maxAgeMs > 0) || item.isStale === 1 || !item.data) {
                     tableStoreClean.delete(item.id);
                     staleRecordsRemoved++;
@@ -17788,19 +18520,19 @@ async function init() {
                 showLoader(true);
                 try {
                     const { data: allLogs } = await sqeClient.from('records').select('supplier, partNo, partName, defect');
-                    if (allLogs) {
-                        const suppliers = [...new Set(allLogs.map(r => r.supplier))].filter(Boolean).map(n => ({ name: n }));
+                    if (Array.isArray(allLogs) && allLogs.length > 0) {
+                        const suppliers = [...new Set(allLogs.map(r => r && r.supplier).filter(Boolean))].map(n => ({ name: n }));
                         await sqeClient.from('master_suppliers').upsert(suppliers, { onConflict: 'name' });
                         
                         const parts = []; const seen = new Set();
                         allLogs.forEach(r => {
-                            if(r.partNo && !seen.has(r.partNo)) {
+                            if(r && r.partNo && !seen.has(r.partNo)) {
                                 seen.add(r.partNo); parts.push({ part_no: r.partNo, part_name: r.partName || '-' });
                             }
                         });
                         await sqeClient.from('master_parts').upsert(parts, { onConflict: 'part_no' });
 
-                        const defects = [...new Set(allLogs.map(r => r.defect))].filter(Boolean).map(d => ({ defect_name: d.toUpperCase() }));
+                        const defects = [...new Set(allLogs.map(r => r && r.defect).filter(Boolean))].map(d => ({ defect_name: d.toUpperCase() }));
                         await sqeClient.from('master_defects').upsert(defects, { onConflict: 'defect_name' });
                         
                         writeAuditLog('HARVEST_MASTER', 'ทำการสแกนประวัติและปรับปรุง Master Data ทั้งหมด');
@@ -18521,6 +19253,12 @@ function handleGlobalAdd() {
             WapAdminSystem.handleAddNew(); // เรียกฟังก์ชัน Add ของ Admin
         }
     }
+    // แก้ไขส่วนนี้ในฟังก์ชัน handleGlobalAdd()
+    else if (pageTitle.includes('CALIBRATION')) {
+    if (typeof WapCalibrationSystem !== 'undefined') {
+        WapCalibrationSystem.openAddModal(); // เปลี่ยนมาเรียกใช้ Modal ที่สร้างใหม่
+    }
+}
     // 8. หน้า ATTENDANCE
     else if (pageTitle.includes('ATTENDANCE') || pageTitle.includes('DAILY')) {
         document.getElementById('att-leave-date').focus();
@@ -19781,7 +20519,7 @@ const modalHtml = `
 
             <!-- ส่วนจัดการรูปภาพ -->
             <div class="flex flex-col items-center mb-8">
-                <div class="relative group cursor-pointer" onclick="document.getElementById('avatar-input').click()">
+                <div class="relative group cursor-pointer" onclick="const aInp = document.getElementById('avatar-input'); if(aInp && typeof aInp.click === 'function') aInp.click();">
                     <div id="settings-avatar-preview" class="w-24 h-24 rounded-[28px] bg-blue-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden border-4 border-white dark:border-slate-700 shadow-xl">
                         ${avatarHtml}
                     </div>
@@ -20249,19 +20987,28 @@ const Wap8DSystem = (function() {
     }
 
     // ค้นหาฟังก์ชัน fetchCases ภายใน Wap8DSystem แล้วเปลี่ยนเป็นโค้ดนี้:
+// --- แก้ไขฟังก์ชัน fetchCases ภายใน Wap8DSystem ---
 async function fetchCases() {
-    // 1. กำหนดเป้าหมาย: ถ้าเป็นพนักงานให้ดูตัวเอง ถ้าเป็นหัวหน้าให้ดูคนที่เลือก (S.viewingUser)
     const targetUser = (S.userRole === 'supervisor') ? S.viewingUser : S.currentUser;
-    
     if (!targetUser) return [];
 
+    // ดึงค่า Case ID จาก URL (ถ้ามี)
+    const linkParams = window.checkDeepLinkParams();
+    const deepCaseId = linkParams ? linkParams.caseId : null;
+
     try {
-        // 2. เพิ่ม .eq('user_id', targetUser) เพื่อกรองเฉพาะเจ้าของงาน
-        const { data, error } = await sqeClient
-            .from(TABLE)
-            .select('*')
-            .eq('user_id', targetUser) // <--- บรรทัดสำคัญที่เพิ่มเข้าไป
-            .order('created_at', { ascending: false });
+        let query = sqeClient.from(TABLE).select('*');
+
+        // ✅ Logic ใหม่: 
+        // 1. ถ้ามี Deep Link: ให้ดึง (เคสของตัวเอง) OR (เคสที่ระบุในลิงก์)
+        // 2. ถ้าไม่มีลิงก์: ดึงเฉพาะเคสของตัวเองตามปกติ
+        if (deepCaseId) {
+            query = query.or(`user_id.eq."${targetUser}",id.eq."${deepCaseId}"`);
+        } else {
+            query = query.eq('user_id', targetUser);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
         
@@ -22534,55 +23281,73 @@ return `
         }
     }
 
-    async function openReport(id, forceVf = false) {
-    // 1. ตรวจสอบความถูกต้องของข้อมูลก่อนเริ่มวาด
+    // --- แก้ไขฟังก์ชัน openReport ฉบับเสริมความชัวร์ (Direct Cloud Access) ---
+async function openReport(id, forceVf = false) {
+    if (!id) return;
+
+    // 1. ลองหาในหน่วยความจำเครื่องก่อน (Local Search)
     _currentCase = _cases.find(x => String(x.id) === String(id));
 
-    // Fallback: หากหาเคสในหน่วยความจำไม่เจอ (เช่น เปิดจากลิงก์โดยตรง) ให้ดึงข้อมูลใหม่ทันที
+    // 2. 🚀 [จุดสำคัญ] ถ้าหาไม่เจอ ให้ไปดึง "สด" จากฐานข้อมูล Cloud โดยตรง
     if (!_currentCase) {
-        console.log("🛠️ Case not found in memory, re-fetching records...");
-        await fetchCases(); // บังคับดึงข้อมูลเคสจาก Server ใหม่
-        _currentCase = _cases.find(x => String(x.id) === String(id));
+        console.log(`📡 Case ${id} not in local list. Fetching directly from Cloud...`);
+        
+        try {
+            const { data, error } = await sqeClient
+                .from('eight_d_reports') // หรือใช้ตัวแปร TABLE
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                _currentCase = data;
+                // ฉีดข้อมูลเข้าสู่รายการหลัก เพื่อให้ระบบ Running Number และ Map ทำงานต่อได้
+                _cases.push(data); 
+                if (typeof invalidate8DCaseMap === 'function') invalidate8DCaseMap();
+                console.log("✅ Case successfully injected into memory.");
+            }
+        } catch (err) {
+            console.error("❌ Direct Fetch Error:", err);
+            toast("❌ ไม่พบข้อมูลรายงานที่ระบุ หรือคุณไม่มีสิทธิ์เข้าถึง", "error");
+            return;
+        }
     }
 
+    // 3. ตรวจสอบความปลอดภัยครั้งสุดท้าย
     if (!_currentCase) {
-        toast("❌ ไม่พบข้อมูลรายงานที่ระบุในระบบ", "error");
+        toast("❌ ไม่พบข้อมูลในระบบ", "error");
         return;
     }
 
-    // 2. ตั้งค่าสถานะเริ่มต้นของรายงาน
+    // 4. ตั้งค่าสถานะการแสดงผล
     _currentSlide = 0;
     
     // ตัดสินโหมดการแสดงผล (VF/RP Document หรือ 8D Slides)
-    // หากเรียกผ่าน Deep Link จะส่งค่า forceVf มาเป็น true เสมอตาม Case Profile
     _isVfView = (forceVf === true) || (_activeSqeTab === 'vf');
 
-    // 3. จัดการสลับหน้าจอ UI (ซ่อน Dashboard / แสดง Report View)
+    // 5. จัดการสลับหน้าจอ UI (ซ่อน Dashboard / แสดง Report View)
     const dash = document.getElementById('eight-d-dashboard');
     const rptView = document.getElementById('eight-d-report-view');
     if (dash) dash.classList.add('hidden');
     if (rptView) rptView.classList.remove('hidden');
 
-    // จัดการแถบควบคุมหน้าสไลด์ (ถ้าเป็นหน้าเอกสารใบเดียวแบบ VF จะซ่อนไว้)
+    // จัดการแถบควบคุมหน้าสไลด์
     const slideNav = document.querySelector('#eight-d-report-view .bg-slate-100.p-1.rounded-xl');
     if (slideNav) {
         slideNav.style.display = _isVfView ? 'none' : 'flex';
     }
 
-    // 4. อัปเดตสถานะปุ่ม Export และปุ่มส่งอีเมลให้ตรงตามประเภทเคสและสถานะการเซ็น
+    // 6. อัปเดตปุ่มและวาดหน้าเอกสาร
     updateExportAndEmailButtons();
-
-    // 5. >>> [จุดสำคัญ]: บังคับวาดหน้าจอทันที (Force Render) <<<
-    // ขั้นตอนนี้จะเปลี่ยนหน้าสีเทาเป็นเอกสารสีขาวทันที
     renderSlide();
 
-    // 6. หยอดข้อมูลคืน (Rehydrate) และปรับขนาดให้พอดีหน้าจอ
-    // ใช้ setTimeout เพื่อให้มั่นใจว่า HTML ถูกวาดลง DOM เสร็จก่อนเริ่มหยอดข้อมูลลงช่อง ContentEditable
+    // 7. หยอดข้อมูลคืน (Rehydrate) และปรับขนาด
     setTimeout(() => {
         _rehydrateUI(); 
         fitSlideToContainer();
         
-        // เลื่อน Scroll กลับขึ้นไปบนสุดเพื่อให้เห็นหัวเอกสาร
         const scrollArea = document.getElementById('eight-d-presentation-container');
         if (scrollArea) scrollArea.scrollTop = 0;
         
@@ -24469,7 +25234,7 @@ function generateEmlBlob({ to, cc, subject, body, htmlBody, attachments, inlineI
 
         // Inline Images within Multipart/Related
         if (hasInlineImages) {
-            for (const img of inlineImages) {
+            for (const img of (inlineImages || [])) {
                 if (!img || !img.base64) continue;
                 const cleanBase64 = img.base64.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
                 const filename = img.filename || 'evidence.jpg';
@@ -24490,7 +25255,7 @@ function generateEmlBlob({ to, cc, subject, body, htmlBody, attachments, inlineI
 
         // Part 2+: Binary Attachments (PDF, PPTX)
         if (hasAttachments) {
-            for (const att of attachments) {
+            for (const att of (attachments || [])) {
                 if (!att || !att.base64) continue;
                 const cleanBase64 = att.base64.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
                 const filename = att.filename || 'attachment.bin';
@@ -27014,6 +27779,7 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
+
 function resolveCaseIdByControlNo(controlNo) {
     if (!controlNo) return null;
     const upper = controlNo.toUpperCase();
@@ -27032,6 +27798,4221 @@ function resolveCaseIdByControlNo(controlNo) {
     const target = sameType[runningNo - 1];
     return target ? target.id : null;
 }
+
+const WapCalibrationSystem = (function() {
+    // 1. ข้อมูลเริ่มต้นที่มีการระบุสถานะและตัวอย่างหลากหลาย (Calibrated, Calibration Due, Expired)
+    const DEFAULT_CALIBRATION_DATA = [
+        {
+            id: "CAR-CAL-001",
+            code_no: "DG-12M-003",
+            name: "DIAL GAUGE 0-12mm",
+            maker: "Mitutoyo",
+            model: "2046S",
+            serial: "SN-892104",
+            size: "0 - 12 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "QA/QC",
+            sub_section: "Mold Parts Group",
+            pic: "K.Nathawut",
+            reg_date: "2024-01-10",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/DG-12M-003.png"
+        },
+        {
+            id: "CAR-CAL-002",
+            code_no: "DHG-600-004",
+            name: "DIGIMATIC HEIGHT GAUGE",
+            maker: "Mitutoyo",
+            model: "HD-60AX",
+            serial: "SN-443219",
+            size: "0 - 600 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "QA/QC",
+            sub_section: "Dimensional",
+            pic: "K.Nathawut",
+            reg_date: "2024-02-14",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/DHG-600-004.png"
+        },
+        {
+            id: "CAR-CAL-003",
+            code_no: "VCD-150-019",
+            name: "VERNIER CALIPER DIGIMATIC",
+            maker: "Mitutoyo",
+            model: "500-196-30",
+            serial: "SN-102938",
+            size: "0 - 150 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "Maintenance",
+            sub_section: "Machining Line",
+            pic: "K.Somchai",
+            reg_date: "2023-11-05",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/VCD-150-019.png"
+        },
+        {
+            id: "CAR-CAL-004",
+            code_no: "OM-025-059",
+            name: "OUTSIDE MICROMETER 0-25mm",
+            maker: "Mitutoyo",
+            model: "103-137",
+            serial: "SN-554102",
+            size: "0 - 25 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "QA/QC",
+            sub_section: "Tooling Group",
+            pic: "K.Nathawut",
+            reg_date: "2024-03-01",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/OM-025-059.png"
+        },
+        {
+            id: "CAR-CAL-005",
+            code_no: "EB-120-001",
+            name: "ELECTRONIC BALANCE 120g",
+            maker: "Sartorius",
+            model: "ENTRIS120",
+            serial: "SN-998231",
+            size: "0 - 120 g",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "Production",
+            sub_section: "Torque & Force",
+            pic: "K.Prasert",
+            reg_date: "2023-08-12",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/EB-120-001.png"
+        },
+        {
+            id: "CAR-CAL-006",
+            code_no: "HLD-010-081",
+            name: "DIGITAL HARDNESS TESTER",
+            maker: "Time Group",
+            model: "TH-170",
+            serial: "SN-772183",
+            size: "170 - 960 HLD",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "Maintenance",
+            sub_section: "Pressure Unit",
+            pic: "K.Wichai",
+            reg_date: "2023-05-20",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/HLD-010-081.png"
+        },
+        {
+            id: "CAR-CAL-007",
+            code_no: "QAP-122-003",
+            name: "RADIUS GAUGE SET R1-7",
+            maker: "Mitutoyo",
+            model: "186-902",
+            serial: "SN-334912",
+            size: "R 1.0 - 7.0 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "QA/QC",
+            sub_section: "Dimensional",
+            pic: "K.Nathawut",
+            reg_date: "2024-04-15",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/QAP-122-003.png"
+        },
+        {
+            id: "CAR-CAL-008",
+            code_no: "QAP-145-001",
+            name: "PIN GAUGE SET 1.00-10.00",
+            maker: "Eisen",
+            model: "EP-1A",
+            serial: "SN-118274",
+            size: "1.00 - 10.00 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "Production",
+            sub_section: "Assembly Line 2",
+            pic: "K.Anan",
+            reg_date: "2024-05-02",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/QAP-145-001.png"
+        },
+        {
+            id: "CAR-CAL-009",
+            code_no: "QAP NO. 002",
+            name: "VIBRATION DATA RECORDER",
+            maker: "Lutron",
+            model: "MVB-385SD",
+            serial: "SN-652910",
+            size: "Acceleration / Velocity",
+            last_cal: "2026-08-20",
+            next_due: "2027-08-20",
+            dept: "QA/QC",
+            sub_section: "Reliability & Testing",
+            pic: "K.Nathawut",
+            reg_date: "2024-06-10",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/QAP-NO-002.png"
+        }
+    ];
+
+    let _data = DEFAULT_CALIBRATION_DATA.slice();
+    let _selectedIds = new Set();
+    let _currentFiltered = [];
+    let _calScroller = null;
+    let _realtimeSubscribed = false;
+    let _viewMode = 'TABLE'; // 'TABLE' | 'CALENDAR'
+    const _initCalDate = new Date();
+    let _calendarYear = _initCalDate.getFullYear();
+    let _calendarMonth = _initCalDate.getMonth(); // 0 - 11
+    let _selectedCalendarDate = null; // 'YYYY-MM-DD'
+
+    function updateBulkBarUI(filteredItems) {
+        const bulkBar = document.getElementById('cal-bulk-bar');
+        const countEl = document.getElementById('cal-selected-count');
+        const selectAllCb = document.getElementById('cal-select-all');
+
+        const totalSelected = _selectedIds.size;
+        if (countEl) countEl.textContent = totalSelected;
+
+        if (bulkBar) {
+            if (totalSelected > 0) {
+                bulkBar.classList.remove('hidden');
+                bulkBar.classList.add('flex');
+            } else {
+                bulkBar.classList.add('hidden');
+                bulkBar.classList.remove('flex');
+            }
+        }
+
+        if (selectAllCb) {
+            const list = Array.isArray(filteredItems) ? filteredItems : (_currentFiltered || []);
+            if (list.length > 0) {
+                const selectedInFilterCount = list.filter(item => item && _selectedIds.has(String(item.id))).length;
+                if (selectedInFilterCount === list.length) {
+                    selectAllCb.checked = true;
+                    selectAllCb.indeterminate = false;
+                } else if (selectedInFilterCount > 0) {
+                    selectAllCb.checked = false;
+                    selectAllCb.indeterminate = true;
+                } else {
+                    selectAllCb.checked = false;
+                    selectAllCb.indeterminate = false;
+                }
+            } else {
+                selectAllCb.checked = false;
+                selectAllCb.indeterminate = false;
+            }
+        }
+    }
+
+    function toggleSelectRow(id, isChecked) {
+        if (!id) return;
+        const strId = String(id);
+        if (isChecked) {
+            _selectedIds.add(strId);
+        } else {
+            _selectedIds.delete(strId);
+        }
+        updateBulkBarUI(_currentFiltered);
+    }
+
+    function toggleSelectAll(masterEl) {
+        const isChecked = masterEl ? masterEl.checked : false;
+        const list = Array.isArray(_currentFiltered) && _currentFiltered.length > 0 ? _currentFiltered : _data;
+        
+        list.forEach(item => {
+            if (!item || !item.id) return;
+            if (isChecked) {
+                _selectedIds.add(String(item.id));
+            } else {
+                _selectedIds.delete(String(item.id));
+            }
+        });
+
+        render();
+    }
+
+    function selectAllFiltered() {
+        const list = Array.isArray(_currentFiltered) && _currentFiltered.length > 0 ? _currentFiltered : _data;
+        list.forEach(item => {
+            if (item && item.id) _selectedIds.add(String(item.id));
+        });
+        render();
+        if (typeof toast === 'function') toast(`✅ เลือกเครื่องมือทั้งหมดในตาราง ${list.length} รายการ`, "info");
+    }
+
+    function clearSelection() {
+        _selectedIds.clear();
+        render();
+        if (typeof toast === 'function') toast("🔄 ล้างการเลือกเครื่องมือทั้งหมดแล้ว", "info");
+    }
+
+    async function openBulkCalibrateModal() {
+        if (_selectedIds.size === 0) {
+            if (typeof toast === 'function') toast("⚠️ กรุณาเลือกเครื่องมือที่ต้องการอัปเดตอย่างน้อย 1 รายการ", "warning");
+            return;
+        }
+
+        const selectedCount = _selectedIds.size;
+        const todayStr = new Date().toISOString().split('T')[0];
+        
+        // คำนวณวันถัดไป 1 ปี (Next Due + 1 Year)
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        const nextDueStr = nextYear.toISOString().split('T')[0];
+        const monthStr = nextYear.toLocaleString('en-US', { month: 'long' });
+
+        showCustomConfirmDialog({
+            title: `ยืนยันบันทึกสอบเทียบแบบกลุ่ม (${selectedCount} รายการ)`,
+            subtitle: `ระบบจะอัปเดตวันสอบเทียบ (Last Cal) เป็นวันที่ปัจจุบัน (${todayStr}) และคำนวณวันครบกำหนดรอบถัดไป (Next Due) เป็น ${nextDueStr} ให้กับเครื่องมือที่เลือกทั้ง ${selectedCount} รายการ`,
+            badge: "BULK CALIBRATION",
+            type: "info",
+            confirmText: "🚀 ยืนยันบันทึกสอบเทียบทั้งหมด",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                const updatedItems = [];
+                _data.forEach(item => {
+                    if (item && _selectedIds.has(String(item.id))) {
+                        item.last_cal = todayStr;
+                        item.next_due = nextDueStr;
+                        item.month = monthStr;
+                        item.status = 'NORMAL';
+
+                        // เพิ่ม Log ประวัติ
+                        const logs = ensureInstrumentLogs(item);
+                        logs.push({
+                            id: 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                            date: todayStr,
+                            cert_no: 'CAL-' + (item.code_no || item.id) + '-' + new Date().getFullYear(),
+                            lab: 'Internal QA Metrology Laboratory',
+                            result: 'PASSED',
+                            deviation: '0.00 mm (Within Spec)',
+                            next_due: nextDueStr,
+                            technician: 'PHETSAYAM (QC Metrologist)',
+                            traceability: 'ISO/IEC 17025 Certified',
+                            notes: 'Bulk Calibration Routine Completed'
+                        });
+                        item.calibration_logs = logs;
+                        updatedItems.push(item);
+                    }
+                });
+
+                // บันทึก LocalDB
+                if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                    try {
+                        await localDB.calibrationMaster.bulkPut(updatedItems);
+                    } catch(e) {
+                        console.warn("[Bulk Cal Local DB Error]", e);
+                    }
+                }
+
+                // ซิงก์ Supabase
+                syncToCloud(updatedItems);
+
+                _selectedIds.clear();
+                render();
+                updateOverdueBadge();
+                if (typeof toast === 'function') toast(`🎉 อัปเดตสถานะสอบเทียบเรียบร้อย ${selectedCount} รายการ`, "success");
+            }
+        });
+    }
+
+    // --- Batch Edit Calibration History Notes Modal & Engine ---
+    function openBatchEditNotesModal() {
+        if (_selectedIds.size === 0) {
+            if (typeof toast === 'function') toast("⚠️ กรุณาเลือกเครื่องมือที่ต้องการแก้ไขบันทึกประวัติอย่างน้อย 1 รายการ", "warning");
+            return;
+        }
+
+        const existingModal = document.getElementById('cal-batch-notes-modal-overlay');
+        if (existingModal) existingModal.remove();
+
+        const selectedItems = (_data || []).filter(item => item && _selectedIds.has(String(item.id)));
+        if (selectedItems.length === 0) {
+            if (typeof toast === 'function') toast("⚠️ ไม่พบข้อมูลเครื่องมือที่เลือก", "warning");
+            return;
+        }
+
+        const isDark = document.body.classList.contains('dark-mode') || 
+                       document.documentElement.classList.contains('dark') || 
+                       localStorage.getItem('carrier_theme') === 'dark';
+
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        const overlay = document.createElement('div');
+        overlay.id = 'cal-batch-notes-modal-overlay';
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 22000;
+            background: ${isDark ? 'rgba(2, 6, 23, 0.85)' : 'rgba(15, 23, 42, 0.65)'};
+            backdrop-filter: blur(12px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 14px; transition: all 0.3s ease;
+        `;
+
+        const modal = document.createElement('div');
+        modal.id = 'cal-batch-notes-card';
+        modal.className = `cal-doc-modal ${isDark ? 'theme-dark' : 'theme-light'}`;
+        modal.style.cssText = `
+            position: relative; width: 100%; max-width: 980px; max-height: 94vh; height: auto;
+            background: ${isDark ? '#0f172a' : '#ffffff'}; border-radius: 20px; overflow: hidden;
+            display: flex; flex-direction: column; border: 1.5px solid ${isDark ? '#334155' : '#cbd5e1'};
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: ${isDark ? '#f8fafc' : '#0f172a'};
+        `;
+
+        const renderSelectedInstrumentRows = () => {
+            const currentSelected = (_data || []).filter(item => item && _selectedIds.has(String(item.id)));
+            if (currentSelected.length === 0) {
+                return `<div class="p-6 text-center text-slate-400 text-xs font-bold">ไม่มีเครื่องมือที่เลือก</div>`;
+            }
+            return currentSelected.map((item, idx) => {
+                const logs = ensureInstrumentLogs(item);
+                const latestLog = (logs && logs.length > 0) ? logs[logs.length - 1] : null;
+                const latestNote = latestLog ? (latestLog.notes || 'No remarks recorded') : 'No previous log';
+                const imgUrl = getInstrumentImageUrl(item);
+                const deptPic = extractResponsiblePerson(item);
+
+                return `
+                    <div id="batch-item-row-${item.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; background:${isDark ? '#1e293b' : '#f8fafc'}; border:1px solid ${isDark ? '#334155' : '#e2e8f0'}; border-radius:12px; margin-bottom:8px; transition:all 0.2s ease;">
+                        <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+                            <div style="width:32px; height:32px; border-radius:8px; background:${isDark ? '#334155' : '#e2e8f0'}; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; border:1px solid ${isDark ? '#475569' : '#cbd5e1'};">
+                                ${imgUrl ? `<img src="${imgUrl}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/32?text=EQ'"/>` : `<span style="font-size:12px;">🔬</span>`}
+                            </div>
+                            <div style="min-width:0; flex:1;">
+                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <span style="font-size:10px; font-weight:900; font-family:'DM Mono', monospace; color:#3b82f6; background:${isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)'}; padding:1px 6px; border-radius:4px;">
+                                        ${item.code_no || item.id}
+                                    </span>
+                                    <span style="font-size:11.5px; font-weight:800; color:${isDark ? '#f8fafc' : '#1e293b'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;" title="${item.name}">
+                                        ${item.name}
+                                    </span>
+                                    <span style="font-size:9.5px; color:${isDark ? '#94a3b8' : '#64748b'}; font-weight:600;">
+                                        (${item.dept || '-'} / ${deptPic})
+                                    </span>
+                                </div>
+                                <div style="font-size:9.5px; color:${isDark ? '#94a3b8' : '#64748b'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;" title="Current: ${latestNote}">
+                                    <span style="font-weight:700; color:${isDark ? '#cbd5e1' : '#475569'};">Current Note:</span> ${latestNote}
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="WapCalibrationSystem.removeBatchItem('${item.id}')" 
+                                style="width:24px; height:24px; border-radius:6px; background:${isDark ? '#334155' : '#e2e8f0'}; border:none; color:${isDark ? '#94a3b8' : '#64748b'}; display:flex; align-items:center; justify-content:center; font-size:11px; cursor:pointer; flex-shrink:0; transition:all 0.2s ease;"
+                                title="Remove from batch selection">
+                            ✕
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        modal.innerHTML = `
+            <!-- Top Header Banner -->
+            <div style="background: linear-gradient(135deg, #312e81 0%, #1e1b4b 50%, #0f172a 100%); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; border-bottom: 1.5px solid rgba(99, 102, 241, 0.3);">
+                <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                    <div style="width: 40px; height: 40px; background: rgba(99, 102, 241, 0.25); border: 1.5px solid rgba(165, 180, 252, 0.4); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+                        📝
+                    </div>
+                    <div style="min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <h3 style="margin: 0; font-size: 14px; font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase; color: #ffffff;">
+                                Batch Edit Calibration History Notes
+                            </h3>
+                            <span id="batch-modal-count-badge" style="background: #4f46e5; border: 1px solid rgba(199, 210, 254, 0.4); color: #ffffff; font-size: 9px; font-weight: 900; padding: 2px 8px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em;">
+                                ${selectedItems.length} Instruments Selected
+                            </span>
+                        </div>
+                        <p style="margin: 2px 0 0 0; font-size: 10.5px; color: #c7d2fe; font-weight: 600;">
+                            แก้ไขและบันทึกหมายเหตุ/ผลการสอบเทียบแบบกลุ่มให้ทุกเครื่องมือที่เลือกพร้อมกัน
+                        </p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('cal-batch-notes-modal-overlay').remove()" 
+                        style="width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 900; cursor: pointer; transition: all 0.2s ease;">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Modal Content (Two Columns Layout) -->
+            <div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; padding: 18px; overflow-y: auto; max-height: calc(94vh - 130px); flex: 1; background: ${isDark ? '#0b1329' : '#f8fafc'};">
+                
+                <!-- Left Column: Settings & Input -->
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    
+                    <!-- 1. Update Mode Selector -->
+                    <div style="background: ${isDark ? '#1e293b' : '#ffffff'}; padding: 14px; border-radius: 14px; border: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <label style="display: block; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: ${isDark ? '#93c5fd' : '#1e40af'}; margin-bottom: 10px;">
+                            🎯 Update Method / รูปแบบการอัปเดตบันทึก
+                        </label>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e2e8f0' : '#1e293b'}; cursor: pointer; padding: 6px 10px; border-radius: 8px; background: ${isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(241, 245, 249, 0.8)'};">
+                                <input type="radio" name="batch-note-mode" value="REPLACE_LATEST" checked style="margin-top: 2px; cursor: pointer; accent-color: #4f46e5;">
+                                <div>
+                                    <span style="font-weight: 900; color: #4f46e5;">Update Latest Record Note</span> (แทนที่บันทึกของประวัติสอบเทียบล่าสุด)
+                                    <div style="font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'};">ปรับปรุงข้อความบันทึกในรอบสอบเทียบล่าสุดของแต่ละเครื่องมือ</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e2e8f0' : '#1e293b'}; cursor: pointer; padding: 6px 10px; border-radius: 8px; background: ${isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(241, 245, 249, 0.8)'};">
+                                <input type="radio" name="batch-note-mode" value="APPEND_LATEST" style="margin-top: 2px; cursor: pointer; accent-color: #4f46e5;">
+                                <div>
+                                    <span style="font-weight: 900; color: #0284c7;">Append to Latest Note</span> (เพิ่มข้อความต่อท้ายบันทึกเดิม)
+                                    <div style="font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'};">คงข้อความเดิมไว้และใส่หมายเหตุนี้เพิ่มเข้าไปต่อท้าย</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e2e8f0' : '#1e293b'}; cursor: pointer; padding: 6px 10px; border-radius: 8px; background: ${isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(241, 245, 249, 0.8)'};">
+                                <input type="radio" name="batch-note-mode" value="ADD_NEW_ENTRY" style="margin-top: 2px; cursor: pointer; accent-color: #4f46e5;">
+                                <div>
+                                    <span style="font-weight: 900; color: #16a34a;">Add New History Event Log</span> (เพิ่มรายการประวัติใหม่พร้อมบันทึกนี้)
+                                    <div style="font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'};">สร้างประวัติสอบเทียบ/ตรวจสอบใหม่อีก 1 รายการพร้อมบันทึกนี้</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e2e8f0' : '#1e293b'}; cursor: pointer; padding: 6px 10px; border-radius: 8px; background: ${isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(241, 245, 249, 0.8)'};">
+                                <input type="radio" name="batch-note-mode" value="REPLACE_ALL" style="margin-top: 2px; cursor: pointer; accent-color: #4f46e5;">
+                                <div>
+                                    <span style="font-weight: 900; color: #d97706;">Replace All History Logs Notes</span> (แทนที่บันทึกในทุกประวัติ)
+                                    <div style="font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'};">นำข้อความนี้ไปใส่ในประวัติทุกรายการของเครื่องมือที่เลือก</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 2. Quick Presets Templates -->
+                    <div style="background: ${isDark ? '#1e293b' : '#ffffff'}; padding: 14px; border-radius: 14px; border: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <label style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: ${isDark ? '#93c5fd' : '#1e40af'}; margin-bottom: 8px;">
+                            <span>⚡ Quick QC Note Templates (คลิกเพื่อเลือกข้อความสำเร็จรูป)</span>
+                        </label>
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Calibration verified in accordance with ISO/IEC 17025:2017 standards. All parameter readings conform to standard tolerance specifications.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(79, 70, 229, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#3730a3'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ ISO 17025 Conformity
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Periodic routine calibration completed successfully. Zero-point verified and accuracy within specification limits.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5'}; color: ${isDark ? '#a7f3d0' : '#065f46'}; border: 1px solid ${isDark ? 'rgba(16, 185, 129, 0.4)' : '#a7f3d0'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ Periodic Routine
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Pre-production verification passed. Accuracy confirmed on inspection line before mass production batch.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(14, 165, 233, 0.2)' : '#e0f2fe'}; color: ${isDark ? '#bae6fd' : '#0369a1'}; border: 1px solid ${isDark ? 'rgba(14, 165, 233, 0.4)' : '#bae6fd'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ Pre-Production
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Sensor cleaned, readjusted zero point, and recalibrated. Official QA sticker attached.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px solid ${isDark ? 'rgba(245, 158, 11, 0.4)' : '#fde68a'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ Clean & Zeroed
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Calibrated by accredited external metrology laboratory with traceable standards. Certificate on file in QA archive.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(168, 85, 247, 0.2)' : '#f3e8ff'}; color: ${isDark ? '#e9d5ff' : '#6b21a8'}; border: 1px solid ${isDark ? 'rgba(168, 85, 247, 0.4)' : '#e9d5ff'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ External Lab Cert
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Audited and approved for annual ISO 9001 / IATF 16949 quality compliance.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(236, 72, 153, 0.2)' : '#fce7f3'}; color: ${isDark ? '#fbcfe8' : '#9d174d'}; border: 1px solid ${isDark ? 'rgba(236, 72, 153, 0.4)' : '#fbcfe8'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ Annual QA Audit
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3. Notes Content Textarea -->
+                    <div style="background: ${isDark ? '#1e293b' : '#ffffff'}; padding: 14px; border-radius: 14px; border: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <label style="display: block; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: ${isDark ? '#93c5fd' : '#1e40af'}; margin-bottom: 8px;">
+                            💬 History Note Content / ข้อความบันทึกประวัติ <span style="color:#ef4444;">*</span>
+                        </label>
+                        <textarea id="cal-batch-notes-text" rows="4" 
+                                  placeholder="พิมพ์หรือเลือกข้อความบันทึกประวัติการสอบเทียบที่ต้องการนำไปใช้กับเครื่องมือที่เลือก..." 
+                                  style="width: 100%; padding: 10px 12px; font-size: 12px; font-family: inherit; font-weight: 600; border-radius: 10px; background: ${isDark ? '#0f172a' : '#f8fafc'}; color: ${isDark ? '#f8fafc' : '#0f172a'}; border: 1.5px solid ${isDark ? '#475569' : '#cbd5e1'}; outline: none; transition: border-color 0.2s ease; resize: vertical; box-sizing: border-box;"></textarea>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                            <div>
+                                <label style="display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; color: ${isDark ? '#94a3b8' : '#64748b'}; margin-bottom: 4px;">
+                                    Technician / Inspector
+                                </label>
+                                <input type="text" id="cal-batch-notes-tech" value="PHETSAYAM (QC Metrologist)"
+                                       style="width: 100%; height: 32px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 8px; background: ${isDark ? '#0f172a' : '#f8fafc'}; color: ${isDark ? '#f8fafc' : '#0f172a'}; border: 1px solid ${isDark ? '#475569' : '#cbd5e1'}; outline: none; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; color: ${isDark ? '#94a3b8' : '#64748b'}; margin-bottom: 4px;">
+                                    Event Date
+                                </label>
+                                <input type="date" id="cal-batch-notes-date" value="${todayStr}"
+                                       style="width: 100%; height: 32px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 8px; background: ${isDark ? '#0f172a' : '#f8fafc'}; color: ${isDark ? '#f8fafc' : '#0f172a'}; border: 1px solid ${isDark ? '#475569' : '#cbd5e1'}; outline: none; box-sizing: border-box;">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Column: Target Instruments List -->
+                <div style="display: flex; flex-direction: column; background: ${isDark ? '#1e293b' : '#ffffff'}; padding: 14px; border-radius: 14px; border: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-height: 0;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; flex-shrink: 0;">
+                        <div>
+                            <span style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: ${isDark ? '#93c5fd' : '#1e40af'};">
+                                📋 Target Instruments
+                            </span>
+                            <span id="batch-items-count-text" style="font-size: 10px; font-weight: 700; color: ${isDark ? '#94a3b8' : '#64748b'}; margin-left: 4px;">
+                                (${selectedItems.length} items)
+                            </span>
+                        </div>
+                        <span style="font-size: 9.5px; font-weight: 600; color: ${isDark ? '#64748b' : '#94a3b8'};">
+                            คลิก ✕ เพื่อตัดรายการออก
+                        </span>
+                    </div>
+
+                    <!-- Scrollable List of Target Instruments -->
+                    <div id="cal-batch-instruments-list" style="overflow-y: auto; flex: 1; max-height: 380px; padding-right: 4px;">
+                        ${renderSelectedInstrumentRows()}
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="background: ${isDark ? '#0f172a' : '#ffffff'}; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; border-top: 1.5px solid ${isDark ? '#334155' : '#e2e8f0'};">
+                <div style="font-size: 11px; font-weight: 700; color: ${isDark ? '#94a3b8' : '#64748b'};">
+                    💡 หมายเหตุจะถูกบันทึกลงในระบบประวัติการสอบเทียบของเครื่องมือทั้งหมดทันที
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" onclick="document.getElementById('cal-batch-notes-modal-overlay').remove()" 
+                            style="padding: 8px 16px; font-size: 11.5px; font-weight: 800; border-radius: 10px; background: ${isDark ? '#334155' : '#f1f5f9'}; color: ${isDark ? '#e2e8f0' : '#475569'}; border: 1px solid ${isDark ? '#475569' : '#cbd5e1'}; cursor: pointer; transition: all 0.2s ease;">
+                        ยกเลิก
+                    </button>
+                    <button type="button" onclick="WapCalibrationSystem.applyBatchHistoryNotes()" 
+                            id="cal-batch-apply-btn"
+                            style="padding: 8px 20px; font-size: 11.5px; font-weight: 900; border-radius: 10px; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: #ffffff; border: 1px solid rgba(199, 210, 254, 0.4); cursor: pointer; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35); display: flex; align-items: center; gap: 6px; transition: all 0.2s ease;">
+                        <span>🚀 Apply Notes to ${selectedItems.length} Instruments</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+    }
+
+    function applyBatchNoteTemplate(text) {
+        const textarea = document.getElementById('cal-batch-notes-text');
+        if (textarea) {
+            textarea.value = text;
+            textarea.focus();
+        }
+    }
+
+    function removeBatchItem(id) {
+        if (!id) return;
+        _selectedIds.delete(String(id));
+        
+        // อัปเดตแถวใน modal
+        const row = document.getElementById(`batch-item-row-${id}`);
+        if (row) row.remove();
+
+        const count = _selectedIds.size;
+        const countBadge = document.getElementById('batch-modal-count-badge');
+        if (countBadge) countBadge.textContent = `${count} Instruments Selected`;
+
+        const countText = document.getElementById('batch-items-count-text');
+        if (countText) countText.textContent = `(${count} items)`;
+
+        const applyBtn = document.getElementById('cal-batch-apply-btn');
+        if (applyBtn) {
+            applyBtn.innerHTML = `<span>🚀 Apply Notes to ${count} Instruments</span>`;
+        }
+
+        updateBulkBarUI(_currentFiltered);
+        render();
+
+        if (count === 0) {
+            const overlay = document.getElementById('cal-batch-notes-modal-overlay');
+            if (overlay) overlay.remove();
+            if (typeof toast === 'function') toast("ลบการเลือกเครื่องมือทั้งหมดแล้ว", "info");
+        }
+    }
+
+    async function applyBatchHistoryNotes() {
+        const notesTextEl = document.getElementById('cal-batch-notes-text');
+        const noteText = notesTextEl ? notesTextEl.value.trim() : '';
+
+        if (!noteText) {
+            if (typeof toast === 'function') toast("⚠️ กรุณากรอกข้อความบันทึกประวัติก่อนกดยืนยัน", "warning");
+            if (notesTextEl) notesTextEl.focus();
+            return;
+        }
+
+        const modeRadios = document.getElementsByName('batch-note-mode');
+        let selectedMode = 'REPLACE_LATEST';
+        for (const r of modeRadios) {
+            if (r.checked) {
+                selectedMode = r.value;
+                break;
+            }
+        }
+
+        const techName = (document.getElementById('cal-batch-notes-tech') && document.getElementById('cal-batch-notes-tech').value.trim()) || 'PHETSAYAM (QC Metrologist)';
+        const eventDate = (document.getElementById('cal-batch-notes-date') && document.getElementById('cal-batch-notes-date').value) || new Date().toISOString().split('T')[0];
+
+        const targetItems = (_data || []).filter(item => item && _selectedIds.has(String(item.id)));
+        if (targetItems.length === 0) {
+            if (typeof toast === 'function') toast("⚠️ ไม่พบเครื่องมือที่เลือก", "error");
+            return;
+        }
+
+        const count = targetItems.length;
+
+        targetItems.forEach(item => {
+            const logs = ensureInstrumentLogs(item);
+            
+            if (selectedMode === 'REPLACE_LATEST') {
+                if (logs.length > 0) {
+                    const latest = logs[logs.length - 1];
+                    latest.notes = noteText;
+                    if (techName) latest.technician = techName;
+                } else {
+                    logs.push({
+                        id: `LOG-${item.id}-${Date.now()}`,
+                        date: eventDate,
+                        next_due: item.next_due || '-',
+                        cert_no: `CAL-${item.code_no || item.id}-${eventDate.split('-')[0]}`,
+                        lab: 'Internal QA Metrology Laboratory',
+                        result: (item.status === 'EXPIRED') ? 'EXPIRED' : 'PASSED',
+                        type: 'BATCH_NOTE_UPDATE',
+                        deviation: '0.00 mm',
+                        technician: techName,
+                        notes: noteText
+                    });
+                }
+            } else if (selectedMode === 'APPEND_LATEST') {
+                if (logs.length > 0) {
+                    const latest = logs[logs.length - 1];
+                    const existing = latest.notes || '';
+                    latest.notes = existing ? `${existing} | ${noteText}` : noteText;
+                    if (techName) latest.technician = techName;
+                } else {
+                    logs.push({
+                        id: `LOG-${item.id}-${Date.now()}`,
+                        date: eventDate,
+                        next_due: item.next_due || '-',
+                        cert_no: `CAL-${item.code_no || item.id}-${eventDate.split('-')[0]}`,
+                        lab: 'Internal QA Metrology Laboratory',
+                        result: (item.status === 'EXPIRED') ? 'EXPIRED' : 'PASSED',
+                        type: 'BATCH_NOTE_UPDATE',
+                        deviation: '0.00 mm',
+                        technician: techName,
+                        notes: noteText
+                    });
+                }
+            } else if (selectedMode === 'ADD_NEW_ENTRY') {
+                logs.push({
+                    id: `LOG-${item.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    date: eventDate,
+                    next_due: item.next_due || '-',
+                    cert_no: `NOTE-${item.code_no || item.id}-${eventDate.split('-')[0]}`,
+                    lab: 'Internal QA Metrology Laboratory',
+                    result: (item.status === 'EXPIRED') ? 'EXPIRED' : 'PASSED',
+                    type: 'QC_REMARK_EVENT',
+                    deviation: '0.000 mm',
+                    tolerance: '±0.010 mm',
+                    uncertainty: 'U = 0.0012 mm (k=2)',
+                    env_temp: '20.0°C / 50% RH',
+                    technician: techName,
+                    traceability: 'ISO/IEC 17025 Certified',
+                    notes: noteText
+                });
+            } else if (selectedMode === 'REPLACE_ALL') {
+                logs.forEach(l => {
+                    l.notes = noteText;
+                    if (techName) l.technician = techName;
+                });
+            }
+
+            item.calibration_logs = logs;
+            if (item.history_logs && Array.isArray(item.history_logs)) {
+                item.history_logs.unshift({
+                    date: eventDate,
+                    action: 'BATCH_NOTE_UPDATE',
+                    notes: noteText,
+                    by: techName
+                });
+            }
+        });
+
+        // บันทึกลง LocalDB
+        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+            try {
+                await localDB.calibrationMaster.bulkPut(targetItems);
+            } catch(e) {
+                console.warn("[Batch Notes LocalDB Error]", e);
+            }
+        }
+
+        // ซิงก์ไป Supabase / Cloud
+        syncToCloud(targetItems);
+
+        // ปิด modal และรีเฟรชหน้าจอ
+        const overlay = document.getElementById('cal-batch-notes-modal-overlay');
+        if (overlay) overlay.remove();
+
+        _selectedIds.clear();
+        render();
+        updateOverdueBadge();
+        updateBulkBarUI(_currentFiltered);
+
+        if (typeof toast === 'function') toast(`🎉 อัปเดตบันทึกประวัติการสอบเทียบเรียบร้อย ${count} รายการ`, "success");
+    }
+
+    // --- Supabase Online Cloud Sync Helpers (Data only, images resolved from files) ---
+    function getSupabaseClient() {
+        if (typeof getSupabase === 'function') {
+            const client = getSupabase();
+            if (client) return client;
+        }
+        if (typeof sqeClient !== 'undefined' && sqeClient) return sqeClient;
+        if (typeof wapClient !== 'undefined' && wapClient) return wapClient;
+        if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+            try {
+                return window.supabase.createClient(SQE_URL, SQE_KEY, {
+                    auth: { persistSession: false },
+                    global: { headers: { apikey: SQE_KEY, Authorization: `Bearer ${SQE_KEY}` } }
+                });
+            } catch(e) {}
+        }
+        return null;
+    }
+
+    function cleanEntryForCloud(item) {
+        if (!item) return null;
+        return {
+            id: String(item.id || '').trim(),
+            code_no: String(item.code_no || '-').trim(),
+            name: String(item.name || '').trim(),
+            maker: String(item.maker || '-').trim(),
+            model: String(item.model || '-').trim(),
+            serial: String(item.serial || '-').trim(),
+            size: String(item.size || '-').trim(),
+last_cal: item.last_cal && item.last_cal !== '-' ? item.last_cal : '2026-08-20',
+next_due: item.next_due && item.next_due !== '-' ? item.next_due : '2027-08-20',
+            dept: String(item.dept || '-').trim(),
+            sub_section: String(item.sub_section || '-').trim(),
+            pic: String(item.pic || '').trim(),
+            reg_date: item.reg_date && item.reg_date !== '-' ? item.reg_date : new Date().toISOString().split('T')[0],
+            frequency: String(item.frequency || '12 M').trim(),
+            month: String(item.month || 'August').trim(),
+            status: String(item.status || 'NORMAL').trim()
+        };
+    }
+
+    async function syncToCloud(entryOrList) {
+        try {
+            const sb = getSupabaseClient();
+            if (!sb) {
+                console.warn('[Calibration Supabase Sync] No Supabase client available');
+                return;
+            }
+            const items = Array.isArray(entryOrList) ? entryOrList : [entryOrList];
+            const cleanRows = items.map(cleanEntryForCloud).filter(Boolean);
+            if (cleanRows.length === 0) return;
+
+            const { error } = await sb.from('calibration_records').upsert(cleanRows, { onConflict: 'id' });
+            if (error) {
+                console.warn('[Calibration Supabase Sync]', error.message || error);
+            } else {
+                console.log('[Calibration Supabase Sync] Successfully synced to cloud:', cleanRows.length);
+            }
+        } catch(err) {
+            console.warn('[Calibration Supabase Sync Exception]', err);
+        }
+    }
+
+    async function syncCalibrationData(silent = false) {
+        const btn = document.getElementById('cal-sync-cloud-btn');
+        const icon = btn ? (btn.querySelector('.cal-sync-icon') || btn.querySelector('svg')) : null;
+        const textEl = btn ? btn.querySelector('.cal-sync-btn-text') : null;
+        const originalText = textEl ? textEl.innerText : '';
+
+        try {
+            if (!navigator.onLine) {
+                if (!silent && typeof toast === 'function') {
+                    toast("⚠️ ไม่สามารถเชื่อมต่อได้: อุปกรณ์กำลังอยู่ในสถานะออฟไลน์ (Offline)", "warning");
+                }
+                return false;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.75';
+                if (icon) icon.classList.add('animate-spin');
+                if (textEl) textEl.innerText = 'Syncing...';
+            }
+
+            const sb = getSupabaseClient();
+            if (!sb) {
+                if (!silent && typeof toast === 'function') toast("⚠️ ไม่พบการเชื่อมต่อ Supabase Database", "error");
+                return false;
+            }
+
+            // 1. ดึงข้อมูลล่าสุดจาก Dexie IndexedDB (Local Database)
+            let itemsToSync = [];
+            if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                try {
+                    itemsToSync = await localDB.calibrationMaster.toArray();
+                } catch (dexErr) {
+                    console.warn('[Calibration Dexie Read Warning]', dexErr);
+                }
+            }
+
+            // ถ้าใน Dexie ว่างเปล่า ให้ fallback ไปที่ _data ใน memory หรือ DEFAULT_CALIBRATION_DATA
+            if (!itemsToSync || itemsToSync.length === 0) {
+                itemsToSync = (_data && _data.length > 0) ? _data : DEFAULT_CALIBRATION_DATA;
+                // บันทึกกลับลง Dexie เพื่อรักษาความสอดคล้องของข้อมูล
+                if (typeof localDB !== 'undefined' && localDB.calibrationMaster && itemsToSync.length > 0) {
+                    try {
+                        await localDB.calibrationMaster.bulkPut(itemsToSync);
+                    } catch(e) {}
+                }
+            }
+
+            // 2. ทำความสะอาดและตรวจสอบข้อมูลก่อนส่ง (Data Sanitization & Field Mapping)
+            const cleanRows = itemsToSync.map(cleanEntryForCloud).filter(Boolean);
+            if (cleanRows.length === 0) {
+                if (!silent && typeof toast === 'function') toast("ℹ️ ไม่มีข้อมูลเครื่องมือสำหรับซิงก์", "info");
+                return false;
+            }
+
+            // 3. ทยอยส่งข้อมูลแบบ Chunked Batch (ครั้งละ 50 รายการ เพื่อความปลอดภัยและความเสถียร)
+            const BATCH_SIZE = 50;
+            let totalSynced = 0;
+
+            for (let i = 0; i < cleanRows.length; i += BATCH_SIZE) {
+                const batch = cleanRows.slice(i, i + BATCH_SIZE);
+                const { error } = await sb.from('calibration_records').upsert(batch, { onConflict: 'id' });
+                if (error) {
+                    console.error('[Calibration Supabase Sync Error]', error);
+                    throw error;
+                }
+                totalSynced += batch.length;
+            }
+
+            // 4. อัปเดต Memory State และ Refresh หน้าจอ
+            _data = itemsToSync;
+            render();
+            updateOverdueBadge();
+
+            console.log(`[Calibration Sync] Successfully pushed ${totalSynced} items from Dexie to Supabase.`);
+            if (!silent && typeof toast === 'function') {
+                toast(`☁️ Sync Calibration Data สำเร็จ: ซิงก์ข้อมูล ${totalSynced} รายการจาก Dexie ไปยัง Supabase Database เรียบร้อยแล้ว`, "success");
+            }
+            return true;
+
+        } catch(err) {
+            console.error('[Calibration Supabase Sync Exception]', err);
+            if (!silent && typeof toast === 'function') {
+                toast(`❌ เกิดข้อผิดพลาดในการซิงก์: ${err.message || err}`, "error");
+            }
+            return false;
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                if (icon) icon.classList.remove('animate-spin');
+                if (textEl) textEl.innerText = originalText || 'Sync Calibration Data';
+            }
+        }
+    }
+
+    async function syncAllToCloud(silent = false) {
+        return await syncCalibrationData(silent);
+    }
+
+    async function deleteFromCloud(id) {
+        try {
+            const sb = getSupabaseClient();
+            if (!sb || !id) return;
+            await sb.from('calibration_records').delete().eq('id', id);
+        } catch(err) {
+            console.warn('[Calibration Supabase Delete Warning]', err);
+        }
+    }
+
+    async function loadFromCloud() {
+        try {
+            const sb = getSupabaseClient();
+            if (!sb) return false;
+            const { data: rows, error } = await sb.from('calibration_records').select('*');
+            if (error) {
+                console.warn('[Calibration Supabase Load Error]', error.message);
+                // พยายามส่งข้อมูลปัจจุบันขึ้นตาราง Supabase
+                await syncAllToCloud(true);
+                return false;
+            }
+            if (rows && rows.length > 0) {
+                const mapped = rows.map(r => ({
+                    ...r,
+                    imageUrl: getInstrumentImageUrl(r) || ""
+                }));
+                _data = mapped;
+                if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                    try { await localDB.calibrationMaster.bulkPut(mapped); } catch(e) {}
+                }
+                render();
+                updateOverdueBadge();
+                console.log('[Calibration] Synced online data from Supabase:', rows.length, 'records');
+                return true;
+            } else {
+                // ถ้าใน Supabase ยังไม่มีข้อมูล ให้ส่งข้อมูลเริ่มต้นทั้งหมดขึ้น Cloud ทันที!
+                console.log('[Calibration] Supabase table empty, uploading all inventory data now...');
+                await syncAllToCloud(true);
+                return true;
+            }
+        } catch(err) {
+            console.warn('[Calibration Supabase Load Exception]', err);
+            return false;
+        }
+    }
+
+    function initRealtime() {
+        if (_realtimeSubscribed) return;
+        try {
+            const sb = getSupabaseClient();
+            if (!sb || typeof sb.channel !== 'function') return;
+
+            sb.channel('calibration_realtime_channel')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'calibration_records' }, async (payload) => {
+                    console.log('[Calibration Realtime Change]', payload.eventType);
+                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                        const newRow = payload.new;
+                        if (newRow && newRow.id) {
+                            const item = {
+                                ...newRow,
+                                imageUrl: getInstrumentImageUrl(newRow) || ""
+                            };
+                            const idx = _data.findIndex(x => String(x.id) === String(item.id));
+                            if (idx !== -1) {
+                                _data[idx] = { ..._data[idx], ...item };
+                            } else {
+                                _data.unshift(item);
+                            }
+                            if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                                try { await localDB.calibrationMaster.put(item); } catch(e) {}
+                            }
+                            render();
+                            updateOverdueBadge();
+                        }
+                    } else if (payload.eventType === 'DELETE') {
+                        if (payload.old && payload.old.id) {
+                            _data = _data.filter(x => String(x.id) !== String(payload.old.id));
+                            if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                                try { await localDB.calibrationMaster.delete(payload.old.id); } catch(e) {}
+                            }
+                            render();
+                            updateOverdueBadge();
+                        }
+                    }
+                })
+                .subscribe();
+
+            _realtimeSubscribed = true;
+        } catch(e) {
+            console.warn('[Calibration Realtime Subscribe Error]', e);
+        }
+    }
+
+function extractResponsiblePerson(itemOrStr) {
+    if (!itemOrStr) return "-";
+    
+    let raw = "";
+    if (typeof itemOrStr === 'string') {
+        raw = itemOrStr;
+    } else if (typeof itemOrStr === 'object') {
+        // ดึงจากช่อง PIC หรือ Sub Section (Area & Group)
+        if (itemOrStr.pic && itemOrStr.pic !== "-" && String(itemOrStr.pic).trim()) {
+            raw = String(itemOrStr.pic).trim();
+        } else if (itemOrStr.sub_section && itemOrStr.sub_section !== "-" && String(itemOrStr.sub_section).trim()) {
+            raw = String(itemOrStr.sub_section).trim();
+        }
+    }
+    
+    if (!raw || raw === "-") return "-";
+
+    // --- 1. ตรวจสอบชื่อในวงเล็บ (...) ---
+    // ใช้ Regex ค้นหาข้อความที่อยู่ในวงเล็บ
+    const bracketMatch = raw.match(/\(([^)]+)\)/);
+    
+    if (bracketMatch && bracketMatch[1]) {
+        let nameInside = bracketMatch[1].trim();
+        // ล้างคำนำหน้าชื่อ เช่น K., Khun, Mr., Ms. และจุดต่างๆ ออก
+        return nameInside
+            .replace(/^(?:mr|ms|mrs|miss|khun|dr|k)\.?\s*/gi, '') // ลบ K. หรือคำนำหน้า
+            .replace(/\./g, '') // ลบจุด
+            .trim();
+    }
+
+    // --- 2. ถ้าไม่มีชื่อในวงเล็บ ให้ใช้ Logic ชื่อกลุ่มแบบสั้น ---
+    let cleaned = raw.trim();
+
+    // กรณีพิเศษสำหรับ Piping
+    if (cleaned.toUpperCase().startsWith("PIPING PART")) {
+        return "Piping Parts";
+    }
+
+    // ตัดจบที่คำว่า Parts (สำหรับ Printing Parts, Electrical Parts ฯลฯ)
+    const partsIndex = cleaned.toUpperCase().indexOf("PARTS");
+    if (partsIndex !== -1) {
+        return cleaned.substring(0, partsIndex + 5).trim();
+    }
+
+    // ถ้าไม่มีคำว่า Parts ให้เช็คคำว่า Group
+    const groupIndex = cleaned.toUpperCase().indexOf("GROUP");
+    if (groupIndex !== -1) {
+        return cleaned.substring(0, groupIndex + 5).trim();
+    }
+
+    return cleaned;
+}
+
+    // ฟังก์ชันคำนวณจำนวนเครื่องมือที่เลยกำหนดเทียบ (Overdue / Expired)
+    function getOverdueCount() {
+        const today = new Date();
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        return _data.filter(item => {
+            const nextDue = item.next_due && item.next_due !== '-' ? new Date(item.next_due) : null;
+            let diffDays = 999;
+            if (nextDue && !isNaN(nextDue.getTime())) {
+                const dueZero = new Date(nextDue.getFullYear(), nextDue.getMonth(), nextDue.getDate()).getTime();
+                diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+            }
+            return (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE');
+        }).length;
+    }
+
+    // ฟังก์ชันอัปเดต Badge และกระดิ่งแจ้งเตือน Overdue ทั่วทั้งแอป
+    function updateOverdueBadge() {
+        const overdueCount = getOverdueCount();
+        
+        // 1. อัปเดตในปุ่มกระดิ่งส่วนหัว (Header Toolbar)
+        const bellCountEl = document.getElementById('cal-overdue-bell-count');
+        const bellBtn = document.getElementById('cal-overdue-bell-btn');
+        const bellDot = document.getElementById('cal-overdue-bell-dot');
+        const bellIcon = bellBtn ? bellBtn.querySelector('.cal-bell-icon') : null;
+
+        if (bellCountEl) {
+            bellCountEl.textContent = overdueCount;
+        }
+
+        if (bellBtn) {
+            if (overdueCount > 0) {
+                bellBtn.classList.add('has-overdue');
+                if (bellDot) bellDot.classList.remove('hidden');
+                if (bellIcon) bellIcon.classList.add('cal-bell-alert');
+            } else {
+                bellBtn.classList.remove('has-overdue');
+                if (bellDot) bellDot.classList.add('hidden');
+                if (bellIcon) bellIcon.classList.remove('cal-bell-alert');
+            }
+        }
+
+        // 2. อัปเดตในหน้า Calibration (ถ้ามี)
+        const innerBadge = document.getElementById('cal-overdue-badge-inner');
+        if (innerBadge) {
+            innerBadge.textContent = overdueCount;
+        }
+    }
+
+    // ฟังก์ชันคลิกกระดิ่งแจ้งเตือน -> สลับไปหน้า Calibration และกรองเฉพาะรายการ Overdue ในตารางทันที
+    function goToOverdue() {
+        // สลับไปหน้า Calibration
+        if (typeof window.switchPage === 'function') {
+            const calNavBtn = document.querySelector('[onclick*="Calibration"]') || document.querySelector('[onclick*="CALIBRATION"]');
+            window.switchPage('Calibration', calNavBtn);
+        }
+
+        // ตั้งค่าตัวกรองสถานะเป็น EXPIRED
+        setTimeout(() => {
+            const statusSelect = document.getElementById('cal-filter-status');
+            const searchInput = document.getElementById('cal-search');
+            const deptSelect = document.getElementById('cal-filter-dept');
+
+            if (statusSelect) statusSelect.value = 'EXPIRED';
+            if (searchInput) searchInput.value = '';
+            if (deptSelect) deptSelect.value = 'ALL';
+
+            render();
+
+            // เลื่อนตารางขึ้นบนสุด
+            const tbody = document.getElementById('cal-table-body');
+            const container = tbody ? tbody.closest('.overflow-auto') : null;
+            if (container) {
+                container.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            const count = getOverdueCount();
+            toast(`🔔 แสดงรายการเครื่องมือที่เลยกำหนดเทียบ (Overdue) ทั้งหมด ${count} รายการ`, count > 0 ? 'warning' : 'info');
+        }, 80);
+    }
+
+function _buildRow(item, index) {
+    const rawImg = getInstrumentImageUrl(item);
+    const safeImg = rawImg ? formatImageUrl(rawImg) : "";
+    
+    // --- [1] ส่วนเตรียมรูปภาพ ---
+    const photoHtml = safeImg 
+        ? `<div class="img-thumb" style="width:60px; height:40px; flex-shrink:0; border-radius:6px; overflow:hidden; border:1.5px solid #e2e8f0; background:#fff; cursor:pointer;" 
+                onclick="WapCalibrationSystem.openMetrologyViewer('${item.id}')" title="คลิกเพื่อดูเอกสารและภาพถ่ายจริง">
+                <img src="${safeImg}" style="width:100%; height:100%; object-fit:cover;" onerror="handleImgError(this)">
+           </div>`
+        : `<div style="width:60px; height:40px; flex-shrink:0; border-radius:6px; border:1.5px dashed #cbd5e1; background:#f8fafc; display:flex; align-items:center; justify-content:center; cursor:pointer;" 
+                onclick="WapCalibrationSystem.triggerUpload('${item.id}')" title="เพิ่มรูปภาพ">
+                <span style="color:#cbd5e1; font-size:7px; font-weight:900;">ADD</span>
+           </div>`;
+
+    // --- [2] ระบบคำนวณสถานะและ Visual Status Indicators ---
+    const today = new Date();
+    const nextDue = item.next_due && item.next_due !== '-' ? new Date(item.next_due) : null;
+    const lastCal = item.last_cal && item.last_cal !== '-' ? new Date(item.last_cal) : null;
+    
+    // คำนวณจำนวนวันคงเหลือ (Next Due)
+    let diffDays = 999;
+    if (nextDue && !isNaN(nextDue.getTime())) {
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const dueZero = new Date(nextDue.getFullYear(), nextDue.getMonth(), nextDue.getDate()).getTime();
+        diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+    }
+    
+    // คำนวณจำนวนวันที่พึ่งสอบเทียบไป (Recently Cal)
+    let justCalDays = 999;
+    if (lastCal && !isNaN(lastCal.getTime())) {
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const calZero = new Date(lastCal.getFullYear(), lastCal.getMonth(), lastCal.getDate()).getTime();
+        justCalDays = Math.ceil((todayZero - calZero) / (1000 * 60 * 60 * 24));
+    }
+
+    // กำหนดธีมสี ตัวบ่งชี้สถานะ (Indicator Dots / Icons / Badges)
+    let st = {
+        key: "CALIBRATED",
+        label: "CALIBRATED",
+        th: "สอบเทียบแล้ว (ปกติ)",
+        color: "#10b981",
+        bg: "#ecfdf5",
+        border: "#a7f3d0",
+        pillClass: "calibrated",
+        rowClass: "status-calibrated",
+        beaconHtml: `<span class="cal-beacon calibrated" title="Calibrated & Active"><span class="beacon-dot"></span></span>`,
+        iconSvg: `<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="text-emerald-600"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>`,
+        badgeText: "CALIBRATED",
+        subText: diffDays < 900 ? `Valid (${diffDays}d left)` : "Valid",
+        subColor: "text-emerald-700"
+    };
+
+    if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+        st = {
+            key: "IN_CALIBRATION",
+            label: "IN CALIBRATION",
+            th: "กำลังส่งสอบเทียบ (ส่งแคลอยู่)",
+            color: "#f97316",
+            bg: "#fff7ed",
+            border: "#fed7aa",
+            pillClass: "in-cal",
+            rowClass: "status-in-cal",
+            beaconHtml: `<span class="cal-beacon in-cal" title="In Calibration / กำลังส่งสอบเทียบ"><span class="beacon-ping"></span><span class="beacon-dot"></span></span>`,
+            iconSvg: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
+            badgeText: "IN CALIBRATION",
+            subText: "ส่งแคลอยู่ (Out for Cal)",
+            subColor: "text-orange-600 font-black"
+        };
+    } else if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+        const overdueDays = Math.abs(diffDays);
+        st = {
+            key: "EXPIRED",
+            label: "EXPIRED",
+            th: "หมดอายุ / เลยกำหนด",
+            color: "#ef4444",
+            bg: "#fef2f2",
+            border: "#fecaca",
+            pillClass: "expired",
+            rowClass: "status-expired",
+            beaconHtml: `<span class="cal-beacon expired" title="Expired / Overdue"><span class="beacon-ping"></span><span class="beacon-dot"></span></span>`,
+            iconSvg: `<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="text-rose-600"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
+            badgeText: "EXPIRED",
+            subText: diffDays < 0 ? `Overdue ${overdueDays}d` : "Expired",
+            subColor: "text-rose-600 font-black"
+        };
+    } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+        st = {
+            key: "DUE_SOON",
+            label: "CALIBRATION DUE",
+            th: "ใกล้ครบกำหนดสอบเทียบ",
+            color: "#f59e0b",
+            bg: "#fffbeb",
+            border: "#fde68a",
+            pillClass: "due",
+            rowClass: "status-due",
+            beaconHtml: `<span class="cal-beacon due" title="Calibration Due Soon"><span class="beacon-ping"></span><span class="beacon-dot"></span></span>`,
+            iconSvg: `<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="text-amber-600"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>`,
+            badgeText: "CALIBRATION DUE",
+            subText: `Due in ${diffDays}d`,
+            subColor: "text-amber-700 font-black"
+        };
+    } else if (justCalDays <= 15 || item.status === 'JUST_CAL') {
+        st = {
+            key: "NORMAL",
+            label: "CALIBRATED",
+            th: "พึ่งสอบเทียบใหม่",
+            color: "#3b82f6",
+            bg: "#eff6ff",
+            border: "#bfdbfe",
+            pillClass: "just-cal",
+            rowClass: "status-just-cal",
+            beaconHtml: `<span class="cal-beacon just-cal" title="Recently Calibrated"><span class="beacon-ping"></span><span class="beacon-dot"></span></span>`,
+            iconSvg: `<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="text-blue-600"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>`,
+            badgeText: "CALIBRATED",
+            subText: `Just Cal (${justCalDays}d ago)`,
+            subColor: "text-blue-700 font-black"
+        };
+    }
+
+// --- [เพิ่มส่วนนี้ไว้ก่อนบรรทัด return เพื่อประมวลผลการตัดคำ] ---
+const displaySubSection = (() => {
+    let sub = String(item.sub_section || "-").trim();
+    // ตัดจบที่คำว่า PARTS
+    const partsIndex = sub.toUpperCase().indexOf("PARTS");
+    if (partsIndex !== -1) {
+        return sub.substring(0, partsIndex + 5).trim();
+    }
+    // ถ้าไม่มี PARTS ให้เช็คคำว่า GROUP
+    const groupIndex = sub.toUpperCase().indexOf("GROUP");
+    if (groupIndex !== -1) {
+        return sub.substring(0, groupIndex + 5).trim();
+    }
+    return sub;
+})();
+
+return `
+    <tr class="cal-row-premium ${st.rowClass} hover:bg-slate-50/90 dark:hover:bg-slate-800/80 transition-all text-[10.5px] font-bold text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800" 
+        data-rid="${item.id}" 
+        style="--status-color: ${st.color}; border-left: 4px solid ${st.color};">
+        
+        <!-- Column 1: Index Number & Checkbox -->
+        <td class="py-2 px-2 text-center" style="width: 55px;">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;">
+                <span class="font-mono text-slate-400 dark:text-slate-500 text-[10.5px] font-bold leading-none">${index + 1}</span>
+                <input type="checkbox" 
+                       class="cal-row-checkbox w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 transition-all" 
+                       data-id="${item.id}" 
+                       ${_selectedIds && _selectedIds.has(String(item.id)) ? 'checked' : ''} 
+                       onclick="event.stopPropagation(); WapCalibrationSystem.toggleSelectRow('${item.id}', this.checked)">
+            </div>
+        </td>
+        
+        <!-- Column 2: Photo & Internal Code -->
+        <td class="py-1.5 px-2 text-center" style="width: 120px;">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 80px;">
+                <div style="flex-shrink: 0;">
+                    ${photoHtml}
+                </div>
+                <div style="text-align: center; line-height: 1; margin-top: 3px;">
+                    <span class="cal-id-badge" title="Internal Asset ID">
+                        ${item.code_no || '-'}
+                    </span>
+                </div>
+            </div>
+        </td>
+        
+        <!-- Column 4: Instrument Name & Maker & S/N -->
+        <td class="py-2 px-4" style="min-width: 200px;">
+            <div style="display: inline-flex; flex-direction: column; gap: 3px; min-width: max-content;">
+                <div style="font-size: 12px; font-weight: 850; color: #1e293b; line-height: 1.2; white-space: nowrap; display: flex; align-items: center; gap: 6px;" class="dark:text-slate-100">
+                    <span>${item.name}</span>
+                </div>
+                <div style="height: 1.5px; background: linear-gradient(90deg, ${st.color} 0%, transparent 100%); width: 75px; margin: 1px 0;"></div>
+                <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                    <div style="display: flex; align-items: center; gap: 3px;" title="Maker / Brand">
+                        <span style="color: #94a3b8; font-size: 8px; font-weight: 800;">MKR:</span>
+                        <span style="color: #64748b; font-size: 10px; font-weight: 700;" class="dark:text-slate-300">${item.maker || '-'}</span>
+                    </div>
+                    <div style="width: 1px; height: 8px; background: #e2e8f0;" class="dark:bg-slate-700"></div>
+                    <div style="display: flex; align-items: center; gap: 3px;" title="Serial Number">
+                        <span style="color: #94a3b8; font-size: 8px; font-weight: 800;">S/N:</span>
+                        <span style="color: #3b82f6; font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 700;">${item.serial || '-'}</span>
+                    </div>
+                </div>
+            </div>
+        </td>
+
+        <!-- Column 5: Model -->
+        <td class="py-1 px-4 font-mono text-slate-700 dark:text-slate-300" style="width: 140px;" title="Model Number">${item.model || '-'}</td>
+        
+        <!-- Column 6: Size -->
+        <td class="py-1 px-4 text-slate-700 dark:text-slate-300" style="width: 110px;" title="Capacity Range">${item.size || '-'}</td>
+
+        <!-- Column 7: Calibration Schedule (Next Due / Last) -->
+        <td class="py-2 px-4 text-center" style="min-width: 150px;">
+            <div class="cal-status-card">
+                <div class="cal-status-pill ${st.pillClass}">
+                    ${st.beaconHtml}
+                    ${st.iconSvg}
+                    <span>${st.badgeText}</span>
+                </div>
+
+                <div style="text-align: center; line-height: 1.1; margin-top: 2px;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <span style="font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 950; color: #1e293b;" class="dark:text-slate-100">
+                            ${item.next_due}
+                        </span>
+                    </div>
+                    <div class="${st.subColor}" style="font-size: 8.5px; text-transform: uppercase; margin-top: 2px;">
+                        ${st.subText}
+                    </div>
+                    <div style="font-size: 7.5px; color: #94a3b8; font-weight: 800; text-transform: uppercase; margin-top: 1px;">
+                        LAST CAL: ${item.last_cal}
+                    </div>
+                </div>
+            </div>
+        </td>
+
+        <!-- Column 8: Department -->
+        <td class="py-2 px-4 text-center" style="width: 140px; vertical-align: middle;">
+            <div style="background: #eff6ff; color: #1e40af; padding: 3px 12px; border-radius: 6px; font-size: 11px; font-weight: 900; border: 1px solid #dbeafe; display: inline-block; letter-spacing: 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); text-transform: uppercase;" class="dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800" title="Owning Department">
+                ${item.dept || '-'}
+            </div>
+        </td>
+
+        <!-- Column 9: RESPONSIBLE (PIC) -->
+        <td class="py-2 px-4" style="min-width: 150px;">
+            ${(() => {
+                const picVal = extractResponsiblePerson(item);
+                if (!picVal || picVal === '-') return `<span style="color: #94a3b8; font-weight: 700; font-size: 11px;">-</span>`;
+
+                // Check if it's a specific Person or a Group
+                const isPerson = !(picVal.includes("Parts") || picVal.includes("Group"));
+
+                // Dynamic Color Theme
+                const badgeColor = isPerson ? "#10b981" : "#1e3a8a";
+                const borderNormal = isPerson ? "#059669" : "#1e293b";
+                const shadowColor = isPerson ? "rgba(16, 185, 129, 0.2)" : "rgba(30, 58, 138, 0.2)";
+
+                return `
+                    <div class="cal-pic-badge" 
+                         style="background: ${badgeColor}; border: 1px solid ${borderNormal}; box-shadow: 0 2px 6px ${shadowColor}; transition: all 0.25s ease;" 
+                         title="Responsible PIC: ${picVal}"
+                         onmouseover="this.style.borderColor='#3b82f6'; this.style.transform='translateY(-2px)';" 
+                         onmouseout="this.style.borderColor='${borderNormal}'; this.style.transform='translateY(0)';">
+                        <span class="pic-icon-wrap" style="background: rgba(255,255,255,0.2);">
+                            <svg width="10" height="10" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24">
+                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                            </svg>
+                        </span>
+                        <span class="pic-text" style="color: #fff; font-weight: 800; text-transform: uppercase;">${picVal}</span>
+                    </div>`;
+            })()}
+        </td>
+
+        <!-- Column 10: Reg Date -->
+        <td class="py-1 px-4 text-center text-slate-400 dark:text-slate-500 font-mono" style="width: 110px;" title="Registered Date">${item.reg_date || '-'}</td>
+        
+        <!-- Column 11: Freq -->
+        <td class="py-1 px-4 text-center" style="width: 80px;" title="Calibration Cycle"><span class="freq-pill">${item.frequency || '12 M'}</span></td>
+        
+        <!-- Column 12: Month -->
+        <td class="py-1 px-4 text-center" style="width: 100px;" title="Target Month"><span class="month-pill">${item.month || '-'}</span></td>
+        
+        <!-- Column 13: Actions -->
+        <td class="py-1 px-4 text-center" style="width: 100px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                <button type="button" class="btn-action-cal edit" title="Edit This Record"
+                        onclick="event.stopPropagation(); WapCalibrationSystem.openEditModal('${item.id}')">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+                <button type="button" class="btn-action-cal view" title="View Metrology Document"
+                        onclick="event.stopPropagation(); WapCalibrationSystem.openMetrologyViewer('${item.id}')">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </button>
+                <button type="button" class="btn-action-cal history" title="Chronological Calibration History"
+                        onclick="event.stopPropagation(); WapCalibrationSystem.displayCalibrationHistory('${item.id}')">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </button>
+            </div>
+        </td>
+    </tr>
+    `;
+}
+// เพิ่มฟังก์ชันนี้เข้าไปใน WapCalibrationSystem (ใน script.js)
+
+// ค้นหา WapCalibrationSystem.openEditModal แล้วแทนที่ด้วยชุดนี้
+function openEditModal(id) {
+    const item = _data.find(x => String(x.id) === String(id) || (x.serial && String(x.serial) === String(id)) || (x.code_no && String(x.code_no) === String(id)));
+    if (!item) return;
+
+    // 1. เปิดโครงสร้าง Modal หลัก
+    openAddModal(); 
+
+    // ฟังก์ชันช่วยแปลงรูปแบบวันที่สำหรับสติกเกอร์ (เช่น 20-AUG-26)
+    const formatForSticker = (dateStr) => {
+        if (!dateStr || dateStr === '-') return '---';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        return `${String(d.getDate()).padStart(2, '0')}-${months[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
+    };
+
+    // 2. หยอดข้อมูลพร้อมใส่กิมมิก
+    setTimeout(() => {
+        const modal = document.getElementById('cal-add-modal');
+        if (!modal) return;
+
+        // เปลี่ยนหัวข้อเป็นโหมด Update
+        modal.querySelector('h3').textContent = "แก้ไขข้อมูลเครื่องมือ (INSTRUMENT TERMINAL)";
+        
+        // --- ระบบดึงข้อมูล (Data Mapping) ---
+        const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ""; };
+
+        // 🎯 ดึงข้อมูลจาก S/N (Serial No.) มาใส่ในช่อง Asset ID / รหัสทรัพย์สิน เท่านั้น
+        const assetIdFromSN = item.serial || item.code_no || item.id || "";
+        setVal('reg-id', assetIdFromSN);
+        const regIdEl = document.getElementById('reg-id');
+        if (regIdEl) {
+            regIdEl.readOnly = true; 
+            regIdEl.style.backgroundColor = "#f1f5f9"; // ล็อค ID
+            regIdEl.dataset.internalId = item.id;
+        }
+        const formEl = document.getElementById('cal-reg-form');
+        if (formEl) {
+            formEl.dataset.internalId = item.id;
+        }
+
+        setVal('reg-maker', item.maker);
+        setVal('reg-model', item.model);
+        setVal('reg-name', item.name);
+        setVal('reg-serial', item.serial);
+        setVal('reg-size', item.size);
+        setVal('reg-codeno', item.code_no);
+
+// จัดการช่อง Ownership (Dept) - เปลี่ยนมาหยอดค่าลง Input โดยตรง
+const deptEl = document.getElementById('reg-dept');
+if (deptEl) {
+    // เนื่องจากเปลี่ยนเป็นช่อง Input แล้ว สามารถใส่ค่าจากฐานข้อมูลลงไปได้ทันที
+    deptEl.value = item.dept || '';
+}
+
+        const subEl = document.getElementById('reg-sub');
+        if (subEl) {
+            if (subEl.tagName === 'SELECT' && typeof subEl.add === 'function') {
+                const opts = Array.from(subEl.options || []);
+                let matched = false;
+                for (let opt of opts) {
+                    if (opt && opt.value && opt.value.toLowerCase().includes((item.sub_section || '').toLowerCase())) {
+                        subEl.value = opt.value;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched && item.sub_section) {
+                    const newOpt = new Option(item.sub_section, item.sub_section);
+                    subEl.add(newOpt);
+                    subEl.value = item.sub_section;
+                }
+            } else {
+                subEl.value = item.sub_section || '';
+            }
+        }
+
+        // จัดการผู้รับผิดชอบ (Person in Charge)
+        const picVal = extractResponsiblePerson(item);
+        setVal('reg-pic', (picVal && picVal !== '-') ? picVal : (item.pic || ''));
+
+        // จัดการวันที่และหน้าปัด Next Due
+        setVal('reg-last-cal', item.last_cal);
+        const freqInt = parseInt(item.frequency) || 12;
+        setVal('reg-freq', freqInt);
+        
+        const nextDueDisp = document.getElementById('reg-next-due-display');
+        if (nextDueDisp) {
+            nextDueDisp.textContent = item.next_due;
+            if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+                nextDueDisp.textContent = "กำลังส่งแคลอยู่";
+                nextDueDisp.style.color = '#f97316';
+            } else {
+                nextDueDisp.style.color = (item.status === 'EXPIRED') ? '#ef4444' : (item.status === 'DUE_SOON') ? '#f59e0b' : '#10b981';
+            }
+        }
+
+        // หากเครื่องมือกำลังส่งแคลอยู่ ให้เน้นช่อง Last Calibrated เพื่อให้กรอกเมื่อได้รับเครื่องมือกลับ
+        if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+            const lastCalInp = document.getElementById('reg-last-cal');
+            if (lastCalInp) {
+                lastCalInp.style.borderColor = '#f97316';
+                lastCalInp.style.backgroundColor = '#fff7ed';
+                lastCalInp.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.25)';
+            }
+            const modalBody = modal.querySelector('form');
+            if (modalBody && !document.getElementById('cal-incal-notice')) {
+                const notice = document.createElement('div');
+                notice.id = 'cal-incal-notice';
+                notice.className = 'p-3 rounded-xl bg-orange-50 dark:bg-orange-950/50 border-2 border-orange-300 dark:border-orange-700 text-orange-900 dark:text-orange-200 text-xs font-bold flex items-center gap-2.5 col-span-full shadow-xs mb-2';
+                notice.innerHTML = `
+                    <span class="text-xl shrink-0">🚚</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-black text-orange-800 dark:text-orange-200 uppercase tracking-tight">สถานะปัจจุบัน: กำลังส่งสอบเทียบ (ส่งแคลอยู่)</div>
+                        <div class="text-[11px] font-semibold text-orange-700 dark:text-orange-300 mt-0.5">เมื่อได้รับเครื่องมือกลับมาแล้ว ให้กรอกวันที่ <b>"Last Calibrated / สอบล่าสุด"</b> แล้วกดบันทึก ระบบจะปรับสถานะกลับเป็น <b>CALIBRATED (สอบเทียบแล้ว)</b> ทันที</div>
+                    </div>
+                `;
+                modalBody.prepend(notice);
+            }
+        }
+
+        // ============================================================
+        // 🎯 [ส่วนที่เพิ่มใหม่] Sticker Hydration (หยอดข้อมูลลงป้ายสติกเกอร์)
+        // ============================================================
+        const updateStickerText = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+
+        updateStickerText('stk-prev-serial', item.serial || '---');
+        updateStickerText('stk-prev-cert', 'CAL-' + (item.code_no || item.id || 'N/A'));
+        
+        // บังคับใช้ชื่อ PHETSAYAM ในป้ายสติกเกอร์พรีวิว
+        updateStickerText('stk-prev-pic', 'PHETSAYAM'); 
+
+        updateStickerText('stk-prev-last', formatForSticker(item.last_cal));
+        updateStickerText('stk-prev-due', formatForSticker(item.next_due));
+        // ============================================================
+
+        // จัดการรูปภาพพรีวิว
+// --- แก้ไขส่วนจัดการรูปภาพพรีวิว ใน openEditModal ---
+const resolvedImg = getInstrumentImageUrl(item);
+const dz = document.getElementById('reg-dropzone');
+const label = document.getElementById('reg-img-label');
+
+if (resolvedImg && dz) {
+    dz.style.backgroundImage = `url(${formatImageUrl(resolvedImg)})`;
+    dz.style.backgroundSize = 'contain';
+    dz.style.backgroundRepeat = 'no-repeat';
+    dz.style.backgroundPosition = 'center';
+    dz.style.borderColor = '#3b82f6'; // เปลี่ยนขอบเป็นสีน้ำเงินเมื่อมีภาพ
+    dz.style.backgroundAlpha = '1';
+    
+    // ซ่อนข้อความ "NO PHOTO" เมื่อมีรูปจริง
+    if (label) label.style.display = 'none';
+    
+    dz.innerHTML += `<div style="background:rgba(30, 64, 175, 0.8); position:absolute; bottom:0; left:0; right:0; padding:4px; font-size:9px; font-weight:900; color:#fff; text-align:center; letter-spacing:1px;">REAL PHOTO ACTIVE</div>`;
+}
+
+        // กิมมิก: เปลี่ยนปุ่ม Save เป็น Update พร้อมแอนิเมชั่น
+        const saveBtn = modal.querySelector('button[onclick*="saveNew"]');
+        if (saveBtn) {
+            saveBtn.innerHTML = `<span>🚀 UPDATE RECORD</span>`;
+            saveBtn.style.background = "linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)";
+        }
+        
+    }, 60);
+}
+// 1. พจนานุกรมการจับคู่หัวข้อ (Smart Alias Mapping) ให้ตรงกับตารางทุกคอลัมน์
+const calFieldAliases = {
+    id: ['no.', 'no', 'id', 'asset id'],
+    code_barcode: ['coed /barcoed', 'code / barcode', 'barcode'], // ดักคำว่า Coed
+    name: ['Instrrument Name', 'instrument name', 'name', 'ชื่อเครื่องมือ'], // ดักคำว่า Instrrument (r 2 ตัว)
+    maker: ['Maker Name', 'brand', 'ยี่ห้อ', 'maker'],
+    model: ['Model', 'รุ่น'],
+    code_no: ['Code No.', 'code no', 'internal code'],
+    serial: ['Serial No.', 'serial no', 's/n'],
+    size: ['Size', 'range', 'ขนาด'],
+    last_cal: ['Cal. Date', 'cal date', 'last cal'],
+    next_due: ['Due Date', 'next due'],
+    dept: ['Section', 'dept', 'department', 'แผนก'],
+    sub_section: ['Sub Section', 'category', 'กลุ่มงาน', 'area & group', 'area', 'group'],
+    pic: ['ผู้รับผิดชอบ', 'pic', 'person in charge', 'responsible', 'owner', 'ผู้ดูแล'],
+    Register_date: ['Register date', 'interval'],
+    Frequency:['Frequency', 'Frequency', 'frequency', 'รอบ'],
+    Month:['Month', 'Month', 'month', 'เดือน'],
+};
+
+// 2. ฟังก์ชันเรียกหน้าต่างเลือกไฟล์
+function triggerImport() {
+    const calInp = document.getElementById('cal-import-input');
+    if (calInp && typeof calInp.click === 'function') {
+        calInp.click();
+    } else {
+        toast("⚠️ ไม่พบช่องนำเข้าไฟล์ Calibration", "warning");
+    }
+}
+
+async function handleImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    toast("⏳ กำลังวิเคราะห์และจับคู่หัวข้อตาราง...", "info");
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            // ดึงข้อมูลออกมาเป็น Array ของ Array (raw rows)
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+            if (rows.length < 1) throw new Error("ไม่พบข้อมูลในไฟล์");
+
+            // --- 1. ระบบสแกนหาแถวหัวตารางและแมปตำแหน่งคอลัมน์ ---
+            let mapping = {};
+            let headerRowIdx = -1;
+
+            // ค้นหาจาก 20 แถวแรก
+            for (let i = 0; i < Math.min(rows.length, 20); i++) {
+                let currentMapping = {};
+                let matchCount = 0;
+                
+                rows[i].forEach((cell, cellIdx) => {
+                    const cleanCell = String(cell || "").trim().toLowerCase();
+                    
+                    // วนลูปเช็คกับ calFieldAliases (Fuzzy Matching)
+                    const calAliasEntries = (typeof calFieldAliases !== 'undefined' && calFieldAliases) ? Object.entries(calFieldAliases) : [];
+                    for (const [fieldKey, aliases] of calAliasEntries) {
+                        const lowerAliases = (aliases || []).map(a => String(a).toLowerCase());
+                        if (lowerAliases.includes(cleanCell)) {
+                            currentMapping[fieldKey] = cellIdx;
+                            matchCount++;
+                        }
+                    }
+                });
+
+                // ถ้าเจอหัวข้อตรงกัน 5 หัวข้อขึ้นไป มั่นใจได้ว่าเป็นแถว Header
+                if (matchCount >= 5) {
+                    headerRowIdx = i;
+                    mapping = currentMapping;
+                    break;
+                }
+            }
+
+            if (headerRowIdx === -1) {
+                throw new Error("ระบบหาหัวตารางไม่เจอ! กรุณาตรวจสอบว่าหัวข้อในไฟล์ตรงกับที่กำหนดไว้ (เช่น Coed /Barcoed หรือ Instrrument Name)");
+            }
+
+            // --- 2. เริ่มดึงข้อมูลจากแถวถัดจาก Header ---
+            const newEntries = rows.slice(headerRowIdx + 1).map((row, idx) => {
+                // ถ้าช่องชื่อเครื่องมือว่าง ให้ข้ามแถวนั้น
+                if (!row[mapping.name]) return null;
+
+                // จัดการเรื่องวันที่ (รองรับทั้ง Date Object และ String)
+                const parseDate = (val) => {
+                    if (val instanceof Date) return val.toISOString().split('T')[0];
+                    if (!val || val === "-") return "-";
+                    const d = new Date(val);
+                    return isNaN(d.getTime()) ? String(val) : d.toISOString().split('T')[0];
+                };
+
+                const nextDueDate = parseDate(row[mapping.next_due]);
+                let monthStr = "-";
+                if (nextDueDate !== "-") {
+                    const d = new Date(nextDueDate);
+                    monthStr = d.toLocaleString('en-US', { month: 'long' });
+                }
+
+                const subVal = String(row[mapping.sub_section] || "-");
+                const deptVal = String(row[mapping.dept] || "-");
+                const explicitPic = mapping.pic !== undefined ? String(row[mapping.pic] || "").trim() : "";
+                const autoPic = extractResponsiblePerson({ sub_section: subVal, dept: deptVal, pic: explicitPic });
+
+                // สร้าง Object ข้อมูลที่แมปแล้ว
+                return {
+                    id: String(row[mapping.id] || "CAR-CAL-" + (Date.now() + idx)),
+                    code_barcode: String(row[mapping.code_barcode] || "-"),
+                    name: String(row[mapping.name] || "-"),
+                    maker: String(row[mapping.maker] || "-"),
+                    model: String(row[mapping.model] || "-"),
+                    code_no: String(row[mapping.code_no] || "-"),
+                    serial: String(row[mapping.serial] || "-"),
+                    size: String(row[mapping.size] || "-"),
+                    last_cal: parseDate(row[mapping.last_cal]),
+                    next_due: nextDueDate,
+                    dept: deptVal,
+                    sub_section: subVal,
+                    pic: autoPic !== "-" ? autoPic : explicitPic,
+                    reg_date: parseDate(row[mapping.Register_date]) !== "-" ? parseDate(row[mapping.Register_date]) : new Date().toISOString().split('T')[0],
+                    frequency: String(row[mapping.Frequency] || "12 M"),
+                    month: row[mapping.Month] || monthStr,
+                    status: 'NORMAL',
+                    imageUrl: getInstrumentImageUrl({
+                        id: String(row[mapping.id] || ""),
+                        code_barcode: String(row[mapping.code_barcode] || ""),
+                        name: String(row[mapping.name] || ""),
+                        maker: String(row[mapping.maker] || ""),
+                        model: String(row[mapping.model] || ""),
+                        code_no: String(row[mapping.code_no] || ""),
+                        serial: String(row[mapping.serial] || "")
+                    }) || ""
+                };
+            }).filter(item => item !== null);
+
+            // --- 3. บันทึกลงเครื่องถาวร (IndexedDB) และ Cloud (Supabase) และอัปเดตหน้าจอ ---
+            if (newEntries.length > 0) {
+                // บันทึกเข้าฐานข้อมูลเครื่อง ( Dexie )
+                await localDB.calibrationMaster.bulkPut(newEntries);
+                
+                // ดึงข้อมูลทั้งหมดจากเครื่องมาแสดง
+                _data = await localDB.calibrationMaster.toArray();
+                
+                render();
+                updateOverdueBadge();
+                toast(`✅ นำเข้าข้อมูลสำเร็จ ${newEntries.length} รายการ และบันทึกลงฐานข้อมูลแล้ว`, "success");
+
+                // ซิงก์ขึ้น Supabase Cloud อัตโนมัติ (เฉพาะข้อมูล ไม่รวมรูปภาพ)
+                syncToCloud(newEntries);
+            } else {
+                toast("⚠️ ไม่พบข้อมูลที่สามารถนำเข้าได้", "info");
+            }
+            
+            event.target.value = ''; // Reset input file
+
+        } catch (err) {
+            console.error(err);
+            toast("❌ ล้มเหลว: " + err.message, "error");
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// แก้ไขเป็น async function เพื่อให้ใช้ await โหลดข้อมูลได้
+    async function init() {
+        // 1. ตรวจสอบก่อนว่ามีหน้า Calibration อยู่ใน DOM หรือไม่
+        const container = document.getElementById('calibration-content');
+        if (!container) return; 
+
+        // 2. >>> โหลดข้อมูลจากฐานข้อมูลถาวรในเครื่อง (IndexedDB) ก่อน เพื่อความรวดเร็วทันที <<<
+        try {
+            const storedData = await localDB.calibrationMaster.toArray();
+            if (storedData && storedData.length > 0) {
+                // อัปเดตรายการและล้างประวัติปี 2013 หรือปีก่อนหน้าออก ให้เหลือเฉพาะ 2025 และ 2026
+                storedData.forEach(item => {
+                    if (item.last_cal && item.last_cal.includes('-08-10')) { 
+                        item.last_cal = '2026-08-20'; 
+                        item.next_due = '2027-08-20'; 
+                        item.month = 'August';
+                    }
+                    if (item.calibration_logs) {
+                        if (typeof item.calibration_logs === 'string') {
+                            try { item.calibration_logs = JSON.parse(item.calibration_logs); } catch(e) { item.calibration_logs = []; }
+                        }
+                        if (Array.isArray(item.calibration_logs)) {
+                            item.calibration_logs = item.calibration_logs.filter(log => {
+                                if (!log || !log.date) return false;
+                                const yr = parseInt(String(log.date).split('-')[0], 10);
+                                return yr === 2025 || yr === 2026;
+                            });
+                        }
+                    }
+                });
+                _data = storedData; // นำข้อมูลที่จำไว้มาใส่ในตัวแปรหลัก
+                try {
+                    await localDB.calibrationMaster.bulkPut(storedData);
+                } catch(e) {}
+                console.log("[Calibration] Local data loaded:", _data.length);
+            }
+        } catch (err) {
+            console.error("[Calibration] Database error:", err);
+        }
+
+        // กรองประวัติใน _data ให้เหลือเฉพาะปี 2025 และ 2026 เสมอ
+        (_data || []).forEach(item => {
+            if (item && item.calibration_logs) {
+                if (typeof item.calibration_logs === 'string') {
+                    try { item.calibration_logs = JSON.parse(item.calibration_logs); } catch(e) { item.calibration_logs = []; }
+                }
+                if (Array.isArray(item.calibration_logs)) {
+                    item.calibration_logs = item.calibration_logs.filter(log => {
+                        if (!log || !log.date) return false;
+                        const yr = parseInt(String(log.date).split('-')[0], 10);
+                        return yr === 2025 || yr === 2026;
+                    });
+                }
+            }
+        });
+
+        // เชื่อมโยงรูปภาพอัตโนมัติจาก assetsinstruments/ (เหมือน STAFF_EMAIL_MAP)
+        _data.forEach(item => {
+            if (!item.imageUrl || item.imageUrl.trim() === "" || item.imageUrl.startsWith("assetsinstruments/") || item.imageUrl.startsWith("./assetsinstruments/")) {
+                const autoImg = getInstrumentImageUrl(item);
+                if (autoImg) item.imageUrl = autoImg;
+            }
+        });
+
+        // 3. โหลดรายชื่อแผนกเข้า Filter (ถ้ามี Select)
+        const depts = [...new Set((_data || []).map(item => item && item.dept).filter(Boolean))];
+        const selectDept = document.getElementById('cal-filter-dept');
+        if (selectDept && selectDept.options.length <= 1) {
+            depts.forEach(d => {
+                if (d && d !== '-') selectDept.add(new Option(d, d));
+            });
+        }
+
+        // 4. ผูก Event การค้นหา (ทำครั้งเดียว)
+        const searchInput = document.getElementById('cal-search');
+        if (searchInput && !searchInput.dataset.listener) {
+            searchInput.addEventListener('input', render);
+            searchInput.dataset.listener = "true";
+        }
+
+        // 5. วาดตารางแสดงผล
+        render();
+        updateOverdueBadge();
+
+        // 6. >>> โหลดและเชื่อมต่อ Real-time จาก Supabase Cloud Database (Online Full-Stack) <<<
+        try {
+            loadFromCloud();
+            initRealtime();
+        } catch(cloudErr) {
+            console.warn("[Calibration Cloud Connect]", cloudErr);
+        }
+    }
+
+function render() {
+        const tbody = document.getElementById('cal-table-body');
+        const container = tbody.closest('.overflow-auto'); // หาตัวครอบที่ทำหน้าที่ scroll
+        const searchInput = document.getElementById('cal-search');
+        const deptSelect = document.getElementById('cal-filter-dept');
+        const statusSelect = document.getElementById('cal-filter-status');
+        const countBadge = document.getElementById('cal-count-badge');
+
+        if (!tbody || !container) return;
+
+        const query = searchInput.value.toLowerCase().trim();
+        const dept = deptSelect.value;
+        const status = statusSelect.value;
+
+        // ระบบกรองข้อมูล พร้อมคำนวณสถานะอัจฉริยะ (Expired, Due Soon, Calibrated)
+        const today = new Date();
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+        const filtered = _data.filter(item => {
+            const nextDue = item.next_due && item.next_due !== '-' ? new Date(item.next_due) : null;
+            let diffDays = 999;
+            if (nextDue && !isNaN(nextDue.getTime())) {
+                const dueZero = new Date(nextDue.getFullYear(), nextDue.getMonth(), nextDue.getDate()).getTime();
+                diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+            }
+            
+            let itemStatusKey = 'CALIBRATED';
+            if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+                itemStatusKey = 'IN_CALIBRATION';
+            } else if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+                itemStatusKey = 'EXPIRED';
+            } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+                itemStatusKey = 'DUE_SOON';
+            } else {
+                itemStatusKey = 'CALIBRATED';
+            }
+
+            const picVal = extractResponsiblePerson(item);
+            const searchableText = `${item.id} ${item.name} ${item.maker} ${item.model} ${item.code_no} ${item.serial} ${item.dept} ${item.sub_section} ${picVal} ${item.month} ${itemStatusKey} ส่งแคล ส่งแคลอยู่ in calibration`.toLowerCase();
+            const matchSearch = searchableText.includes(query);
+            const matchDept = dept === 'ALL' || item.dept === dept;
+            const matchStatus = status === 'ALL' || 
+                                (status === 'IN_CALIBRATION' && itemStatusKey === 'IN_CALIBRATION') ||
+                                (status === 'EXPIRED' && itemStatusKey === 'EXPIRED') ||
+                                (status === 'DUE_SOON' && itemStatusKey === 'DUE_SOON') ||
+                                ((status === 'CALIBRATED' || status === 'NORMAL') && itemStatusKey === 'CALIBRATED');
+            return matchSearch && matchDept && matchStatus;
+        });
+
+        _currentFiltered = filtered;
+        if (countBadge) countBadge.textContent = `${filtered.length} / ${_data.length} รายการ`;
+
+        // อัปเดตกระดิ่งแจ้งเตือน Overdue
+        updateOverdueBadge();
+
+        // อัปเดต Bulk Action Toolbar และ Checkbox สถานะ
+        updateBulkBarUI(filtered);
+
+        // สร้าง VirtualTableScroller 12 คอลัมน์
+        if (!_calScroller) {
+            _calScroller = new window.VirtualTableScroller({
+                containerId: container,
+                tbodyId: tbody,
+                rowHeight: 62,
+                columnsCount: 12,
+                rowBuilder: _buildRow,
+                emptyHtml: `<tr><td colspan="12" style="text-align:center;padding:40px;color:#94a3b8;font-weight:700;">ไม่พบข้อมูลเครื่องมือ</td></tr>`
+            });
+        }
+
+        // สั่งวาดตาราง (ใช้ .setItems เพื่อประมวลผล Virtual Scroll)
+        _calScroller.setItems(filtered, true); 
+
+        // สั่งวาดปฏิทินรายเดือน (ถ้าเปิดแท็บ Monthly View อยู่ หรืออัปเดตข้อมูล)
+        renderCalendar();
+    }
+
+    // ============================================================
+    // MONTHLY CALENDAR VIEW LOGIC & INTERACTION HANDLERS
+    // ============================================================
+    const CALENDAR_MONTHS = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
+    function setViewMode(mode) {
+        _viewMode = (mode === 'CALENDAR') ? 'CALENDAR' : 'TABLE';
+        const tableBtn = document.getElementById('cal-view-btn-table');
+        const monthBtn = document.getElementById('cal-view-btn-month');
+        const tableArea = document.getElementById('cal-table-area');
+        const calArea = document.getElementById('cal-calendar-area');
+        const bulkBar = document.getElementById('cal-bulk-bar');
+
+        if (_viewMode === 'CALENDAR') {
+            if (tableBtn) {
+                tableBtn.className = "h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer";
+            }
+            if (monthBtn) {
+                monthBtn.className = "h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs cursor-pointer";
+            }
+            if (tableArea) tableArea.classList.add('hidden');
+            if (calArea) calArea.classList.remove('hidden');
+            if (bulkBar) bulkBar.classList.add('hidden');
+            renderCalendar();
+        } else {
+            if (tableBtn) {
+                tableBtn.className = "h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs cursor-pointer";
+            }
+            if (monthBtn) {
+                monthBtn.className = "h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer";
+            }
+            if (calArea) calArea.classList.add('hidden');
+            if (tableArea) tableArea.classList.remove('hidden');
+            updateBulkBarUI(_currentFiltered);
+            if (_calScroller) {
+                if (typeof _calScroller.refresh === 'function') {
+                    _calScroller.refresh();
+                } else if (typeof _calScroller.render === 'function') {
+                    _calScroller.render();
+                }
+            }
+        }
+    }
+
+    function changeCalendarMonth(delta) {
+        _calendarMonth += delta;
+        if (_calendarMonth < 0) {
+            _calendarMonth = 11;
+            _calendarYear -= 1;
+        } else if (_calendarMonth > 11) {
+            _calendarMonth = 0;
+            _calendarYear += 1;
+        }
+        _selectedCalendarDate = null;
+        renderCalendar();
+    }
+
+    function goToCurrentMonth() {
+        const now = new Date();
+        _calendarYear = now.getFullYear();
+        _calendarMonth = now.getMonth();
+        _selectedCalendarDate = `${_calendarYear}-${String(_calendarMonth + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        renderCalendar();
+    }
+
+    function jumpCalendarMonth(val) {
+        if (!val) return;
+        const parts = val.split('-');
+        if (parts.length === 2) {
+            _calendarYear = parseInt(parts[0], 10);
+            _calendarMonth = parseInt(parts[1], 10) - 1;
+            _selectedCalendarDate = null;
+            renderCalendar();
+        }
+    }
+
+    function selectCalendarDate(dateStr) {
+        _selectedCalendarDate = (_selectedCalendarDate === dateStr) ? null : dateStr;
+        renderCalendar();
+    }
+
+    function renderCalendar() {
+        const gridContainer = document.getElementById('cal-grid-cells');
+        const monthTitle = document.getElementById('cal-month-title');
+        const jumpSelect = document.getElementById('cal-month-jump-select');
+        const agendaList = document.getElementById('cal-agenda-list');
+        const agendaTitle = document.getElementById('cal-agenda-title');
+        const agendaCount = document.getElementById('cal-agenda-count');
+
+        const kpiTotal = document.getElementById('cal-month-kpi-total');
+        const kpiCalibrated = document.getElementById('cal-month-kpi-calibrated');
+        const kpiDueSoon = document.getElementById('cal-month-kpi-duesoon');
+        const kpiOverdue = document.getElementById('cal-month-kpi-overdue');
+
+        if (!gridContainer) return;
+
+        const currentMonthName = CALENDAR_MONTHS[_calendarMonth];
+        if (monthTitle) {
+            monthTitle.textContent = `${currentMonthName} ${_calendarYear}`;
+        }
+
+        // 1. Populate Jump Select Dropdown
+        if (jumpSelect) {
+            jumpSelect.innerHTML = '';
+            const curY = new Date().getFullYear();
+            for (let y = curY - 2; y <= curY + 2; y++) {
+                for (let m = 0; m < 12; m++) {
+                    const optVal = `${y}-${String(m + 1).padStart(2, '0')}`;
+                    const optText = `${CALENDAR_MONTHS[m].substring(0, 3)} ${y}`;
+                    const opt = new Option(optText, optVal);
+                    if (y === _calendarYear && m === _calendarMonth) {
+                        opt.selected = true;
+                    }
+                    jumpSelect.add(opt);
+                }
+            }
+        }
+
+        // 2. Filter data for the active view
+        const dataList = _currentFiltered || _data || [];
+        const today = new Date();
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        // Map items by date: "YYYY-MM-DD" -> array of items
+        const dateMap = new Map();
+        let monthTotal = 0;
+        let monthCalibrated = 0;
+        let monthDueSoon = 0;
+        let monthOverdue = 0;
+
+        const monthTargetPrefix = `${_calendarYear}-${String(_calendarMonth + 1).padStart(2, '0')}`;
+
+        dataList.forEach(item => {
+            if (!item) return;
+            let dueStr = item.next_due;
+            if (!dueStr || dueStr === '-') {
+                // Fallback using month field if available
+                if (item.month && item.month.toLowerCase() === currentMonthName.toLowerCase()) {
+                    dueStr = `${_calendarYear}-${String(_calendarMonth + 1).padStart(2, '0')}-15`;
+                }
+            }
+
+            if (dueStr && dueStr.length >= 10) {
+                const cleanDateStr = dueStr.substring(0, 10);
+                if (!dateMap.has(cleanDateStr)) {
+                    dateMap.set(cleanDateStr, []);
+                }
+                dateMap.get(cleanDateStr).push(item);
+
+                // Check if belongs to active month for KPI
+                if (cleanDateStr.startsWith(monthTargetPrefix)) {
+                    monthTotal++;
+                    const nextDueDate = new Date(cleanDateStr);
+                    let diffDays = 999;
+                    if (!isNaN(nextDueDate.getTime())) {
+                        const dueZero = new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate()).getTime();
+                        diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+                    }
+                    if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+                        monthOverdue++;
+                    } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+                        monthDueSoon++;
+                    } else {
+                        monthCalibrated++;
+                    }
+                }
+            }
+        });
+
+        // Update KPIs
+        if (kpiTotal) kpiTotal.textContent = monthTotal;
+        if (kpiCalibrated) kpiCalibrated.textContent = monthCalibrated;
+        if (kpiDueSoon) kpiDueSoon.textContent = monthDueSoon;
+        if (kpiOverdue) kpiOverdue.textContent = monthOverdue;
+
+        // 3. Construct 35 or 42 grid cells (Monday-based)
+        const firstDayOfMonth = new Date(_calendarYear, _calendarMonth, 1);
+        let startDay = firstDayOfMonth.getDay(); // 0 is Sun, 1 is Mon
+        startDay = (startDay === 0) ? 6 : startDay - 1; // shift so Mon=0, Sun=6
+
+        const daysInMonth = new Date(_calendarYear, _calendarMonth + 1, 0).getDate();
+        const daysInPrevMonth = new Date(_calendarYear, _calendarMonth, 0).getDate();
+
+        const totalSlots = (startDay + daysInMonth > 35) ? 42 : 35;
+        let gridHtml = '';
+
+        for (let i = 0; i < totalSlots; i++) {
+            let cellYear = _calendarYear;
+            let cellMonth = _calendarMonth;
+            let cellDay = 1;
+            let isOtherMonth = false;
+
+            if (i < startDay) {
+                // Previous month day
+                cellDay = daysInPrevMonth - startDay + i + 1;
+                cellMonth = _calendarMonth - 1;
+                if (cellMonth < 0) {
+                    cellMonth = 11;
+                    cellYear -= 1;
+                }
+                isOtherMonth = true;
+            } else if (i >= startDay + daysInMonth) {
+                // Next month day
+                cellDay = i - (startDay + daysInMonth) + 1;
+                cellMonth = _calendarMonth + 1;
+                if (cellMonth > 11) {
+                    cellMonth = 0;
+                    cellYear += 1;
+                }
+                isOtherMonth = true;
+            } else {
+                // Current month day
+                cellDay = i - startDay + 1;
+            }
+
+            const cellDateStr = `${cellYear}-${String(cellMonth + 1).padStart(2, '0')}-${String(cellDay).padStart(2, '0')}`;
+            const isToday = (cellDateStr === todayStr);
+            const isSelected = (_selectedCalendarDate === cellDateStr);
+            const dayItems = dateMap.get(cellDateStr) || [];
+
+            let cellClass = "cal-day-cell cursor-pointer group select-none";
+            if (isOtherMonth) cellClass += " other-month";
+            if (isToday) cellClass += " is-today";
+            if (isSelected) cellClass += " is-selected";
+
+            // Day Number + Count badge
+            let headerBadge = '';
+            if (isToday) {
+                headerBadge = `<span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-black shadow-xs">${cellDay}</span>`;
+            } else if (isSelected) {
+                headerBadge = `<span class="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-xs">${cellDay}</span>`;
+            } else {
+                headerBadge = `<span class="text-[11px] font-black text-slate-600 dark:text-slate-300 group-hover:text-blue-600">${cellDay}</span>`;
+            }
+
+            let taskCountBadge = '';
+            if (dayItems.length > 0) {
+                taskCountBadge = `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-mono">${dayItems.length}</span>`;
+            }
+
+            // Task chips (max 3)
+            let taskChipsHtml = '';
+            const visibleItems = dayItems.slice(0, 3);
+            visibleItems.forEach(item => {
+                const nextDueDate = item.next_due ? new Date(item.next_due) : null;
+                let diffDays = 999;
+                if (nextDueDate && !isNaN(nextDueDate.getTime())) {
+                    const dueZero = new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate()).getTime();
+                    diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+                }
+
+                let stColor = '#10b981'; // Green
+                let chipBg = 'rgba(16, 185, 129, 0.08)';
+                let chipText = '#047857';
+                let darkChipText = '#34d399';
+
+                if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+                    stColor = '#f97316'; // Orange
+                    chipBg = 'rgba(249, 115, 22, 0.1)';
+                    chipText = '#c2410c';
+                    darkChipText = '#fb923c';
+                } else if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+                    stColor = '#ef4444'; // Red
+                    chipBg = 'rgba(239, 68, 68, 0.1)';
+                    chipText = '#b91c1c';
+                    darkChipText = '#f87171';
+                } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+                    stColor = '#f59e0b'; // Amber
+                    chipBg = 'rgba(245, 158, 11, 0.1)';
+                    chipText = '#b45309';
+                    darkChipText = '#fbbf24';
+                }
+
+                const displayName = item.code_no || item.id;
+                taskChipsHtml += `
+                    <div onclick="event.stopPropagation(); WapCalibrationSystem.openMetrologyViewer('${item.id}')" 
+                         class="cal-task-chip flex items-center justify-between gap-1 shadow-2xs font-black border-l-2 bg-slate-50 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 hover:bg-blue-50 dark:hover:bg-slate-700" 
+                         style="border-left-color: ${stColor};" 
+                         title="${item.code_no || ''} - ${item.name || ''} (${item.dept || '-'})">
+                        <div class="flex items-center gap-1 min-w-0">
+                            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${stColor};"></span>
+                            <span class="truncate text-[9.5px]">${displayName}</span>
+                        </div>
+                        <span class="text-[8px] opacity-60 shrink-0 font-bold uppercase">${item.dept || ''}</span>
+                    </div>
+                `;
+            });
+
+            if (dayItems.length > 3) {
+                const moreCount = dayItems.length - 3;
+                taskChipsHtml += `
+                    <button type="button" onclick="event.stopPropagation(); WapCalibrationSystem.openDayTasksModal('${cellDateStr}')" 
+                            class="w-full text-center py-0.5 text-[9px] font-black text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded transition-colors cursor-pointer">
+                        +${moreCount} more instruments
+                    </button>
+                `;
+            }
+
+            gridHtml += `
+                <div class="${cellClass}" onclick="WapCalibrationSystem.selectCalendarDate('${cellDateStr}')">
+                    <div class="flex items-center justify-between mb-1">
+                        ${headerBadge}
+                        ${taskCountBadge}
+                    </div>
+                    <div class="space-y-1 flex-1 overflow-hidden">
+                        ${taskChipsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        gridContainer.innerHTML = gridHtml;
+
+        // 4. Populate Agenda Sidebar on the right
+        if (agendaList) {
+            let agendaItems = [];
+            let agendaHeaderLabel = "";
+
+            if (_selectedCalendarDate) {
+                agendaItems = dateMap.get(_selectedCalendarDate) || [];
+                agendaHeaderLabel = `Tasks on ${_selectedCalendarDate}`;
+            } else {
+                // All tasks in active month
+                dataList.forEach(item => {
+                    if (!item) return;
+                    let dueStr = item.next_due;
+                    if (!dueStr || dueStr === '-') {
+                        if (item.month && item.month.toLowerCase() === currentMonthName.toLowerCase()) {
+                            dueStr = `${_calendarYear}-${String(_calendarMonth + 1).padStart(2, '0')}-15`;
+                        }
+                    }
+                    if (dueStr && dueStr.startsWith(monthTargetPrefix)) {
+                        agendaItems.push(item);
+                    }
+                });
+                // Sort chronologically
+                agendaItems.sort((a, b) => {
+                    const da = a.next_due || '9999';
+                    const db = b.next_due || '9999';
+                    return da.localeCompare(db);
+                });
+                agendaHeaderLabel = `Tasks in ${currentMonthName} ${_calendarYear}`;
+            }
+
+            if (agendaTitle) agendaTitle.textContent = agendaHeaderLabel;
+            if (agendaCount) agendaCount.textContent = `${agendaItems.length} TASKS`;
+
+            if (agendaItems.length === 0) {
+                agendaList.innerHTML = `
+                    <div class="py-12 px-4 text-center">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 mx-auto flex items-center justify-center mb-3">
+                            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        </div>
+                        <p class="text-xs font-black text-slate-700 dark:text-slate-300 mb-1">No calibration tasks scheduled</p>
+                        <p class="text-[11px] text-slate-400 font-medium">Click on any date in the calendar or change filters to inspect other instruments.</p>
+                    </div>
+                `;
+            } else {
+                let listHtml = '';
+                agendaItems.forEach(item => {
+                    const imgUrl = getInstrumentImageUrl(item);
+                    const picVal = extractResponsiblePerson(item);
+                    const nextDueDate = item.next_due ? new Date(item.next_due) : null;
+                    let diffDays = 999;
+                    if (nextDueDate && !isNaN(nextDueDate.getTime())) {
+                        const dueZero = new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate()).getTime();
+                        diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+                    }
+
+                    const isInCal = item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL';
+                    let stBadge = '';
+                    let borderClass = 'border-emerald-200 dark:border-emerald-800/60';
+                    let calBtnHtml = '';
+
+                    if (isInCal) {
+                        stBadge = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 font-mono">🚚 IN CALIBRATION (ส่งแคลอยู่)</span>`;
+                        borderClass = 'border-orange-300 dark:border-orange-800/80';
+                        calBtnHtml = `
+                            <button type="button" onclick="WapCalibrationSystem.showInCalAlert('${item.id}')" 
+                                    class="flex-1 h-7 px-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg text-[10px] font-black flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer" 
+                                    title="เครื่องมือกำลังอยู่ระหว่างส่งสอบเทียบ (คลิกเพื่อดูคำแนะนำ)">
+                                <span>🚚 ส่งแคลอยู่</span>
+                            </button>
+                        `;
+                    } else if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+                        stBadge = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-mono">🚨 EXPIRED (${Math.abs(diffDays)}d ago)</span>`;
+                        borderClass = 'border-rose-300 dark:border-rose-800/80';
+                        calBtnHtml = `
+                            <button type="button" onclick="WapCalibrationSystem.sendForCalibration('${item.id}')" 
+                                    class="flex-1 h-7 px-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black flex items-center justify-center gap-1 transition-colors shadow-xs cursor-pointer animate-pulse" 
+                                    title="ถึงกำหนดส่งสอบเทียบ - คลิกเพื่อส่งแคล (เปลี่ยนสถานะเป็นส่งแคลอยู่)">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span>Calibrate</span>
+                            </button>
+                        `;
+                    } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+                        stBadge = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-mono">⏳ DUE IN ${diffDays} DAYS</span>`;
+                        borderClass = 'border-amber-300 dark:border-amber-800/80';
+                        calBtnHtml = `
+                            <button type="button" onclick="WapCalibrationSystem.sendForCalibration('${item.id}')" 
+                                    class="flex-1 h-7 px-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black flex items-center justify-center gap-1 transition-colors shadow-xs cursor-pointer" 
+                                    title="ถึงกำหนดส่งสอบเทียบ - คลิกเพื่อส่งแคล (เปลี่ยนสถานะเป็นส่งแคลอยู่)">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span>Calibrate</span>
+                            </button>
+                        `;
+                    } else {
+                        stBadge = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-mono">✅ NORMAL / CALIBRATED</span>`;
+                        borderClass = 'border-emerald-200 dark:border-emerald-800/60';
+                        calBtnHtml = `
+                            <button type="button" onclick="WapCalibrationSystem.showNotDueAlert('${item.id}')" 
+                                    class="flex-1 h-7 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors cursor-not-allowed opacity-60" 
+                                    title="ยังไม่ถึงกำหนดส่งสอบเทียบ (ครบกำหนด: ${item.next_due || '-'})">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span>Calibrate</span>
+                            </button>
+                        `;
+                    }
+
+                    listHtml += `
+                        <div class="bg-white dark:bg-slate-800 p-3 rounded-2xl border ${borderClass} shadow-xs hover:shadow-md transition-all">
+                            <div class="flex items-start gap-2.5">
+                                <div onclick="WapCalibrationSystem.openMetrologyViewer('${item.id}')" 
+                                     class="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0 cursor-pointer group" 
+                                     title="Click to view full Metrology document">
+                                    ${imgUrl ? `<img src="${formatImageUrl(imgUrl)}" class="w-full h-full object-contain p-0.5 group-hover:scale-110 transition-transform">` : `<span class="text-slate-400 font-black text-[10px]">NO IMG</span>`}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center justify-between gap-1 mb-0.5">
+                                        <span class="text-xs font-black text-blue-600 dark:text-blue-400 tracking-tight truncate">${item.code_no || item.id}</span>
+                                        ${stBadge}
+                                    </div>
+                                    <h5 class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">${item.name || 'INSTRUMENT'}</h5>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">${item.maker || '-'} &bull; ${item.model || '-'}</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">${item.dept || '-'}</span>
+                                    <span class="text-slate-400">&bull;</span>
+                                    <span class="truncate max-w-[90px]">${picVal}</span>
+                                </div>
+                                <div class="font-mono font-black text-slate-700 dark:text-slate-200">
+                                    Due: ${item.next_due || '-'}
+                                </div>
+                            </div>
+
+                            <!-- Action buttons -->
+                            <div class="mt-2.5 flex items-center gap-1.5">
+                                <button type="button" onclick="WapCalibrationSystem.openMetrologyViewer('${item.id}')" 
+                                        class="flex-1 h-7 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-black flex items-center justify-center gap-1 transition-colors cursor-pointer" 
+                                        title="View Metrology Evidence Document">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    <span>Viewer</span>
+                                </button>
+                                ${calBtnHtml}
+                                <button type="button" onclick="WapCalibrationSystem.displayCalibrationHistory('${item.id}')" 
+                                        class="w-7 h-7 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 text-purple-600 dark:text-purple-300 rounded-lg flex items-center justify-center transition-colors cursor-pointer" 
+                                        title="Calibration History">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+                                </button>
+                                <button type="button" onclick="WapCalibrationSystem.openEditModal('${item.id}')" 
+                                        class="w-7 h-7 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-300 rounded-lg flex items-center justify-center transition-colors cursor-pointer" 
+                                        title="Edit Instrument">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                agendaList.innerHTML = listHtml;
+            }
+        }
+    }
+
+    // Modal popup to inspect all instruments due on a given day
+    function openDayTasksModal(dateStr) {
+        const existing = document.getElementById('cal-day-modal-overlay');
+        if (existing) existing.remove();
+
+        const dataList = _currentFiltered || _data || [];
+        const dayItems = dataList.filter(item => item && item.next_due && item.next_due.startsWith(dateStr));
+
+        const overlay = document.createElement('div');
+        overlay.id = 'cal-day-modal-overlay';
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 20000;
+            background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(12px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px; transition: all 0.3s ease;
+        `;
+
+        const modal = document.createElement('div');
+        modal.className = "w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]";
+
+        let itemsHtml = '';
+        if (dayItems.length === 0) {
+            itemsHtml = `<div class="p-8 text-center text-slate-400 font-bold">No instruments found for ${dateStr}</div>`;
+        } else {
+            dayItems.forEach(item => {
+                const img = getInstrumentImageUrl(item);
+                const nextDueDate = item.next_due ? new Date(item.next_due) : null;
+                let diffDays = 999;
+                if (nextDueDate && !isNaN(nextDueDate.getTime())) {
+                    const todayZero = new Date().setHours(0,0,0,0);
+                    const dueZero = new Date(nextDueDate).setHours(0,0,0,0);
+                    diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+                }
+                const isInCal = item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL';
+                const isDue = (diffDays <= 30 || item.status === 'EXPIRED' || item.status === 'OVERDUE' || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') && !isInCal;
+
+                let calBtn = '';
+                if (isInCal) {
+                    calBtn = `<button type="button" onclick="document.getElementById('cal-day-modal-overlay')?.remove(); WapCalibrationSystem.showInCalAlert('${item.id}')" class="h-8 px-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-[10px] font-black flex items-center gap-1 transition-colors cursor-pointer shadow-xs"><span>🚚 ส่งแคลอยู่</span></button>`;
+                } else if (isDue) {
+                    calBtn = `<button type="button" onclick="document.getElementById('cal-day-modal-overlay')?.remove(); WapCalibrationSystem.sendForCalibration('${item.id}')" class="h-8 px-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black flex items-center gap-1 transition-colors cursor-pointer shadow-xs"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><span>Calibrate</span></button>`;
+                } else {
+                    calBtn = `<button type="button" onclick="WapCalibrationSystem.showNotDueAlert('${item.id}')" class="h-8 px-2.5 bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-colors cursor-not-allowed opacity-60"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span>Calibrate</span></button>`;
+                }
+
+                itemsHtml += `
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
+                                ${img ? `<img src="${formatImageUrl(img)}" class="w-full h-full object-contain">` : `<span class="text-[9px] font-black text-slate-400">NO IMG</span>`}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-black text-blue-600 dark:text-blue-400">${item.code_no || item.id}</span>
+                                    <span class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[9px] font-black uppercase">${item.dept || '-'}</span>
+                                </div>
+                                <h6 class="text-xs font-bold text-slate-800 dark:text-white truncate">${item.name || ''}</h6>
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400">${item.maker || '-'} &bull; ${item.model || '-'}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button type="button" onclick="document.getElementById('cal-day-modal-overlay').remove(); WapCalibrationSystem.openMetrologyViewer('${item.id}')" class="h-8 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-[10px] font-black flex items-center gap-1 transition-colors cursor-pointer">
+                                <span>Viewer</span>
+                            </button>
+                            ${calBtn}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        modal.innerHTML = `
+            <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm">📅</div>
+                    <div>
+                        <h3 class="text-sm font-black text-slate-800 dark:text-white uppercase">Calibrations Due on ${dateStr}</h3>
+                        <p class="text-[10.5px] text-slate-500 dark:text-slate-400 font-bold">${dayItems.length} Instruments Scheduled</p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('cal-day-modal-overlay').remove()" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-black hover:bg-rose-500 hover:text-white transition-colors cursor-pointer">✕</button>
+            </div>
+            <div class="p-4 overflow-auto flex-1 space-y-2.5 scroll-custom">
+                ${itemsHtml}
+            </div>
+            <div class="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-end">
+                <button type="button" onclick="document.getElementById('cal-day-modal-overlay').remove()" class="h-9 px-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer">
+                    Close
+                </button>
+            </div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+    }
+
+    // Quick Mark Calibrated Action
+    async function quickMarkCalibrated(id) {
+        const item = _data.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        const now = new Date();
+        const calDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        
+        // Calculate new Next Due based on frequency
+        let freqMonths = 12;
+        if (item.frequency) {
+            const num = parseInt(item.frequency, 10);
+            if (!isNaN(num) && num > 0) freqMonths = num;
+        }
+
+        const nextDate = new Date(now.getFullYear(), now.getMonth() + freqMonths, now.getDate());
+        const nextDueStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
+        const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const nextMonthName = monthsList[nextDate.getMonth()];
+
+        item.last_cal = calDateStr;
+        item.next_due = nextDueStr;
+        item.month = nextMonthName;
+        item.status = 'NORMAL';
+
+        // Add to history logs
+        const logEntry = {
+            id: 'LOG-' + Date.now(),
+            date: calDateStr,
+            cert_no: 'CERT-' + calDateStr.replace(/-/g, '') + '-' + (item.code_no || item.id).replace(/[^A-Za-z0-9]/g, '').substring(0, 6),
+            lab: 'Internal QA/QC Metrology Lab',
+            result: 'PASS',
+            deviation: '0.000',
+            next_due: nextDueStr,
+            technician: (window.currentUser && window.currentUser.name) || item.pic || 'QA Inspector',
+            notes: 'Calibrated via Monthly Calibration System'
+        };
+
+        if (!item.history_logs) item.history_logs = [];
+        item.history_logs.unshift(logEntry);
+
+        try {
+            if (window.localDB && window.localDB.calibrationMaster) {
+                await window.localDB.calibrationMaster.put(item);
+            }
+        } catch(e) {
+            console.warn("DB save error", e);
+        }
+
+        try {
+            if (typeof syncToCloud === 'function') {
+                syncToCloud([item]);
+            }
+        } catch(e) {}
+
+        render();
+        if (typeof toast === 'function') {
+            toast(`✅ บันทึกการสอบเทียบ ${item.code_no || item.id} เรียบร้อย (รอบถัดไป: ${nextDueStr})`, "success");
+        }
+    }
+
+    // Action: ส่งเครื่องมือไปสอบเทียบ (Send for Calibration)
+    async function sendForCalibration(id) {
+        const item = _data.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        const nextDueDate = item.next_due ? new Date(item.next_due) : null;
+        let diffDays = 999;
+        if (nextDueDate && !isNaN(nextDueDate.getTime())) {
+            const todayZero = new Date().setHours(0,0,0,0);
+            const dueZero = new Date(nextDueDate).setHours(0,0,0,0);
+            diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+        }
+
+        const isDue = (diffDays <= 30 || item.status === 'EXPIRED' || item.status === 'OVERDUE' || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE');
+
+        if (!isDue) {
+            showNotDueAlert(id);
+            return;
+        }
+
+        if (typeof showCustomConfirmDialog === 'function') {
+            showCustomConfirmDialog({
+                title: "🚚 ยืนยันการส่งสอบเทียบ (Send for Calibration)",
+                message: `คุณต้องการเปลี่ยนสถานะเครื่องมือ <b>${item.code_no || item.id} - ${item.name || ''}</b> เป็น <b>"ส่งแคลอยู่ (IN CALIBRATION)"</b> ใช่หรือไม่?<br><br><span class="text-xs text-slate-500 font-normal">สถานะจะเปลี่ยนเป็นสอบเทียบแล้ว (CALIBRATED) ก็ต่อเมื่อได้รับเครื่องมือกลับมาและนำผล/วันที่สอบล่าสุด (Last Calibrated) มากรอกใส่แล้วบันทึก</span>`,
+                icon: "🚚",
+                confirmText: "ยืนยันส่งแคล",
+                cancelText: "ยกเลิก",
+                confirmColor: "from-amber-500 to-orange-600",
+                onConfirm: async () => {
+                    await executeSendForCalibration(item);
+                }
+            });
+        } else {
+            await executeSendForCalibration(item);
+        }
+    }
+
+    async function executeSendForCalibration(item) {
+        const now = new Date();
+        const sendDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        
+        item.status = 'IN_CALIBRATION';
+        item.sent_for_cal_date = sendDateStr;
+
+        // Log entry note
+        const logEntry = {
+            id: 'LOG-SEND-' + Date.now(),
+            date: sendDateStr,
+            cert_no: 'PENDING-CALIBRATION',
+            lab: 'Vendor / Metrology Calibration Lab',
+            result: 'IN_PROGRESS',
+            deviation: '-',
+            next_due: item.next_due || '-',
+            technician: (window.currentUser && window.currentUser.name) || item.pic || 'QA Inspector',
+            notes: 'ส่งเครื่องมือออกไปสอบเทียบ (Out for calibration)'
+        };
+
+        if (!item.history_logs) item.history_logs = [];
+        item.history_logs.unshift(logEntry);
+
+        try {
+            if (window.localDB && window.localDB.calibrationMaster) {
+                await window.localDB.calibrationMaster.put(item);
+            }
+        } catch(e) {
+            console.warn("DB save error", e);
+        }
+
+        try {
+            if (typeof syncToCloud === 'function') {
+                syncToCloud([item]);
+            }
+        } catch(e) {}
+
+        render();
+        if (typeof toast === 'function') {
+            toast(`🚚 เปลี่ยนสถานะ ${item.code_no || item.id} เป็น "ส่งแคลอยู่" เรียบร้อยแล้ว`, "warning");
+        }
+    }
+
+    function showNotDueAlert(id) {
+        const item = _data.find(x => String(x.id) === String(id));
+        const dueText = item ? (item.next_due || item.month || 'ตามรอบกำหนด') : '-';
+        if (typeof toast === 'function') {
+            toast(`⏳ เครื่องมือ ${item ? (item.code_no || item.id) : ''} ยังไม่ถึงกำหนดส่งสอบเทียบ (ครบกำหนด: ${dueText}) สามารถกดส่งแคลได้เมื่อถึงดิวเท่านั้น`, "info");
+        }
+    }
+
+    function showInCalAlert(id) {
+        const item = _data.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        if (typeof showCustomConfirmDialog === 'function') {
+            showCustomConfirmDialog({
+                title: "เครื่องมือกำลังอยู่ระหว่างส่งสอบเทียบ 🚚",
+                message: `เครื่องมือ <b>${item.code_no || item.id} - ${item.name || ''}</b> อยู่ในสถานะ <b>"ส่งแคลอยู่ (IN CALIBRATION)"</b><br><br>เมื่อได้รับเครื่องมือกลับมาแล้ว ให้กด <b>"เปิดแก้ไขเพื่อกรอกผลสอบ"</b> เพื่อใส่เลขวันที่ Last Calibrated และบันทึก จะเป็นการเปลี่ยนสถานะกลับเป็นปกติ`,
+                icon: "🚚",
+                confirmText: "เปิดแก้ไขเพื่อกรอกผลสอบ",
+                cancelText: "ปิด",
+                confirmColor: "from-blue-600 to-indigo-600",
+                onConfirm: () => {
+                    openEditModal(item.id);
+                }
+            });
+        } else {
+            openEditModal(item.id);
+        }
+    }
+
+    function resetStatusFilter() {
+        const statusSelect = document.getElementById('cal-filter-status');
+        const deptSelect = document.getElementById('cal-filter-dept');
+        const searchInput = document.getElementById('cal-search');
+
+        if (statusSelect) statusSelect.value = 'ALL';
+        if (deptSelect) deptSelect.value = 'ALL';
+        if (searchInput) searchInput.value = '';
+
+        render();
+        toast("🔄 รีเซ็ตตัวกรองสถานะและรายการทั้งหมดเรียบร้อย", "info");
+    }
+
+
+
+// เพิ่มฟังก์ชันนี้เข้าไปในตัวแปร WapCalibrationSystem
+function triggerUpload(id) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            // 1. ค้นหาข้อมูลในอาเรย์ _data และอัปเดตรูปภาพ (base64)
+            const index = _data.findIndex(item => item.id === id);
+            if (index !== -1) {
+                _data[index].imageUrl = ev.target.result;
+                _data[index].status = 'NORMAL'; // เปลี่ยนสถานะเป็นปกติเมื่อใส่รูป (ตัวอย่าง)
+                
+                // 2. วาดตารางใหม่ทันที
+                render();
+                toast('📸 อัปเดตรูปภาพเครื่องมือเรียบร้อยแล้ว', 'success');
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+// --- เพิ่มฟังก์ชันเหล่านี้ใน WapCalibrationSystem ---
+
+// --- ส่วนการจัดการรูปภาพและฟอร์มแบบพรีเมียม ---
+
+function openAddModal() {
+    const modalId = 'cal-add-modal';
+    const existing = document.getElementById(modalId);
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal-overlay';
+    // กิมมิก: ฉากหลังแบบ Cyber-Atmosphere
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(2, 6, 23, 0.82);backdrop-filter:blur(16px);padding:12px;';
+
+    modal.innerHTML = `
+        <div style="background:#fff; border-radius:24px; width:100%; max-width:720px; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 40px 100px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.2); animation: modalPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.2);">
+            
+            <!-- Tech Header -->
+            <div style="background:linear-gradient(90deg, #0f172a 0%, #1e40af 100%); color:#fff; padding:14px 22px; display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #3b82f6; flex-shrink:0;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:38px; height:38px; background:rgba(59, 130, 246, 0.2); border:1.5px solid #60a5fa; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 0 15px rgba(59, 130, 246, 0.3); flex-shrink:0;">⚙️</div>
+                    <div style="min-width:0;">
+                        <h3 style="margin:0; font-size:15px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Calibration Command</h3>
+                        <p style="margin:0; font-size:9px; color:#93c5fd; font-weight:800; letter-spacing:0.08em; text-transform:uppercase;">UNIT MASTER DATA INTERFACE v1.0</p>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('${modalId}').remove()" style="background:rgba(239, 68, 68, 0.2); border:none; color:#f87171; width:30px; height:30px; border-radius:50%; cursor:pointer; font-weight:900; transition:0.2s; display:flex; align-items:center; justify-content:center; flex-shrink:0;" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'; this.style.color='#f87171';">✕</button>
+            </div>
+
+            <form id="cal-reg-form" style="padding:18px 22px; display:flex; flex-direction:column; gap:16px; background:#fcfdfe; overflow-y:auto; max-height:calc(92vh - 65px);">
+                
+                <!-- Section 1: IDENTITY (3-Col Responsive) -->
+                <div class="cal-grid-3">
+                    <div class="field-box">
+                        <label class="tech-label">Asset ID <span class="cap">/ รหัสทรัพย์สิน</span></label>
+                        <input type="text" id="reg-id" placeholder="CAR-CAL-000" class="tech-input" style="color:#1e40af; font-family:'DM Mono', monospace;">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label">Brand <span class="cap">/ ผู้ผลิต</span></label>
+                        <input type="text" id="reg-maker" placeholder="e.g. Mitutoyo" class="tech-input">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label">Model <span class="cap">/ รุ่น</span></label>
+                        <input type="text" id="reg-model" placeholder="Model No." class="tech-input">
+                    </div>
+                </div>
+
+                <!-- Section 2: Name -->
+                <div class="field-box">
+                    <label class="tech-label">Instrument Description <span class="cap">/ ชื่อเรียกอุปกรณ์อย่างเป็นทางการ</span></label>
+                    <input type="text" id="reg-name" placeholder="Enter full description..." class="tech-input" style="font-size:13px; height:40px;">
+                </div>
+
+                <!-- Section 3: Ownership & Responsibility (Clean 3-Col Centered) -->
+                <input type="hidden" id="reg-sub" value="">
+                <div class="cal-grid-3">
+                    <div class="field-box">
+                        <label class="tech-label">Serial No. <span class="cap">/ S/N</span></label>
+                        <input type="text" id="reg-serial" placeholder="S/N: 000000" class="tech-input">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label">Ownership <span class="cap">/ แผนก</span></label>
+                        <input type="text" id="reg-dept" placeholder="Department..." class="tech-input" list="cal-dept-datalist">
+                        <datalist id="cal-dept-datalist">
+                            <option value="QAP">
+                            <option value="SQE">
+                            <option value="Maintenance">
+                            <option value="Production">
+                            <option value="QA/QC Division">
+                        </datalist>
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label" style="color:#2563eb;">RESPONSIBLE (PIC)</label>
+                        <input type="text" id="reg-pic" placeholder="e.g. K.Nathawut" class="tech-input" list="cal-pic-datalist" style="font-weight:700; color:#1e40af; background:#f0f7ff;">
+                        <datalist id="cal-pic-datalist">
+                            <option value="K.Nathawut">
+                            <option value="K.Somchai">
+                            <option value="K.Prasert">
+                            <option value="K.Wichai">
+                            <option value="K.Anan">
+                        </datalist>
+                    </div>
+                </div>
+
+                <!-- Section 4: DIGITAL STATUS (The LCD Display) -->
+                <div class="cal-digital-panel">
+                    <div class="field-box">
+                        <label class="tech-label" style="color:#60a5fa;">Last Calibrated <span class="cap" style="color:#93c5fd;">/ สอบล่าสุด</span></label>
+                        <input type="date" id="reg-last-cal" onchange="WapCalibrationSystem.calcDue()" class="tech-input" style="background:rgba(255,255,255,0.06); border-color:#334155; color:#fff; color-scheme:dark;">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label" style="color:#60a5fa;">Cycle <span class="cap" style="color:#93c5fd;">/ รอบ (เดือน)</span></label>
+                        <select id="reg-freq" onchange="WapCalibrationSystem.calcDue()" class="tech-input" style="background:rgba(255,255,255,0.06); border-color:#334155; color:#fff;">
+                            <option value="12" style="background:#0f172a; color:#fff;">12 Months (Standard)</option>
+                            <option value="6" style="background:#0f172a; color:#fff;">6 Months</option>
+                            <option value="24" style="background:#0f172a; color:#fff;">24 Months</option>
+                        </select>
+                    </div>
+                    <div class="field-box" style="text-align:right;">
+                        <label class="tech-label" style="color:#10b981; justify-content:flex-end;">Next Due Deadline <span class="cap" style="color:#059669;">/ วันครบกำหนด</span></label>
+                        <div id="reg-next-due-display" style="background:#000; color:#10b981; border-radius:12px; height:42px; display:flex; align-items:center; justify-content:center; font-family:'DM Mono', monospace; font-size:16px; font-weight:950; border:2px solid #064e3b; text-shadow:0 0 10px #10b981; letter-spacing:1px;">
+                            ---- -- --
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: Capacity & Internal Code (2-Col Responsive) -->
+                <div class="cal-grid-2">
+                    <div class="field-box">
+                        <label class="tech-label">Capacity / Range <span class="cap">/ ย่านการวัด</span></label>
+                        <input type="text" id="reg-size" placeholder="e.g. 0 - 150 mm" class="tech-input">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label">Internal Code <span class="cap">/ รหัสอ้างอิงภายใน</span></label>
+                        <input type="text" id="reg-codeno" placeholder="Ref. No." class="tech-input">
+                    </div>
+                </div>
+
+                <!-- Section 6: Media (Photo & Sticker Preview) -->
+                <div class="cal-media-grid">
+                    
+                    <!-- 1. กล่องภาพตัวเครื่อง (Device Photo) -->
+                    <div id="reg-dropzone" class="media-dropzone" 
+                         style="min-height: 200px; border-radius: 14px; border: 2px dashed #cbd5e1; background: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; transition: 0.3s;"
+                         onclick="const rInp = document.getElementById('reg-img-input'); if(rInp && typeof rInp.click === 'function') rInp.click();">
+                        
+                        <div id="reg-img-label" style="text-align: center; padding: 10px;">
+                            <div style="font-size: 10px; font-weight: 950; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Device Photo</div>
+                            <div style="font-size: 8px; color: #94a3b8; font-weight: 700; margin-top: 4px;">CLICK TO UPLOAD</div>
+                        </div>
+
+                        <input type="file" id="reg-img-input" hidden accept="image/*" onchange="WapCalibrationSystem.handleImg(this, 'reg-dropzone')">
+                    </div>
+
+                    <!-- 2. กล่องป้ายสติกเกอร์ (Sticker Preview) -->
+                    <div id="sticker-dropzone" class="media-dropzone" 
+                         style="min-height: 200px; border-radius: 14px; padding: 10px; background: rgba(59, 130, 246, 0.04); border: 2px dashed #bfdbfe; display: flex; align-items: center; justify-content: center; cursor: default;">
+                        
+                        <div style="width:100%; max-width:240px; background:#fff; border:1.5px solid #0047bb; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 10px 20px rgba(0,0,0,0.08); font-family: Arial, sans-serif; text-align:left;">
+                            <div style="background:#0047bb; color:#fff; padding:4px 10px; font-size:10px; font-weight:bold; letter-spacing:0.2px;">NA Caltechnologies Co., Ltd.</div>
+                            <div style="padding:10px 12px; position:relative; background:#fff; min-height:130px;">
+                                <div style="position:absolute; right:8px; top:18px; width:55px; display:flex; flex-direction:column; align-items:center; opacity:0.75; pointer-events:none;">
+                                    <div style="width:44px; height:44px; border:1.5px solid rgba(0, 71, 187, 0.3); border-radius:50%; display:flex; align-items:center; justify-content:center; transform:rotate(-15deg);">
+                                        <div style="text-align:center; font-size:5px; font-weight:bold; color:rgba(0, 71, 187, 0.5); line-height:1;">METROLOGY<br>VERIFIED</div>
+                                    </div>
+                                </div>
+                                <div style="border-bottom:1.2px solid #000; padding:2px 0; margin-bottom:4px; display:flex; align-items:baseline;"><span style="font-size:9px; font-weight:bold; width:65px; color:#000;">SERIAL ---</span><span id="stk-prev-serial" style="font-size:11px; font-weight:bold; font-family:'Courier New', Courier, monospace;">-</span></div>
+                                <div style="border-bottom:1.2px solid #000; padding:2px 0; margin-bottom:4px; display:flex; align-items:baseline;"><span style="font-size:9px; font-weight:bold; width:65px; color:#000;">CERT.</span><span id="stk-prev-cert" style="font-size:10px; font-weight:bold; font-family:'Courier New', Courier, monospace;">-</span></div>
+                                <div style="border-bottom:1.2px solid #000; padding:2px 0; margin-bottom:6px; display:flex; align-items:baseline;"><span style="font-size:9px; font-weight:bold; width:65px; color:#000;">CAL BY</span><span id="stk-prev-pic" style="font-size:10px; font-weight:bold; font-family:'Courier New', Courier, monospace; color:#000;">PHETSAYAM</span></div>
+                                <div style="display:flex; gap:5px; margin-top:8px;">
+                                    <div style="flex:1;"><div style="font-size:8.5px; font-weight:bold; color:#000;">CAL DATE</div><div id="stk-prev-last" style="font-size:10.5px; font-weight:bold; font-family:'Courier New', Courier, monospace; color:#000;">-</div></div>
+                                    <div style="flex:1;"><div style="font-size:8.5px; font-weight:bold; color:#000;">DUE DATE</div><div id="stk-prev-due" style="font-size:10.5px; font-weight:bold; font-family:'Courier New', Courier, monospace; color:#ef4444;">-</div></div>
+                                </div>
+                                <div style="margin-top:8px; border-bottom:1.5px solid #000; width:100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div style="display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:6px; padding-top:10px; border-top:1px solid #f1f5f9; flex-shrink:0;">
+                    <button type="button" onclick="document.getElementById('${modalId}').remove()" style="background:none; border:none; color:#94a3b8; font-weight:800; font-size:11px; cursor:pointer; text-transform:uppercase; padding:8px 16px;">Discard</button>
+                    <button type="button" onclick="WapCalibrationSystem.saveNew()" style="background:#1e40af; color:#fff; border:none; padding:10px 28px; border-radius:12px; font-weight:950; font-size:11px; cursor:pointer; box-shadow:0 8px 20px rgba(30,64,175,0.25); text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+                        Update Terminal
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+}
+
+// ฟังก์ชันดึงผู้รับผิดชอบจากข้อความในวงเล็บของ Group อัตโนมัติลงในช่อง PIC
+function autoFillPicFromGroup() {
+    const subInp = document.getElementById('reg-sub');
+    const deptInp = document.getElementById('reg-dept');
+    const picInp = document.getElementById('reg-pic');
+    if (subInp && picInp) {
+        const extracted = extractResponsiblePerson({
+            sub_section: subInp.value,
+            dept: deptInp ? deptInp.value : ''
+        });
+        if (extracted && extracted !== '-') {
+            picInp.value = extracted;
+        }
+    }
+}
+
+// ฟังก์ชันช่วยคำนวณวัน Due Date
+function calcDue() {
+    const lastDate = document.getElementById('reg-last-cal') ? document.getElementById('reg-last-cal').value : '';
+    const interval = parseInt(document.getElementById('reg-freq') ? document.getElementById('reg-freq').value : '12') || 12;
+    const display = document.getElementById('reg-next-due-display');
+    
+    if (lastDate && interval) {
+        const d = new Date(lastDate);
+        if (!isNaN(d.getTime())) {
+            d.setMonth(d.getMonth() + interval);
+            const nextDueStr = d.toISOString().split('T')[0];
+            if (display) {
+                display.textContent = nextDueStr;
+                display.dataset.value = nextDueStr;
+                display.style.color = '#10b981';
+            }
+        }
+    }
+}
+
+// จัดการรูปภาพ (Equipment & Sticker)
+let currentEquipmentImg = "";
+function handleImg(input, targetId) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const result = e.target.result;
+            if(targetId === 'reg-dropzone') currentEquipmentImg = result;
+            const zone = document.getElementById(targetId);
+            zone.style.backgroundImage = `url(${result})`;
+            zone.style.backgroundSize = 'contain';
+            zone.style.backgroundRepeat = 'no-repeat';
+            zone.style.backgroundPosition = 'center';
+            zone.innerHTML = `<div style="background:rgba(255,255,255,0.7); position:absolute; bottom:5px; right:5px; padding:2px 8px; border-radius:5px; font-size:9px; font-weight:800;">CHANGE PHOTO</div>`;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// บันทึกข้อมูล
+async function saveNew() {
+    const nextDueDisplay = document.getElementById('reg-next-due-display');
+    let nextDue = (nextDueDisplay && nextDueDisplay.dataset.value) || (nextDueDisplay && nextDueDisplay.textContent && nextDueDisplay.textContent !== '-' && !nextDueDisplay.textContent.includes('ส่งแคล') ? nextDueDisplay.textContent : "-");
+    const subVal = document.getElementById('reg-sub') ? document.getElementById('reg-sub').value.trim() : "";
+    const deptVal = document.getElementById('reg-dept') ? document.getElementById('reg-dept').value : "";
+    let picVal = document.getElementById('reg-pic') ? document.getElementById('reg-pic').value.trim() : "";
+    
+    if (!picVal || picVal === "-") {
+        picVal = extractResponsiblePerson({ sub_section: subVal, dept: deptVal });
+    }
+    
+    const regIdInput = document.getElementById('reg-id');
+    const formEl = document.getElementById('cal-reg-form');
+    const internalId = (regIdInput && regIdInput.dataset.internalId) || (formEl && formEl.dataset.internalId) || (regIdInput ? regIdInput.value.trim() : "");
+    const assetIdVal = regIdInput ? regIdInput.value.trim() : "";
+    const serialVal = document.getElementById('reg-serial') ? document.getElementById('reg-serial').value.trim() : assetIdVal;
+
+    const existingIdx = _data.findIndex(x => 
+        (internalId && String(x.id) === String(internalId)) ||
+        (assetIdVal && (String(x.id) === String(assetIdVal) || (x.serial && String(x.serial) === String(assetIdVal)))) ||
+        (serialVal && x.serial && String(x.serial) === String(serialVal))
+    );
+
+    const targetId = (existingIdx !== -1 && _data[existingIdx].id) ? _data[existingIdx].id : (internalId || assetIdVal || ('CAR-CAL-' + Date.now()));
+    const lastCalVal = document.getElementById('reg-last-cal') ? document.getElementById('reg-last-cal').value : "-";
+    const freqMonths = parseInt(document.getElementById('reg-freq') ? document.getElementById('reg-freq').value : '12') || 12;
+
+    // Recalculate next due if needed
+    if ((!nextDue || nextDue === '-' || nextDue.includes('ส่งแคล')) && lastCalVal && lastCalVal !== '-') {
+        const d = new Date(lastCalVal);
+        if (!isNaN(d.getTime())) {
+            d.setMonth(d.getMonth() + freqMonths);
+            nextDue = d.toISOString().split('T')[0];
+        }
+    }
+
+    const wasInCal = existingIdx !== -1 && (_data[existingIdx].status === 'IN_CALIBRATION' || _data[existingIdx].status === 'OUT_FOR_CAL' || _data[existingIdx].status === 'SENDING_CAL');
+    let finalStatus = 'NORMAL';
+
+    if (wasInCal) {
+        // Returned from calibration with new last_cal date
+        finalStatus = 'NORMAL';
+    } else if (existingIdx !== -1 && _data[existingIdx].status) {
+        finalStatus = _data[existingIdx].status;
+        if (finalStatus === 'EXPIRED' || finalStatus === 'OVERDUE') {
+            // Check if last cal was refreshed
+            if (lastCalVal && lastCalVal !== _data[existingIdx].last_cal) {
+                finalStatus = 'NORMAL';
+            }
+        }
+    }
+
+    const entry = {
+        id: targetId,
+        name: document.getElementById('reg-name').value.trim(),
+        maker: document.getElementById('reg-maker').value.trim(),
+        model: document.getElementById('reg-model').value.trim(),
+        code_no: document.getElementById('reg-codeno').value.trim() || "-",
+        serial: serialVal || assetIdVal,
+        size: document.getElementById('reg-size').value.trim() || "-",
+        last_cal: lastCalVal,
+        next_due: nextDue,
+        dept: deptVal,
+        sub_section: subVal,
+        pic: picVal !== "-" ? picVal : "",
+        reg_date: (existingIdx !== -1 && _data[existingIdx].reg_date) ? _data[existingIdx].reg_date : new Date().toISOString().split('T')[0],
+        frequency: freqMonths + " M",
+        month: nextDue !== "-" ? new Date(nextDue).toLocaleString('en-US', {month: 'long'}) : "-",
+        status: finalStatus,
+        imageUrl: currentEquipmentImg || ((existingIdx !== -1 && _data[existingIdx].imageUrl) ? _data[existingIdx].imageUrl : "")
+    };
+
+    if (!entry.id || !entry.name || !entry.last_cal || entry.last_cal === "-") {
+        toast("⚠️ กรุณากรอกข้อมูลที่จำเป็น (*) ให้ครบถ้วน รวมถึงวันที่สอบล่าสุด", "error");
+        return;
+    }
+
+    // If instrument returned from calibration, add a completion history log
+    if (wasInCal) {
+        const returnLogEntry = {
+            id: 'LOG-RET-' + Date.now(),
+            date: entry.last_cal,
+            cert_no: 'CERT-' + (entry.last_cal || '').replace(/-/g, '') + '-' + (entry.code_no || entry.id).replace(/[^A-Za-z0-9]/g, '').substring(0, 6),
+            lab: 'Internal QA/QC Metrology Lab',
+            result: 'PASS',
+            deviation: '0.000',
+            next_due: entry.next_due,
+            technician: (window.currentUser && window.currentUser.name) || entry.pic || 'QA Inspector',
+            notes: 'ได้รับเครื่องมือกลับจากการสอบเทียบ และบันทึกผลสอบเรียบร้อย (Returned & Calibrated)'
+        };
+        const existingLogs = (existingIdx !== -1 && _data[existingIdx].history_logs) ? [..._data[existingIdx].history_logs] : [];
+        existingLogs.unshift(returnLogEntry);
+        entry.history_logs = existingLogs;
+    } else if (existingIdx !== -1 && _data[existingIdx].history_logs) {
+        entry.history_logs = _data[existingIdx].history_logs;
+    }
+
+    if (existingIdx !== -1) {
+        _data[existingIdx] = { ..._data[existingIdx], ...entry };
+    } else {
+        _data.unshift(entry);
+    }
+
+    try {
+        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+            await localDB.calibrationMaster.put(entry);
+        }
+    } catch(err) {
+        console.warn("[Calibration] Persistence warning:", err);
+    }
+
+    // ซิงก์ขึ้น Supabase Cloud อัตโนมัติ
+    syncToCloud(entry);
+
+    const modal = document.getElementById('cal-add-modal');
+    if (modal) modal.remove();
+    currentEquipmentImg = "";
+    render();
+    updateOverdueBadge();
+    
+    if (wasInCal) {
+        toast(`✅ บันทึกผลสอบเทียบ ${entry.code_no || entry.id} สำเร็จ และปรับสถานะเป็น "สอบเทียบแล้ว (CALIBRATED)" เรียบร้อย`, "success");
+    } else {
+        toast(existingIdx !== -1 ? "✅ อัปเดตข้อมูลเครื่องมือเรียบร้อย" : "✅ ลงทะเบียนเครื่องมือสำเร็จ และพร้อมใช้งาน", "success");
+    }
+}
+
+// อย่าลืมอัปเดต return
+// return { init, render, openAddModal, calcDue, handleImg, saveNew, ... };
+
+// ฟังก์ชันแสดงพรีวิวรูปในฟอร์ม
+let tempRegImg = "";
+function handleRegImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            tempRegImg = e.target.result;
+            document.getElementById('reg-img-preview').innerHTML = `<img src="${tempRegImg}" style="width:100%; height:100%; object-fit:cover;">`;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// ฟังก์ชันเก็บข้อมูลและวาดตาราง
+function handleSaveNew() {
+    const newEntry = {
+        id: document.getElementById('reg-id').value.trim() || 'CAR-CAL-' + Date.now(),
+        name: document.getElementById('reg-name').value.trim(),
+        maker: document.getElementById('reg-maker').value.trim(),
+        model: document.getElementById('reg-model').value.trim(),
+        code_no: document.getElementById('reg-serial').value.trim(),
+        serial: document.getElementById('reg-serial').value.trim(),
+        size: document.getElementById('reg-size').value.trim(),
+        last_cal: document.getElementById('reg-last-cal').value || '-',
+        next_due: document.getElementById('reg-next-due').value || '-',
+        dept: document.getElementById('reg-dept').value,
+        sub_section: 'Dimensional', // หรือจะเพิ่มช่องเลือกประเภทได้
+        reg_date: new Date().toISOString().split('T')[0],
+        frequency: document.getElementById('reg-freq').value || '12 M',
+        month: new Date(document.getElementById('reg-next-due').value).toLocaleString('en-US', {month: 'long'}) || '-',
+        status: 'NORMAL',
+        imageUrl: tempRegImg
+    };
+
+    if (!newEntry.name) { toast("⚠️ กรุณาระบุชื่อเครื่องมือ", "error"); return; }
+
+    // เพิ่มข้อมูลเข้าอาเรย์หลัก
+    _data.unshift(newEntry);
+    
+    // บันทึก Local & Cloud
+    if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+        try { localDB.calibrationMaster.put(newEntry); } catch(e) {}
+    }
+    syncToCloud(newEntry);
+
+    // ปิด Modal และเคลียร์ค่า
+    document.getElementById('cal-add-modal').remove();
+    tempRegImg = "";
+    
+    // วาดตารางใหม่
+    render();
+    updateOverdueBadge();
+    toast("✅ ลงทะเบียนเครื่องมือใหม่สำเร็จ", "success");
+}
+// --- เพิ่มเข้าไปใน WapCalibrationSystem ---
+
+function clearAll() {
+    if (S.userRole === 'supervisor') { 
+        toast('⚠️ โหมดอ่านอย่างเดียว: ไม่สามารถลบข้อมูลได้', 'error'); 
+        return; 
+    }
+    
+    if (_data.length === 0) {
+        toast('ไม่มีข้อมูลให้ลบ', 'info');
+        return;
+    }
+
+    showCustomConfirmDialog({
+        title: "ยืนยันล้างข้อมูลเครื่องมือทั้งหมด",
+        subtitle: "รายการเครื่องมือมาตรฐานทั้งหมดในหน้านี้จะถูกลบออกถาวร",
+        badge: "DANGER ZONE",
+        type: "danger",
+        requiresTextInput: "DELETE ALL",
+        inputPlaceholder: "พิมพ์ 'DELETE ALL' เพื่อยืนยัน",
+        confirmText: "🔥 ยืนยันลบข้อมูลทั้งหมด",
+        cancelText: "ยกเลิก",
+        onConfirm: async () => {
+            const idsToDelete = _data.map(x => x.id);
+            _data = []; // ล้างข้อมูลจำลองในเครื่อง
+            if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                try { await localDB.calibrationMaster.clear(); } catch(e) {}
+            }
+            try {
+                const sb = getSupabaseClient();
+                if (sb) {
+                    await sb.from('calibration_records').delete().neq('id', '');
+                }
+            } catch(e) {}
+            render();   // วาดตารางใหม่ (จะเป็นตารางว่าง)
+            updateOverdueBadge();
+            toast("🗑️ ล้างข้อมูลทะเบียนเครื่องมือเรียบร้อยแล้ว", "success");
+        }
+    });
+}
+function openMetrologyViewer(id) {
+    const item = _data.find(x => String(x.id) === String(id));
+    if (!item) return;
+
+    const existing = document.getElementById('metro-viewer-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'metro-viewer-overlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 20000; 
+        background: rgba(2, 6, 23, 0.85); 
+        backdrop-filter: blur(14px); 
+        display: flex; align-items: center; justify-content: center; 
+        padding: 12px; transition: all 0.3s ease;
+    `;
+
+    const stColor = (item.status === 'EXPIRED') ? '#ef4444' : (item.status === 'DUE_SOON') ? '#f59e0b' : '#10b981';
+    const displayImg = getInstrumentImageUrl(item);
+    const picVal = extractResponsiblePerson(item);
+
+    // ฟังก์ชันแปลงวันที่ (20-AUG-26)
+    const formatStickerDate = (dateStr) => {
+        if (!dateStr || dateStr === '-') return '---';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        return `${String(d.getDate()).padStart(2, '0')}-${months[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
+    };
+
+    const modal = document.createElement('div');
+    modal.id = 'premium-metro-card';
+    modal.style.cssText = `
+        position: relative; width: 100%; max-width: 1050px; max-height: 92vh; height: 90vh; 
+        background: #0b1220; border-radius: 28px; overflow: hidden; 
+        display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,0.12);
+        box-shadow: 0 40px 100px rgba(0,0,0,0.6); font-family: 'Inter', sans-serif;
+    `;
+
+    modal.innerHTML = `
+        <!-- Top Bar Header -->
+        <div style="height:54px; background:linear-gradient(90deg, #0f172a 0%, #1e40af 100%); border-bottom:2px solid #3b82f6; display:flex; align-items:center; justify-content:space-between; padding:0 22px; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+                <div style="width:32px; height:32px; background:rgba(255,255,255,0.1); border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <svg width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42z"/></svg>
+                </div>
+                <div style="min-width:0;">
+                    <h3 style="margin:0; font-size:14px; font-weight:950; color:#fff; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Metrology Evidence Viewer</h3>
+                    <p style="margin:0; font-size:8.5px; color:#93c5fd; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">${item.id || ''} &bull; ${item.name || 'INSTRUMENT'}</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('metro-viewer-overlay').remove()" style="background:rgba(239, 68, 68, 0.2); border:none; color:#f87171; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'; this.style.color='#f87171';">✕</button>
+        </div>
+
+        <div class="metro-viewer-layout">
+            <!-- Left Stage (Image) -->
+            <div id="metro-img-stage" class="metro-image-stage">
+                <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">
+                    ${displayImg ? `<img src="${formatImageUrl(displayImg)}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:18px; box-shadow: 0 25px 60px rgba(0,0,0,0.7); background:#000;">` : `<div style="color:#475569; font-weight:900; font-size:12px; letter-spacing:1px;">NO PHOTO ATTACHED</div>`}
+                </div>
+            </div>
+
+            <!-- Right Sidebar / Stacked on Mobile (Data + Sticker) -->
+            <div id="metro-side-pane" class="metro-sidebar-pane">
+                
+                <div style="display:flex; align-items:center; gap:8px; color:#60a5fa; font-weight:950; font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
+                    <span style="width:3px; height:12px; background:#3b82f6; border-radius:4px;"></span>
+                    <span>Identity Details</span>
+                </div>
+
+                <!-- Info Cards Section -->
+                <div style="display:flex; flex-direction:column; gap:6px;">
+
+${[
+    { l: 'INTERNAL CODE', v: item.code_no || '-' },
+    { l: 'SERIAL NO.', v: item.serial || '-' },
+    { l: 'DEPARTMENT', v: item.dept || '-' },
+    { l: 'CERTIFICATE NO', v: 'CAL-' + (item.code_no || item.id || 'N/A') + '-2026' },
+    { l: 'STATUS', v: item.status, c: stColor, isStatus: true },
+    { l: 'INTERVAL', v: (item.frequency ? item.frequency + ' Months' : '12 Months') },
+    { l: 'RESPONSIBLE (PIC)', v: picVal || '-' }
+].map(info => `
+    <div style="background:rgba(2, 6, 23, 0.65); border:1px solid #1e293b; border-radius:12px; padding:8px 14px; display:flex; flex-direction:column; justify-content:center; transition:0.25s;" onmouseover="this.style.borderColor='#3b82f6';" onmouseout="this.style.borderColor='#1e293b';">
+        <div style="font-size:7.5px; font-weight:900; color:#64748b; text-transform:uppercase; margin-bottom:1px; letter-spacing:0.5px;">${info.l}</div>
+        <div style="font-size:12px; font-weight:800; color:${info.c || '#f1f5f9'}; line-height:1.2; ${info.isStatus ? 'font-weight:950;' : ''}">
+            ${info.v}
+        </div>
+    </div>
+`).join('')}
+                </div>
+
+                <div style="margin-top:12px; padding:10px; background:rgba(255,255,255,0.02); border:1px dashed #334155; border-radius:18px;">
+                    <div style="font-size:8.5px; font-weight:900; color:#94a3b8; text-transform:uppercase; margin-bottom:8px; text-align:center; letter-spacing:1px;">Official Calibration Label</div>
+                    
+                    <div style="width:100%; background:#fff; border-radius:10px; overflow:hidden; border:1.5px solid #0033a0; display:flex; flex-direction:column; font-family:'Arial', sans-serif; box-shadow: 0 10px 25px rgba(0,0,0,0.3); position:relative;">
+                        
+                        <!-- 1. Header: Deep Blue -->
+                        <div style="background:#1d4ed8; color:#fff; padding:5px 10px; font-size:11px; font-weight:bold; letter-spacing:0.2px; border-bottom: 1.5px solid #0033a0;">
+                            NA Caltechnologies Co., Ltd.
+                        </div>
+
+                        <!-- 2. Body Content -->
+                        <div style="padding:10px 12px; position:relative; background:#fff;">
+                            
+                            <!-- Metrology Verified Stamp -->
+                            <div style="position:absolute; right:10px; top:35px; width:60px; height:60px; border:1.5px solid rgba(147, 197, 253, 0.6); border-radius:50%; display:flex; align-items:center; justify-content:center; transform:rotate(-15deg); pointer-events:none; z-index:1;">
+                                <div style="text-align:center; font-size:6px; font-weight:bold; color:rgba(30, 58, 138, 0.45); line-height:1.1; text-transform:uppercase;">
+                                    METROLOGY<br>VERIFIED<br>2026
+                                </div>
+                            </div>
+
+                            <!-- รายละเอียดข้อมูล -->
+                            <div style="border-bottom:1.2px solid #000; padding:3px 0; margin-bottom:4px; display:flex; align-items:center;">
+                                <span style="font-size:10px; font-weight:950; width:75px; color:#000;">SERIAL ---</span>
+                                <span style="font-size:11px; font-weight:950; color:#000; letter-spacing:0.3px; font-family:'Courier New', Courier, monospace;">${item.serial || '-'}</span>
+                            </div>
+
+                            <div style="border-bottom:1.2px solid #000; padding:3px 0; margin-bottom:4px; display:flex; align-items:center;">
+                                <span style="font-size:10px; font-weight:950; width:75px; color:#000;">CERT.</span>
+                                <span style="font-size:11px; font-weight:950; color:#000; letter-spacing:0.2px; font-family:'Courier New', Courier, monospace;">CAL-${item.code_no || item.id || 'N/A'}</span>
+                            </div>
+
+                            <div style="border-bottom:1.2px solid #000; padding:3px 0; margin-bottom:8px; display:flex; align-items:center;">
+                                <span style="font-size:10px; font-weight:950; width:75px; color:#000;">CAL BY</span>
+                                <span style="font-size:10.5px; font-weight:bold; font-family:'Courier New', Courier, monospace; color:#000;">PHETSAYAM</span>
+                            </div>
+
+                            <!-- ส่วนวันที่ -->
+                            <div style="display:flex; justify-content:space-between; margin-top:6px;">
+                                <div style="flex:1;">
+                                    <div style="font-size:9px; font-weight:950; color:#000; margin-bottom:2px;">CAL DATE</div>
+                                    <div style="font-size:13px; font-weight:950; color:#000; font-family:'Courier New', Courier, monospace;">
+                                        ${formatStickerDate(item.last_cal)}
+                                    </div>
+                                </div>
+                                <div style="flex:1; padding-left:8px;">
+                                    <div style="font-size:9px; font-weight:950; color:#000; margin-bottom:2px;">DUE DATE</div>
+                                    <div style="font-size:13px; font-weight:950; color:#ef4444; font-family:'Courier New', Courier, monospace;">
+                                        ${formatStickerDate(item.next_due)}
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                        <!-- เส้นจบด้านล่างสุดของป้าย -->
+                        <div style="height:3px; background:#0033a0; width:100%;"></div>
+                    </div>
+                </div>
+
+                <!-- Action to Open Chronological History -->
+                <button onclick="WapCalibrationSystem.displayCalibrationHistory('${item.id}')" 
+                        style="margin-top:10px; width:100%; padding:11px 16px; background:linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color:#fff; border:none; border-radius:14px; font-weight:900; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 6px 20px rgba(124,58,237,0.35); text-transform:uppercase; letter-spacing:0.6px; transition:0.2s;"
+                        onmouseover="this.style.opacity='0.9'; this.style.transform='translateY(-1px)';"
+                        onmouseout="this.style.opacity='1'; this.style.transform='none';">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>View Chronological History</span>
+                </button>
+            </div>
+        </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+// ============================================================
+// CHRONOLOGICAL CALIBRATION HISTORY SYSTEM
+// ============================================================
+
+function ensureInstrumentLogs(item) {
+    if (!item) return [];
+    if (typeof item.calibration_logs === 'string') {
+        try {
+            item.calibration_logs = JSON.parse(item.calibration_logs);
+        } catch (e) {
+            item.calibration_logs = [];
+        }
+    }
+    if (Array.isArray(item.calibration_logs) && item.calibration_logs.length > 0) {
+        // กรองเฉพาะประวัติปี 2025 และ 2026 เท่านั้น (ลบประวัติ 2013 หรือปีก่อนหน้าออกทั้งหมด)
+        const validLogs = item.calibration_logs.filter(log => {
+            if (!log || !log.date) return false;
+            const y = parseInt(String(log.date).split('-')[0], 10);
+            return y === 2025 || y === 2026;
+        });
+        if (validLogs.length > 0) {
+            item.calibration_logs = validLogs;
+            return item.calibration_logs;
+        }
+    }
+
+    // สร้างข้อมูลประวัติการสอบเทียบลำดับเวลาเฉพาะปี 2025 และ 2026
+    const logs = [];
+    const baseCode = item.code_no || item.id || 'CAL';
+    const picName = extractResponsiblePerson(item) || 'PHETSAYAM';
+    const lastCal = (item.last_cal && item.last_cal !== '-') ? item.last_cal : '2026-08-20';
+    const nextDue = (item.next_due && item.next_due !== '-') ? item.next_due : '2027-08-20';
+
+    // 1. Previous Periodic Calibration ปี 2025
+    logs.push({
+        id: `LOG-${item.id}-002`,
+        date: '2025-08-20',
+        next_due: '2026-08-20',
+        cert_no: `CAL-${baseCode}-2025`,
+        lab: 'NA Caltechnologies Co., Ltd.',
+        result: 'PASSED',
+        type: 'PERIODIC_ANNUAL',
+        deviation: '-0.002 mm',
+        tolerance: '±0.010 mm',
+        uncertainty: 'U = 0.0015 mm (k=2)',
+        env_temp: '20.2°C / 52% RH',
+        technician: picName !== '-' ? picName : 'PHETSAYAM',
+        traceability: 'Accredited Lab No. 0341 / ISO 17025',
+        notes: 'Periodic annual routine calibration. All measuring points conform to manufacturer accuracy specifications.'
+    });
+
+    // 2. Current / Latest Calibration ปี 2026
+    logs.push({
+        id: `LOG-${item.id}-003`,
+        date: lastCal,
+        next_due: nextDue,
+        cert_no: `CAL-${baseCode}-2026`,
+        lab: 'NA Caltechnologies Co., Ltd.',
+        result: (item.status === 'EXPIRED') ? 'EXPIRED' : 'PASSED',
+        type: 'ROUTINE_CALIBRATION',
+        deviation: '+0.001 mm',
+        tolerance: '±0.010 mm',
+        uncertainty: 'U = 0.0014 mm (k=2)',
+        env_temp: '20.0°C / 54% RH',
+        technician: picName !== '-' ? picName : 'PHETSAYAM',
+        traceability: 'ISO/IEC 17025:2017 & NIST Traceable Standards',
+        notes: `Latest calibration cycle completed. Metrology verification passed. Official sticker attached. Next due: ${nextDue}.`
+    });
+
+    item.calibration_logs = logs;
+    return logs;
+}
+
+function calculateDueDateString(baseDateStr, freqStr) {
+    if (!baseDateStr || baseDateStr === '-') return '-';
+    const d = new Date(baseDateStr);
+    if (isNaN(d.getTime())) return '-';
+    let months = 12;
+    if (freqStr) {
+        const num = parseInt(freqStr, 10);
+        if (!isNaN(num) && num > 0) months = num;
+    }
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().split('T')[0];
+}
+
+function formatChronologicalDate(dateStr) {
+    if (!dateStr || dateStr === '-') return '---';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+}
+
+function displayCalibrationHistory(id, sortOrder = 'desc') {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
+    if (!item) {
+        if (typeof toast === 'function') toast("⚠️ ไม่พบข้อมูลเครื่องมือ", "error");
+        return;
+    }
+
+    const existing = document.getElementById('cal-history-modal-overlay');
+    if (existing) existing.remove();
+
+    const rawLogs = ensureInstrumentLogs(item);
+    const logs = Array.isArray(rawLogs) ? rawLogs : [];
+    
+    // เรียงลำดับเวลา (Chronological sorting)
+    const sortedLogs = [...logs].sort((a, b) => {
+        const timeA = new Date(a.date).getTime() || 0;
+        const timeB = new Date(b.date).getTime() || 0;
+        return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
+
+    // ตรวจสอบโหมด มืด / สว่าง ปัจจุบัน
+    const isDark = document.body.classList.contains('dark-mode') || 
+                   document.documentElement.classList.contains('dark') || 
+                   localStorage.getItem('carrier_theme') === 'dark';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'cal-history-modal-overlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 21000;
+        background: ${isDark ? 'rgba(2, 6, 23, 0.85)' : 'rgba(15, 23, 42, 0.65)'};
+        backdrop-filter: blur(12px);
+        display: flex; align-items: center; justify-content: center;
+        padding: 12px; transition: all 0.3s ease;
+    `;
+
+    const displayImg = getInstrumentImageUrl(item);
+    const picVal = extractResponsiblePerson(item);
+    const isExpired = (item.status === 'EXPIRED');
+    const isDueSoon = (item.status === 'DUE_SOON');
+    const stStatusText = isExpired ? 'EXPIRED (OUT OF CALIBRATION)' : isDueSoon ? 'DUE SOON' : 'VALID / CONFORMING';
+    const stStatusClass = isExpired ? 'fail' : 'pass';
+
+    const modal = document.createElement('div');
+    modal.id = 'cal-history-card-modal';
+    modal.className = `cal-doc-modal ${isDark ? 'theme-dark' : 'theme-light'}`;
+    modal.style.cssText = `
+        position: relative; width: 100%; max-width: 920px; max-height: 94vh; height: 92vh;
+        background: var(--doc-bg); border-radius: 20px; overflow: hidden;
+        display: flex; flex-direction: column; border: 1.5px solid var(--doc-border);
+        box-shadow: var(--doc-shadow); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: var(--doc-text-main);
+    `;
+
+    modal.innerHTML = `
+        <!-- Top Formal Document Header Banner -->
+        <div class="cal-doc-header" style="padding: 14px 22px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                <div style="width: 40px; height: 40px; background: rgba(255, 255, 255, 0.15); border: 1.5px solid rgba(255, 255, 255, 0.35); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    🏛️
+                </div>
+                <div style="min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <h3 style="margin: 0; font-size: 14.5px; font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase; color: #ffffff;">
+                            QA METROLOGY RECORD & CALIBRATION HISTORY LEDGER
+                        </h3>
+                        <span style="background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); color: #ffffff; font-size: 8.5px; font-weight: 900; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
+                            FORM QA-CAL-08 &bull; ISO/IEC 17025
+                        </span>
+                    </div>
+                    <p style="margin: 2px 0 0 0; font-size: 10px; color: var(--doc-header-sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                        Equipment Tag: <span style="color:#ffffff; font-family:'DM Mono', monospace; font-weight:900;">${item.code_no || item.id}</span> &bull; ${item.name || 'INSTRUMENT'} &bull; Rev. 2026-Q1
+                    </p>
+                </div>
+            </div>
+
+            <!-- Header Actions (Theme Switcher + Print + Close) -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                <button onclick="WapCalibrationSystem.toggleHistoryModalTheme('${item.id}', '${sortOrder}')" 
+                        class="cal-doc-btn" 
+                        style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #ffffff; font-size: 10.5px;" 
+                        title="สลับโหมด มืด/สว่าง">
+                    ${isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
+                </button>
+                <button onclick="WapCalibrationSystem.printCalibrationHistory('${item.id}')" 
+                        class="cal-doc-btn" 
+                        style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: #ffffff; font-size: 10.5px;" 
+                        title="พิมพ์เอกสารทางการ / Export PDF">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12 0h12v4H6v-4z"/></svg>
+                    <span>Print / PDF</span>
+                </button>
+                <button onclick="document.getElementById('cal-history-modal-overlay').remove()" 
+                        style="background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); color: #ffffff; width: 32px; height: 32px; border-radius: 50%; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; font-weight: bold;" 
+                        onmouseover="this.style.background='#ef4444';" 
+                        onmouseout="this.style.background='rgba(239, 68, 68, 0.25)';">✕</button>
+            </div>
+        </div>
+
+        <!-- Official Equipment Specification & Master Data Ribbon -->
+        <div class="cal-doc-specs" style="padding: 12px 22px; flex-shrink: 0;">
+            <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center;">
+                <!-- Instrument Photo Thumbnail -->
+                <div style="width: 52px; height: 52px; background: var(--doc-bg); border: 1.5px solid var(--doc-border); border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
+                    ${displayImg ? `<img src="${formatImageUrl(displayImg)}" style="width:100%; height:100%; object-fit:contain;">` : `<span style="font-size:22px;">⚙️</span>`}
+                </div>
+
+                <!-- Structured Technical Info Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 14px;">
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">INSTRUMENT TAG</div>
+                        <div style="font-size: 12px; font-weight: 900; color: var(--doc-text-main); font-family: 'DM Mono', monospace;">${item.code_no || item.id}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">INSTRUMENT NAME</div>
+                        <div style="font-size: 12px; font-weight: 800; color: var(--doc-text-main); line-height: 1.2;">${item.name || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">MAKER & MODEL</div>
+                        <div style="font-size: 11px; font-weight: 700; color: var(--doc-text-body);">${item.maker || '-'} / ${item.model || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">SERIAL NO. (S/N)</div>
+                        <div style="font-size: 11px; font-weight: 800; color: var(--doc-text-main); font-family: 'DM Mono', monospace;">${item.serial || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">LOCATION / DEPT</div>
+                        <div style="font-size: 11px; font-weight: 700; color: var(--doc-text-body);">${item.dept || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">CUSTODIAN (PIC)</div>
+                        <div style="font-size: 11px; font-weight: 800; color: var(--doc-text-main);">${picVal || '-'}</div>
+                    </div>
+                </div>
+
+                <!-- Status & Cycle Summary Badge -->
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;">
+                    <div class="cal-doc-seal ${stStatusClass}">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background: ${isExpired ? '#ef4444' : '#10b981'};"></span>
+                        <span>${stStatusText}</span>
+                    </div>
+                    <div style="font-size: 9.5px; font-weight: 800; color: var(--doc-text-muted);">
+                        Frequency: <span style="color: var(--doc-text-main);">${item.frequency || '12 M'}</span> &bull; <span style="color: #2563eb; font-weight: 900;">${logs.length} Cycles</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Official Ledger Controls Toolbar -->
+        <div class="cal-doc-toolbar" style="padding: 9px 22px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 10px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Timeline Order:</span>
+                <button onclick="WapCalibrationSystem.displayCalibrationHistory('${item.id}', '${sortOrder === 'desc' ? 'asc' : 'desc'}')"
+                        class="cal-doc-btn cal-doc-btn-default" style="font-size: 10.5px; font-weight: 800;">
+                    ${sortOrder === 'desc' ? '⬇️ Newest Cycle First (Chronological)' : '⬆️ Oldest Baseline First'}
+                </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button onclick="WapCalibrationSystem.toggleAddHistoryForm('${item.id}')"
+                        class="cal-doc-btn cal-doc-btn-primary">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                    <span>Record New Calibration Cycle</span>
+                </button>
+                <button onclick="WapCalibrationSystem.copyHistorySummary('${item.id}')"
+                        class="cal-doc-btn cal-doc-btn-default">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    <span>Copy Audit Summary</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Add New Calibration Log Form (Collapsible) -->
+        <div id="cal-history-new-entry-drawer" style="display: none; background: var(--doc-surface-subtle); border-bottom: 2px solid #2563eb; padding: 16px 22px; flex-shrink: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="font-size: 11.5px; font-weight: 900; color: #2563eb; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+                    <span>⚡ Record Official Metrology Calibration Event</span>
+                </div>
+                <button onclick="WapCalibrationSystem.toggleAddHistoryForm('${item.id}', false)" style="background: none; border: none; color: var(--doc-text-muted); font-size: 12px; cursor: pointer; font-weight: 900;">Cancel ✕</button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Calibration Date</label>
+                    <input type="date" id="hist-new-date" value="${new Date().toISOString().split('T')[0]}" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px;" onchange="WapCalibrationSystem.updateHistoryNewDueDate('${item.frequency || '12 M'}')">
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Certificate Reference No.</label>
+                    <input type="text" id="hist-new-cert" value="CAL-${item.code_no || item.id}-${new Date().getFullYear()}" class="tech-input" style="background: var(--doc-input-bg); color: #2563eb; border-color: var(--doc-input-border); font-family: 'DM Mono', monospace; height: 36px; border-radius: 8px; font-weight: 800;">
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Accredited Laboratory / Agency</label>
+                    <input type="text" id="hist-new-lab" value="NA Caltechnologies Co., Ltd." list="hist-lab-list" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px;">
+                    <datalist id="hist-lab-list">
+                        <option value="NA Caltechnologies Co., Ltd.">
+                        <option value="Internal QA Metrology Laboratory">
+                        <option value="Thai-German Institute (TGI)">
+                        <option value="National Institute of Metrology (NIMT)">
+                        <option value="Mitutoyo Calibration Laboratory">
+                    </datalist>
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Inspection Result</label>
+                    <select id="hist-new-result" class="tech-input" style="background: var(--doc-input-bg); color: #059669; border-color: var(--doc-input-border); font-weight: 900; height: 36px; border-radius: 8px;">
+                        <option value="PASSED" style="color:#059669; font-weight:bold;">✅ PASSED (In Tolerance)</option>
+                        <option value="PASSED (ADJUSTED)" style="color:#d97706; font-weight:bold;">⚠️ PASSED (After Adjustment)</option>
+                        <option value="REJECTED" style="color:#dc2626; font-weight:bold;">❌ REJECTED (Out of Spec)</option>
+                    </select>
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Measured Deviation</label>
+                    <input type="text" id="hist-new-dev" placeholder="+0.001 mm" value="+0.001 mm" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px; font-weight: 800;">
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Inspector / Calibrated By</label>
+                    <input type="text" id="hist-new-tech" value="PHETSAYAM" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px;">
+                </div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;">
+                <div style="flex: 1; min-width: 240px;">
+                    <input type="text" id="hist-new-notes" placeholder="Remarks / Standards Traceability (e.g. ISO/IEC 17025 conformity verified, NIST traceable standard...)" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px;">
+                </div>
+                <button type="button" onclick="WapCalibrationSystem.saveHistoryNewEntry('${item.id}')"
+                        class="cal-doc-btn cal-doc-btn-emerald" style="padding: 8px 22px;">
+                    Save Official Cycle Record
+                </button>
+            </div>
+        </div>
+
+        <!-- Chronological Timeline Log List Area -->
+        <div class="cal-doc-body" style="flex: 1; overflow-y: auto; padding: 20px 24px;">
+            <div class="cal-history-timeline" style="--rail-color: var(--doc-timeline-rail);">
+                ${sortedLogs.map((log, index) => {
+                    const isLatest = (index === 0 && sortOrder === 'desc') || (index === sortedLogs.length - 1 && sortOrder === 'asc');
+                    const isPassed = log.result && log.result.includes('PASS');
+                    const resBadgeBg = isPassed ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5') : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2');
+                    const resBadgeBorder = isPassed ? '#10b981' : '#ef4444';
+                    const resBadgeText = isPassed ? (isDark ? '#34d399' : '#059669') : (isDark ? '#f87171' : '#dc2626');
+
+                    return `
+                    <div class="cal-doc-card cal-history-card ${isLatest ? 'is-latest' : ''}" style="border-radius: 14px; padding: 14px 18px; margin-bottom: 16px;">
+                        <div class="cal-history-dot ${isLatest ? 'latest' : ''}" style="${isLatest ? 'background:#10b981;' : 'background:#2563eb;'}"></div>
+                        
+                        <!-- Card Header: Date + Cycle Identifier + Result Stamp -->
+                        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <span style="font-size: 14px; font-weight: 900; color: var(--doc-text-main); font-family: 'DM Mono', monospace;">
+                                        📅 ${formatChronologicalDate(log.date)}
+                                    </span>
+                                    ${isLatest ? `
+                                        <span style="background: ${isDark ? 'rgba(37, 99, 235, 0.25)' : '#dbeafe'}; border: 1px solid #2563eb; color: ${isDark ? '#93c5fd' : '#1d4ed8'}; font-size: 9px; font-weight: 900; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
+                                            ACTIVE LATEST CYCLE
+                                        </span>
+                                    ` : `
+                                        <span style="background: var(--doc-surface-subtle); border: 1px solid var(--doc-border-subtle); color: var(--doc-text-muted); font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 4px; text-transform: uppercase;">
+                                            CYCLE RECORD
+                                        </span>
+                                    `}
+                                    <span style="background: var(--doc-surface); border: 1px solid var(--doc-border-subtle); color: var(--doc-text-body); font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-family: 'DM Mono', monospace;">
+                                        ${log.cert_no || 'CERT-N/A'}
+                                    </span>
+                                </div>
+                                <div style="font-size: 10.5px; color: var(--doc-text-muted); font-weight: 700; margin-top: 3px;">
+                                    Laboratory: <span style="color: #2563eb; font-weight: 800;">${log.lab || 'Accredited Calibration Lab'}</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="background: ${resBadgeBg}; border: 1px solid ${resBadgeBorder}; color: ${resBadgeText}; font-size: 10px; font-weight: 950; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.06em; display: flex; align-items: center; gap: 5px;">
+                                    <span>${isPassed ? '✓' : '✕'}</span>
+                                    <span>${log.result || 'PASSED'}</span>
+                                </div>
+                                ${logs.length > 1 ? `
+                                <button onclick="WapCalibrationSystem.deleteHistoryLog('${item.id}', '${log.id || log.cert_no}')"
+                                        title="Delete this cycle record"
+                                        style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; width: 26px; height: 26px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: 0.2s;"
+                                        onmouseover="this.style.background='#ef4444'; this.style.color='#fff';"
+                                        onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'; this.style.color='#ef4444';">
+                                    ✕
+                                </button>` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Technical Parameter Grid (Formal Inspection Sheet Readout) -->
+                        <div class="cal-doc-param-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px; padding: 10px 12px; border-radius: 10px; margin-bottom: 10px;">
+                            <div>
+                                <div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Measured Deviation</div>
+                                <div style="font-size: 12px; font-weight: 900; color: var(--doc-param-accent); font-family: 'DM Mono', monospace;">${log.deviation || '0.000 mm'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Tolerance / MPE</div>
+                                <div style="font-size: 11.5px; font-weight: 800; color: var(--doc-param-val); font-family: 'DM Mono', monospace;">${log.tolerance || '±0.010 mm'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Next Due Deadline</div>
+                                <div style="font-size: 12px; font-weight: 900; color: #059669; font-family: 'DM Mono', monospace;">${log.next_due || '-'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Ambient Condition</div>
+                                <div style="font-size: 10.5px; font-weight: 700; color: var(--doc-text-body);">${log.env_temp || '20.0°C / 50% RH'}</div>
+                            </div>
+                            <div>
+<div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Calibrated By (PIC)</div>
+<div style="font-size: 11.5px; font-weight: 800; color: var(--doc-text-main);">PHETSAYAM</div>
+                            </div>
+                        </div>
+
+                        <!-- Remarks & Traceability Footer -->
+                        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; font-size: 10.5px; color: var(--doc-text-muted);">
+                            <div style="font-style: italic;">
+                                📝 ${log.notes || 'Routine calibration inspection verified in tolerance.'}
+                            </div>
+                            <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
+                                Standard: <span style="color: var(--doc-text-body); font-weight: 900;">${log.traceability || 'ISO/IEC 17025 & NIST TRACEABLE'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+
+        <!-- Official Document Footer -->
+        <div class="cal-doc-footer" style="padding: 12px 22px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <div style="font-size: 10px; color: var(--doc-text-muted); font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <span>🔒 ISO/IEC 17025 Metrology Quality Control &bull; Formal System Audit Trail</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button onclick="WapCalibrationSystem.printCalibrationHistory('${item.id}')"
+                        class="cal-doc-btn cal-doc-btn-default" style="font-size: 11px;">
+                    🖨️ Print Certificate Sheet
+                </button>
+                <button onclick="document.getElementById('cal-history-modal-overlay').remove()"
+                        class="cal-doc-btn cal-doc-btn-primary" style="padding: 7px 22px;">
+                    Close Ledger
+                </button>
+            </div>
+        </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+function toggleHistoryModalTheme(id, sortOrder) {
+    if (typeof toggleTheme === 'function') {
+        toggleTheme();
+    } else {
+        const body = document.body;
+        const isDark = body.classList.toggle('dark-mode');
+        localStorage.setItem('carrier_theme', isDark ? 'dark' : 'light');
+    }
+    displayCalibrationHistory(id, sortOrder);
+}
+
+function printCalibrationHistory(id) {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
+    if (!item) return;
+    const rawLogs = ensureInstrumentLogs(item);
+    const logs = Array.isArray(rawLogs) ? rawLogs : [];
+    const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const picVal = extractResponsiblePerson(item);
+
+    const printWin = window.open('', '_blank', 'width=920,height=820');
+    if (!printWin) {
+        if (typeof toast === 'function') toast("⚠️ กรุณาอนุญาตป๊อปอัปเพื่อเปิดหน้าต่างพิมพ์รายงาน", "warning");
+        return;
+    }
+
+    const printHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Calibration Record - ${item.code_no || item.id}</title>
+        <style>
+            @page { size: A4 portrait; margin: 15mm 15mm 15mm 15mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 0; padding: 20px; background: #fff; line-height: 1.4; font-size: 11.5px; }
+            .header-banner { border-bottom: 2.5px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start; }
+            .company-name { font-size: 16px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; }
+            .doc-title { font-size: 13px; font-weight: 800; color: #334155; text-transform: uppercase; margin-top: 2px; }
+            .doc-meta { font-size: 9px; color: #64748b; font-weight: 700; margin-top: 2px; }
+            .meta-box { border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; background: #f8fafc; }
+            .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 11px; }
+            .meta-label { font-weight: 800; color: #64748b; font-size: 8.5px; text-transform: uppercase; }
+            .meta-val { font-weight: 900; color: #0f172a; margin-top: 1px; }
+            table.history-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            table.history-table th { background: #1e3a8a; color: #fff; padding: 6px 8px; font-size: 9.5px; text-align: left; text-transform: uppercase; border: 1px solid #1e3a8a; }
+            table.history-table td { border: 1px solid #e2e8f0; padding: 6px 8px; font-size: 10px; vertical-align: top; }
+            table.history-table tr:nth-child(even) { background: #f8fafc; }
+            .badge-pass { background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px; border: 1px solid #86efac; display: inline-block; }
+            .badge-fail { background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px; border: 1px solid #fca5a5; display: inline-block; }
+            .sign-section { margin-top: 36px; display: flex; justify-content: space-between; page-break-inside: avoid; }
+            .sign-box { width: 220px; text-align: center; border-top: 1px solid #64748b; padding-top: 6px; font-size: 10.5px; }
+            .no-print { margin-bottom: 12px; text-align: right; }
+            @media print {
+                .no-print { display: none !important; }
+                body { padding: 0; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="no-print">
+            <button onclick="window.print()" style="padding: 6px 18px; background: #1e3a8a; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🖨️ Print Document / Save PDF</button>
+        </div>
+
+        <div class="header-banner">
+            <div>
+                <div class="company-name">CARRIER QUALITY ASSURANCE &amp; METROLOGY DIVISION</div>
+                <div class="doc-title">OFFICIAL CALIBRATION HISTORY &amp; METROLOGY TRACEABILITY LEDGER</div>
+                <div class="doc-meta">DOCUMENT FORM NO: QA-CAL-REC-08 &bull; ISO/IEC 17025:2017 &amp; NIST TRACEABLE</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 11px; font-weight: 900; color: #1e3a8a; font-family: monospace;">TAG: ${item.code_no || item.id}</div>
+                <div style="font-size: 9px; color: #64748b;">Printed: ${new Date().toLocaleDateString('en-GB')}</div>
+            </div>
+        </div>
+
+        <div class="meta-box">
+            <div class="meta-grid">
+                <div><div class="meta-label">Control Tag / Code:</div><div class="meta-val">${item.code_no || item.id}</div></div>
+                <div><div class="meta-label">Instrument Name:</div><div class="meta-val">${item.name || '-'}</div></div>
+                <div><div class="meta-label">Maker / Brand:</div><div class="meta-val">${item.maker || '-'}</div></div>
+                <div><div class="meta-label">Model Number:</div><div class="meta-val">${item.model || '-'}</div></div>
+                <div><div class="meta-label">Serial Number (S/N):</div><div class="meta-val">${item.serial || '-'}</div></div>
+                <div><div class="meta-label">Department / Area:</div><div class="meta-val">${item.dept || '-'}</div></div>
+                <div><div class="meta-label">Custodian (PIC):</div><div class="meta-val">${picVal || '-'}</div></div>
+                <div><div class="meta-label">Calibration Frequency:</div><div class="meta-val">${item.frequency || '12 M'}</div></div>
+            </div>
+        </div>
+
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th style="width: 30px;">#</th>
+                    <th>Cal Date</th>
+                    <th>Certificate No.</th>
+                    <th>Laboratory / Agency</th>
+                    <th>Deviation / MPE</th>
+                    <th>Next Due</th>
+                    <th>Result</th>
+                    <th>Calibrated By</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sorted.map((l, i) => `
+                <tr>
+                    <td style="font-weight: bold; text-align: center;">${i + 1}</td>
+                    <td style="font-weight: bold;">${l.date}</td>
+                    <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">${l.cert_no || '-'}</td>
+                    <td>${l.lab || '-'}</td>
+                    <td>
+                        <div>Dev: <b>${l.deviation || '-'}</b></div>
+                        <div style="font-size: 8.5px; color: #64748b;">MPE: ${l.tolerance || '±0.010 mm'}</div>
+                    </td>
+                    <td style="font-weight: bold; color: #15803d;">${l.next_due || '-'}</td>
+                    <td><span class="${l.result && l.result.includes('PASS') ? 'badge-pass' : 'badge-fail'}">${l.result || 'PASSED'}</span></td>
+                    <td>PHETSAYAM</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td colspan="7" style="font-size: 9px; color: #475569; padding-top: 3px; padding-bottom: 6px; font-style: italic;">
+                        Remarks: ${l.notes || 'Routine calibration verified.'} | Standard: ${l.traceability || 'ISO/IEC 17025'}
+                    </td>
+                </tr>
+                `).join('')}
+            </tbody>
+        </table>
+
+        <div class="sign-section">
+            <div class="sign-box">
+                <div><b>Prepared / Verified By</b></div>
+                <div style="height: 38px;"></div>
+                <div>(${picVal || 'PHETSAYAM'})</div>
+                <div style="font-size: 8.5px; color: #64748b;">Metrology Calibration Officer</div>
+            </div>
+            <div class="sign-box">
+                <div><b>Approved By (QA Department)</b></div>
+                <div style="height: 38px;"></div>
+                <div>(QA Department Manager)</div>
+                <div style="font-size: 8.5px; color: #64748b;">Quality Assurance Division</div>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    printWin.document.open();
+    printWin.document.write(printHtml);
+    printWin.document.close();
+}
+
+
+function toggleAddHistoryForm(id, forceOpen) {
+    const drawer = document.getElementById('cal-history-new-entry-drawer');
+    if (!drawer) return;
+    if (typeof forceOpen === 'boolean') {
+        drawer.style.display = forceOpen ? 'block' : 'none';
+    } else {
+        drawer.style.display = (drawer.style.display === 'none') ? 'block' : 'none';
+    }
+}
+
+function updateHistoryNewDueDate(freqStr) {
+    const dateInput = document.getElementById('hist-new-date');
+    if (!dateInput) return;
+    const certInput = document.getElementById('hist-new-cert');
+    if (certInput && dateInput.value) {
+        const year = dateInput.value.split('-')[0];
+        const curCert = certInput.value;
+        if (curCert.includes('CAL-')) {
+            const parts = curCert.split('-');
+            if (parts.length >= 3) {
+                parts[parts.length - 1] = year;
+                certInput.value = parts.join('-');
+            }
+        }
+    }
+}
+
+async function saveHistoryNewEntry(id) {
+    const item = _data.find(x => String(x.id) === String(id));
+    if (!item) return;
+
+    const dateVal = document.getElementById('hist-new-date') ? document.getElementById('hist-new-date').value : '';
+    const certVal = document.getElementById('hist-new-cert') ? document.getElementById('hist-new-cert').value.trim() : '';
+    const labVal = document.getElementById('hist-new-lab') ? document.getElementById('hist-new-lab').value.trim() : 'NA Caltechnologies Co., Ltd.';
+    const resVal = document.getElementById('hist-new-result') ? document.getElementById('hist-new-result').value : 'PASSED';
+    const devVal = document.getElementById('hist-new-dev') ? document.getElementById('hist-new-dev').value.trim() : '+0.000 mm';
+    const techVal = document.getElementById('hist-new-tech') ? document.getElementById('hist-new-tech').value.trim() : 'PHETSAYAM';
+    const notesVal = document.getElementById('hist-new-notes') ? document.getElementById('hist-new-notes').value.trim() : 'Calibration cycle updated.';
+
+    if (!dateVal) {
+        if (typeof toast === 'function') toast("⚠️ กรุณาระบุวันที่สอบเทียบ", "error");
+        return;
+    }
+
+    const calculatedDueDate = calculateDueDateString(dateVal, item.frequency || '12 M');
+
+    const newLog = {
+        id: `LOG-${item.id}-${Date.now()}`,
+        date: dateVal,
+        next_due: calculatedDueDate,
+        cert_no: certVal || `CAL-${item.code_no || item.id}-${dateVal.split('-')[0]}`,
+        lab: labVal,
+        result: resVal,
+        type: 'ROUTINE_CALIBRATION',
+        deviation: devVal,
+        tolerance: '±0.010 mm',
+        uncertainty: 'U = 0.0014 mm (k=2)',
+        env_temp: '20.0°C / 50% RH',
+        technician: techVal,
+        traceability: 'ISO/IEC 17025 Certified',
+        notes: notesVal
+    };
+
+    const logs = ensureInstrumentLogs(item);
+    logs.push(newLog);
+    item.calibration_logs = logs;
+
+    // อัปเดตข้อมูลหลักของเครื่องมือ (last_cal และ next_due)
+    item.last_cal = dateVal;
+    item.next_due = calculatedDueDate;
+    if (calculatedDueDate !== '-') {
+        const d = new Date(calculatedDueDate);
+        if (!isNaN(d.getTime())) {
+            item.month = d.toLocaleString('en-US', { month: 'long' });
+        }
+    }
+    item.status = (resVal === 'REJECTED') ? 'EXPIRED' : 'NORMAL';
+
+    // บันทึกลง LocalDB และ Supabase
+    try {
+        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+            await localDB.calibrationMaster.put(item);
+        }
+    } catch(e) {}
+    syncToCloud(item);
+
+    // วาดตารางใหม่และรีเฟรชหน้าประวัติ
+    render();
+    updateOverdueBadge();
+    displayCalibrationHistory(item.id, 'desc');
+
+    if (typeof toast === 'function') toast(`✅ บันทึกประวัติการสอบเทียบและปรับปรุงวันครบกำหนดเป็น ${calculatedDueDate} เรียบร้อย`, "success");
+}
+
+async function deleteHistoryLog(instrumentId, logIdOrCert) {
+    const item = (_data || []).find(x => x && String(x.id) === String(instrumentId));
+    if (!item) return;
+
+    const rawLogs = ensureInstrumentLogs(item);
+    const logs = Array.isArray(rawLogs) ? rawLogs : [];
+    if (logs.length <= 1) {
+        if (typeof toast === 'function') toast("⚠️ ไม่สามารถลบประวัติรายการเดียวที่เหลืออยู่ได้", "warning");
+        return;
+    }
+
+    const idx = logs.findIndex(l => (l.id === logIdOrCert || l.cert_no === logIdOrCert));
+    if (idx === -1) return;
+
+    logs.splice(idx, 1);
+    item.calibration_logs = logs;
+
+    // อัปเดตสถานะและวันสอบเทียบล่าสุดตามรายการที่เหลือ
+    const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (sorted.length > 0) {
+        item.last_cal = sorted[0].date;
+        item.next_due = sorted[0].next_due;
+    }
+
+    try {
+        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+            await localDB.calibrationMaster.put(item);
+        }
+    } catch(e) {}
+    syncToCloud(item);
+
+    render();
+    updateOverdueBadge();
+    displayCalibrationHistory(item.id, 'desc');
+    if (typeof toast === 'function') toast("🗑️ ลบรายการประวัติการสอบเทียบเรียบร้อย", "info");
+}
+
+function copyHistorySummary(id) {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
+    if (!item) return;
+    const rawLogs = ensureInstrumentLogs(item);
+    const logs = Array.isArray(rawLogs) ? rawLogs : [];
+    const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    let text = `=== CALIBRATION CHRONOLOGICAL HISTORY REPORT ===\n`;
+    text += `Instrument ID: ${item.id}\n`;
+    text += `Name: ${item.name}\n`;
+    text += `Brand/Model: ${item.maker || '-'} / ${item.model || '-'}\n`;
+    text += `Serial No: ${item.serial || '-'}\n`;
+    text += `Department: ${item.dept || '-'}\n`;
+    text += `Responsible: ${extractResponsiblePerson(item)}\n`;
+    text += `Cycle Frequency: ${item.frequency || '12 M'}\n`;
+    text += `-------------------------------------------------\n`;
+    sorted.forEach((l, i) => {
+        text += `[#${i + 1}] Date: ${l.date} | Cert: ${l.cert_no} | Status: ${l.result}\n`;
+        text += `     Lab: ${l.lab} | Deviation: ${l.deviation || '-'} | Next Due: ${l.next_due}\n`;
+        text += `     Inspector: ${l.technician || '-'} | Notes: ${l.notes || '-'}\n`;
+    });
+    text += `=================================================`;
+
+    if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).then(() => {
+            if (typeof toast === 'function') toast("📋 คัดลอกสรุปประวัติการสอบเทียบเรียบร้อย", "success");
+        }).catch(() => {
+            prompt("คัดลอกข้อความสรุปประวัติ:", text);
+        });
+    } else {
+        prompt("คัดลอกข้อความสรุปประวัติ:", text);
+    }
+}
+
+// ส่วนท้ายของโมดูล WapCalibrationSystem ใน script.js
+    
+    return { 
+        init, 
+        render, 
+        resetStatusFilter,
+        setViewMode,
+        changeCalendarMonth,
+        goToCurrentMonth,
+        jumpCalendarMonth,
+        selectCalendarDate,
+        renderCalendar,
+        openDayTasksModal,
+        quickMarkCalibrated,
+        sendForCalibration,
+        executeSendForCalibration,
+        showNotDueAlert,
+        showInCalAlert,
+        toggleSelectRow,
+        toggleSelectAll,
+        selectAllFiltered,
+        clearSelection,
+        openBulkCalibrateModal,
+        openBatchEditNotesModal,
+        applyBatchNoteTemplate,
+        removeBatchItem,
+        applyBatchHistoryNotes,
+        updateBulkBarUI,
+        getOverdueCount,
+        updateOverdueBadge,
+        goToOverdue,
+        triggerUpload, 
+        openAddModal, 
+        openEditModal, 
+        openMetrologyViewer,
+        displayCalibrationHistory,
+        openCalibrationHistory: displayCalibrationHistory,
+        toggleHistoryModalTheme,
+        printCalibrationHistory,
+        toggleAddHistoryForm,
+        updateHistoryNewDueDate,
+        saveHistoryNewEntry,
+        deleteHistoryLog,
+        copyHistorySummary,
+        ensureInstrumentLogs,
+        handleRegImage, 
+        handleSaveNew,
+        calcDue, 
+        handleImg, 
+        saveNew,
+        autoFillPicFromGroup,
+        extractResponsiblePerson,
+        triggerImport, 
+        handleImport,
+        clearAll, 
+        syncCalibrationData,
+        syncAllToCloud,
+        loadFromCloud,
+        getInstrumentImageUrl,
+        INSTRUMENT_IMAGE_MAP,
+        exportCSV: () => toast("Exporting CSV...", "info") 
+    };
+})(); // ปิดโมดูล
+window.WapCalibrationSystem = WapCalibrationSystem;
+window.syncCalibrationData = function(silent) {
+    if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.syncCalibrationData === 'function') {
+        return window.WapCalibrationSystem.syncCalibrationData(silent);
+    }
+};
+window.displayCalibrationHistory = function(id, sortOrder) {
+    if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.displayCalibrationHistory === 'function') {
+        window.WapCalibrationSystem.displayCalibrationHistory(id, sortOrder);
+    }
+};
+window.openCalibrationHistory = window.displayCalibrationHistory;
+window.printCalibrationHistory = function(id) {
+    if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.printCalibrationHistory === 'function') {
+        window.WapCalibrationSystem.printCalibrationHistory(id);
+    }
+};
+
+
+// อัปเดตตัวเลขแจ้งเตือน Overdue ที่กระดิ่งทันทีเมื่อโหลดหน้าเว็บ
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.updateOverdueBadge === 'function') {
+            window.WapCalibrationSystem.updateOverdueBadge();
+        }
+    }, 200);
+});
+setTimeout(() => {
+    if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.updateOverdueBadge === 'function') {
+        window.WapCalibrationSystem.updateOverdueBadge();
+    }
+}, 500);
 window.resolveCaseIdByControlNo = resolveCaseIdByControlNo;
 // --- ส่วนเชื่อมต่อฟังก์ชันจากภายในสคริปต์ ออกไปให้ปุ่มใน HTML ใช้งานได้ ---
 
