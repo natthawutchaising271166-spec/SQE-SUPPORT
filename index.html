@@ -47,7 +47,7 @@
     </div>
     <button  onclick="this.parentElement.style.display='none'" class="banner-close" title="Close" aria-label="Close">✕</button>
 </div>
-<div id="maintenance-view" class="jarvis-maintenance">
+<div id="maintenance-view" class="jarvis-maintenance hidden-view" style="display: none;">
     <!-- พื้นหลังดวงดาวพุ่ง -->
     <canvas id="starfield"></canvas>
     
@@ -142,17 +142,61 @@
     </div>
     
             <div class="login-tab-switcher">
-                <button  id="tab-support" onclick="switchLoginTab('staff')" class="login-tab-btn active" title="SQE SUPPORT" aria-label="SQE SUPPORT">SQE SUPPORT</button>
+                <button  id="tab-support" onclick="switchLoginTab('sqe_support')" class="login-tab-btn active" title="SQE SUPPORT" aria-label="SQE SUPPORT">SQE SUPPORT</button>
                 <button  id="tab-supervisor" onclick="switchLoginTab('supervisor')" class="login-tab-btn" title="SUPERVISOR" aria-label="SUPERVISOR">SUPERVISOR</button>
             </div>
 
             <div class="login-input-area">
     <div class="space-y-5">
-        <!-- 1. Email Input พร้อม Real-time Validation -->
-        <div class="input-group">
+        <!-- 1. Email Input พร้อม Real-time Validation & Datalist -->
+        <div id="email-input-group" class="input-group">
             <label class="input-tiny-label">Access Email</label>
-            <input  type="email" id="login-email" class="premium-input" placeholder="name@carrier.com" oninput="validateEmail(this)" title="Name@Carrier.Com" aria-label="Name@Carrier.Com">
+            <input  type="email" id="login-email" list="login-email-list" class="premium-input" placeholder="name@carrier.com" oninput="validateEmail(this)" title="Name@Carrier.Com" aria-label="Name@Carrier.Com">
+            <datalist id="login-email-list"></datalist>
             <p id="email-hint" class="hidden text-[8px] mt-1 font-bold text-rose-400 uppercase tracking-tighter">โปรดระบุอีเมลองค์กรที่ถูกต้อง</p>
+        </div>
+
+        <!-- Quick Select for Approvers & Engineers (4. Engineering & Reports / 5. Approval Matrix) -->
+        <div id="supervisor-quick-select-wrap" class="hidden input-group relative">
+            <div class="flex items-center justify-between mb-1.5 gap-2 flex-nowrap w-full">
+                <div class="flex items-center gap-1.5 whitespace-nowrap shrink-0 min-w-0">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
+                    <span class="text-[9px] font-black uppercase tracking-wider text-blue-300 whitespace-nowrap">ACCESS APPROVER / ENGINEER</span>
+                </div>
+                <span class="text-[8.5px] font-black text-emerald-400 uppercase tracking-wider bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-500/40 whitespace-nowrap shrink-0">⚡ ENGINEER+ ONLY</span>
+            </div>
+            <div class="relative w-full">
+                <div class="relative flex items-center">
+                    <input type="text" 
+                           id="login-supervisor-input" 
+                           placeholder="🔍 ค้นหา / เลือกวิศวกรและหัวหน้างาน..." 
+                           class="premium-input pr-9 text-xs font-semibold text-white bg-slate-900/90 border-blue-500/40 focus:border-blue-400 cursor-pointer" 
+                           autocomplete="off"
+                           oninput="handleSupervisorInput(this.value)"
+                           onfocus="renderSupervisorLoginDropdown(this.value)"
+                           onclick="renderSupervisorLoginDropdown(this.value)"
+                           title="เลือกหัวหน้างาน / ผู้อนุมัติ / วิศวกร" 
+                           aria-label="เลือกหัวหน้างาน / ผู้อนุมัติ / วิศวกร">
+                    <button type="button" 
+                            id="login-supervisor-chevron-btn"
+                            onclick="toggleSupervisorLoginDropdown(event)" 
+                            class="absolute right-2 text-slate-400 hover:text-white transition-all p-1"
+                            title="แสดงรายชื่อ" 
+                            aria-label="แสดงรายชื่อ">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Custom Dropdown Container styled like Claim Modal AC -->
+                <div id="login-supervisor-dropdown" 
+                     class="hidden absolute top-full left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-xl bg-slate-950/95 border border-blue-500/50 shadow-2xl z-[99999] backdrop-blur-xl p-1.5 custom-scrollbar text-left">
+                </div>
+            </div>
+            <select id="login-supervisor-select" onchange="handleSupervisorQuickSelect(this.value)" class="hidden">
+                <option value="">-- เลือกหัวหน้างาน / ผู้อนุมัติ / วิศวกร --</option>
+            </select>
         </div>
         
         <!-- 2. Password Input พร้อม Toggle & Caps Lock Detection -->
@@ -444,7 +488,7 @@
 </aside>
 <div id="sidebar-backdrop" onclick="toggleSidebar('close')"></div>
         <main class="flex-1 flex flex-col overflow-hidden bg-slate-50 min-w-0">
-<header class="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-2 sm:px-3 md:px-4 h-14 min-h-[56px] flex items-center justify-between gap-1.5 sm:gap-2 z-30 flex-nowrap overflow-x-auto scrollbar-none min-w-0">
+<header class="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-2 sm:px-3 md:px-4 h-14 min-h-[56px] flex items-center justify-between gap-1.5 sm:gap-2 relative z-50 overflow-visible min-w-0">
     <!-- [กลุ่มฝั่งซ้าย]: ปุ่มเมนูมือถือ + หัวข้อหน้า + ปุ่มสลับแท็บ SQE EN -->
     <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <button  onclick="toggleSidebar('open')" class="sm:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200 mr-1" title="Toggle Sidebar" aria-label="Toggle Sidebar">
@@ -476,17 +520,6 @@
             VF Running
         </button>
         <button id="btn-rn-tab-rp" onclick="WapRNSystem.switchRnTab('rp')" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-rose-600" title="RP Running">
-            RP Running
-        </button>
-    </div>
-</div>
-<!-- แถบสลับหน้า Running Number ใน Header -->
-<div id="rn-header-tools" class="hidden items-center gap-1.5 flex-nowrap shrink-0 ml-1.5">
-    <div class="flex bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-inner items-center gap-0.5">
-        <button id="btn-rn-tab-vf" onclick="WapRNSystem.switchRnTab('vf')" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all bg-blue-600 text-white shadow-sm">
-            VF Running
-        </button>
-        <button id="btn-rn-tab-rp" onclick="WapRNSystem.switchRnTab('rp')" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-rose-600">
             RP Running
         </button>
     </div>
@@ -546,11 +579,73 @@
 
     <!-- [กลุ่มฝั่งขวาสุด]: Online Badge + Staff Selector + Filter Bar -->
     <div class="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0 flex-nowrap">
-        <!-- ดรอปดาวน์พนักงาน -->
-        <div id="staff-selector-wrap" class="hidden items-center gap-1 shrink-0">
+        <!-- ดรอปดาวน์พนักงาน (Custom Dropdown สำหรับ Supervisor) -->
+        <div id="staff-selector-wrap" class="hidden items-center gap-1 shrink-0 relative z-50">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">:</span>
-            <select  id="staff-filter-select" class="staff-select" onchange="onStaffSelect(this.value)" title="Staff Filter Select" aria-label="Staff Filter Select">
-                <option value="">-- เลือกพนักงาน --</option>
+            <div class="relative">
+                <button type="button" 
+                        id="staff-custom-select-btn" 
+                        onclick="window.toggleStaffCustomDropdown(event)"
+                        class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-2xs transition-all duration-150 cursor-pointer min-w-[170px] max-w-[240px] justify-between"
+                        title="เลือกผู้ปฏิบัติงาน"
+                        aria-label="เลือกผู้ปฏิบัติงาน">
+                    <div class="flex items-center gap-1.5 truncate">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 shrink-0"></span>
+                        <span id="staff-custom-select-label" class="truncate font-bold">-- เลือกผู้ปฏิบัติงาน --</span>
+                    </div>
+                    <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0 transition-transform duration-200" id="staff-select-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+
+                <!-- Custom Dropdown Panel -->
+                <div id="staff-custom-dropdown-panel" 
+                     class="hidden absolute right-0 top-full mt-1.5 w-80 max-h-96 flex-col rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 shadow-2xl z-[999999] backdrop-blur-xl transition-all overflow-hidden">
+                    <!-- Search header & Category Chips -->
+                    <div class="p-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex flex-col gap-2">
+                        <div class="flex items-center justify-between px-0.5">
+                            <span class="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                ผู้ปฏิบัติงานในระบบ
+                            </span>
+                            <span id="staff-custom-count-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/60">
+                                0 คน
+                            </span>
+                        </div>
+                        <div class="relative flex items-center">
+                            <span class="absolute left-2.5 text-slate-400 text-xs">🔍</span>
+                            <input type="text" 
+                                   id="staff-custom-search-input" 
+                                   placeholder="ค้นหาชื่อ, อีเมล หรือตำแหน่ง..." 
+                                   class="w-full pl-7 pr-7 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-500 transition-all"
+                                   oninput="window.filterStaffCustomDropdown(this.value)"
+                                   onkeydown="window.handleStaffDropdownKeydown(event)"
+                                   onclick="event.stopPropagation()">
+                            <button type="button" 
+                                    id="staff-custom-search-clear" 
+                                    onclick="window.clearStaffDropdownSearch(event)"
+                                    class="hidden absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-4 h-4 rounded-full items-center justify-center bg-slate-100 dark:bg-slate-800 transition-colors"
+                                    title="ล้างคำค้นหา">✕</button>
+                        </div>
+                        <!-- Quick Role Filters -->
+                        <div id="staff-custom-role-filters" class="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
+                            <button type="button" onclick="window.setStaffRoleFilter('ALL', event)" class="staff-role-chip active px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider transition-all bg-blue-600 text-white shadow-2xs">ALL</button>
+                            <button type="button" onclick="window.setStaffRoleFilter('IQC', event)" class="staff-role-chip px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">IQC</button>
+                            <button type="button" onclick="window.setStaffRoleFilter('ENGINEER', event)" class="staff-role-chip px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">EN</button>
+                            <button type="button" onclick="window.setStaffRoleFilter('SUPERVISOR', event)" class="staff-role-chip px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">SUP</button>
+                            <button type="button" onclick="window.setStaffRoleFilter('MANAGER', event)" class="staff-role-chip px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">MGR</button>
+                        </div>
+                    </div>
+                    <!-- Staff List items container -->
+                    <div id="staff-custom-list-container" class="p-1.5 overflow-y-auto max-h-64 custom-scrollbar flex flex-col gap-1">
+                        <!-- Items populated dynamically -->
+                    </div>
+                </div>
+            </div>
+            <!-- Hidden native select kept for compatibility -->
+            <select id="staff-filter-select" class="hidden" onchange="onStaffSelect(this.value)" title="Staff Filter Select" aria-label="Staff Filter Select">
+                <option value="">-- เลือกผู้ปฏิบัติงาน --</option>
+
             </select>
         </div>
 

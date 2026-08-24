@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 3000 --host",
-    "build": "mkdir -p public && cp script.js public/script.js && cp styles.css public/styles.css && vite build",
+    "build": "mkdir -p public && cp script.js public/script.js && vite build",
     "preview": "vite preview --port 3000",
     "lint": "echo 'No lint errors found.'"
   },

@@ -187,8 +187,17 @@ window.unlockMaintenanceForAdmin = function() {
     window.adminBypass = true;
     const mtx = document.getElementById('maintenance-view');
     const login = document.getElementById('login-view');
-    if (mtx) mtx.classList.add('hidden-view');
-    if (login) {
+    const dash = document.getElementById('dashboard-view');
+    if (mtx) {
+        mtx.classList.add('hidden-view');
+        mtx.style.display = 'none';
+    }
+    if (window.S && window.S.isLoggedIn) {
+        if (dash) {
+            dash.classList.remove('hidden-view');
+            dash.style.display = 'flex';
+        }
+    } else if (login) {
         login.classList.remove('hidden-view');
         login.style.display = 'flex';
     }
@@ -4068,12 +4077,16 @@ const STAFF_EMAIL_MAP = {
     "Mr.Anuchit A.": "anuchit.arnoon@carrier.com",
     "Anuchit A.": "anuchit.arnoon@carrier.com",
     "Mr. Anuchit A.": "anuchit.arnoon@carrier.com",
-    "Mr.Eueangkoon S.": "EUEANGKOON.SEESANIT@carrier.com",
-    "Eueangkoon S.": "EUEANGKOON.SEESANIT@carrier.com",
-    "Mr. Eueangkoon S.": "EUEANGKOON.SEESANIT@carrier.com",
+    "Anuchit Arnoon": "anuchit.arnoon@carrier.com",
+    "Mr.Eueangkoon S.": "eueangkoon.seesanit@carrier.com",
+    "Eueangkoon S.": "eueangkoon.seesanit@carrier.com",
+    "Mr. Eueangkoon S.": "eueangkoon.seesanit@carrier.com",
+    "Eueangkoon Seesanit": "eueangkoon.seesanit@carrier.com",
+    "Mr. Eueangkoon Seesanit": "eueangkoon.seesanit@carrier.com",
     "Mr.Meechai T.": "meechai.thawornpong@carrier.com",
     "Meechai T.": "meechai.thawornpong@carrier.com",
     "Mr. Meechai T.": "meechai.thawornpong@carrier.com",
+    "Meechai Thawornpong": "meechai.thawornpong@carrier.com",
     
     // Electronic
     "Mr.Puriwat S.": "puriwat.sangjan@carrier.com",
@@ -4095,6 +4108,9 @@ const STAFF_EMAIL_MAP = {
     "Pakon M.": "pakon.muanglen@carrier.com",
 
     // Approved Team / Leadership
+    "Mr.Suphap M.": "suphap.m@carrier.com",
+    "Suphap M.": "suphap.m@carrier.com",
+    "Mr. Suphap M.": "suphap.m@carrier.com",
     "Mr.Watcharin Y.": "watcharin.yawanopart@carrier.com",
     "Watcharin Y.": "watcharin.yawanopart@carrier.com",
     "Mr. Watcharin Y.": "watcharin.yawanopart@carrier.com",
@@ -5196,12 +5212,457 @@ function getWapSupabase() {
     return wapClient;
 }
 
+/**
+ * 🛡️ 4. วิศวกรและหัวกระดาษรายงาน (Engineering & Reports) & 5. สายการอนุมัติเอกสาร (Approval Matrix) DIRECTORY
+ * รวบรวมอีเมลและรายชื่อวิศวกรและผู้อนุมัติทั้งหมดสำหรับระบบ Login และการอนุมัติรายงาน
+ */
+// ============================================================
+// 🛡️ ADMIN & SUPERVISOR ACCESS PERMISSION CONTROL
+// ============================================================
+function hasAdminAccessPermission(userEmail, userRole) {
+    const email = (userEmail || S.currentUser || '').toLowerCase().trim();
+    const masterAdminEmail = 'natthawut.chaising@carrier.com';
+    if (email && email === masterAdminEmail.toLowerCase()) return true;
+
+    // 1. ตรวจสอบ Role ปัจจุบัน
+    let currentRole = (userRole || S.userRole || S.loginRole || '').toLowerCase().trim();
+
+    // 2. ตรวจสอบข้อมูลผู้ใช้ในตารางแคช
+    if (typeof _data === 'object' && Array.isArray(_data?.users) && _data.users.length > 0) {
+        const u = _data.users.find(x => x.email && x.email.toLowerCase().trim() === email);
+        if (u && u.role) currentRole = u.role.toLowerCase().trim();
+    }
+
+    // 3. ปฏิเสธระดับปฏิบัติการทั่วไปทันที (sqe_support, staff, iqc)
+    if (currentRole === 'sqe_support' || currentRole === 'staff' || currentRole === 'iqc') {
+        return false;
+    }
+
+    // 4. อนุญาตเฉพาะระดับ Engineer ขึ้นไป (Admin, Manager, Supervisor, Engineer)
+    const allowed = ['admin', 'manager', 'supervisor', 'engineer', 'en', 'วิศวกร', 'หัวหน้างาน', 'ผู้จัดการ', 'ผู้ดูแล'];
+    return allowed.some(r => currentRole.includes(r));
+}
+window.hasAdminAccessPermission = hasAdminAccessPermission;
+
+// ============================================================
+// 🛡️ DATABASE USERS & ROLE PERMISSION CACHE
+// ============================================================
+window._dbUsersRoleMap = new Map();
+
+window.fetchDbUsersForDirectory = async function() {
+    try {
+        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+        if (!sb) return;
+        const { data, error } = await sb
+            .from('users')
+            .select('email, display_name, role, status, department')
+            .order('email', { ascending: true });
+            
+        if (!error && Array.isArray(data) && data.length > 0) {
+            window._dbUsersRoleMap.clear();
+            data.forEach(u => {
+                if (u && u.email) {
+                    const em = u.email.toLowerCase().trim();
+                    window._dbUsersRoleMap.set(em, {
+                        email: u.email,
+                        display_name: u.display_name || '',
+                        role: u.role || 'staff',
+                        status: u.status || 'active',
+                        department: u.department || ''
+                    });
+                }
+            });
+            console.log(`[Users DB] Synced ${data.length} users with real roles from DB.`);
+        }
+    } catch (e) {
+        console.warn('fetchDbUsersForDirectory error:', e);
+    }
+};
+
+// Initial sync
+if (typeof setTimeout === 'function') {
+    setTimeout(() => {
+        if (typeof window.fetchDbUsersForDirectory === 'function') {
+            window.fetchDbUsersForDirectory();
+        }
+    }, 500);
+}
+
+window.formatDbRoleToBadge = function(dbRole, category = '') {
+    const raw = String(dbRole || category || '').trim();
+    const low = raw.toLowerCase();
+
+    if (low === 'admin' || low.includes('admin') || low.includes('ผู้ดูแล')) {
+        return { label: 'ADMIN', bg: 'bg-purple-950/90 text-purple-300 border-purple-500/60', icon: '👑' };
+    }
+    if (low === 'manager' || low.includes('manag') || low.includes('ผู้จัดการ')) {
+        return { label: 'MANAGER', bg: 'bg-rose-950/90 text-rose-300 border-rose-500/60', icon: '👔' };
+    }
+    if (low === 'sqe_mold' || low.includes('mold')) {
+        return { label: 'SQE MOLD', bg: 'bg-indigo-950/90 text-indigo-300 border-indigo-500/60', icon: '⚡' };
+    }
+    if (low === 'sqe_assy' || low === 'sqe_assembly' || low.includes('assy')) {
+        return { label: 'SQE ASSY', bg: 'bg-sky-950/90 text-sky-300 border-sky-500/60', icon: '⚡' };
+    }
+    if (low === 'sqe_sheet' || low.includes('sheet')) {
+        return { label: 'SQE SHEET', bg: 'bg-teal-950/90 text-teal-300 border-teal-500/60', icon: '⚡' };
+    }
+    if (low === 'engineer' || low.includes('engineer') || low.includes('วิศวกร')) {
+        return { label: 'ENGINEER', bg: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/60', icon: '🔧' };
+    }
+    if (low === 'supervisor' || low.includes('super') || low.includes('lead') || low.includes('หัวหน้า')) {
+        return { label: 'SUPERVISOR', bg: 'bg-blue-950/90 text-blue-300 border-blue-500/60', icon: '⚡' };
+    }
+    if (low === 'iqc') {
+        return { label: 'IQC', bg: 'bg-cyan-950/90 text-cyan-300 border-cyan-500/60', icon: '🔍' };
+    }
+    if (low === 'sqe_support' || low === 'staff' || low.includes('support') || low.includes('พนักงาน')) {
+        return { label: 'SQE SUPPORT', bg: 'bg-slate-900/90 text-slate-300 border-slate-600/60', icon: '👤' };
+    }
+    return { label: raw ? raw.toUpperCase() : 'SUPERVISOR', bg: 'bg-blue-950/90 text-blue-300 border-blue-500/60', icon: '⚡' };
+};
+
+/**
+ * 🛡️ 4. วิศวกรและหัวกระดาษรายงาน (Engineering & Reports) & 5. สายการอนุมัติเอกสาร (Approval Matrix) DIRECTORY
+ * แสดงเฉพาะระดับ Engineer ขึ้นไป (Admin, Manager, Supervisor, Engineer) - ดึงตำแหน่งจากระดับสิทธิ์ในฐานข้อมูล
+ */
+window.getEngineeringAndApprovalDirectory = function() {
+    const list = [];
+    const emailMap = new Map();
+
+    const addEntry = (name, email, fallbackRole = 'SUPERVISOR', category = 'General') => {
+        if (!email || email === '-' || !email.includes('@')) return;
+        const cleanEm = (typeof window.resolveStaffEmail === 'function')
+            ? window.resolveStaffEmail(name, email)
+            : email.trim();
+        const key = cleanEm.toLowerCase();
+
+        // 🌟 ดึงระดับสิทธิ์/ตำแหน่งจริงจากตาราง users ในฐานข้อมูล
+        const dbUser = window._dbUsersRoleMap ? window._dbUsersRoleMap.get(key) : null;
+        const realRole = (dbUser && dbUser.role) ? dbUser.role : fallbackRole;
+        const finalDisplayName = (dbUser && dbUser.display_name && dbUser.display_name !== '-')
+            ? dbUser.display_name
+            : ((name && name !== '-') ? name.trim() : cleanEm.split('@')[0]);
+
+        if (!emailMap.has(key)) {
+            const entry = {
+                name: finalDisplayName,
+                email: cleanEm,
+                role: realRole,
+                category: category || 'General'
+            };
+            emailMap.set(key, entry);
+            list.push(entry);
+        } else {
+            const exist = emailMap.get(key);
+            if (dbUser && dbUser.role) {
+                exist.role = dbUser.role;
+            }
+        }
+    };
+
+    // 1. สายการอนุมัติเอกสาร (5. Approval Matrix - ผู้จัดการ, วิศวกร, หัวหน้างาน)
+    const baseApprovalMatrix = [
+        { name: "Mr.Watcharin Y.", email: "watcharin.yawanopart@carrier.com", role: "SUPERVISOR", cat: "5. สายการอนุมัติเอกสาร (Approve VF / SQE Leader)" },
+        { name: "Mr.Komson N.", email: "komson.namwicha@carrier.com", role: "SUPERVISOR", cat: "5. สายการอนุมัติเอกสาร (Confirm VF / SQE)" },
+        { name: "Ms.Siriporn P.", email: "Siriporn.Prasongsuk@carrier.com", role: "SUPERVISOR", cat: "5. สายการอนุมัติเอกสาร (Confirm RP / IQC Leader)" },
+        { name: "Mr.Ekkalak L.", email: "ekkalak.laksanasamrith@carrier.com", role: "MANAGER", cat: "5. สายการอนุมัติเอกสาร (Approve RP / IQC Leader)" },
+        { name: "Ms.Nipawan J.", email: "nipawan.janpong@carrier.com", role: "MANAGER", cat: "5. สายการอนุมัติเอกสาร (Approve VF/RP / SQE Manager)" },
+        { name: "Mr.Jumnong T.", email: "jumnong.thongsom@carrier.com", role: "MANAGER", cat: "5. สายการอนุมัติเอกสาร (Approve VF/RP / Management)" },
+        { name: "Ms.Songporn C.", email: "songporn.chaisim@carrier.com", role: "ENGINEER", cat: "5. สายการอนุมัติเอกสาร (Engineer & Approver)" },
+        { name: "Mr.Witsarut S.", email: "witsarut.singholsai@carrier.com", role: "SUPERVISOR", cat: "5. สายการอนุมัติเอกสาร (Supervisor & Approver)" },
+        { name: "Mr.Chiraphat K.", email: "Chiraphat.Khanthong@carrier.com", role: "SUPERVISOR", cat: "5. สายการอนุมัติเอกสาร (Supervisor & Approver)" },
+        { name: "Ms.Naruemon C.", email: "naruemon.champa@carrier.com", role: "ENGINEER", cat: "5. สายการอนุมัติเอกสาร (Engineer & Approver)" }
+    ];
+    baseApprovalMatrix.forEach(item => addEntry(item.name, item.email, item.role, item.cat));
+
+    // 2. วิศวกรและหัวกระดาษรายงานเฉพาะระดับ Engineer / Leader (4. Engineering & Reports)
+    const baseEngineering = [
+        { name: "Mr.Natthawut C.", email: "natthawut.chaising@carrier.com", role: "ADMIN", cat: "4. วิศวกรและหัวกระดาษรายงาน (SQE Mold / Admin)" },
+        { name: "Mr.Meechai T.", email: "meechai.thawornpong@carrier.com", role: "ENGINEER", cat: "4. วิศวกรและหัวกระดาษรายงาน (IQC Engineer)" },
+        { name: "Mr.Pongpan P.", email: "pongpan.panna@carrier.com", role: "SUPERVISOR", cat: "4. วิศวกรและหัวกระดาษรายงาน (SQE Supervisor)" },
+        { name: "Ms.Panida B.", email: "panida.boonchamoi@carrier.com", role: "SUPERVISOR", cat: "4. วิศวกรและหัวกระดาษรายงาน (IQC/SQE Supervisor)" },
+        { name: "Mr.Pakon M.", email: "pakon.muanglen@carrier.com", role: "SUPERVISOR", cat: "4. วิศวกรและหัวกระดาษรายงาน (IQC/SQE Supervisor)" }
+    ];
+    baseEngineering.forEach(item => addEntry(item.name, item.email, item.role, item.cat));
+
+    // 3. Scan dynamic master data from _data.system & window.VF_RP_MASTER_DATA
+    const sources = [];
+    if (typeof _data === 'object' && Array.isArray(_data?.system)) sources.push(..._data.system);
+    if (typeof window.VF_RP_MASTER_DATA === 'object' && Array.isArray(window.VF_RP_MASTER_DATA)) sources.push(...window.VF_RP_MASTER_DATA);
+
+    sources.forEach(r => {
+        if (r.iqc_eng_name && r.iqc_eng_name.toLowerCase().includes('meechai')) {
+            addEntry(r.iqc_eng_name, r.iqc_eng_email, 'ENGINEER', '4. วิศวกรและหัวกระดาษรายงาน (IQC Engineer)');
+        }
+        if (r.engineer && r.sqe_email) {
+            addEntry(r.engineer, r.sqe_email, 'ENGINEER', '4. วิศวกรและหัวกระดาษรายงาน (SQE Engineer)');
+        }
+        if (r.confirm_vf_name && r.confirm_vf_email) addEntry(r.confirm_vf_name, r.confirm_vf_email, 'SUPERVISOR', '5. สายการอนุมัติเอกสาร (Confirm VF)');
+        if (r.approve_vf_name && r.approve_vf_email) addEntry(r.approve_vf_name, r.approve_vf_email, 'SUPERVISOR', '5. สายการอนุมัติเอกสาร (Approve VF)');
+        if (r.confirm_rp_name && r.confirm_rp_email) addEntry(r.confirm_rp_name, r.confirm_rp_email, 'SUPERVISOR', '5. สายการอนุมัติเอกสาร (Confirm RP)');
+        if (r.approve_rp_name && r.approve_rp_email) addEntry(r.approve_rp_name, r.approve_rp_email, 'MANAGER', '5. สายการอนุมัติเอกสาร (Approve RP)');
+        if (r.approve_vf_rp_name && r.approve_vf_rp_email) addEntry(r.approve_vf_rp_name, r.approve_vf_rp_email, 'MANAGER', '5. สายการอนุมัติเอกสาร (Approve VF/RP)');
+    });
+
+    // 4. เพิ่มรายชื่อผู้ใช้ระดับ Supervisor / Engineer / Manager / Admin จากตาราง users ในฐานข้อมูลอัตโนมัติ
+    if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
+        window._dbUsersRoleMap.forEach((u, emKey) => {
+            if (u.status !== 'inactive' && !emailMap.has(emKey)) {
+                const lowR = (u.role || '').toLowerCase();
+                const isSupOrEng = ['admin', 'manager', 'supervisor', 'engineer', 'sqe_mold', 'sqe_assy', 'sqe_sheet'].some(r => lowR.includes(r));
+                if (isSupOrEng) {
+                    addEntry(u.display_name, u.email, u.role, u.department || 'SQE Database Users');
+                }
+            }
+        });
+    }
+
+    return list;
+};
+
+window.isApproverOrEngineer = function(email) {
+    if (!email) return false;
+    const em = String(email).trim().toLowerCase();
+    const adminEmails = [
+        'natthawut.chaising@carrier.com',
+        'natthawutchaising271166@gmail.com',
+        'zatknatthawut@gmail.com'
+    ];
+    if (adminEmails.includes(em) || em.includes('admin') || em.includes('natthawut') || em.includes('supervisor') || em.includes('engineer') || em.includes('manager')) return true;
+
+    const list = window.getEngineeringAndApprovalDirectory();
+    if (list.some(item => item.email && item.email.toLowerCase() === em)) return true;
+    return false;
+};
+
+window.renderSupervisorLoginDropdown = function(query = '') {
+    const dropdown = document.getElementById('login-supervisor-dropdown');
+    if (!dropdown) return;
+
+    dropdown.classList.remove('hidden');
+
+    // ถ้าแคชยังว่าง ให้โหลดจาก DB เบื้องหลัง
+    if ((!window._dbUsersRoleMap || window._dbUsersRoleMap.size === 0) && typeof window.fetchDbUsersForDirectory === 'function') {
+        window.fetchDbUsersForDirectory();
+    }
+
+    const list = (typeof window.getEngineeringAndApprovalDirectory === 'function') 
+        ? window.getEngineeringAndApprovalDirectory() 
+        : [];
+    
+    const q = String(query || '').trim().toLowerCase();
+    const filtered = q 
+        ? list.filter(item => 
+            item.name.toLowerCase().includes(q) || 
+            item.email.toLowerCase().includes(q) || 
+            (item.category && item.category.toLowerCase().includes(q)) ||
+            (item.role && item.role.toLowerCase().includes(q))
+        )
+        : list;
+
+    if (filtered.length === 0) {
+        dropdown.innerHTML = `
+            <div class="p-3 text-center text-xs text-slate-400 font-medium">
+                ❌ ไม่พบรายชื่อวิศวกรหรือหัวหน้างานที่ค้นหา
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    filtered.forEach(item => {
+        // ดึง Role จริงจากฐานข้อมูลถ้ามี
+        const emKey = (item.email || '').toLowerCase().trim();
+        const dbUser = window._dbUsersRoleMap ? window._dbUsersRoleMap.get(emKey) : null;
+        const currentRole = (dbUser && dbUser.role) ? dbUser.role : item.role;
+        const badge = (typeof window.formatDbRoleToBadge === 'function')
+            ? window.formatDbRoleToBadge(currentRole, item.category)
+            : { label: 'SUPERVISOR', bg: 'bg-blue-950/90 text-blue-300 border-blue-500/60', icon: '⚡' };
+
+        const safeName = (item.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const safeEmail = (item.email || '').replace(/'/g, "\\'");
+        const catClean = item.category ? item.category.replace(/^[0-9]\.\s*/, '') : '';
+        
+        html += `
+            <div class="supervisor-ac-item flex items-center justify-between gap-2.5 p-2 rounded-lg cursor-pointer transition-all hover:bg-blue-950/70 border border-slate-800/60 hover:border-blue-500/60 mb-1 last:mb-0 bg-slate-900/60"
+                 onmousedown="event.preventDefault(); window.selectSupervisorLoginOption('${safeEmail}', '${safeName}')">
+                <div class="flex flex-col min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5 font-bold text-xs text-white">
+                        <span>${badge.icon}</span>
+                        <span class="truncate">${item.name}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono pl-5 truncate">
+                        <span class="text-blue-400/90">${item.email}</span>
+                    </div>
+                    ${catClean ? `<div class="text-[9.5px] text-slate-400 pl-5 truncate font-sans">${catClean}</div>` : ''}
+                </div>
+                <div class="shrink-0 flex items-center">
+                    <span class="text-[9px] font-black px-2 py-0.5 rounded border ${badge.bg} tracking-wider">
+                        ${badge.label}
+                    </span>
+                </div>
+            </div>
+        `;
+    });
+
+    dropdown.innerHTML = html;
+};
+
+window.handleSupervisorInput = function(val) {
+    const inputVal = String(val || '').trim();
+    window.renderSupervisorLoginDropdown(inputVal);
+
+    const emailInput = document.getElementById('login-email');
+    if (!emailInput) return;
+
+    if (!inputVal) {
+        emailInput.value = '';
+        emailInput.classList.remove('valid', 'invalid');
+        return;
+    }
+
+    // 1. ตรวจสอบว่ามีรูปแบบ email ใน string หรือไม่
+    const emailMatch = inputVal.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    if (emailMatch) {
+        emailInput.value = emailMatch[0].toLowerCase();
+        emailInput.classList.add('valid');
+        return;
+    }
+
+    // 2. ค้นหาชื่อตรงกับ Directory หรือไม่
+    const list = (typeof window.getEngineeringAndApprovalDirectory === 'function') 
+        ? window.getEngineeringAndApprovalDirectory() 
+        : [];
+    const lower = inputVal.toLowerCase();
+    const exact = list.find(item => item.name.toLowerCase() === lower || item.email.toLowerCase() === lower);
+    if (exact) {
+        emailInput.value = exact.email.toLowerCase();
+        emailInput.classList.add('valid');
+    }
+};
+
+window.toggleSupervisorLoginDropdown = function(e) {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    const dropdown = document.getElementById('login-supervisor-dropdown');
+    if (!dropdown) return;
+    if (dropdown.classList.contains('hidden')) {
+        const input = document.getElementById('login-supervisor-input');
+        window.renderSupervisorLoginDropdown(input ? input.value : '');
+    } else {
+        dropdown.classList.add('hidden');
+    }
+};
+
+window.selectSupervisorLoginOption = function(email, name) {
+    if (!email) return;
+    const cleanEmail = email.toLowerCase().trim();
+    const emailInput = document.getElementById('login-email');
+    const supInput = document.getElementById('login-supervisor-input');
+    const dropdown = document.getElementById('login-supervisor-dropdown');
+    
+    if (emailInput) {
+        emailInput.value = cleanEmail;
+        emailInput.classList.add('valid');
+        emailInput.classList.remove('invalid');
+    }
+    if (supInput) {
+        // แสดงผลแค่อีเมลที่ครบถ้วนเท่านั้นตามความต้องการ
+        supInput.value = cleanEmail;
+        supInput.classList.add('valid');
+        supInput.classList.remove('invalid');
+    }
+    if (dropdown) {
+        dropdown.classList.add('hidden');
+    }
+    
+    // Always force supervisor mode
+    switchLoginTab('supervisor');
+    toast(`🔑 เลือกเข้าใช้งานในฐานะ: ${cleanEmail}`, "info");
+};
+
+// Global click listener to close supervisor dropdown on click outside
+if (typeof document !== 'undefined') {
+    document.addEventListener('click', (e) => {
+        const wrap = document.getElementById('supervisor-quick-select-wrap');
+        const dropdown = document.getElementById('login-supervisor-dropdown');
+        if (dropdown && !dropdown.classList.contains('hidden')) {
+            if (wrap && !wrap.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        }
+    });
+}
+
+window.populateLoginEmailDatalist = function() {
+    try {
+        const list = window.getEngineeringAndApprovalDirectory();
+        const datalist = document.getElementById('login-email-list');
+        const select = document.getElementById('login-supervisor-select');
+
+        if (datalist) {
+            datalist.innerHTML = list.map(item => 
+                `<option value="${item.email}">${item.name} | ${item.category}</option>`
+            ).join('');
+        }
+
+        if (select) {
+            let html = '<option value="">-- เลือกวิศวกร / หัวหน้างาน --</option>';
+            list.forEach(i => {
+                html += `<option value="${i.email}">${i.name} [${i.role}] - ${i.email}</option>`;
+            });
+            select.innerHTML = html;
+        }
+    } catch (err) {
+        console.warn("populateLoginEmailDatalist skipped:", err);
+    }
+};
+
+window.handleSupervisorQuickSelect = function(email) {
+    if (!email) return;
+    const emailInput = document.getElementById('login-email');
+    if (emailInput) {
+        emailInput.value = email;
+        emailInput.classList.add('valid');
+    }
+    // Always force supervisor mode
+    switchLoginTab('supervisor');
+    toast(`🔑 เลือกเข้าใช้งานในฐานะหัวหน้างาน: ${email}`, "info");
+};
+
 function switchLoginTab(role) {
-    S.loginRole = role;
-    $id('tab-support').classList.toggle('active', role === 'staff');
-    $id('tab-supervisor').classList.toggle('active', role === 'supervisor');
-    $id('password-field').style.display = role === 'staff' ? 'block' : 'none';
-    $id('login-error').classList.add('hidden');
+    const isSupport = (role === 'staff' || role === 'sqe_support');
+    S.loginRole = isSupport ? 'sqe_support' : 'supervisor';
+    const tabSupport = $id('tab-support');
+    const tabSupervisor = $id('tab-supervisor');
+    const emailGroup = $id('email-input-group');
+    const passField = $id('password-field');
+    const quickSelectWrap = $id('supervisor-quick-select-wrap');
+    const btnText = $id('login-btn-text');
+
+    if (tabSupport) tabSupport.classList.toggle('active', isSupport);
+    if (tabSupervisor) tabSupervisor.classList.toggle('active', !isSupport);
+    
+    // โหมด SQE Support: แสดง Access Email และ Security Key ปกติ, ซ่อน Approver Select
+    // โหมด SUPERVISOR: ซ่อน Access Email และ Security Key, แสดงเฉพาะ Approver/Engineer Select ช่องเดียว
+    if (emailGroup) {
+        emailGroup.style.display = isSupport ? 'block' : 'none';
+        emailGroup.classList.toggle('hidden', !isSupport);
+    }
+    if (passField) {
+        passField.style.display = isSupport ? 'block' : 'none';
+        passField.classList.toggle('hidden', !isSupport);
+    }
+    if (quickSelectWrap) {
+        quickSelectWrap.style.display = !isSupport ? 'block' : 'none';
+        quickSelectWrap.classList.toggle('hidden', isSupport);
+    }
+    if (btnText) btnText.textContent = !isSupport ? 'INITIALIZE SUPERVISOR SESSION' : 'INITIALIZE SESSION';
+    $id('login-error')?.classList.add('hidden');
+
+    if (!isSupport && typeof window.fetchDbUsersForDirectory === 'function') {
+        window.fetchDbUsersForDirectory();
+    }
 }
 
 function togglePassVis() {
@@ -5215,6 +5676,7 @@ function togglePassVis() {
 
 async function handleLogin() {
     const emailEl = $id('login-email');
+    const supEl = $id('login-supervisor-input');
     const passEl = $id('login-pass');
     const errEl = $id('login-error');
     const btnText = $id('login-btn-text');
@@ -5222,15 +5684,53 @@ async function handleLogin() {
     const btn = $id('login-btn');
     const rememberMe = $id('remember-me') ? $id('remember-me').checked : false;
 
-    const email = emailEl.value.trim().toLowerCase();
-    const pass = passEl.value;
+    let email = (emailEl ? emailEl.value : '').trim().toLowerCase();
+    const pass = passEl ? passEl.value : '';
+
+    // ถ้าอยู่ในโหมด Supervisor และยังไม่มีค่าใน login-email แต่มีค่าใน login-supervisor-input ให้ดึงอีเมลอัตโนมัติ
+    if (S.loginRole === 'supervisor' && (!email || !email.includes('@'))) {
+        const supVal = supEl ? supEl.value.trim() : '';
+        if (supVal) {
+            const emailMatch = supVal.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+            if (emailMatch) {
+                email = emailMatch[0].toLowerCase();
+                if (emailEl) emailEl.value = email;
+            } else {
+                const list = (typeof window.getEngineeringAndApprovalDirectory === 'function') 
+                    ? window.getEngineeringAndApprovalDirectory() 
+                    : [];
+                const found = list.find(item => item.name.toLowerCase().includes(supVal.toLowerCase()) || item.email.toLowerCase().includes(supVal.toLowerCase()));
+                if (found) {
+                    email = found.email.toLowerCase();
+                    if (emailEl) emailEl.value = email;
+                }
+            }
+        }
+    }
 
     errEl.classList.add('hidden');
-    if (!email) { showLoginError("กรุณากรอกอีเมล"); return; }
+    if (!email) { 
+        showLoginError(S.loginRole === 'supervisor' ? "กรุณาเลือกหรือค้นหาวิศวกร/หัวหน้างาน" : "กรุณากรอกอีเมล"); 
+        return; 
+    }
     if (!email.includes('@')) { showLoginError("โปรดระบุอีเมลองค์กรที่ถูกต้อง"); return; }
     
-    // 1. กรองเบื้องต้น: เฉพาะ Staff เท่านั้นที่บังคับกรอกรหัสผ่านในหน้านี้ (Supervisor ตรวจสอบใน DB)
-    if (S.loginRole === 'staff' && !pass) { showLoginError("กรุณากรอก Security Key"); return; }
+    // ตรวจสอบว่าเป็นอีเมลจาก 4. Engineering & Reports หรือ 5. Approval Matrix หรือไม่
+    const isEngOrApprover = (typeof window.isApproverOrEngineer === 'function')
+        ? window.isApproverOrEngineer(email)
+        : true;
+
+    // หากเป็นอีเมลในกลุ่มสายการอนุมัติ/วิศวกร หรือเลือกแท็บ Supervisor ให้กำหนดให้ล็อกอินเป็นหัวหน้างานเสมอ
+    if (S.loginRole === 'supervisor' || isEngOrApprover) {
+        S.loginRole = 'supervisor';
+    }
+
+    // 1. กรองเบื้องต้น: เฉพาะ SQE Support / Staff ทั่วไปที่ไม่ได้เป็นผู้อนุมัติ บังคับกรอกรหัสผ่าน
+    const isSupportLogin = (S.loginRole === 'staff' || S.loginRole === 'sqe_support');
+    if (isSupportLogin && !isEngOrApprover && !pass) { 
+        showLoginError("กรุณากรอก Security Key"); 
+        return; 
+    }
 
     // --- ตรวจสอบ MAINTENANCE MODE (โหมดปิดปรับปรุง) ---
     try {
@@ -5251,22 +5751,54 @@ async function handleLogin() {
         const sb = getSupabase();
         if (!sb) throw new Error('NO_CLIENT');
 
-        // 2. ดึงข้อมูล User (Strict Mode: ไม่มีการแอดเพิ่มอัตโนมัติ)
-        const { data: userData, error: userErr } = await sb.from('users').select('*').eq('email', email).single();
-        
-        // หากไม่พบข้อมูล (error code PGRST116 คือไม่พบแถวข้อมูล)
-        if (userErr && userErr.code === 'PGRST116') throw new Error('NOT_REGISTERED');
-        if (userErr) throw userErr;
-        if (!userData) throw new Error('NOT_REGISTERED');
+        // 2. ดึงข้อมูล User
+        let userData = null;
+        try {
+            const { data, error: userErr } = await sb.from('users').select('*').eq('email', email).single();
+            if (!userErr && data) {
+                userData = data;
+            }
+        } catch (_) {}
+
+        // หากไม่พบในตาราง users แต่เป็นหัวหน้างาน/วิศวกรผู้อนุมัติ (หรือเข้าในโหมด Supervisor) ให้สร้างโปรไฟล์และอนุญาตให้เข้าใช้งานได้ทันที
+        if (!userData) {
+            if (S.loginRole === 'supervisor' || isEngOrApprover) {
+                userData = {
+                    email: email,
+                    role: 'supervisor',
+                    status: 'active',
+                    created_at: new Date().toISOString()
+                };
+                try {
+                    await sb.from('users').upsert({ email, role: 'supervisor', status: 'active' }, { onConflict: 'email' });
+                } catch (_) {}
+            } else {
+                throw new Error('NOT_REGISTERED');
+            }
+        }
 
         // 3. ตรวจสอบสถานะบัญชี (ถ้า Admin ปิดการใช้งาน)
         if (userData.status === 'inactive') throw new Error('ACCOUNT_DISABLED');
 
-        // 4. ตรวจสอบสิทธิ์ (Role) ให้ตรงกับปุ่มที่เลือก (SQE Support vs Supervisor)
-        if (userData.role !== S.loginRole) throw new Error('ROLE_MISMATCH');
+        // 4. กำหนดสิทธิ์: หากเป็นผู้อนุมัติ/วิศวกร หรือล็อกอินในโหมด Supervisor
+        const normalizedDbRole = (userData.role === 'staff') ? 'sqe_support' : (userData.role || 'sqe_support');
+        const normalizedLoginRole = (S.loginRole === 'staff') ? 'sqe_support' : S.loginRole;
 
-        // 5. ตรวจสอบรหัสผ่าน (เฉพาะ Staff)
-        if (S.loginRole === 'staff' && userData.password !== pass) {
+        if (S.loginRole === 'supervisor') {
+            userData.role = 'supervisor';
+            S.loginRole = 'supervisor';
+            S.userRole = 'supervisor';
+        } else if (normalizedLoginRole === 'sqe_support') {
+            // โหมด SQE Support: บังคับเป็น staff เสมอ และไม่แสดงเมนูของหัวหน้างาน
+            userData.role = 'staff';
+            S.loginRole = 'sqe_support';
+            S.userRole = 'staff';
+        } else if (normalizedDbRole !== normalizedLoginRole) {
+            throw new Error('ROLE_MISMATCH');
+        }
+
+        // 5. ตรวจสอบรหัสผ่าน (เฉพาะ SQE Support / Staff ทั่วไปที่ไม่ได้เป็นผู้อนุมัติ)
+        if (isSupportLogin && !isEngOrApprover && userData.password && userData.password !== pass) {
             throw new Error('WRONG_PASSWORD');
         }
 
@@ -5278,15 +5810,17 @@ async function handleLogin() {
         }
 
         // 7. จัดการเพิ่มเติมกรณี Supervisor
-        if (S.loginRole === 'supervisor') {
+        if (S.loginRole === 'supervisor' || S.loginRole === 'manager' || S.loginRole === 'engineer' || S.loginRole === 'admin') {
             await checkSupervisorRole(userData.email); 
         }
 
         // --- ผ่านทุกเงื่อนไข: เข้าสู่ระบบสำเร็จ ---
-        await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
+        try {
+            await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
+        } catch (_) {}
         
-        finalizeLoginProcess(email, S.loginRole, rememberMe);
-        writeAuditLog('LOGIN', `ผู้ใช้งาน ${email} เข้าสู่ระบบสำเร็จ`);
+        finalizeLoginProcess(email, userData.role || S.loginRole, rememberMe);
+        writeAuditLog('LOGIN', `ผู้ใช้งาน ${email} เข้าสู่ระบบสำเร็จ (Role: ${userData.role || S.loginRole})`);
 
     } catch (err) {
         let msg = 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
@@ -5296,6 +5830,8 @@ async function handleLogin() {
             msg = '❌ ไม่พบข้อมูลในระบบ โปรดติดต่อ Admin เพื่อลงทะเบียนใช้งาน';
         } else if (err.message === 'ACCOUNT_DISABLED') {
             msg = '🚫 บัญชีนี้ถูกระงับการใช้งานชั่วคราว โปรดติดต่อ Admin';
+        } else if (err.message === 'SUPERVISOR_UNAUTHORIZED') {
+            msg = '⛔ สิทธิ์ไม่เพียงพอ: บัญชีนี้เป็น SQE Support / Staff ทั่วไป ไม่สามารถเข้าสู่ระบบในโหมดหัวหน้างาน/วิศวกรได้';
         } else if (err.message === 'WRONG_PASSWORD') {
             msg = '🔑 Security Key ไม่ถูกต้อง';
         } else if (err.message === 'ROLE_MISMATCH') {
@@ -5320,39 +5856,36 @@ async function checkDeepLinkAndAutoLogin() {
     if (!params.email) return; // ไม่มี email ใน URL ก็ไม่ต้องทำอะไร
 
     console.log("🔗 Deep Link Auto-Login for:", params.email);
+    const email = decodeURIComponent(params.email).trim().toLowerCase();
 
     const emailInput = document.getElementById('login-email');
     const passInput = document.getElementById('login-pass');
     if (emailInput) {
-        emailInput.value = decodeURIComponent(params.email);
+        emailInput.value = email;
         emailInput.classList.add('valid');
     }
 
-    try {
-        const { data, error } = await sqeClient
-            .from('users')
-            .select('password, role')
-            .eq('email', params.email.toLowerCase())
-            .single();
+    // กำหนดให้ล็อกอินเป็นหัวหน้างานเสมอ เพื่อให้เปิดตามลิงก์เข้าอนุมัติรายงานได้ทันที
+    S.loginRole = 'supervisor';
+    switchLoginTab('supervisor');
 
-        if (!error && data) {
-            if (passInput) passInput.value = data.password;
-            S.loginRole = data.role || 'staff';
-            toast("🔑 กำลังล็อกอินอัตโนมัติจากลิงก์อีเมล...", "info");
-            await handleLogin(); // ระบบเดิมจะไปต่อที่ finalizeLogin → launchDirectWarp เอง
-        } else {
-            toast("⚠️ ไม่พบบัญชีผู้ใช้ตามอีเมลในลิงก์ กรุณาลงชื่อเข้าใช้ด้วยตนเอง", "error");
-        }
+    try {
+        toast("🔑 กำลังล็อกอินเข้าสู่ระบบในฐานะหัวหน้างาน (Supervisor) เพื่อเปิดอนุมัติรายงาน...", "info");
+        await handleLogin(); // ระบบจะพาไปต่อที่ finalizeLogin → launchDirectWarp → เปิดรายงานอัตโนมัติ
     } catch (e) {
         console.error("Auto-login failed:", e);
-        toast("❌ ล็อกอินอัตโนมัติไม่สำเร็จ กรุณากรอกรหัสผ่านเอง", "error");
+        toast("⚠️ ล็อกอินอัตโนมัติไม่สำเร็จ กรุณากด INITIALIZE SESSION เพื่อเข้าสู่ระบบ", "warn");
     }
 }
 window.checkDeepLinkAndAutoLogin = checkDeepLinkAndAutoLogin;
 
 async function checkSupervisorRole(email) {
-    let isSupervisor = false; // ✅ ประกาศ local ป้องกัน global leak
+    let isSupervisor = true; // ✅ ค่าเริ่มต้นเป็นหัวหน้างานเสมอสำหรับระบบอนุมัติ
     try {
+        const isEngAppr = (typeof window.isApproverOrEngineer === 'function') && window.isApproverOrEngineer(email);
+        if (isEngAppr || S.loginRole === 'supervisor') {
+            return true;
+        }
         const { data: profile, error } = await getSupabase()
             .from('users').select('role, email').eq('email', email).single();
         if (error) throw error;
@@ -5710,34 +6243,69 @@ function launchDirectWarp(email, role) {
  */
 async function enforceMaintenanceMode() {
     try {
-        const { data, error } = await sqeClient
+        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+        if (!sb) {
+            const mtx = document.getElementById('maintenance-view');
+            if (mtx) {
+                mtx.classList.add('hidden-view');
+                mtx.style.display = 'none';
+            }
+            return;
+        }
+
+        const { data, error } = await sb
             .from('system_settings')
             .select('is_maintenance_active')
             .eq('id', 'global_config')
             .single();
 
-        if (error) return;
-
-        const isMtx = !!data.is_maintenance_active;
         const mtxView = document.getElementById('maintenance-view');
         const dashView = document.getElementById('dashboard-view');
         const loginView = document.getElementById('login-view');
 
-        const isMaster = S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
+        if (error || !data) {
+            if (mtxView && !window.adminBypass) {
+                mtxView.classList.add('hidden-view');
+                mtxView.style.display = 'none';
+            }
+            return;
+        }
 
-        if (isMtx && !isMaster && !adminBypass) {
-            if (mtxView) mtxView.classList.remove('hidden-view');
+        const isMtx = !!data.is_maintenance_active;
+        const isMaster = S && S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
+
+        if (isMtx && !isMaster && !window.adminBypass) {
+            if (mtxView) {
+                mtxView.classList.remove('hidden-view');
+                mtxView.style.display = 'flex';
+            }
             if (dashView) dashView.style.display = 'none';
             if (loginView) loginView.style.display = 'none';
         } else {
-            if (mtxView) mtxView.classList.add('hidden-view');
-            if (S.isLoggedIn) {
-                if (dashView) dashView.style.display = 'flex';
+            if (mtxView) {
+                mtxView.classList.add('hidden-view');
+                mtxView.style.display = 'none';
+            }
+            if (S && S.isLoggedIn) {
+                if (dashView) {
+                    dashView.classList.remove('hidden-view');
+                    dashView.style.display = 'flex';
+                }
             } else {
-                if (loginView) loginView.style.display = 'flex';
+                if (loginView) {
+                    loginView.classList.remove('hidden-view');
+                    loginView.style.display = 'flex';
+                }
             }
         }
-    } catch (err) { console.log("Maintenance check skip"); }
+    } catch (err) {
+        console.log("Maintenance check skip:", err);
+        const mtxView = document.getElementById('maintenance-view');
+        if (mtxView) {
+            mtxView.classList.add('hidden-view');
+            mtxView.style.display = 'none';
+        }
+    }
 }
 
 
@@ -5793,23 +6361,33 @@ window.addEventListener('load', () => {
         linkData = window.checkDeepLinkParams();
     }
 
-    // 4. จัดเตรียมหน้า Login (Auto-fill Email)
+    // 4. จัดเตรียมหน้า Login (Auto-fill Email & Populate Datalist จาก 4. Engineering & Reports / 5. Approval Matrix)
+    if (typeof window.populateLoginEmailDatalist === 'function') {
+        window.populateLoginEmailDatalist();
+    }
+
     const emailInput = document.getElementById('login-email');
     const passInput = document.getElementById('login-pass');
 
     if (emailInput) {
         if (linkData.email) {
-            // ถ้าเปิดจากลิงก์: ใช้อีเมลจากลิงก์ (สำคัญที่สุด)
-            emailInput.value = decodeURIComponent(linkData.email);
+            // ถ้าเปิดจากลิงก์: ใช้อีเมลจากลิงก์ และกำหนดให้เป็น Supervisor เสมอเพื่อเปิดอนุมัติรายงาน
+            const decodedEmail = decodeURIComponent(linkData.email).trim();
+            emailInput.value = decodedEmail;
             emailInput.classList.add('valid');
-            console.log("🔗 Login ready for:", linkData.email);
+            const supInput = document.getElementById('login-supervisor-input');
+            if (supInput) {
+                supInput.value = decodedEmail;
+                supInput.classList.add('valid');
+            }
+            console.log("🔗 Login ready for Supervisor:", decodedEmail);
             
-            // กระโดดไปรอที่ช่องรหัสผ่านทันที เพื่อความรวดเร็ว
-            setTimeout(() => {
-                if (passInput) passInput.focus();
-            }, 800);
+            if (typeof switchLoginTab === 'function') {
+                switchLoginTab('supervisor');
+            }
+            S.loginRole = 'supervisor';
             
-            toast("📧 เตรียมอีเมลของคุณไว้แล้ว โปรดใส่ Security Key", "info");
+            toast("📧 กำหนดสถานะหัวหน้างาน (Supervisor) สำหรับการอนุมัติรายงาน", "info");
         } else {
             // ถ้าเปิดปกติ: ใช้อีเมลที่เคยจำไว้ (Remember Me)
             const savedEmail = localStorage.getItem('carrier_remembered_email');
@@ -5956,15 +6534,60 @@ async function watchSystemUpdate() {
 })();
 
 function handleLogout() {
-    // 1. ล้างข้อมูล Session และ State
+    // 1. ล้างข้อมูล Session, Token, และ State ทั้งหมด
     sessionStorage.removeItem('sqe_session');
+    sessionStorage.removeItem('reboot_login_email');
+    sessionStorage.removeItem('reboot_login_role');
+    localStorage.removeItem('carrier_remembered_email');
+
     S.isLoggedIn = false;
     S.currentUser = '';
     S.userRole = 'staff';
     S.viewingUser = '';
     S.records = [];
 
-    // 2. [จุดสำคัญ] คืนค่าแอนิเมชั่น (Reset Warp Effect)
+    // 2. ล้างค่าในฟอร์ม Login ทุกช่อง (Access Email, Approver Select, Password)
+    const emailIn = document.getElementById('login-email');
+    if (emailIn) {
+        emailIn.value = '';
+        emailIn.classList.remove('valid', 'invalid');
+    }
+
+    const supIn = document.getElementById('login-supervisor-input');
+    if (supIn) {
+        supIn.value = '';
+        supIn.classList.remove('valid', 'invalid');
+    }
+
+    const passIn = document.getElementById('login-pass');
+    if (passIn) {
+        passIn.value = '';
+        passIn.type = 'password';
+        const eyeSlash = document.getElementById('eye-slash');
+        if (eyeSlash) eyeSlash.style.display = 'none';
+    }
+
+    const rememberCheck = document.getElementById('remember-me');
+    if (rememberCheck) {
+        rememberCheck.checked = false;
+    }
+
+    const supDropdown = document.getElementById('login-supervisor-dropdown');
+    if (supDropdown) {
+        supDropdown.classList.add('hidden');
+    }
+
+    const emailHint = document.getElementById('email-hint');
+    if (emailHint) {
+        emailHint.classList.add('hidden');
+    }
+
+    const loginError = document.getElementById('login-error');
+    if (loginError) {
+        loginError.classList.add('hidden');
+    }
+
+    // 3. [จุดสำคัญ] คืนค่าแอนิเมชั่น (Reset Warp Effect)
     // ใช้ gsap.set เพื่อคืนค่าดั้งเดิมทันที
     const loginCard = document.querySelector('.modern-glass-card');
     const brandHeader = document.querySelector('.login-brand-header');
@@ -5987,23 +6610,13 @@ function handleLogout() {
         banner.style.display = 'flex'; 
     }
 
-    // 3. สลับหน้าจอกลับไปที่ Login View
+    // 4. สลับหน้าจอกลับไปที่ Login View
     const dashView = document.getElementById('dashboard-view');
     const loginView = document.getElementById('login-view');
     if (dashView) dashView.classList.add('hidden-view');
     if (loginView) {
         loginView.classList.remove('hidden-view');
         loginView.style.display = 'flex';
-    }
-
-    // 4. ล้างช่องรหัสผ่านเพื่อความปลอดภัย
-    const passIn = document.getElementById('login-pass');
-    if (passIn) {
-        passIn.value = '';
-        // ถ้าตาเปิดอยู่ให้ปิดตาด้วย
-        passIn.type = 'password';
-        const eyeSlash = document.getElementById('eye-slash');
-        if (eyeSlash) eyeSlash.style.display = 'none';
     }
 
     // แจ้งเตือนผู้ใช้
@@ -6047,7 +6660,10 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         gsap.set(showBtn, { x: 0, opacity: 1 });
     }
 
-    if (S.userRole === 'supervisor') { 
+    const isSupervisorSession = (S.loginRole === 'supervisor');
+
+    if (isSupervisorSession) { 
+        S.userRole = 'supervisor';
         if (staffWrap) {
             staffWrap.classList.remove('hidden');
             staffWrap.classList.add('flex');
@@ -6065,7 +6681,11 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
             el.style.cursor = 'not-allowed';
         });
     } else {
-        if (staffWrap) staffWrap.classList.add('hidden');
+        S.userRole = 'staff';
+        if (staffWrap) {
+            staffWrap.classList.add('hidden');
+            staffWrap.classList.remove('flex');
+        }
         S.viewingUser = S.currentUser;
         if (showFormBtn) showFormBtn.style.display = 'flex';
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
@@ -6079,11 +6699,13 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         });
     }
 
-    // --- [ส่วนที่ 4: ตรวจสอบ Admin Access] ---
+    // --- [ส่วนที่ 4: ตรวจสอบ Admin Access (เฉพาะ Admin, Manager, Supervisor, Engineer)] ---
     const adminFooterBtn = document.getElementById('admin-footer-access');
-    const masterAdminEmail = 'natthawut.chaising@carrier.com'; 
-    const isSupervisorOrMaster = (S.userRole === 'supervisor' || S.loginRole === 'supervisor' || (S.currentUser && S.currentUser.toLowerCase() === masterAdminEmail.toLowerCase()));
-    if (isSupervisorOrMaster) {
+    const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
+        ? hasAdminAccessPermission(S.currentUser, S.userRole) 
+        : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
+
+    if (isAllowedAdmin) {
         if (adminFooterBtn) adminFooterBtn.classList.remove('hidden');
     } else {
         if (adminFooterBtn) adminFooterBtn.classList.add('hidden');
@@ -6307,37 +6929,454 @@ function updateOnlineBadge() {
     }
 }
 
+let _staffDirectoryCache = [];
+let _activeStaffRoleFilter = 'ALL';
+let _staffFocusedIndex = -1;
+
+function getRoleAvatarStyle(roleTag) {
+    const r = String(roleTag || '').toUpperCase();
+    if (r.includes('ADMIN')) {
+        return {
+            avatarBg: 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700/60',
+            badgeBg: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60',
+            dot: 'bg-amber-500'
+        };
+    } else if (r.includes('MANAGER')) {
+        return {
+            avatarBg: 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700/60',
+            badgeBg: 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60',
+            dot: 'bg-purple-500'
+        };
+    } else if (r.includes('SUPERVISOR') || r.includes('SUPER')) {
+        return {
+            avatarBg: 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700/60',
+            badgeBg: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60',
+            dot: 'bg-indigo-500'
+        };
+    } else if (r.includes('ENGINEER') || r.includes('MOLD') || r.includes('ASSY') || r.includes('SHEET') || r.includes('ENG')) {
+        return {
+            avatarBg: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60',
+            badgeBg: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60',
+            dot: 'bg-emerald-500'
+        };
+    } else if (r.includes('IQC')) {
+        return {
+            avatarBg: 'bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-700/60',
+            badgeBg: 'bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800/60',
+            dot: 'bg-sky-500'
+        };
+    }
+    return {
+        avatarBg: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700',
+        badgeBg: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
+        dot: 'bg-slate-400'
+    };
+}
+
+function getInitials(name, email) {
+    const clean = String(name || '').replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+    if (!clean) {
+        const prefix = (email || '').split('@')[0] || '';
+        return prefix.substring(0, 2).toUpperCase() || 'ST';
+    }
+    const parts = clean.split(/\s+/);
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return clean.substring(0, 2).toUpperCase();
+}
+
+window.setStaffRoleFilter = function(role, e) {
+    if (e) e.stopPropagation();
+    _activeStaffRoleFilter = role || 'ALL';
+    _staffFocusedIndex = -1;
+
+    // Update active class on chips
+    const chips = document.querySelectorAll('#staff-custom-role-filters .staff-role-chip');
+    chips.forEach(chip => {
+        const txt = chip.textContent.trim().toUpperCase();
+        const isMatch = (_activeStaffRoleFilter === 'ALL' && txt === 'ALL') ||
+                        (_activeStaffRoleFilter === 'IQC' && txt === 'IQC') ||
+                        (_activeStaffRoleFilter === 'ENGINEER' && (txt === 'EN' || txt === 'ENGINEER')) ||
+                        (_activeStaffRoleFilter === 'SUPERVISOR' && (txt === 'SUP' || txt === 'SUPERVISOR')) ||
+                        (_activeStaffRoleFilter === 'MANAGER' && (txt === 'MGR' || txt === 'MANAGER'));
+        if (isMatch) {
+            chip.className = 'staff-role-chip active px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider transition-all bg-blue-600 text-white shadow-2xs';
+        } else {
+            chip.className = 'staff-role-chip px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700';
+        }
+    });
+
+    const searchInput = document.getElementById('staff-custom-search-input');
+    window.renderStaffCustomDropdown(searchInput ? searchInput.value : '');
+};
+
+window.clearStaffDropdownSearch = function(e) {
+    if (e) e.stopPropagation();
+    const input = document.getElementById('staff-custom-search-input');
+    const clearBtn = document.getElementById('staff-custom-search-clear');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    if (clearBtn) clearBtn.classList.add('hidden');
+    window.renderStaffCustomDropdown('');
+};
+
+window.handleStaffDropdownKeydown = function(e) {
+    const listContainer = document.getElementById('staff-custom-list-container');
+    if (!listContainer) return;
+    const items = listContainer.querySelectorAll('.staff-dropdown-item');
+    if (!items.length) return;
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _staffFocusedIndex = Math.min(_staffFocusedIndex + 1, items.length - 1);
+        updateItemFocus(items);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _staffFocusedIndex = Math.max(_staffFocusedIndex - 1, 0);
+        updateItemFocus(items);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (_staffFocusedIndex >= 0 && _staffFocusedIndex < items.length) {
+            items[_staffFocusedIndex].click();
+        }
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        window.toggleStaffCustomDropdown();
+    }
+};
+
+function updateItemFocus(items) {
+    items.forEach((it, idx) => {
+        if (idx === _staffFocusedIndex) {
+            it.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50/60', 'dark:bg-blue-950/40');
+            it.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } else {
+            it.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50/60', 'dark:bg-blue-950/40');
+        }
+    });
+}
+
+window.renderStaffCustomDropdown = function(query = '') {
+    const listContainer = document.getElementById('staff-custom-list-container');
+    const countBadge = document.getElementById('staff-custom-count-badge');
+    const clearBtn = document.getElementById('staff-custom-search-clear');
+    if (!listContainer) return;
+
+    const q = String(query || '').trim().toLowerCase();
+    if (clearBtn) {
+        if (q.length > 0) clearBtn.classList.remove('hidden');
+        else clearBtn.classList.add('hidden');
+    }
+
+    let filtered = _staffDirectoryCache.filter(item => {
+        // 1. Role filter
+        if (_activeStaffRoleFilter !== 'ALL') {
+            const role = (item.roleTag || '').toUpperCase();
+            if (_activeStaffRoleFilter === 'IQC' && !role.includes('IQC')) return false;
+            if (_activeStaffRoleFilter === 'ENGINEER' && !(role.includes('ENG') || role.includes('MOLD') || role.includes('ASSY') || role.includes('SHEET'))) return false;
+            if (_activeStaffRoleFilter === 'SUPERVISOR' && !(role.includes('SUPERVISOR') || role.includes('SUPER'))) return false;
+            if (_activeStaffRoleFilter === 'MANAGER' && !role.includes('MANAGER')) return false;
+        }
+        // 2. Search query filter
+        if (q) {
+            return item.name.toLowerCase().includes(q) ||
+                   item.email.toLowerCase().includes(q) ||
+                   (item.roleTag && item.roleTag.toLowerCase().includes(q));
+        }
+        return true;
+    });
+
+    if (countBadge) {
+        countBadge.textContent = `${filtered.length} คน`;
+    }
+
+    _staffFocusedIndex = -1;
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `
+            <div class="py-6 px-3 text-center flex flex-col items-center justify-center gap-1.5 text-slate-400">
+                <span class="text-2xl">🔍</span>
+                <span class="text-xs font-semibold">ไม่พบผู้ปฏิบัติงานที่ตรงกับเงื่อนไข</span>
+                <span class="text-[10px] text-slate-400">ลองเปลี่ยนคำค้นหาหรือเลือกหมวดหมู่อื่น</span>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+
+    // Option: All Staff
+    if (!q && _activeStaffRoleFilter === 'ALL') {
+        const isAllSelected = !S.viewingUser || S.viewingUser === S.currentUser;
+        html += `
+            <div class="staff-dropdown-item group flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-150 hover:bg-blue-50/80 dark:hover:bg-slate-800/80 text-left border border-transparent ${isAllSelected ? 'bg-blue-50/90 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60 shadow-2xs font-bold' : ''}"
+                 onclick="window.selectStaffCustomOption('', '-- เลือกผู้ปฏิบัติงาน --', '')">
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div class="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black border shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700">
+                        ALL
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                        <span class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
+                            -- ทั้งหมด / All Staff --
+                            ${isAllSelected ? '<span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>' : ''}
+                        </span>
+                        <span class="text-[10px] text-slate-400 truncate">แสดงข้อมูลพนักงานทุกคนรวมกัน</span>
+                    </div>
+                </div>
+                <div class="shrink-0">
+                    <span class="text-[9px] font-black px-2 py-0.5 rounded-md border bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700">
+                        ALL
+                    </span>
+                </div>
+            </div>
+        `;
+    }
+
+    filtered.forEach(item => {
+        const isSelected = S.viewingUser && S.viewingUser.toLowerCase() === item.email.toLowerCase();
+        const safeEmail = (item.email || '').replace(/'/g, "\\'");
+        const safeName = (item.name || '').replace(/'/g, "\\'");
+        const safeRoleTag = (item.roleTag || '').replace(/'/g, "\\'");
+        const displayLabel = item.roleTag ? `${item.name}(${item.roleTag})` : item.name;
+        const safeDisplayLabel = displayLabel.replace(/'/g, "\\'");
+
+        const roleStyle = getRoleAvatarStyle(item.roleTag);
+        const initials = getInitials(item.name, item.email);
+
+        html += `
+            <div class="staff-dropdown-item group flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all duration-150 hover:bg-slate-100/90 dark:hover:bg-slate-800/90 text-left border border-transparent ${isSelected ? 'bg-blue-50/90 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60 shadow-2xs font-bold' : ''}"
+                 onclick="window.selectStaffCustomOption('${safeEmail}', '${safeDisplayLabel}', '${safeRoleTag}')">
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div class="relative shrink-0">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black border ${roleStyle.avatarBg}">
+                            ${initials}
+                        </div>
+                        ${isSelected ? '<span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900 animate-ping"></span><span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900"></span>' : ''}
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                        <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">${item.name}</span>
+                        <span class="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">${item.email}</span>
+                    </div>
+                </div>
+                <div class="shrink-0 flex items-center">
+                    <span class="text-[9px] font-black px-1.5 py-0.5 rounded-md border tracking-wider ${roleStyle.badgeBg}">
+                        ${item.roleTag || 'STAFF'}
+                    </span>
+                </div>
+            </div>
+        `;
+    });
+
+    listContainer.innerHTML = html;
+};
+
+window.toggleStaffCustomDropdown = function(e) {
+    if (e) e.stopPropagation();
+    const panel = document.getElementById('staff-custom-dropdown-panel');
+    const chevron = document.getElementById('staff-select-chevron');
+    const searchInput = document.getElementById('staff-custom-search-input');
+    if (!panel) return;
+
+    const isHidden = panel.classList.contains('hidden');
+    if (isHidden) {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+        if (chevron) chevron.classList.add('rotate-180');
+        if (searchInput) {
+            searchInput.value = '';
+            setTimeout(() => searchInput.focus(), 60);
+        }
+        window.renderStaffCustomDropdown('');
+    } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+        if (chevron) chevron.classList.remove('rotate-180');
+    }
+};
+
+window.filterStaffCustomDropdown = function(val) {
+    window.renderStaffCustomDropdown(val);
+};
+
+window.selectStaffCustomOption = function(email, label, roleTag) {
+    const labelEl = document.getElementById('staff-custom-select-label');
+    const selectEl = document.getElementById('staff-filter-select');
+    const panel = document.getElementById('staff-custom-dropdown-panel');
+    const chevron = document.getElementById('staff-select-chevron');
+    const btn = document.getElementById('staff-custom-select-btn');
+
+    if (labelEl) {
+        labelEl.textContent = label || '-- เลือกผู้ปฏิบัติงาน --';
+    }
+    if (selectEl) {
+        selectEl.value = email || '';
+    }
+    if (panel) {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+    }
+    if (chevron) {
+        chevron.classList.remove('rotate-180');
+    }
+
+    if (btn) {
+        if (email) {
+            btn.classList.add('ring-2', 'ring-blue-500/30', 'border-blue-400', 'dark:border-blue-600', 'bg-blue-50/50', 'dark:bg-blue-950/30');
+        } else {
+            btn.classList.remove('ring-2', 'ring-blue-500/30', 'border-blue-400', 'dark:border-blue-600', 'bg-blue-50/50', 'dark:bg-blue-950/30');
+        }
+    }
+
+    onStaffSelect(email || '');
+};
+
+// Global click handler to close staff custom dropdown
+document.addEventListener('click', (e) => {
+    const staffWrap = document.getElementById('staff-selector-wrap');
+    const staffPanel = document.getElementById('staff-custom-dropdown-panel');
+    const staffChevron = document.getElementById('staff-select-chevron');
+    if (staffPanel && !staffPanel.classList.contains('hidden')) {
+        if (staffWrap && !staffWrap.contains(e.target)) {
+            staffPanel.classList.add('hidden');
+            staffPanel.classList.remove('flex');
+            if (staffChevron) staffChevron.classList.remove('rotate-180');
+        }
+    }
+});
+
 // 1. ฟังก์ชันโหลดรายชื่อพนักงาน (ดึงจากตาราง users ใน SQE Database)
 async function loadStaffList() {
     const selectEl = document.getElementById('staff-filter-select');
     if (!selectEl) return;
 
     try {
-        // ใช้ sqeClient เพราะตาราง users อยู่ในฐานข้อมูล SQE
-        const { data: staffList, error } = await sqeClient
-            .from('users')
-            .select('email')
-            .eq('role', 'staff')
-            .order('email', { ascending: true });
-
-        if (error) throw error;
+        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+        let staffList = null;
+        if (sb) {
+            try {
+                const { data, error } = await sb
+                    .from('users')
+                    .select('email, display_name, role')
+                    .order('email', { ascending: true });
+                if (!error && data && data.length > 0) {
+                    staffList = data;
+                }
+            } catch (_) {}
+        }
 
         // ล้างตัวเลือกเก่า
-        selectEl.innerHTML = '<option value="">-- เลือกพนักงาน --</option>';
+        selectEl.innerHTML = '<option value="">-- เลือกผู้ปฏิบัติงาน --</option>';
+        _staffDirectoryCache = [];
+
+        const resolveStaffInfo = (staff) => {
+            if (!staff) return { name: '', email: '', roleTag: '', badgeClass: '', fullLabel: '' };
+            let name = (staff.display_name || staff.name || '').trim();
+            const email = (staff.email || '').trim().toLowerCase();
+            
+            // 🌟 ดึงระดับสิทธิ์/ตำแหน่งจริงจากตาราง users ในฐานข้อมูล
+            const dbUser = window._dbUsersRoleMap ? window._dbUsersRoleMap.get(email) : null;
+            const rawRole = String(staff.role || (dbUser && dbUser.role) || staff.category || '').toLowerCase();
+
+            name = name.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+
+            if (!name || name === '-' || name.includes('@')) {
+                if (typeof window.getEngineeringAndApprovalDirectory === 'function') {
+                    const found = window.getEngineeringAndApprovalDirectory().find(d => d.email && d.email.toLowerCase() === email);
+                    if (found && found.name && found.name !== '-') {
+                        name = found.name.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+                    }
+                }
+            }
+            if (!name || name === '-' || name.includes('@')) {
+                if (typeof STAFF_EMAIL_MAP === 'object') {
+                    for (const [sName, sEmail] of Object.entries(STAFF_EMAIL_MAP)) {
+                        if (sEmail && sEmail.toLowerCase().trim() === email) {
+                            name = sName.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!name || name === '-' || name.includes('@')) {
+                const prefix = email.split('@')[0] || '';
+                const parts = prefix.split('.');
+                if (parts.length >= 2) {
+                    const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+                    const lastInitial = parts[1].charAt(0).toUpperCase();
+                    name = `${first} ${lastInitial}.`;
+                } else if (prefix) {
+                    name = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+                } else {
+                    name = 'Staff';
+                }
+            }
+
+            const badgeObj = (typeof window.formatDbRoleToBadge === 'function')
+                ? window.formatDbRoleToBadge(rawRole)
+                : { label: rawRole.toUpperCase() };
+            const roleTag = badgeObj.label || 'STAFF';
+
+            // สีที่ไม่โดดเด่นมาก: โทน Slate เรียบหรู สะอาดตา
+            const badgeClass = 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300/60 dark:border-slate-700/60';
+            const fullLabel = roleTag ? `${name}(${roleTag})` : name;
+
+            return { name, email, roleTag, badgeClass, fullLabel };
+        };
+
+        const addedEmails = new Set();
+
+        const addStaffEntry = (info) => {
+            if (!info || !info.email) return;
+            const emKey = info.email.toLowerCase().trim();
+            if (addedEmails.has(emKey)) return;
+            addedEmails.add(emKey);
+
+            _staffDirectoryCache.push(info);
+
+            const opt = document.createElement('option');
+            opt.value = info.email;
+            opt.textContent = info.fullLabel;
+            selectEl.appendChild(opt);
+        };
 
         if (staffList && staffList.length > 0) {
             staffList.forEach(staff => {
-                const opt = document.createElement('option');
-                opt.value = staff.email;
-                // ตัดชื่อมาโชว์ให้สวยงาม
-                opt.textContent = staff.email.split('@')[0].replace(/\./g, ' ').toUpperCase();
-                selectEl.appendChild(opt);
+                const info = resolveStaffInfo(staff);
+                addStaffEntry(info);
             });
-            console.log("Supervisor: Staff list loaded successfully.");
+        } else {
+            const directory = (typeof window.getEngineeringAndApprovalDirectory === 'function')
+                ? window.getEngineeringAndApprovalDirectory()
+                : [];
+            directory.forEach(staff => {
+                const info = resolveStaffInfo({
+                    display_name: staff.name,
+                    role: staff.role,
+                    email: staff.email
+                });
+                addStaffEntry(info);
+            });
         }
+
+        // อัปเดตการแสดงผล Label ถ้ามีการเลือกอยู่แล้ว
+        const curViewing = S.viewingUser || '';
+        const foundSelected = _staffDirectoryCache.find(it => it.email.toLowerCase() === curViewing.toLowerCase());
+        const labelEl = document.getElementById('staff-custom-select-label');
+        if (labelEl) {
+            if (foundSelected) {
+                labelEl.textContent = foundSelected.fullLabel;
+            } else {
+                labelEl.textContent = '-- เลือกผู้ปฏิบัติงาน --';
+            }
+        }
+
+        window.renderStaffCustomDropdown('');
+        console.log("Supervisor: Staff list loaded successfully.");
     } catch (err) {
         console.error('Error loading staff list:', err);
-        toast("โหลดรายชื่อพนักงานไม่สำเร็จ", "error");
     }
 }
 
@@ -8370,10 +9409,17 @@ function switchSubTerminal(view) {
             onlineBadge.classList.add('flex');
         }
 
-        // ✅ ✨ แสดงรายชื่อพนักงาน (เฉพาะ Supervisor) ในหน้าตาราง
-        if (S.userRole === 'supervisor' && staffWrap) {
+        // ✅ ✨ แสดงรายชื่อพนักงาน (เฉพาะเมื่อเข้าใช้งานผ่านแท็บหัวหน้างาน Supervisor)
+        const isSup = (S.loginRole === 'supervisor');
+        if (isSup && staffWrap) {
             staffWrap.classList.remove('hidden');
             staffWrap.classList.add('flex');
+            if (document.getElementById('staff-filter-select') && document.getElementById('staff-filter-select').options.length <= 1) {
+                loadStaffList();
+            }
+        } else if (staffWrap) {
+            staffWrap.classList.add('hidden');
+            staffWrap.classList.remove('flex');
         }
 
         // ✅ แสดงเครื่องมือจัดการข้อมูล | ❌ ซ่อนฟิลเตอร์วันที่และเวนเดอร์
@@ -8508,7 +9554,17 @@ const allPages = [
         if (dashFilterWrap) dashFilterWrap.classList.add('hidden');
         switchSubTerminal('entry'); 
     } 
-    else if (pageNameUpper === 'ADMIN CONSOLE') {
+    else if (pageNameUpper === 'ADMIN CONSOLE' || pageNameUpper === 'ADMIN USER CONTROL') {
+        // ตรวจสอบสิทธิ์ก่อนเข้าใช้งานหน้า Admin Control
+        const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
+            ? hasAdminAccessPermission(S.currentUser, S.userRole) 
+            : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
+
+        if (!isAllowedAdmin) {
+            toast('⚠️ คุณไม่มีสิทธิ์เข้าถึง Admin Console (เฉพาะ Engineer, Supervisor, Manager และ Admin เท่านั้น)', 'error');
+            return;
+        }
+
         if (subNav) subNav.classList.add('hidden'); // ซ่อนปุ่มสลับหน้า Claim
         if (claimOpTools) claimOpTools.classList.add('hidden');
         if (dashFilterWrap) dashFilterWrap.classList.add('hidden');
@@ -15744,6 +16800,19 @@ function updateSidebarUserUI(targetUser) {
     }
     if ($id('user-display-email')) $id('user-display-email').textContent = targetUser;
     if ($id('user-avatar')) $id('user-avatar').textContent = displayName.charAt(0);
+
+    // อัปเดตการแสดงผลปุ่ม Admin User Control
+    const adminFooterBtn = document.getElementById('admin-footer-access');
+    if (adminFooterBtn) {
+        const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
+            ? hasAdminAccessPermission(S.currentUser, S.userRole) 
+            : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
+        if (isAllowedAdmin) {
+            adminFooterBtn.classList.remove('hidden');
+        } else {
+            adminFooterBtn.classList.add('hidden');
+        }
+    }
 }
 
 // ปรับปรุงฟังก์ชัน Reset ให้ล้างค่าและสั่ง Refresh รวม
@@ -18200,13 +19269,14 @@ const WapAdminSystem = (function() {
 
     function getAdminClients() {
         const clients = [];
-        if (typeof wapClient !== 'undefined' && wapClient) clients.push(wapClient);
-        if (typeof sqeClient !== 'undefined' && sqeClient) clients.push(sqeClient);
-        return clients.length > 0 ? clients : [wapClient || sqeClient].filter(Boolean);
+        const mainSb = (typeof getSupabase === 'function' ? getSupabase() : null) || (typeof sqeClient !== 'undefined' ? sqeClient : null);
+        if (mainSb) clients.push(mainSb);
+        if (typeof wapClient !== 'undefined' && wapClient && wapClient !== mainSb) clients.push(wapClient);
+        return clients.length > 0 ? clients : [mainSb || wapClient].filter(Boolean);
     }
 
     function getPrimaryAdminClient() {
-        return (typeof wapClient !== 'undefined' && wapClient) ? wapClient : sqeClient;
+        return (typeof getSupabase === 'function' ? getSupabase() : null) || (typeof sqeClient !== 'undefined' ? sqeClient : null) || wapClient;
     }
 
     function initAdminRealtimeSubscriptions() {
@@ -18575,9 +19645,14 @@ function formatRuleForSupabase(item, idx = 0) {
     }
 
     async function init() {
-        const isMaster = (S.currentUser || '').toLowerCase() === masterAdminEmail.toLowerCase();
-        const isSupervisor = S.userRole === 'supervisor' || S.loginRole === 'supervisor';
-        if (!isMaster && !isSupervisor) return;
+        const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
+            ? hasAdminAccessPermission(S.currentUser, S.userRole) 
+            : ((S.currentUser || '').toLowerCase() === masterAdminEmail.toLowerCase() || S.userRole === 'supervisor' || S.userRole === 'engineer' || S.userRole === 'manager' || S.userRole === 'admin');
+
+        if (!isAllowedAdmin) {
+            toast('⚠️ เฉพาะ Engineer, Supervisor, Manager และ Admin เท่านั้นที่สามารถใช้งานส่วนนี้ได้', 'error');
+            return;
+        }
         
         await loadBannerSettings();
         
@@ -18701,18 +19776,148 @@ function formatRuleForSupabase(item, idx = 0) {
         });
     }
 
+    function extractDisplayNameFromEmail(email) {
+        if (!email || typeof email !== 'string' || !email.includes('@')) return '';
+        const prefix = email.split('@')[0];
+        const parts = prefix.split('.');
+        if (parts.length >= 2) {
+            const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            const lastInitial = parts[1].charAt(0).toUpperCase();
+            return `${first} ${lastInitial}.`;
+        }
+        return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+
+    function resolveOfficialDisplayName(email, fallbackName) {
+        if (fallbackName && fallbackName !== '-' && fallbackName.trim() && !fallbackName.includes('@')) {
+            return fallbackName.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+        }
+        if (!email) return 'User';
+        const cleanEm = email.toLowerCase().trim();
+        if (typeof window.getEngineeringAndApprovalDirectory === 'function') {
+            const found = window.getEngineeringAndApprovalDirectory().find(d => d.email && d.email.toLowerCase().trim() === cleanEm);
+            if (found && found.name && found.name !== '-') {
+                return found.name.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+            }
+        }
+        if (typeof STAFF_EMAIL_MAP === 'object') {
+            for (const [sName, sEmail] of Object.entries(STAFF_EMAIL_MAP)) {
+                if (sEmail && sEmail.toLowerCase().trim() === cleanEm) {
+                    return sName.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+                }
+            }
+        }
+        return extractDisplayNameFromEmail(email);
+    }
+
+    function onEmailInputForDisplayName(email) {
+        const dispInput = document.getElementById('adm-u-display-name');
+        if (dispInput && (!dispInput.dataset.manuallyEdited || !dispInput.value)) {
+            dispInput.value = resolveOfficialDisplayName(email, '');
+        }
+    }
+
+    async function changeUserRoleDirectly(userId, email, newRole) {
+        if (!email) return;
+        showLoader(true);
+        try {
+            const clients = getAdminClients();
+            const nowIso = new Date().toISOString();
+            const cleanEmail = email.trim();
+            
+            // ค้นหาข้อมูลในแคชเพื่อรักษา display_name, password และ status เดิมไว้
+            const u = _data.users.find(x => String(x.id) === String(userId) || (x.email && x.email.toLowerCase() === cleanEmail.toLowerCase()));
+            if (u) {
+                u.role = newRole;
+                u.updated_at = nowIso;
+            }
+
+            const currentPass = (u && u.password && u.password !== '****') ? u.password : 'Carrier1234';
+            const currentDispName = (u && u.display_name) ? u.display_name : resolveOfficialDisplayName(cleanEmail, '');
+            const currentStatus = (u && u.status) ? u.status : 'active';
+
+            const payload = {
+                email: cleanEmail,
+                display_name: currentDispName,
+                password: currentPass,
+                role: newRole,
+                status: currentStatus,
+                updated_at: nowIso
+            };
+
+            let updated = false;
+            for (const client of clients) {
+                // 1. Update by numeric ID if valid database ID
+                if (userId && !isNaN(userId) && Number(userId) > 0) {
+                    try {
+                        const { error: idErr, data: idData } = await client.from('users').update({ role: newRole, updated_at: nowIso }).eq('id', Number(userId)).select('id');
+                        if (!idErr && idData && idData.length > 0) { updated = true; continue; }
+                    } catch (_) {}
+                }
+
+                // 2. Update by case-insensitive email (ilike)
+                try {
+                    const { error: upErr, data: upData } = await client.from('users').update({ role: newRole, updated_at: nowIso }).ilike('email', cleanEmail).select('id');
+                    if (!upErr && upData && upData.length > 0) { updated = true; continue; }
+                } catch (_) {}
+
+                // 3. Fallback: Find existing or insert
+                try {
+                    const { data: existUser } = await client.from('users').select('id').ilike('email', cleanEmail).maybeSingle();
+                    if (existUser && existUser.id) {
+                        const { error: existErr } = await client.from('users').update({ role: newRole, updated_at: nowIso }).eq('id', existUser.id);
+                        if (!existErr) { updated = true; continue; }
+                    } else {
+                        const { error: insErr, data: insData } = await client.from('users').insert([{
+                            ...payload,
+                            created_at: nowIso
+                        }]).select('id');
+                        if (!insErr) {
+                            if (insData && insData[0] && u) u.id = insData[0].id;
+                            updated = true;
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            writeAuditLog('USER_ROLE_CHANGE', `เปลี่ยนระดับสิทธิ์ของ ${cleanEmail} เป็น ${newRole.toUpperCase()} (Real-time Supabase Sync)`);
+            toast(`⚡ บันทึกระดับสิทธิ์ ${newRole.toUpperCase()} ลง Supabase ทันทีเรียบร้อย`, "success");
+            renderTable();
+            updateStats();
+        } catch (e) {
+            console.error(e);
+            toast("❌ บันทึกสิทธิ์ลง Supabase ไม่สำเร็จ: " + (e.message || ''), "error");
+        }
+        showLoader(false);
+    }
+
     async function toggleUserStatus(userId, currentStatus) {
+        const user = _data.users.find(u => String(u.id) === String(userId));
+        const email = user ? user.email : '';
         const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+        const nowIso = new Date().toISOString();
         try {
             const clients = getAdminClients();
             for (const client of clients) {
-                try {
-                    await client.from('users').update({ status: newStatus, updated_at: new Date() }).eq('id', userId);
-                } catch (_) {}
+                if (userId && !isNaN(userId) && Number(userId) > 0) {
+                    try {
+                        await client.from('users').update({ status: newStatus, updated_at: nowIso }).eq('id', Number(userId));
+                    } catch (_) {}
+                }
+                if (email) {
+                    try {
+                        await client.from('users').update({ status: newStatus, updated_at: nowIso }).ilike('email', email.trim());
+                    } catch (_) {}
+                }
             }
-            writeAuditLog('USER_STATUS_CHANGE', `เปลี่ยนสถานะ User ID ${userId} เป็น ${newStatus}`);
-            toast(`เปลี่ยนสถานะพนักงานเป็น ${newStatus}`, "success");
-            loadData();
+            if (user) {
+                user.status = newStatus;
+                user.updated_at = nowIso;
+            }
+            writeAuditLog('USER_STATUS_CHANGE', `เปลี่ยนสถานะ User: ${email || userId} เป็น ${newStatus}`);
+            toast(`⚡ เปลี่ยนสถานะพนักงานเป็น ${newStatus.toUpperCase()} และบันทึกลง Supabase สำเร็จ`, "success");
+            renderTable();
+            updateStats();
         } catch (e) { toast("เปลี่ยนสถานะไม่สำเร็จ", "error"); }
     }
 
@@ -18722,24 +19927,32 @@ function formatRuleForSupabase(item, idx = 0) {
             subtitle: `พนักงาน (${email}) จะต้องตั้งค่ารหัสผ่านใหม่ในการเข้าใช้งานครั้งหน้า`,
             badge: "USER SECURITY",
             type: "warning",
-            details: [
-                { label: "User Email", value: email },
-                { label: "User ID", value: userId }
-            ],
-            confirmText: "🔑 ยืนยันบังคับ Reset",
-            cancelText: "ยกเลิก",
+            confirmText: "บังคับเปลี่ยนรหัสผ่าน",
             onConfirm: async () => {
+                showLoader(true);
                 try {
                     const clients = getAdminClients();
+                    const nowIso = new Date().toISOString();
                     for (const client of clients) {
-                        try {
-                            await client.from('users').update({ force_reset: true, updated_at: new Date() }).eq('id', userId);
-                        } catch (_) {}
+                        if (userId && !isNaN(userId) && Number(userId) > 0) {
+                            try {
+                                await client.from('users').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).eq('id', Number(userId));
+                            } catch (_) {}
+                        }
+                        if (email) {
+                            try {
+                                await client.from('users').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).ilike('email', email.trim());
+                            } catch (_) {}
+                        }
                     }
-                    writeAuditLog('USER_FORCE_RESET', `บังคับ Reset Key ให้กับ: ${email}`);
-                    toast("ตั้งค่าบังคับเปลี่ยนรหัสผ่านแล้ว", "success");
-                    loadData();
-                } catch (e) { toast("ดำเนินการไม่สำเร็จ", "error"); }
+                    writeAuditLog('USER_FORCE_RESET', `ตั้งค่าบังคับเปลี่ยนรหัสผ่าน: ${email}`);
+                    toast(`🔒 บังคับเปลี่ยนรหัสผ่านสำหรับ ${email} เรียบร้อย`, "info");
+                    renderTable();
+                    updateStats();
+                } catch (e) {
+                    toast("ดำเนินการไม่สำเร็จ", "error");
+                }
+                showLoader(false);
             }
         });
     }
@@ -18814,7 +20027,76 @@ function formatRuleForSupabase(item, idx = 0) {
                         }
                     } catch (_) {}
                 }
-                _data.users = users || [];
+
+                // ดึงรายชื่อและอีเมลทั้งหมดจาก 4. Engineering & Reports และ 5. Approval Matrix
+                const engAndApprList = (typeof window.getEngineeringAndApprovalDirectory === 'function')
+                    ? window.getEngineeringAndApprovalDirectory()
+                    : [];
+                
+                const userMap = new Map();
+                (users || []).forEach(u => {
+                    if (u.email) {
+                        const em = u.email.toLowerCase().trim();
+                        userMap.set(em, { 
+                            ...u,
+                            display_name: u.display_name || resolveOfficialDisplayName(u.email, ''),
+                            password: u.password || 'Carrier1234'
+                        });
+                    }
+                });
+
+                const missingToSync = [];
+                const nowIso = new Date().toISOString();
+
+                engAndApprList.forEach(item => {
+                    const emKey = item.email.toLowerCase().trim();
+                    if (!userMap.has(emKey)) {
+                        const rawRole = (item.role || '').toLowerCase();
+                        let defaultRole = 'supervisor';
+                        if (rawRole.includes('iqc')) defaultRole = 'iqc';
+                        else if (rawRole.includes('sqe') || rawRole.includes('engineer')) defaultRole = 'engineer';
+                        else if (rawRole.includes('manager')) defaultRole = 'manager';
+
+                        const officialName = resolveOfficialDisplayName(item.email, item.name);
+                        const defaultPassword = 'Carrier' + Math.floor(1000 + Math.random() * 9000);
+                        const newStaffUser = {
+                            id: 'usr_' + emKey.replace(/[^a-z0-9]/g, '_'),
+                            email: item.email,
+                            display_name: officialName,
+                            role: defaultRole,
+                            status: 'active',
+                            password: defaultPassword,
+                            created_at: nowIso,
+                            updated_at: nowIso
+                        };
+                        userMap.set(emKey, newStaffUser);
+                        missingToSync.push({
+                            email: item.email,
+                            display_name: officialName,
+                            role: defaultRole,
+                            status: 'active',
+                            password: defaultPassword,
+                            created_at: nowIso,
+                            updated_at: nowIso
+                        });
+                    }
+                });
+
+                // Auto-sync any unsynced staff to Supabase in background
+                if (missingToSync.length > 0) {
+                    (async () => {
+                        for (const client of clients) {
+                            try {
+                                await client.from('users').upsert(missingToSync, { onConflict: 'email' });
+                            } catch (_) {}
+                        }
+                    })();
+                }
+
+                _data.users = Array.from(userMap.values()).map(u => ({
+                    ...u,
+                    display_name: u.display_name || resolveOfficialDisplayName(u.email, '')
+                })).sort((a, b) => (a.email || '').localeCompare(b.email || ''));
 
                 // ดึงข้อมูลประมวลผลการใช้งานจริงจากตารางทั้งหมดแบบขนาน (Parallel Fetch)
                 try {
@@ -19237,7 +20519,8 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         if (_currentTab === 'users') {
             thead.innerHTML = `
                 <tr class="text-[11px] text-slate-600 dark:text-slate-300 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80">
-                    <th class="px-5 py-3.5 text-left font-bold">Agent Identity & Role</th>
+                    <th class="px-5 py-3.5 text-left font-bold">Agent Identity (ชื่อ & อีเมล)</th>
+                    <th class="px-5 py-3.5 text-center font-bold">Clearance Role (ระดับสิทธิ์)</th>
                     <th class="px-5 py-3.5 text-center font-bold">Real System Usage</th>
                     <th class="px-5 py-3.5 text-center font-bold">Status</th>
                     <th class="px-5 py-3.5 text-center font-bold">Security Key</th>
@@ -19248,27 +20531,50 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
                 .filter(u => {
                     const q = (_query || '').toLowerCase();
                     const email = (u.email || '').toLowerCase();
+                    const displayName = (u.display_name || '').toLowerCase();
                     const role = (u.role || '').toLowerCase();
-                    return email.includes(q) || role.includes(q);
+                    return email.includes(q) || displayName.includes(q) || role.includes(q);
                 })
                 .map(u => {
                     const isOnline = u.last_seen && (new Date() - new Date(u.last_seen)) / 1000 / 60 < 10;
                     const safeEmail = u.email || 'unknown@carrier.com';
+                    const displayName = u.display_name || extractDisplayNameFromEmail(safeEmail);
                     const usage = u.realUsage || { claims: 0, support: 0, s5: 0, jobs: 0, ot: 0, audit: 0, total: 0 };
+                    const rawRole = (u.role || 'sqe_support').toLowerCase().trim();
+                    let normRole = 'sqe_support';
+                    if (rawRole === 'iqc') normRole = 'iqc';
+                    else if (rawRole === 'engineer' || rawRole === 'en') normRole = 'engineer';
+                    else if (rawRole === 'supervisor') normRole = 'supervisor';
+                    else if (rawRole === 'manager') normRole = 'manager';
+                    else if (rawRole === 'admin') normRole = 'admin';
 
                     return `
                     <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800" data-rid="${u.id}">
                         <td class="px-5 py-3.5">
                             <div class="flex items-center gap-3">
                                 <div class="relative flex-shrink-0">
-                                    <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/60 border border-blue-200 dark:border-blue-700 flex items-center justify-center font-black text-blue-700 dark:text-blue-300 text-xs">${safeEmail[0].toUpperCase()}</div>
+                                    <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/60 border border-blue-200 dark:border-blue-700 flex items-center justify-center font-black text-blue-700 dark:text-blue-300 text-xs">${(displayName[0] || safeEmail[0] || 'U').toUpperCase()}</div>
                                     <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-800 ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}" title="${isOnline ? 'Online now' : 'Offline'}"></span>
                                 </div>
                                 <div>
-                                    <p class="font-bold text-slate-800 dark:text-slate-100 leading-tight text-xs">${safeEmail.split('@')[0]}</p>
-                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 uppercase tracking-tight font-medium">${u.role || 'STAFF'} | ${safeEmail}</p>
+                                    <p class="font-bold text-slate-800 dark:text-slate-100 leading-tight text-xs flex items-center gap-1.5">
+                                        <span>${displayName}</span>
+                                    </p>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 tracking-tight font-medium">${safeEmail}</p>
                                 </div>
                             </div>
+                        </td>
+                        <td class="px-5 py-3.5 text-center">
+                            <select onchange="WapAdminSystem.changeUserRoleDirectly('${u.id}', '${safeEmail}', this.value)" 
+                                    class="h-7 px-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-[11px] font-bold text-slate-800 dark:text-slate-100 outline-none cursor-pointer transition-all shadow-2xs"
+                                    title="เปลี่ยนระดับสิทธิ์ (Real-Time DB Sync)">
+                                <option value="sqe_support" ${normRole === 'sqe_support' ? 'selected' : ''}>1. SQE Support</option>
+                                <option value="iqc" ${normRole === 'iqc' ? 'selected' : ''}>2. IQC</option>
+                                <option value="engineer" ${normRole === 'engineer' ? 'selected' : ''}>3. EN / Engineer</option>
+                                <option value="supervisor" ${normRole === 'supervisor' ? 'selected' : ''}>4. Supervisor</option>
+                                <option value="manager" ${normRole === 'manager' ? 'selected' : ''}>5. Manager</option>
+                                <option value="admin" ${normRole === 'admin' ? 'selected' : ''}>6. Admin</option>
+                            </select>
                         </td>
                         <td class="px-5 py-3.5 text-center">
                             <div class="flex flex-col items-center justify-center gap-1">
@@ -19595,18 +20901,22 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
                     if (emailIdx === -1 && rawHeaders.length === 1) {
                         mappedRecords = dataRows.map(r => ({
                             email: String(r[0] || '').trim().toLowerCase(),
-                            name: String(r[0] || '').split('@')[0].toUpperCase(),
-                            role: 'staff',
+                            name: resolveOfficialDisplayName(String(r[0] || '').trim().toLowerCase(), ''),
+                            role: 'sqe_support',
                             password: 'Carrier@123',
                             status: 'active'
                         })).filter(u => u.email && u.email.includes('@'));
                     } else {
                         mappedRecords = dataRows.map(r => {
                             const email = emailIdx !== -1 ? String(r[emailIdx] || '').trim().toLowerCase() : String(r[0] || '').trim().toLowerCase();
-                            const rawRole = roleIdx !== -1 ? String(r[roleIdx] || '').trim().toLowerCase() : 'staff';
-                            let role = 'staff';
+                            const rawRole = roleIdx !== -1 ? String(r[roleIdx] || '').trim().toLowerCase() : 'sqe_support';
+                            let role = 'sqe_support';
                             if (rawRole.includes('super') || rawRole.includes('หัวหน้า') || rawRole.includes('sup')) role = 'supervisor';
                             else if (rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) role = 'admin';
+                            else if (rawRole.includes('iqc')) role = 'iqc';
+                            else if (rawRole.includes('eng') || rawRole.includes('วิศวกร')) role = 'engineer';
+                            else if (rawRole.includes('manag') || rawRole.includes('ผจก') || rawRole.includes('ผู้จัดการ')) role = 'manager';
+                            else role = 'sqe_support';
                             
                             const rawStatus = statusIdx !== -1 ? String(r[statusIdx] || '').trim().toLowerCase() : 'active';
                             const status = (rawStatus === 'inactive' || rawStatus === 'ปิด' || rawStatus === 'false') ? 'inactive' : 'active';
@@ -20019,18 +21329,28 @@ mappedRecords = dataRows.map((r, idx) => {
                     <div class="space-y-3">
                         <div>
                             <label class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">Carrier Email</label>
-                            <input type="email" id="adm-u-email" class="w-full h-10 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="name@carrier.com" title="Email" aria-label="Email">
+                            <input type="email" id="adm-u-email" oninput="WapAdminSystem.onEmailInputForDisplayName(this.value)" class="w-full h-10 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="name@carrier.com" title="Email" aria-label="Email">
+                        </div>
+                        <div>
+                            <label class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1 flex items-center justify-between">
+                                <span>Display Name (ชื่อพนักงาน)</span>
+                                <span class="text-[9.5px] text-blue-600 dark:text-blue-400 font-normal lowercase">ดึงอัตโนมัติจากอีเมล</span>
+                            </label>
+                            <input type="text" id="adm-u-display-name" oninput="this.dataset.manuallyEdited = '1'" class="w-full h-10 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="เช่น meechai" title="Display Name" aria-label="Display Name">
                         </div>
                         <div>
                             <label class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">Security Key (Password)</label>
                             <input type="text" id="adm-u-pass" class="w-full h-10 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold font-mono text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="รหัสผ่านเข้าใช้งาน" title="Password" aria-label="Password">
                         </div>
                         <div>
-                            <label class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">Clearance Role</label>
+                            <label class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">Clearance Role (ระดับสิทธิ์)</label>
                             <select id="adm-u-role" class="w-full h-10 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20" title="Role" aria-label="Role">
-                                <option value="staff">Staff (บันทึกข้อมูลและรายงานปัญหา)</option>
-                                <option value="supervisor">Supervisor (ดูรายงานและจัดการ)</option>
-                                <option value="admin">Admin (ผู้ดูแลระบบ)</option>
+                                <option value="sqe_support">1. SQE Support (ผู้ประสานงาน SQE)</option>
+                                <option value="iqc">2. IQC (เจ้าหน้าที่ IQC)</option>
+                                <option value="engineer">3. EN / Engineer (วิศวกร SQE / EN)</option>
+                                <option value="supervisor">4. Supervisor (หัวหน้างาน)</option>
+                                <option value="manager">5. Manager (ผู้จัดการ)</option>
+                                <option value="admin">6. Admin (ผู้ดูแลระบบ)</option>
                             </select>
                         </div>
                     </div>
@@ -21593,43 +22913,6 @@ mappedRecords = dataRows.map((r, idx) => {
         renderTable();
     }
 
-    async function saveUser() {
-        const email = document.getElementById('adm-u-email')?.value.trim();
-        const pass = document.getElementById('adm-u-pass')?.value.trim();
-        const role = document.getElementById('adm-u-role')?.value || 'staff';
-
-        if (!email || !pass) return toast("กรุณากรอก Email และ Password", "error");
-
-        showLoader(true);
-        try {
-            const clients = getAdminClients();
-            let successCount = 0;
-            for (const client of clients) {
-                try {
-                    const { error } = await client.from('users').insert([{
-                        email: email,
-                        password: pass,
-                        role: role,
-                        status: 'active',
-                        created_at: new Date()
-                    }]);
-                    if (!error) successCount++;
-                } catch(e) {}
-            }
-
-            if (successCount === 0) throw new Error("ไม่สามารถบันทึกผู้ใช้ลงฐานข้อมูลได้");
-
-            writeAuditLog('USER_CREATE', `สร้างผู้ใช้ใหม่: ${email} (${role})`);
-            toast("✅ ลงทะเบียนพนักงานสำเร็จ", "success");
-            closeMasterModal();
-            loadData();
-        } catch (e) {
-            console.error(e);
-            toast("❌ เพิ่มพนักงานล้มเหลว: " + (e.message || ''), "error");
-        }
-        showLoader(false);
-    }
-
     async function saveQuickMaster() {
         const val = $id('m-input-val')?.value.trim();
         if (!val) return toast("กรุณากรอกข้อมูล", "error");
@@ -21818,11 +23101,22 @@ mappedRecords = dataRows.map((r, idx) => {
             const clients = getAdminClients();
             for (const client of clients) {
                 try {
-                    await client.from('users').update({ 
-                        force_reset: newVal, 
-                        is_reset_key_required: newVal,
-                        updated_at: new Date()
-                    }).eq('id', userId);
+                    if (userId && !String(userId).startsWith('appr_')) {
+                        await client.from('users').update({ 
+                            force_reset: newVal, 
+                            is_reset_key_required: newVal,
+                            updated_at: new Date().toISOString()
+                        }).eq('id', userId);
+                    }
+                } catch (_) {}
+                try {
+                    if (user.email) {
+                        await client.from('users').update({ 
+                            force_reset: newVal, 
+                            is_reset_key_required: newVal,
+                            updated_at: new Date().toISOString()
+                        }).eq('email', user.email);
+                    }
                 } catch (_) {}
             }
 
@@ -21851,25 +23145,129 @@ mappedRecords = dataRows.map((r, idx) => {
         showLoader(true);
         try {
             const clients = getAdminClients();
+            const nowIso = new Date().toISOString();
+            const payload = {
+                email: user.email,
+                display_name: user.display_name || resolveOfficialDisplayName(user.email, ''),
+                password: newPass,
+                role: user.role || 'sqe_support',
+                status: user.status || 'active',
+                updated_at: nowIso
+            };
+
             for (const client of clients) {
                 try {
-                    await client.from('users').update({ 
-                        password: newPass,
-                        updated_at: new Date()
-                    }).eq('id', userId);
+                    await client.from('users').upsert(payload, { onConflict: 'email' });
+                } catch (_) {}
+                try {
+                    if (userId && !String(userId).startsWith('appr_')) {
+                        await client.from('users').update({ 
+                            password: newPass,
+                            updated_at: nowIso
+                        }).eq('id', userId);
+                    }
+                } catch (_) {}
+                try {
+                    if (user.email) {
+                        await client.from('users').update({ 
+                            password: newPass,
+                            updated_at: nowIso
+                        }).eq('email', user.email);
+                    }
                 } catch (_) {}
             }
 
             user.password = newPass;
+            user.updated_at = nowIso;
 
             writeAuditLog('USER_KEY_RESET', `ตั้งค่ารหัสผ่านใหม่ให้กับ ${user.email}`);
-            toast("⚡ เปลี่ยนรหัสผ่านใหม่สำเร็จ", "success");
+            toast("⚡ เปลี่ยนรหัสผ่านใหม่และบันทึกลง Supabase สำเร็จ", "success");
             
             openResetSecurityModal(userId);
             renderTable();
             updateStats();
         } catch (e) {
             toast("เปลี่ยนรหัสผ่านไม่สำเร็จ: " + (e.message || ''), "error");
+        }
+        showLoader(false);
+    }
+
+    async function saveUser() {
+        const email = document.getElementById('adm-u-email')?.value.trim();
+        let displayName = document.getElementById('adm-u-display-name')?.value.trim();
+        const pass = document.getElementById('adm-u-pass')?.value.trim();
+        const role = document.getElementById('adm-u-role')?.value || 'sqe_support';
+
+        if (!email || !pass) return toast("กรุณากรอก Email และ Password ให้ครบถ้วน", "error");
+        if (!displayName) {
+            displayName = resolveOfficialDisplayName(email, '');
+        }
+
+        showLoader(true);
+        try {
+            const clients = getAdminClients();
+            const nowIso = new Date().toISOString();
+            const payload = {
+                email: email,
+                display_name: displayName,
+                password: pass,
+                role: role,
+                status: 'active',
+                created_at: nowIso,
+                updated_at: nowIso
+            };
+
+            let success = false;
+            for (const client of clients) {
+                try {
+                    const { data: existUser } = await client.from('users').select('id').ilike('email', email).maybeSingle();
+                    if (existUser && existUser.id) {
+                        const { error: upErr } = await client.from('users').update({
+                            display_name: displayName,
+                            password: pass,
+                            role: role,
+                            status: 'active',
+                            updated_at: nowIso
+                        }).eq('id', existUser.id);
+                        if (!upErr) { success = true; continue; }
+                    } else {
+                        const { error: insErr } = await client.from('users').insert([payload]);
+                        if (!insErr) { success = true; }
+                    }
+                } catch (_) {}
+            }
+
+            const existingIdx = _data.users.findIndex(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+            if (existingIdx !== -1) {
+                _data.users[existingIdx] = {
+                    ..._data.users[existingIdx],
+                    display_name: displayName,
+                    password: pass,
+                    role: role,
+                    status: 'active',
+                    updated_at: nowIso
+                };
+            } else {
+                _data.users.push({
+                    id: 'usr_' + Date.now(),
+                    email: email,
+                    display_name: displayName,
+                    password: pass,
+                    role: role,
+                    status: 'active',
+                    created_at: nowIso,
+                    updated_at: nowIso
+                });
+            }
+
+            writeAuditLog('USER_CREATE', `เพิ่ม/อัปเดตบัญชีพนักงาน: ${email} (${displayName}) สิทธิ์: ${role}`);
+            toast("✅ เพิ่มบัญชีพนักงานและบันทึกลง Supabase สำเร็จ", "success");
+            closeMasterModal();
+            renderTable();
+            updateStats();
+        } catch (e) {
+            console.error(e);
+            toast("❌ เพิ่มพนักงานล้มเหลว: " + (e.message || ''), "error");
         }
         showLoader(false);
     }
@@ -21885,8 +23283,16 @@ mappedRecords = dataRows.map((r, idx) => {
         setModalSize('normal');
         modal.classList.remove('hidden-view');
         const safeEmail = user.email || '';
+        const safeDisplayName = user.display_name || extractDisplayNameFromEmail(safeEmail);
         const safePass = user.password || '';
-        const currentRole = user.role || 'staff';
+        const rawRole = (user.role || 'sqe_support').toLowerCase().trim();
+        let currentRole = 'sqe_support';
+        if (rawRole === 'iqc') currentRole = 'iqc';
+        else if (rawRole === 'engineer' || rawRole === 'en') currentRole = 'engineer';
+        else if (rawRole === 'supervisor') currentRole = 'supervisor';
+        else if (rawRole === 'manager') currentRole = 'manager';
+        else if (rawRole === 'admin') currentRole = 'admin';
+
         const currentStatus = user.status || 'active';
         const isForceReset = !!user.force_reset || !!user.is_reset_key_required;
 
@@ -21903,16 +23309,23 @@ mappedRecords = dataRows.map((r, idx) => {
                         <input type="email" id="adm-edit-email" value="${safeEmail}" class="w-full h-10 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="name@carrier.com" title="Email" aria-label="Email">
                     </div>
                     <div>
+                        <label class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">Display Name (ชื่อพนักงาน)</label>
+                        <input type="text" id="adm-edit-display-name" value="${safeDisplayName}" class="w-full h-10 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="เช่น meechai" title="Display Name" aria-label="Display Name">
+                    </div>
+                    <div>
                         <label class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">Security Key (Password)</label>
                         <input type="text" id="adm-edit-pass" value="${safePass}" class="w-full h-10 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold font-mono text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="รหัสผ่านเข้าใช้งาน" title="Password" aria-label="Password">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">Clearance Role</label>
+                            <label class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block mb-1">Clearance Role (ระดับสิทธิ์)</label>
                             <select id="adm-edit-role" class="w-full h-10 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20" title="Clearance Role" aria-label="Clearance Role">
-                                <option value="staff" ${currentRole === 'staff' ? 'selected' : ''}>Staff (บันทึกข้อมูล)</option>
-                                <option value="supervisor" ${currentRole === 'supervisor' ? 'selected' : ''}>Supervisor (ดูรายงาน)</option>
-                                <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>Admin (จัดการระบบ)</option>
+                                <option value="sqe_support" ${currentRole === 'sqe_support' ? 'selected' : ''}>1. SQE Support (ผู้ประสานงาน SQE)</option>
+                                <option value="iqc" ${currentRole === 'iqc' ? 'selected' : ''}>2. IQC (เจ้าหน้าที่ IQC)</option>
+                                <option value="engineer" ${currentRole === 'engineer' ? 'selected' : ''}>3. EN / Engineer (วิศวกร SQE / EN)</option>
+                                <option value="supervisor" ${currentRole === 'supervisor' ? 'selected' : ''}>4. Supervisor (หัวหน้างาน)</option>
+                                <option value="manager" ${currentRole === 'manager' ? 'selected' : ''}>5. Manager (ผู้จัดการ)</option>
+                                <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>6. Admin (ผู้ดูแลระบบ)</option>
                             </select>
                         </div>
                         <div>
@@ -21939,47 +23352,95 @@ mappedRecords = dataRows.map((r, idx) => {
 
     async function updateUser(userId) {
         const email = document.getElementById('adm-edit-email')?.value.trim();
+        let displayName = document.getElementById('adm-edit-display-name')?.value.trim();
         const pass = document.getElementById('adm-edit-pass')?.value.trim();
-        const role = document.getElementById('adm-edit-role')?.value || 'staff';
+        const role = document.getElementById('adm-edit-role')?.value || 'sqe_support';
         const status = document.getElementById('adm-edit-status')?.value || 'active';
         const forceReset = !!document.getElementById('adm-edit-force')?.checked;
 
         if (!email || !pass) return toast("กรุณากรอก Email และ Password ให้ครบถ้วน", "error");
+        if (!displayName) {
+            displayName = resolveOfficialDisplayName(email, '');
+        }
 
         showLoader(true);
         try {
             const clients = getAdminClients();
+            const nowIso = new Date().toISOString();
             let success = false;
+            const updatePayload = {
+                email: email,
+                display_name: displayName,
+                password: pass,
+                role: role,
+                status: status,
+                force_reset: forceReset,
+                is_reset_key_required: forceReset,
+                updated_at: nowIso
+            };
+
             for (const client of clients) {
+                // 1. Update by numeric ID
+                if (userId && !isNaN(userId) && Number(userId) > 0) {
+                    try {
+                        const { error: idErr, data: idData } = await client.from('users').update(updatePayload).eq('id', Number(userId)).select('id');
+                        if (!idErr && idData && idData.length > 0) { success = true; continue; }
+                    } catch (_) {}
+                }
+
+                // 2. Update by case-insensitive email
                 try {
-                    const { error } = await client.from('users').update({
-                        email: email,
-                        password: pass,
-                        role: role,
-                        status: status,
-                        force_reset: forceReset,
-                        updated_at: new Date()
-                    }).eq('id', userId);
-                    if (!error) success = true;
+                    const { error: emErr, data: emData } = await client.from('users').update(updatePayload).ilike('email', email).select('id');
+                    if (!emErr && emData && emData.length > 0) { success = true; continue; }
+                } catch (_) {}
+
+                // 3. Fallback: Find existing or insert
+                try {
+                    const { data: existUser } = await client.from('users').select('id').ilike('email', email).maybeSingle();
+                    if (existUser && existUser.id) {
+                        const { error: existErr } = await client.from('users').update(updatePayload).eq('id', existUser.id);
+                        if (!existErr) { success = true; continue; }
+                    } else {
+                        const { error: insErr } = await client.from('users').insert([{
+                            ...updatePayload,
+                            created_at: nowIso
+                        }]);
+                        if (!insErr) { success = true; }
+                    }
                 } catch (_) {}
             }
 
-            if (!success && clients.length > 0) throw new Error("ไม่สามารถอัปเดตข้อมูลพนักงานในฐานข้อมูลได้");
-
-            const idx = _data.users.findIndex(u => String(u.id) === String(userId));
+            // Always update local cache regardless of offline/cloud state
+            const idx = _data.users.findIndex(u => String(u.id) === String(userId) || (u.email && u.email.toLowerCase() === email.toLowerCase()));
             if (idx !== -1) {
                 _data.users[idx] = {
                     ..._data.users[idx],
                     email: email,
+                    display_name: displayName,
                     password: pass,
                     role: role,
                     status: status,
-                    force_reset: forceReset
+                    force_reset: forceReset,
+                    is_reset_key_required: forceReset,
+                    updated_at: nowIso
                 };
+            } else {
+                _data.users.push({
+                    id: userId || ('user_' + Date.now()),
+                    email: email,
+                    display_name: displayName,
+                    password: pass,
+                    role: role,
+                    status: status,
+                    force_reset: forceReset,
+                    is_reset_key_required: forceReset,
+                    created_at: nowIso,
+                    updated_at: nowIso
+                });
             }
 
-            writeAuditLog('USER_UPDATE', `แก้ไขข้อมูลผู้ใช้งาน: ${email} (${role}, ${status})`);
-            toast("✅ อัปเดตข้อมูลพนักงานเรียบร้อย", "success");
+            writeAuditLog('USER_UPDATE', `แก้ไขข้อมูลผู้ใช้งาน: ${email} (${displayName}, ${role}, ${status})`);
+            toast("✅ อัปเดตข้อมูลพนักงานและบันทึกลง Supabase สำเร็จ", "success");
             closeMasterModal();
             renderTable();
             updateStats();
@@ -22042,11 +23503,18 @@ mappedRecords = dataRows.map((r, idx) => {
             const clients = getAdminClients();
             for (const client of clients) {
                 try {
-                    await client.from('users').delete().eq('id', userId);
+                    if (userId && !String(userId).startsWith('appr_')) {
+                        await client.from('users').delete().eq('id', userId);
+                    }
+                } catch (_) {}
+                try {
+                    if (email) {
+                        await client.from('users').delete().eq('email', email);
+                    }
                 } catch (_) {}
             }
 
-            _data.users = _data.users.filter(u => String(u.id) !== String(userId));
+            _data.users = _data.users.filter(u => String(u.id) !== String(userId) && (!email || u.email !== email));
 
             writeAuditLog('USER_DELETE', `ลบบัญชีพนักงาน: ${email} (ID: ${userId})`);
             toast("🗑️ ลบบัญชีพนักงานเรียบร้อย", "success");
@@ -22125,6 +23593,7 @@ mappedRecords = dataRows.map((r, idx) => {
     return { 
         init, switchTab, loadData, harvestFromHistory, triggerCSVImport, handleCSVFileSelected, parseCSV, executeCSVOverwrite, updateAnnouncement, 
         toggleBanner, deleteEntry, closeMasterModal, handleAddNew, saveMaster, saveUser,
+        extractDisplayNameFromEmail, onEmailInputForDisplayName, changeUserRoleDirectly,
         toggleMaintenance, toggleUserStatus, setForceReset, performFullBackup, performArchive,
         deployNewVersion, triggerForceUpdate, saveQuickMaster,
         openResetSecurityModal, copyUserCredentials, toggleForceResetState, applyNewSecurityKey,
@@ -22281,10 +23750,13 @@ window.onVfDocVendorChange = function(el) {
         : null;
 
     // 2. อัปเดตข้อมูลเข้าสู่สถานะตัวแปรปัจจุบัน (Internal State Update)
-    // จุดนี้สำคัญมาก! เพราะหน้าส่งเมล์จะดึงข้อมูลจาก _currentCase ไปใช้
-    if (typeof _currentCase !== 'undefined' && _currentCase && _currentCase.report_data) {
-        if (!_currentCase.report_data.vf_data) _currentCase.report_data.vf_data = {};
-        const vf = _currentCase.report_data.vf_data;
+    // จุดนี้สำคัญมาก! เพราะหน้าส่งเมล์จะดึงข้อมูลจาก currentCase ไปใช้
+    const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
+        ? Wap8DSystem.getCurrentCase()
+        : null;
+    if (curCase && curCase.report_data) {
+        if (!curCase.report_data.vf_data) curCase.report_data.vf_data = {};
+        const vf = curCase.report_data.vf_data;
 
         // บันทึกชื่อซัพพลายเออร์ที่แก้ไขลงในหน่วยความจำ
         vf.vendor = rawVal; 
@@ -22349,29 +23821,45 @@ window.onVfDocVendorCodeChange = function(el) {
 // ตรวจสอบ Maintenance Mode ทุกๆ 1 นาที และเมื่อโหลดหน้าจอ
 async function syncMaintenanceStatus() {
     try {
-        const { data, error } = await sqeClient
+        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+        if (!sb) return;
+        const { data, error } = await sb
             .from('system_settings')
             .select('is_maintenance_active')
             .eq('id', 'global_config')
             .single();
 
-        if (error) throw error;
-
-        const isMtx = data.is_maintenance_active;
         const mtxView = document.getElementById('maintenance-view');
+        if (error || !data) {
+            if (mtxView && !window.adminBypass) {
+                mtxView.classList.add('hidden-view');
+                mtxView.style.display = 'none';
+            }
+            return;
+        }
+
+        const isMtx = !!data.is_maintenance_active;
         
         // เงื่อนไข: ถ้าเปิดโหมดปรับปรุง และผู้ใช้ไม่ใช่ Natthawut (Master Admin)
-        const isMaster = S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
+        const isMaster = S && S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
 
-        if (isMtx && !isMaster) {
-            mtxView.classList.remove('hidden-view');
+        if (isMtx && !isMaster && !window.adminBypass) {
+            if (mtxView) {
+                mtxView.classList.remove('hidden-view');
+                mtxView.style.display = 'flex';
+            }
             // ถ้า User ล็อกอินค้างอยู่ ให้บังคับ Logout ล่องหน (ไม่เคลียร์ Session เผื่อ Admin เปิดระบบกลับมา)
-            document.getElementById('dashboard-view').classList.add('hidden-view');
+            const dash = document.getElementById('dashboard-view');
+            if (dash) dash.classList.add('hidden-view');
         } else {
-            mtxView.classList.add('hidden-view');
+            if (mtxView) {
+                mtxView.classList.add('hidden-view');
+                mtxView.style.display = 'none';
+            }
             // ถ้า Master Admin เข้ามา หรือระบบเปิดปกติ ให้เช็คสถานะการล็อกอินเดิม
-            if (S.isLoggedIn) {
-                document.getElementById('dashboard-view').classList.remove('hidden-view');
+            if (S && S.isLoggedIn) {
+                const dash = document.getElementById('dashboard-view');
+                if (dash) dash.classList.remove('hidden-view');
             }
         }
         
@@ -22381,21 +23869,36 @@ async function syncMaintenanceStatus() {
 
     } catch (err) {
         console.error("Maintenance Sync Error:", err);
+        const mtxView = document.getElementById('maintenance-view');
+        if (mtxView && !window.adminBypass) {
+            mtxView.classList.add('hidden-view');
+            mtxView.style.display = 'none';
+        }
     }
 }
 
 // ฟังก์ชันให้ Admin ปลดล็อคหน้า Maintenance เพื่อไปหน้า Login
 function unlockMaintenanceForAdmin() {
+    window.adminBypass = true;
     const mtxView = document.getElementById('maintenance-view');
     const loginView = document.getElementById('login-view');
+    const dashView = document.getElementById('dashboard-view');
     
-    if (mtxView) mtxView.style.display = 'none'; // ซ่อนหน้า Maintenance
-    if (loginView) {
+    if (mtxView) {
+        mtxView.classList.add('hidden-view');
+        mtxView.style.display = 'none'; // ซ่อนหน้า Maintenance
+    }
+    if (S && S.isLoggedIn) {
+        if (dashView) {
+            dashView.classList.remove('hidden-view');
+            dashView.style.display = 'flex';
+        }
+    } else if (loginView) {
         loginView.style.display = 'flex'; // แสดงหน้า Login
         loginView.classList.remove('hidden-view');
     }
     
-    toast("🔓 โหมดเข้าใช้งานพิเศษสำหรับผู้ดูแลระบบ", "info");
+    if (typeof toast === 'function') toast("🔓 โหมดเข้าใช้งานพิเศษสำหรับผู้ดูแลระบบ", "info");
 }
 
 
@@ -23299,76 +24802,237 @@ function renderModalAC(type, inputEl) {
     let htmlContent = '';
 
     // ============================================================
-    // กรณีที่ 1: การลงนาม (Sign-off) - ตามเงื่อนไข Matrix
+    // กรณีที่ 1: การลงนาม (Sign-off) - ตามเงื่อนไข Matrix & หมวดหมู่ RP / VF
     // ============================================================
     if (type === 'staff') {
-        const c = (typeof Wap8DSystem !== 'undefined') ? Wap8DSystem.getCurrentCase() : null;
-        const vfData = c?.report_data?.vf_data || {};
-        const reportType = (c?.report_data?.source_report_type || c?.report_type || 'VF').toUpperCase();
-        const isRP = reportType.includes('RP');
+        const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
+            ? Wap8DSystem.getCurrentCase()
+            : null;
+        const vfData = curCase?.report_data?.vf_data || {};
+        const docNo = (typeof getCaseControlNo === 'function' && curCase) ? getCaseControlNo(curCase) : (curCase?.control_no || '');
+        const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
+        const docTypeLabel = (document.getElementById('vf-doc-type-label')?.innerText || '').toUpperCase();
+        const isRP = reportType.includes('RP') || docNo.includes('RP') || docTypeLabel.includes('RP');
 
-        if (inputEl.id === 'prob-issue-by') {
-            const teams = (typeof STAFF_TEAMS !== 'undefined') ? STAFF_TEAMS : [];
-            teams.forEach((team) => {
-                const matchedMembers = team.members.filter(m => !query || m.toLowerCase().includes(query));
-                if (matchedMembers.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0; text-transform: uppercase; position: sticky; top: 0; z-index: 5;">${team.icon} ${team.team}</div>`;
-                    matchedMembers.forEach(m => {
-                        htmlContent += `<div class="modal-ac-item" style="padding: 9px 12px; font-size: 11.5px; font-weight: 700; color: #334155; cursor: pointer; border-bottom: 1px solid #f1f5f9; white-space: nowrap;" onmousedown="event.preventDefault(); applyModalAC('staff', '${m.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">👤 ${m}</div>`;
+        const vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() || vfData.vendor || "";
+        const vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() || vfData.vendor_code || "";
+        const matrix = (typeof window.getVFRPMatrixForSupplier === 'function') ? window.getVFRPMatrixForSupplier(vendorName, vendorCode, '') : null;
+
+        // รายชื่อทีม IQC Engineers สำหรับ RP (ISSUE BY)
+        const iqcEngineers = [
+            "Mr.Meechai T.",
+            "Mr.Anuchit A.",
+            "Mr.Eueangkoon S.",
+            "Mr.Puriwat S.",
+            "Mr.Theerapol W.",
+            "Mr.Pratheep N.",
+            "Mr.Kraiwit P.",
+            "Mr.Sornchai W.",
+            "Ms.Panida B.",
+            "Mr.Pakon M.",
+            "Ms.Siriwan S.",
+            "Ms.Supaporn S.",
+            "Mr.Kaptan Y."
+        ];
+        if (matrix && matrix.iqc_eng_name && matrix.iqc_eng_name !== '-' && !iqcEngineers.includes(matrix.iqc_eng_name)) {
+            iqcEngineers.unshift(matrix.iqc_eng_name);
+        }
+
+        // รายชื่อ Confirm RP (CONFIRM BY - Supervisor)
+        const confirmRpSupervisors = [
+            "Ms.Siriporn P.",
+            "Ms.Songporn C.",
+            "Mr.Komson N."
+        ];
+        if (matrix && matrix.confirm_rp_name && matrix.confirm_rp_name !== '-' && !confirmRpSupervisors.includes(matrix.confirm_rp_name)) {
+            confirmRpSupervisors.unshift(matrix.confirm_rp_name);
+        } else if (matrix && matrix.confirm_rp && matrix.confirm_rp !== '-' && !confirmRpSupervisors.includes(matrix.confirm_rp)) {
+            confirmRpSupervisors.unshift(matrix.confirm_rp);
+        }
+
+        // รายชื่อ Approve RP (APPROVED BY - ผู้อนุมัติหลัก)
+        const approveRpPrimary = [
+            "Mr.Ekkalak L."
+        ];
+        if (matrix && matrix.approve_rp_name && matrix.approve_rp_name !== '-' && !approveRpPrimary.includes(matrix.approve_rp_name)) {
+            approveRpPrimary.unshift(matrix.approve_rp_name);
+        } else if (matrix && matrix.approve_rp && matrix.approve_rp !== '-' && !approveRpPrimary.includes(matrix.approve_rp)) {
+            approveRpPrimary.unshift(matrix.approve_rp);
+        }
+
+        // รายชื่อ SQE Engineers สำหรับ VF (ISSUE BY)
+        const sqeEngineers = [
+            "Mr.Witsarut S.",
+            "Mr.Pongpan P.",
+            "Mr.Natthawut C.",
+            "Mr.Aphinan P.",
+            "Mr.Somchai R.",
+            "Mr.Eakkachai B.",
+            "Mr.Ubonsak J.",
+            "Mr.Thawutchai T.",
+            "Mr.Satthra O."
+        ];
+        if (matrix && matrix.engineer && matrix.engineer !== '-' && !sqeEngineers.includes(matrix.engineer)) {
+            sqeEngineers.unshift(matrix.engineer);
+        }
+
+        // รายชื่อ Confirm VF สำหรับ VF (CONFIRM BY - SQE Leader / Supervisor)
+        const confirmVfList = [
+            "Mr.Suphap M.",
+            "Mr.Witsarut S.",
+            "Mr.Pongpan P.",
+            "Mr.Natthawut C.",
+            "Mr.Aphinan P.",
+            "Mr.Somchai R.",
+            "Mr.Eakkachai B.",
+            "Mr.Ubonsak J.",
+            "Mr.Thawutchai T.",
+            "Mr.Satthra O."
+        ];
+        if (matrix && matrix.confirm_vf_name && matrix.confirm_vf_name !== '-' && !confirmVfList.includes(matrix.confirm_vf_name)) {
+            confirmVfList.unshift(matrix.confirm_vf_name);
+        }
+
+        // รายชื่อ Approve VF สำหรับ VF (APPROVED BY - ผู้อนุมัติหลัก)
+        const approveVfPrimary = [
+            "Mr.Watcharin Y.",
+            "Ms.Nipawan J.",
+            "Mr.Chiraphat K."
+        ];
+        if (matrix && matrix.approve_vf_name && matrix.approve_vf_name !== '-' && !approveVfPrimary.includes(matrix.approve_vf_name)) {
+            approveVfPrimary.unshift(matrix.approve_vf_name);
+        } else if (matrix && matrix.approve_vf && matrix.approve_vf !== '-' && !approveVfPrimary.includes(matrix.approve_vf)) {
+            approveVfPrimary.unshift(matrix.approve_vf);
+        }
+
+        // 🟣 ผู้อนุมัติร่วม (Approve VF/RP - Co-Approver สำหรับทั้ง VF และ RP ในช่อง APPROVED BY)
+        const coApprovers = [
+            "Ms.Nipawan J.",
+            "Mr.Watcharin Y.",
+            "Mr.Jumnong T."
+        ];
+        if (matrix && matrix.approve_vf_rp_name && matrix.approve_vf_rp_name !== '-' && !coApprovers.includes(matrix.approve_vf_rp_name)) {
+            coApprovers.unshift(matrix.approve_vf_rp_name);
+        } else if (matrix && matrix.approve_vfrp && matrix.approve_vfrp !== '-' && !coApprovers.includes(matrix.approve_vfrp)) {
+            coApprovers.unshift(matrix.approve_vfrp);
+        }
+
+        // Helper ฟังก์ชันเรนเดอร์แถวรายการพนักงาน
+        const renderStaffOption = (name, badgeLabel, badgeBgColor, badgeTextColor = '#ffffff', icon = '👤') => {
+            const email = (typeof resolveStaffEmail === 'function') ? resolveStaffEmail(name) : (STAFF_EMAIL_MAP[name] || '');
+            return `
+                <div class="modal-ac-item" 
+                     style="padding: 7px 12px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s ease;"
+                     onmouseover="this.style.backgroundColor='#f8fafc'"
+                     onmouseout="this.style.backgroundColor='transparent'"
+                     onmousedown="event.preventDefault(); applyModalAC('staff', '${name.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                    <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+                        <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 800; font-size: 11.5px; color: #0f172a; white-space: nowrap;">
+                            <span>${icon}</span> ${name}
+                        </span>
+                        ${email ? `<span style="font-size: 9px; color: #64748b; font-weight: 500; padding-left: 18px; font-family: monospace;">${email}</span>` : ''}
+                    </div>
+                    <span style="font-size: 8px; line-height: 1; height: 18px; box-sizing: border-box; background: ${badgeBgColor}; color: ${badgeTextColor}; padding: 0 6px; border-radius: 4px; font-weight: 800; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px;">
+                        ${badgeLabel}
+                    </span>
+                </div>
+            `;
+        };
+
+        // ==========================================
+        // 🟢 เอกสาร RP (Return Part / IQC)
+        // ==========================================
+        if (isRP) {
+            if (inputEl.id === 'prob-issue-by') {
+                // ISSUE BY: กรองแสดงเฉพาะรายชื่อในหมวด 🟢 รายงาน RP (Return Part / IQC) - IQC Engineer
+                const matched = iqcEngineers.filter(m => !query || m.toLowerCase().includes(query));
+                if (matched.length > 0) {
+                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #065f46; background: #ecfdf5; border-bottom: 1.5px solid #a7f3d0; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+                        <span>🟢</span> รายงาน RP (Return Part / IQC) - IQC ENGINEER
+                    </div>`;
+                    matched.forEach(m => {
+                        htmlContent += renderStaffOption(m, 'IQC ENGINEER', '#059669', '#ffffff', '🟢');
                     });
                 }
-            });
-        } else {
-            const vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() || vfData.vendor || "";
-            const matrix = (typeof window.getVFRPMatrixForSupplier === 'function') ? window.getVFRPMatrixForSupplier(vendorName, vfData.vendor_code, '') : null;
-            let allowedNames = [];
-            
-            if (matrix) {
-                if (inputEl.id === 'prob-confirm-by') {
-                    const name = isRP ? (matrix.confirm_rp_name || matrix.confirm_rp) : (matrix.confirm_vf_name || matrix.confirm_vf);
-                    if (name && name !== '-') {
-                        allowedNames.push({ name: name, label: isRP ? "CONFIRM RP" : "CONFIRM VF", color: isRP ? '#059669' : '#2563eb' });
-                    }
-                } else if (inputEl.id === 'prob-approved-by') {
-                    const primaryAppr = isRP ? (matrix.approve_rp_name || matrix.approve_rp) : (matrix.approve_vf_name || matrix.approve_vf);
-                    const coAppr = matrix.approve_vf_rp_name || matrix.approve_vfrp; 
-                    if (primaryAppr && primaryAppr !== '-') {
-                        allowedNames.push({ name: primaryAppr, label: isRP ? "DIRECT APPROVER (RP)" : "DIRECT APPROVER (VF)", color: isRP ? '#059669' : '#2563eb' });
-                    }
-                    if (coAppr && coAppr !== '-' && coAppr !== primaryAppr) {
-                        allowedNames.push({ name: coAppr, label: "APPROVER (VF/RP)", color: '#7c3aed' });
-                    }
+            } else if (inputEl.id === 'prob-confirm-by') {
+                // CONFIRM BY: กรองแสดงเฉพาะ 🟢 หมวดรายงาน RP - Confirm RP (Supervisor)
+                const matched = confirmRpSupervisors.filter(m => !query || m.toLowerCase().includes(query));
+                if (matched.length > 0) {
+                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #065f46; background: #ecfdf5; border-bottom: 1.5px solid #a7f3d0; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+                        <span>🟢</span> หมวดรายงาน RP - CONFIRM RP (SUPERVISOR)
+                    </div>`;
+                    matched.forEach(m => {
+                        htmlContent += renderStaffOption(m, 'CONFIRM RP', '#059669', '#ffffff', '🟢');
+                    });
+                }
+            } else if (inputEl.id === 'prob-approved-by') {
+                // APPROVED BY (RP): แสดงทั้ง 🟢 Approve RP (ผู้อนุมัติหลัก) (Mr.Ekkalak L.) และ 🟣 Approve VF/RP (ผู้อนุมัติร่วม) (Ms.Nipawan J., Mr.Watcharin Y., Mr.Jumnong T.)
+                const primaryMatched = approveRpPrimary.filter(m => m && (!query || m.toLowerCase().includes(query)));
+                if (primaryMatched.length > 0) {
+                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #065f46; background: #ecfdf5; border-bottom: 1.5px solid #a7f3d0; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+                        <span>🟢</span> APPROVE RP (ผู้อนุมัติหลัก)
+                    </div>`;
+                    primaryMatched.forEach(m => {
+                        htmlContent += renderStaffOption(m, 'APPROVE RP', '#059669', '#ffffff', '🟢');
+                    });
+                }
+
+                const coMatched = coApprovers.filter(m => !approveRpPrimary.includes(m) && (!query || m.toLowerCase().includes(query)));
+                if (coMatched.length > 0) {
+                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #581c87; background: #faf5ff; border-top: 1px solid #e9d5ff; border-bottom: 1.5px solid #e9d5ff; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+                        <span>🟣</span> APPROVE VF/RP (ผู้อนุมัติร่วม)
+                    </div>`;
+                    coMatched.forEach(m => {
+                        htmlContent += renderStaffOption(m, 'APPROVE VF/RP', '#7c3aed', '#ffffff', '🟣');
+                    });
                 }
             }
+        } 
+        // ==========================================
+        // 🔵 เอกสาร VF (Vendor Failure)
+        // ==========================================
+        else {
+            if (inputEl.id === 'prob-issue-by') {
+                // ISSUE BY: กรองแสดงเฉพาะ 🔵 หมวดรายงาน VF - SQE Engineer
+                const matched = sqeEngineers.filter(m => !query || m.toLowerCase().includes(query));
+                if (matched.length > 0) {
+                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #1e40af; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+                        <span>🔵</span> หมวดรายงาน VF - SQE ENGINEER
+                    </div>`;
+                    matched.forEach(m => {
+                        htmlContent += renderStaffOption(m, 'SQE ENGINEER', '#2563eb', '#ffffff', '🔵');
+                    });
+                }
+            } else if (inputEl.id === 'prob-confirm-by') {
+                // CONFIRM BY: กรองแสดงเฉพาะ 🔵 หมวดรายงาน VF - Confirm VF (SQE Leader / Supervisor)
+                const matched = confirmVfList.filter(m => !query || m.toLowerCase().includes(query));
+                if (matched.length > 0) {
+                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #1e40af; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+                        <span>🔵</span> หมวดรายงาน VF - CONFIRM VF (SQE LEADER / SUPERVISOR)
+                    </div>`;
+                    matched.forEach(m => {
+                        htmlContent += renderStaffOption(m, 'CONFIRM VF', '#2563eb', '#ffffff', '🔵');
+                    });
+                }
+            } else if (inputEl.id === 'prob-approved-by') {
+                // APPROVED BY (VF): แสดงทั้ง 🔵 Approve VF (ผู้อนุมัติหลัก) (Mr.Watcharin Y., Ms.Nipawan J., Mr.Chiraphat K.) และ 🟣 Approve VF/RP (ผู้อนุมัติร่วม) (Ms.Nipawan J., Mr.Watcharin Y., Mr.Jumnong T.)
+                const primaryMatched = approveVfPrimary.filter(m => m && (!query || m.toLowerCase().includes(query)));
+                if (primaryMatched.length > 0) {
+                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #1e40af; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+                        <span>🔵</span> APPROVE VF (ผู้อนุมัติหลัก)
+                    </div>`;
+                    primaryMatched.forEach(m => {
+                        htmlContent += renderStaffOption(m, 'APPROVE VF', '#2563eb', '#ffffff', '🔵');
+                    });
+                }
 
-            // Fallback & Standard Directory matching role
-            const directory = typeof window.getApproverDirectoryList === 'function' ? window.getApproverDirectoryList() : [];
-            const addedNames = new Set(allowedNames.map(a => a.name.toLowerCase()));
-
-            if (allowedNames.length > 0) {
-                htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #1e40af; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase;">🛡️ รายชื่อที่กำหนดใน MATRIX (${isRP ? 'RP REPORT' : 'VF REPORT'})</div>`;
-                allowedNames.forEach(item => {
-                    if (!query || item.name.toLowerCase().includes(query)) {
-                        htmlContent += `<div class="modal-ac-item" style="padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; white-space: nowrap;" onmousedown="event.preventDefault(); applyModalAC('staff', '${item.name.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                            <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 800; font-size: 11.5px; color: #1e293b; white-space: nowrap;">👤 ${item.name}</span>
-                            <span style="font-size: 8px; line-height: 1; height: 18px; box-sizing: border-box; background: ${item.color || '#2563eb'}; color: #ffffff; padding: 0 6px; border-radius: 4px; font-weight: 800; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 3.5px; letter-spacing: 0.02em;">
-                                <span style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff; opacity: 0.9; display: inline-block;"></span>
-                                ${item.label}
-                            </span>
-                        </div>`;
-                    }
-                });
-            } else {
-                // Secondary directory list (แสดงเฉพาะกรณีที่ไม่มีรายชื่อ Matrix ที่ตรงเงื่อนไข)
-                const relevantOthers = directory.filter(d => !addedNames.has(d.name.toLowerCase()));
-                if (relevantOthers.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; text-transform: uppercase;">📋 รายชื่อผู้มีอำนาจอนุมัติ</div>`;
-                    relevantOthers.forEach(d => {
-                        if (!query || d.name.toLowerCase().includes(query) || d.email.toLowerCase().includes(query)) {
-                            htmlContent += `<div class="modal-ac-item" style="padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: #475569; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; white-space: nowrap;" onmousedown="event.preventDefault(); applyModalAC('staff', '${d.name.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                                <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: 11.5px; color: #334155; white-space: nowrap;">👤 ${d.name}</span>
-                            </div>`;
-                        }
+                const coMatched = coApprovers.filter(m => !approveVfPrimary.includes(m) && (!query || m.toLowerCase().includes(query)));
+                if (coMatched.length > 0) {
+                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #581c87; background: #faf5ff; border-top: 1px solid #e9d5ff; border-bottom: 1.5px solid #e9d5ff; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+                        <span>🟣</span> APPROVE VF/RP (ผู้อนุมัติร่วม)
+                    </div>`;
+                    coMatched.forEach(m => {
+                        htmlContent += renderStaffOption(m, 'APPROVE VF/RP', '#7c3aed', '#ffffff', '🟣');
                     });
                 }
             }
@@ -23474,12 +25138,15 @@ function applyModalAC(type, value, inputEl) {
     if (dd) dd.style.display = 'none';
 
     // 3. บันทึกลง Memory ของ Case (Auto-save) - เก็บเฉพาะชื่อ ไม่เก็บสถานะลายเซ็น
-    if (typeof _currentCase !== 'undefined' && _currentCase) {
-        if (!_currentCase.report_data) _currentCase.report_data = {};
-        if (!_currentCase.report_data.vf_data) _currentCase.report_data.vf_data = {};
+    const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
+        ? Wap8DSystem.getCurrentCase()
+        : null;
+    if (curCase) {
+        if (!curCase.report_data) curCase.report_data = {};
+        if (!curCase.report_data.vf_data) curCase.report_data.vf_data = {};
         
         if (inputEl.id === 'prob-issue-by') {
-            _currentCase.report_data.vf_data.issue_by = value;
+            curCase.report_data.vf_data.issue_by = value;
             
             // ตรวจสอบว่าถ้าช่อง CONFIRM BY มีชื่อเดิมอยู่แล้วแต่ไม่ได้อยู่ในทีมเดียวกับ ISSUE BY ให้รีเซ็ตช่อง CONFIRM BY
             const confirmInput = document.getElementById('prob-confirm-by');
@@ -23488,17 +25155,17 @@ function applyModalAC(type, value, inputEl) {
                 const confirmTeam = typeof getStaffTeamName === 'function' ? getStaffTeamName(confirmInput.value) : null;
                 if (issueTeam && confirmTeam && issueTeam !== confirmTeam) {
                     confirmInput.value = "";
-                    _currentCase.report_data.vf_data.confirm_by = "";
-                    _currentCase.report_data.vf_data.confirm_by_sig_active = false;
-                    _currentCase.report_data.vf_data.confirm_sig_active = false;
+                    curCase.report_data.vf_data.confirm_by = "";
+                    curCase.report_data.vf_data.confirm_by_sig_active = false;
+                    curCase.report_data.vf_data.confirm_sig_active = false;
                     const confirmSig = document.getElementById('sig-prob-confirm-by');
                     if (confirmSig) confirmSig.innerHTML = '';
                 }
             }
         } else if (inputEl.id === 'prob-confirm-by') {
-            _currentCase.report_data.vf_data.confirm_by = value;
+            curCase.report_data.vf_data.confirm_by = value;
         } else if (inputEl.id === 'prob-approved-by') {
-            _currentCase.report_data.vf_data.approved_by = value;
+            curCase.report_data.vf_data.approved_by = value;
         }
     }
 
@@ -34667,21 +36334,18 @@ function printCalibrationHistory(id) {
             .doc-meta { font-size: 9px; color: #64748b; font-weight: 700; margin-top: 2px; }
             .meta-box { border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; background: #f8fafc; }
             .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 11px; }
-            .meta-label { font-weight: 800; color: #64748b; font-size: 8.5px; text-transform: uppercase; }
-            .meta-val { font-weight: 900; color: #0f172a; margin-top: 1px; }
-            table.history-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            table.history-table th { background: #1e3a8a; color: #fff; padding: 6px 8px; font-size: 9.5px; text-align: left; text-transform: uppercase; border: 1px solid #1e3a8a; }
-            table.history-table td { border: 1px solid #e2e8f0; padding: 6px 8px; font-size: 10px; vertical-align: top; }
-            table.history-table tr:nth-child(even) { background: #f8fafc; }
-            .badge-pass { background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px; border: 1px solid #86efac; display: inline-block; }
-            .badge-fail { background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px; border: 1px solid #fca5a5; display: inline-block; }
-            .sign-section { margin-top: 36px; display: flex; justify-content: space-between; page-break-inside: avoid; }
-            .sign-box { width: 220px; text-align: center; border-top: 1px solid #64748b; padding-top: 6px; font-size: 10.5px; }
-            .no-print { margin-bottom: 12px; text-align: right; }
-            @media print {
-                .no-print { display: none !important; }
-                body { padding: 0; }
-            }
+            .meta-label { font-weight: 800; color: #64748b; font-size: 8.5px; text-transform: uppercase; margin-bottom: 2px; }
+            .meta-val { font-weight: 700; color: #0f172a; }
+            .history-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10px; }
+            .history-table th { background: #1e3a8a; color: #fff; text-align: left; padding: 6px 8px; font-weight: 800; text-transform: uppercase; font-size: 9px; }
+            .history-table td { border-bottom: 1px solid #e2e8f0; padding: 6px 8px; color: #334155; vertical-align: middle; }
+            .history-table tr:nth-child(even) td { background: #f8fafc; }
+            .badge-pass { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 8.5px; display: inline-block; }
+            .badge-fail { background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 8.5px; display: inline-block; }
+            .sign-section { margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+            .sign-box { border: 1px dashed #cbd5e1; border-radius: 6px; padding: 14px; text-align: center; font-size: 10px; }
+            @media print { .no-print { display: none; } }
+            .no-print { margin-bottom: 12px; }
         </style>
     </head>
     <body>
@@ -34705,65 +36369,54 @@ function printCalibrationHistory(id) {
             <div class="meta-grid">
                 <div><div class="meta-label">Control Tag / Code:</div><div class="meta-val">${item.code_no || item.id}</div></div>
                 <div><div class="meta-label">Instrument Name:</div><div class="meta-val">${item.name || '-'}</div></div>
-                <div><div class="meta-label">Maker / Brand:</div><div class="meta-val">${item.maker || '-'}</div></div>
-                <div><div class="meta-label">Model Number:</div><div class="meta-val">${item.model || '-'}</div></div>
-                <div><div class="meta-label">Serial Number (S/N):</div><div class="meta-val">${item.serial || '-'}</div></div>
-                <div><div class="meta-label">Department / Area:</div><div class="meta-val">${item.dept || '-'}</div></div>
-                <div><div class="meta-label">Custodian (PIC):</div><div class="meta-val">${picVal || '-'}</div></div>
-                <div><div class="meta-label">Calibration Frequency:</div><div class="meta-val">${item.frequency || '12 M'}</div></div>
+                <div><div class="meta-label">Serial Number:</div><div class="meta-val">${item.serial || item.serial_no || '-'}</div></div>
+                <div><div class="meta-label">Location / Department:</div><div class="meta-val">${item.location || item.dept || '-'}</div></div>
+                <div><div class="meta-label">Calibration Interval:</div><div class="meta-val">${item.frequency || '12 M'}</div></div>
+                <div><div class="meta-label">Last Calibration:</div><div class="meta-val">${item.last_cal ? new Date(item.last_cal).toLocaleDateString('en-GB') : '-'}</div></div>
+                <div><div class="meta-label">Next Due Date:</div><div class="meta-val">${item.next_due || item.next_cal ? new Date(item.next_due || item.next_cal).toLocaleDateString('en-GB') : '-'}</div></div>
+                <div><div class="meta-label">Responsible Person (PIC):</div><div class="meta-val">${picVal || '-'}</div></div>
             </div>
         </div>
 
         <table class="history-table">
             <thead>
                 <tr>
-                    <th style="width: 30px;">#</th>
-                    <th>Cal Date</th>
-                    <th>Certificate No.</th>
-                    <th>Laboratory / Agency</th>
-                    <th>Deviation / MPE</th>
-                    <th>Next Due</th>
-                    <th>Result</th>
-                    <th>Calibrated By</th>
+                    <th style="width: 14%;">Date</th>
+                    <th style="width: 12%;">Result</th>
+                    <th style="width: 18%;">Standard / Method</th>
+                    <th style="width: 16%;">Performed By</th>
+                    <th style="width: 16%;">Verified By</th>
+                    <th>Remarks / Certificate Ref</th>
                 </tr>
             </thead>
             <tbody>
-                ${sorted.map((l, i) => `
-                <tr>
-                    <td style="font-weight: bold; text-align: center;">${i + 1}</td>
-                    <td style="font-weight: bold;">${l.date}</td>
-                    <td style="font-family: monospace; font-weight: bold; color: #1e3a8a;">${l.cert_no || '-'}</td>
-                    <td>${l.lab || '-'}</td>
-                    <td>
-                        <div>Dev: <b>${l.deviation || '-'}</b></div>
-                        <div style="font-size: 8.5px; color: #64748b;">MPE: ${l.tolerance || '±0.010 mm'}</div>
-                    </td>
-                    <td style="font-weight: bold; color: #15803d;">${l.next_due || '-'}</td>
-                    <td><span class="${l.result && l.result.includes('PASS') ? 'badge-pass' : 'badge-fail'}">${l.result || 'PASSED'}</span></td>
-                    <td>PHETSAYAM</td>
-                </tr>
-                <tr>
-                    <td></td>
-                    <td colspan="7" style="font-size: 9px; color: #475569; padding-top: 3px; padding-bottom: 6px; font-style: italic;">
-                        Remarks: ${l.notes || 'Routine calibration verified.'} | Standard: ${l.traceability || 'ISO/IEC 17025'}
-                    </td>
-                </tr>
+                ${sorted.length === 0 ? '<tr><td colspan="6" style="text-align: center; color: #94a3b8; padding: 16px;">No calibration ledger history recorded for this instrument.</td></tr>' : sorted.map(log => `
+                    <tr>
+                        <td><strong>${log.date ? new Date(log.date).toLocaleDateString('en-GB') : '-'}</strong></td>
+                        <td>
+                            <span class="${String(log.result || '').toUpperCase().includes('PASS') ? 'badge-pass' : 'badge-fail'}">
+                                ${String(log.result || 'PASS').toUpperCase()}
+                            </span>
+                        </td>
+                        <td>${log.lab || log.standard || log.method || '-'}</td>
+                        <td>${log.cal_by || log.done_by || picVal || 'PHETSAYAM'}</td>
+                        <td>${log.verified_by || 'QA Inspector'}</td>
+                        <td>${log.notes || log.remark || log.cert_no || '-'}</td>
+                    </tr>
                 `).join('')}
             </tbody>
         </table>
 
         <div class="sign-section">
             <div class="sign-box">
-                <div><b>Prepared / Verified By</b></div>
-                <div style="height: 38px;"></div>
-                <div>(${picVal || 'PHETSAYAM'})</div>
-                <div style="font-size: 8.5px; color: #64748b;">Metrology Calibration Officer</div>
+                <div>Performed by Metrologist / Operator</div>
+                <div style="margin-top: 24px; font-weight: bold;">(______________________________)</div>
+                <div style="font-size: 9px; color: #64748b; margin-top: 4px;">Date: ____/____/________</div>
             </div>
             <div class="sign-box">
-                <div><b>Approved By (QA Department)</b></div>
-                <div style="height: 38px;"></div>
-                <div>(QA Department Manager)</div>
-                <div style="font-size: 8.5px; color: #64748b;">Quality Assurance Division</div>
+                <div>Verified by QA Supervisor / Manager</div>
+                <div style="margin-top: 24px; font-weight: bold;">(______________________________)</div>
+                <div style="font-size: 9px; color: #64748b; margin-top: 4px;">Date: ____/____/________</div>
             </div>
         </div>
     </body>
@@ -34775,209 +36428,112 @@ function printCalibrationHistory(id) {
     printWin.document.close();
 }
 
-
-function toggleAddHistoryForm(id, forceOpen) {
-    const drawer = document.getElementById('cal-history-new-entry-drawer');
-    if (!drawer) return;
-    if (typeof forceOpen === 'boolean') {
-        drawer.style.display = forceOpen ? 'block' : 'none';
-    } else {
-        drawer.style.display = (drawer.style.display === 'none') ? 'block' : 'none';
+function toggleAddHistoryForm(id, show = true) {
+    const form = document.getElementById('cal-add-history-form');
+    if (form) {
+        if (show === false) {
+            form.style.display = 'none';
+        } else {
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
     }
 }
 
 function updateHistoryNewDueDate(freqStr) {
     const dateInput = document.getElementById('hist-new-date');
-    if (!dateInput) return;
-    const certInput = document.getElementById('hist-new-cert');
-    if (certInput && dateInput.value) {
-        const year = dateInput.value.split('-')[0];
-        const curCert = certInput.value;
-        if (curCert.includes('CAL-')) {
-            const parts = curCert.split('-');
-            if (parts.length >= 3) {
-                parts[parts.length - 1] = year;
-                certInput.value = parts.join('-');
-            }
-        }
-    }
+    if (!dateInput || !dateInput.value) return;
 }
 
-async function saveHistoryNewEntry(id) {
-    const item = _data.find(x => String(x.id) === String(id));
+function saveHistoryNewEntry(id) {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
     if (!item) return;
+    const dateEl = document.getElementById('hist-new-date');
+    const certEl = document.getElementById('hist-new-cert');
+    const labEl = document.getElementById('hist-new-lab');
+    const resultEl = document.getElementById('hist-new-result');
+    const devEl = document.getElementById('hist-new-dev');
+    const techEl = document.getElementById('hist-new-tech');
+    const notesEl = document.getElementById('hist-new-notes');
 
-    const dateVal = document.getElementById('hist-new-date') ? document.getElementById('hist-new-date').value : '';
-    const certVal = document.getElementById('hist-new-cert') ? document.getElementById('hist-new-cert').value.trim() : '';
-    const labVal = document.getElementById('hist-new-lab') ? document.getElementById('hist-new-lab').value.trim() : 'NA Caltechnologies Co., Ltd.';
-    const resVal = document.getElementById('hist-new-result') ? document.getElementById('hist-new-result').value : 'PASSED';
-    const devVal = document.getElementById('hist-new-dev') ? document.getElementById('hist-new-dev').value.trim() : '+0.000 mm';
-    const techVal = document.getElementById('hist-new-tech') ? document.getElementById('hist-new-tech').value.trim() : 'PHETSAYAM';
-    const notesVal = document.getElementById('hist-new-notes') ? document.getElementById('hist-new-notes').value.trim() : 'Calibration cycle updated.';
-
-    if (!dateVal) {
-        if (typeof toast === 'function') toast("⚠️ กรุณาระบุวันที่สอบเทียบ", "error");
-        return;
-    }
-
-    const calculatedDueDate = calculateDueDateString(dateVal, item.frequency || '12 M');
-
+    const calDate = dateEl ? dateEl.value : new Date().toISOString().split('T')[0];
     const newLog = {
-        id: `LOG-${item.id}-${Date.now()}`,
-        date: dateVal,
-        next_due: calculatedDueDate,
-        cert_no: certVal || `CAL-${item.code_no || item.id}-${dateVal.split('-')[0]}`,
-        lab: labVal,
-        result: resVal,
-        type: 'ROUTINE_CALIBRATION',
-        deviation: devVal,
-        tolerance: '±0.010 mm',
-        uncertainty: 'U = 0.0014 mm (k=2)',
+        id: 'LOG-' + Date.now(),
+        date: calDate,
+        cert_no: certEl ? certEl.value.trim() : `CAL-${item.code_no || item.id}-${new Date().getFullYear()}`,
+        lab: labEl ? labEl.value.trim() : 'Accredited Calibration Lab',
+        result: resultEl ? resultEl.value : 'PASSED',
+        deviation: devEl ? devEl.value.trim() : '0.000 mm',
+        tolerance: item.tolerance || '±0.010 mm',
+        next_due: calculateDueDateString(calDate, item.frequency || '12 M'),
         env_temp: '20.0°C / 50% RH',
-        technician: techVal,
-        traceability: 'ISO/IEC 17025 Certified',
-        notes: notesVal
+        cal_by: techEl ? techEl.value.trim() : 'PHETSAYAM',
+        notes: notesEl ? notesEl.value.trim() : '',
+        traceability: 'ISO/IEC 17025 & NIST TRACEABLE'
     };
 
-    const logs = ensureInstrumentLogs(item);
-    logs.push(newLog);
-    item.calibration_logs = logs;
+    if (!Array.isArray(item.calibration_logs)) item.calibration_logs = [];
+    item.calibration_logs.unshift(newLog);
 
-    // อัปเดตข้อมูลหลักของเครื่องมือ (last_cal และ next_due)
-    item.last_cal = dateVal;
-    item.next_due = calculatedDueDate;
-    if (calculatedDueDate !== '-') {
-        const d = new Date(calculatedDueDate);
-        if (!isNaN(d.getTime())) {
-            item.month = d.toLocaleString('en-US', { month: 'long' });
-        }
+    item.last_cal = newLog.date;
+    item.next_due = newLog.next_due;
+    item.status = 'NORMAL';
+
+    if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+        localDB.calibrationMaster.put(item).catch(() => {});
     }
-    item.status = (resVal === 'REJECTED') ? 'EXPIRED' : 'NORMAL';
 
-    // บันทึกลง LocalDB และ Supabase
-    try {
-        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
-            await localDB.calibrationMaster.put(item);
-        }
-    } catch(e) {}
-    syncToCloud(item);
-
-    // วาดตารางใหม่และรีเฟรชหน้าประวัติ
+    if (typeof toast === 'function') toast('✅ บันทึกประวัติการสอบเทียบสำเร็จ', 'success');
+    displayCalibrationHistory(id);
     render();
-    updateOverdueBadge();
-    displayCalibrationHistory(item.id, 'desc');
-
-    if (typeof toast === 'function') toast(`✅ บันทึกประวัติการสอบเทียบและปรับปรุงวันครบกำหนดเป็น ${calculatedDueDate} เรียบร้อย`, "success");
 }
 
-async function deleteHistoryLog(instrumentId, logIdOrCert) {
-    const item = (_data || []).find(x => x && String(x.id) === String(instrumentId));
-    if (!item) return;
-
-    const rawLogs = ensureInstrumentLogs(item);
-    const logs = Array.isArray(rawLogs) ? rawLogs : [];
-    if (logs.length <= 1) {
-        if (typeof toast === 'function') toast("⚠️ ไม่สามารถลบประวัติรายการเดียวที่เหลืออยู่ได้", "warning");
-        return;
-    }
-
-    const idx = logs.findIndex(l => (l.id === logIdOrCert || l.cert_no === logIdOrCert));
-    if (idx === -1) return;
-
-    logs.splice(idx, 1);
-    item.calibration_logs = logs;
-
-    // อัปเดตสถานะและวันสอบเทียบล่าสุดตามรายการที่เหลือ
-    const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    if (sorted.length > 0) {
-        item.last_cal = sorted[0].date;
-        item.next_due = sorted[0].next_due;
-    }
-
-    try {
+function deleteHistoryLog(id, logId) {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
+    if (!item || !Array.isArray(item.calibration_logs)) return;
+    if (confirm('ยืนยันการลบประวัติการสอบเทียบนี้หรือไม่?')) {
+        item.calibration_logs = item.calibration_logs.filter(l => l && (l.id !== logId && l.cert_no !== logId));
         if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
-            await localDB.calibrationMaster.put(item);
+            localDB.calibrationMaster.put(item).catch(() => {});
         }
-    } catch(e) {}
-    syncToCloud(item);
-
-    render();
-    updateOverdueBadge();
-    displayCalibrationHistory(item.id, 'desc');
-    if (typeof toast === 'function') toast("🗑️ ลบรายการประวัติการสอบเทียบเรียบร้อย", "info");
+        if (typeof toast === 'function') toast('🗑️ ลบประวัติการสอบเทียบแล้ว', 'info');
+        displayCalibrationHistory(id);
+        render();
+    }
 }
 
 function copyHistorySummary(id) {
     const item = (_data || []).find(x => x && String(x.id) === String(id));
     if (!item) return;
     const rawLogs = ensureInstrumentLogs(item);
-    const logs = Array.isArray(rawLogs) ? rawLogs : [];
-    const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    let text = `=== CALIBRATION CHRONOLOGICAL HISTORY REPORT ===\n`;
-    text += `Instrument ID: ${item.id}\n`;
-    text += `Name: ${item.name}\n`;
-    text += `Brand/Model: ${item.maker || '-'} / ${item.model || '-'}\n`;
-    text += `Serial No: ${item.serial || '-'}\n`;
-    text += `Department: ${item.dept || '-'}\n`;
-    text += `Responsible: ${extractResponsiblePerson(item)}\n`;
-    text += `Cycle Frequency: ${item.frequency || '12 M'}\n`;
-    text += `-------------------------------------------------\n`;
-    sorted.forEach((l, i) => {
-        text += `[#${i + 1}] Date: ${l.date} | Cert: ${l.cert_no} | Status: ${l.result}\n`;
-        text += `     Lab: ${l.lab} | Deviation: ${l.deviation || '-'} | Next Due: ${l.next_due}\n`;
-        text += `     Inspector: ${l.technician || '-'} | Notes: ${l.notes || '-'}\n`;
-    });
-    text += `=================================================`;
-
-    if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        navigator.clipboard.writeText(text).then(() => {
-            if (typeof toast === 'function') toast("📋 คัดลอกสรุปประวัติการสอบเทียบเรียบร้อย", "success");
+    const summary = `Instrument: ${item.name} (${item.code_no || item.id})\nLocation: ${item.dept || '-'}\nTotal Cycles: ${rawLogs.length}\nLast Cal: ${item.last_cal || '-'}\nNext Due: ${item.next_due || '-'}`;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(summary).then(() => {
+            if (typeof toast === 'function') toast('📋 คัดลอกข้อมูลสรุปเรียบร้อย', 'success');
         }).catch(() => {
-            prompt("คัดลอกข้อความสรุปประวัติ:", text);
+            if (typeof toast === 'function') toast('📋 ' + summary, 'info');
         });
-    } else {
-        prompt("คัดลอกข้อความสรุปประวัติ:", text);
     }
 }
 
-// ส่วนท้ายของโมดูล WapCalibrationSystem ใน script.js
-    
-    return { 
-        init, 
-        render, 
-        resetStatusFilter,
-        setViewMode,
-        changeCalendarMonth,
-        goToCurrentMonth,
-        jumpCalendarMonth,
-        selectCalendarDate,
-        renderCalendar,
-        openDayTasksModal,
-        quickMarkCalibrated,
-        sendForCalibration,
-        executeSendForCalibration,
-        showNotDueAlert,
-        showInCalAlert,
+    return {
+        init,
+        render,
+        openAddModal,
+        openEditModal,
+        calcDue,
+        handleImg,
+        saveNew: handleSaveNew,
+        triggerUpload,
         toggleSelectRow,
         toggleSelectAll,
         selectAllFiltered,
         clearSelection,
-        openBulkCalibrateModal,
         openBatchEditNotesModal,
         applyBatchNoteTemplate,
-        removeBatchItem,
         applyBatchHistoryNotes,
-        updateBulkBarUI,
-        getOverdueCount,
-        updateOverdueBadge,
-        goToOverdue,
-        triggerUpload, 
-        openAddModal, 
-        openEditModal, 
+        removeBatchItem,
         openMetrologyViewer,
         displayCalibrationHistory,
-        openCalibrationHistory: displayCalibrationHistory,
         toggleHistoryModalTheme,
         printCalibrationHistory,
         toggleAddHistoryForm,
@@ -34985,88 +36541,20 @@ function copyHistorySummary(id) {
         saveHistoryNewEntry,
         deleteHistoryLog,
         copyHistorySummary,
-        ensureInstrumentLogs,
-        handleRegImage, 
-        handleSaveNew,
-        calcDue, 
-        handleImg, 
-        saveNew,
-        autoFillPicFromGroup,
-        extractResponsiblePerson,
-        triggerImport, 
-        handleImport,
-        clearAll, 
-        syncCalibrationData,
-        syncAllToCloud,
-        loadFromCloud,
-        getInstrumentImageUrl,
-        INSTRUMENT_IMAGE_MAP,
-        exportCSV: () => toast("Exporting CSV...", "info") 
+        showNotDueAlert,
+        showInCalAlert,
+        selectCalendarDate,
+        openDayTasksModal,
+        sendForCalibration,
+        changeCalendarMonth,
+        goToCurrentMonth,
+        jumpCalendarMonth,
+        setViewMode,
+        resetStatusFilter,
+        triggerImport,
+        goToOverdue,
+        clearAll
     };
-})(); // ปิดโมดูล
+})();
+
 window.WapCalibrationSystem = WapCalibrationSystem;
-window.syncCalibrationData = function(silent) {
-    if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.syncCalibrationData === 'function') {
-        return window.WapCalibrationSystem.syncCalibrationData(silent);
-    }
-};
-window.displayCalibrationHistory = function(id, sortOrder) {
-    if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.displayCalibrationHistory === 'function') {
-        window.WapCalibrationSystem.displayCalibrationHistory(id, sortOrder);
-    }
-};
-window.openCalibrationHistory = window.displayCalibrationHistory;
-window.printCalibrationHistory = function(id) {
-    if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.printCalibrationHistory === 'function') {
-        window.WapCalibrationSystem.printCalibrationHistory(id);
-    }
-};
-
-window.addEventListener('mousedown', (e) => {
-    if (!e.target.closest('.modal-ac-dropdown')) {
-        document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
-            if (dd.parentElement !== e.target.parentElement) {
-                dd.style.display = 'none';
-            }
-        });
-    }
-});
-// อัปเดตตัวเลขแจ้งเตือน Overdue ที่กระดิ่งทันทีเมื่อโหลดหน้าเว็บ
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.updateOverdueBadge === 'function') {
-            window.WapCalibrationSystem.updateOverdueBadge();
-        }
-    }, 200);
-});
-setTimeout(() => {
-    if (window.WapCalibrationSystem && typeof window.WapCalibrationSystem.updateOverdueBadge === 'function') {
-        window.WapCalibrationSystem.updateOverdueBadge();
-    }
-}, 500);
-window.resolveCaseIdByControlNo = resolveCaseIdByControlNo;
-// --- ส่วนเชื่อมต่อฟังก์ชันจากภายในสคริปต์ ออกไปให้ปุ่มใน HTML ใช้งานได้ ---
-
-// 1. ฟังก์ชันปลดล็อคหน้าบำรุงรักษา (แก้ปุ่ม Admin Access)
-window.unlockMaintenanceForAdmin = unlockMaintenanceForAdmin;
-
-// 2. ฟังก์ชันตรวจสอบอีเมล (แก้ Error validateEmail)
-window.validateEmail = validateEmail;
-
-// 3. ฟังก์ชันตรวจสอบ Caps Lock (แก้ Error checkCapsLock)
-window.checkCapsLock = checkCapsLock;
-
-// 4. ฟังก์ชันสำคัญอื่นๆ (ใส่ไปให้หมดเพื่อให้ระบบ Login และ Sidebar ทำงานได้)
-window.handleLogin = handleLogin;
-window.toggleSidebar = toggleSidebar;
-window.switchPage = switchPage;
-window.switchSubTerminal = switchSubTerminal;
-window.changeLanguage = changeLanguage;
-window.togglePassVisibility = togglePassVisibility;
-window.handleLogout = handleLogout;
-window.cloudSyncAll = cloudSyncAll;
-window.submitEntry = submitEntry;
-window.openPersonalSettings = openPersonalSettings;
-window.updateSupportFormValidation = updateSupportFormValidation;
-window.renderModalAC = renderModalAC;
-window.applyModalAC = applyModalAC;

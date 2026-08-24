@@ -7920,12 +7920,57 @@ body {
 }
 /* Real-time Validation Colors */
 .premium-input.invalid {
-    border-color: rgba(225, 29, 72, 0.5) !important;
-    background: rgba(225, 29, 72, 0.05) !important;
+    border-color: rgba(225, 29, 72, 0.7) !important;
+    background: rgba(225, 29, 72, 0.1) !important;
 }
 
 .premium-input.valid {
-    border-color: rgba(16, 185, 129, 0.5) !important;
+    border-color: rgba(16, 185, 129, 0.7) !important;
+}
+
+/* Strict Login Input Theme (Always dark glass, high-contrast white text, never white background) */
+#login-view .premium-input,
+#login-view #login-supervisor-input,
+#login-view #login-email,
+#login-view #login-pass {
+    background: rgba(15, 23, 42, 0.85) !important;
+    background-color: rgba(15, 23, 42, 0.85) !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    border: 1.5px solid rgba(59, 130, 246, 0.35) !important;
+}
+
+#login-view .premium-input:focus,
+#login-view #login-supervisor-input:focus,
+#login-view #login-email:focus,
+#login-view #login-pass:focus {
+    background: rgba(15, 23, 42, 0.95) !important;
+    background-color: rgba(15, 23, 42, 0.95) !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.25) !important;
+}
+
+#login-view .premium-input.valid,
+#login-view #login-supervisor-input.valid,
+#login-view #login-email.valid {
+    background: rgba(15, 23, 42, 0.9) !important;
+    background-color: rgba(15, 23, 42, 0.9) !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    border-color: rgba(16, 185, 129, 0.7) !important;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.2) !important;
+}
+
+#login-view input:-webkit-autofill,
+#login-view input:-webkit-autofill:hover, 
+#login-view input:-webkit-autofill:focus,
+#login-view input:-webkit-autofill:active {
+    -webkit-text-fill-color: #ffffff !important;
+    -webkit-box-shadow: 0 0 0 1000px #0f172a inset !important;
+    box-shadow: 0 0 0 1000px #0f172a inset !important;
+    transition: background-color 5000s ease-in-out 0s;
 }
 
 /* Custom Checkbox */
@@ -14309,6 +14354,12 @@ body.dark-mode .system-banner {
     overflow: hidden;
 }
 
+.jarvis-maintenance.hidden-view,
+#maintenance-view.hidden-view,
+#maintenance-view[style*="display: none"] {
+    display: none !important;
+}
+
 #starfield {
     position: absolute;
     inset: 0;
@@ -17556,3 +17607,61 @@ html.dark .cal-doc-seal.pass,
         max-width: 100% !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════
+ *  STAFF SELECTOR & HEADER TOPMOST DROPDOWN OVERLAY
+ * ═══════════════════════════════════════════════════════ */
+header {
+    overflow: visible !important;
+    position: relative !important;
+    z-index: 100 !important;
+}
+
+#staff-selector-wrap {
+    position: relative !important;
+    z-index: 100 !important;
+}
+
+#staff-custom-dropdown-panel {
+    z-index: 999999 !important;
+    box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.18), 0 10px 15px -5px rgba(0, 0, 0, 0.1) !important;
+    animation: staffDropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes staffDropdownFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.dark #staff-custom-dropdown-panel {
+    box-shadow: 0 25px 45px -5px rgba(0, 0, 0, 0.65), 0 15px 25px -5px rgba(0, 0, 0, 0.45) !important;
+}
+
+#staff-custom-list-container::-webkit-scrollbar {
+    width: 5px;
+}
+#staff-custom-list-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+#staff-custom-list-container::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.35);
+    border-radius: 9999px;
+}
+.dark #staff-custom-list-container::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 116, 139, 0.45);
+}
+
+.staff-role-chip {
+    user-select: none;
+    cursor: pointer;
+}
+.staff-role-chip:active {
+    transform: scale(0.94);
+}
+
