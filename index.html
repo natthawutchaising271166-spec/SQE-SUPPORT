@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
     <title>SQE & WAP Support Portal</title>
 
     <!-- 1. Scripts & External Libraries -->
@@ -420,9 +420,9 @@
 <div id="admin-footer-access" class="hidden mt-0.5 leading-none">
     <button  onclick="switchPage('Admin Console', this)" 
             class="flex items-center gap-1.5 text-[8.5px] font-black text-rose-500 hover:text-rose-600 transition-all uppercase tracking-tighter"
-            style="background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;" title="Master User Control" aria-label="Master User Control">
+            style="background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;" title="Admin User Control" aria-label="Admin User Control">
         <div class="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></div>
-        Master User Control
+        Admin User Control
     </button>
 </div>
             </div>
@@ -618,9 +618,9 @@
                class="w-full h-7 pl-7 pr-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-[9px] font-bold focus:ring-2 focus:ring-blue-500/20 outline-none" title="Search..." aria-label="Search...">
     </div>
 
-<!-- ปุ่ม Sync Data (Harvest) -->
-<button  onclick="WapAdminSystem.harvestFromHistory()" class="btn-admin-mini text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white" title="Sync Data" aria-label="Action">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+<!-- ปุ่ม Import CSV Data -->
+<button onclick="if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerCSVImport === 'function') { window.WapAdminSystem.triggerCSVImport(); } else if(typeof triggerCSVImport === 'function') { triggerCSVImport(); }" class="btn-admin-mini text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white" title="Import CSV Data (นำเข้าข้อมูล CSV)" aria-label="Import CSV">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
 </button>
 
 <!-- ปุ่ม Add New -->
@@ -1971,32 +1971,32 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div class="form-group">
                             <label>วันที่ทำงาน</label>
-                            <input  type="date" id="ot-f-date" class="ot-input-modern" onchange="WapOTManagement.autoSchedule(this.value)" title="Ot F Date" aria-label="Ot F Date">
+                            <input type="date" id="ot-f-date" class="ot-input-modern" onchange="WapOTManagement.autoSchedule(this.value)" title="Ot F Date" aria-label="Ot F Date">
                         </div>
                         <div class="form-group">
                             <label>ประเภท (MULTIPLIER)</label>
-<select  id="ot-f-type" class="ot-input-modern" onchange="WapOTManagement.applyTypeSchedule(this.value)" title="Ot F Type" aria-label="Ot F Type">
-    <option value="">-- เลือกประเภท --</option>
-    <option value="1.5">วันปกติ (x1.5)</option>
-    <option value="1.0">วันเสาร์ (x1.0)</option>
-    <option value="3.0">อาทิตย์/นักขัตฯ (x3.0)</option>
-</select>
+                            <select id="ot-f-type" class="ot-input-modern" onchange="WapOTManagement.applyTypeSchedule(this.value)" title="Ot F Type" aria-label="Ot F Type">
+                                <option value="">-- เลือกประเภท --</option>
+                                <option value="1.5">วันปกติ (x1.5)</option>
+                                <option value="1.0">วันเสาร์ (x1.0)</option>
+                                <option value="3.0">อาทิตย์/นักขัตฯ (x3.0)</option>
+                            </select>
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4 mt-4">
                         <div class="form-group">
                             <label>⏰ เวลาเริ่ม OT</label>
-                            <input  type="text" id="ot-start" class="ot-input-modern" list="ot-time-list" placeholder="เช่น 17:30" oninput="WapOTManagement.calcHours()" title="เช่น 17:30" aria-label="เช่น 17:30">
+                            <input type="text" id="ot-start" class="ot-input-modern" list="ot-time-list" placeholder="เช่น 17:30" oninput="WapOTManagement.calcHours()" title="เช่น 17:30" aria-label="เช่น 17:30">
                         </div>
                         <div class="form-group">
                             <label>⏰ เวลาสิ้นสุด OT</label>
-                            <input  type="text" id="ot-end" class="ot-input-modern" list="ot-time-list" placeholder="เช่น 20:00" oninput="WapOTManagement.calcHours()" title="เช่น 20:00" aria-label="เช่น 20:00">
+                            <input type="text" id="ot-end" class="ot-input-modern" list="ot-time-list" placeholder="เช่น 20:00" oninput="WapOTManagement.calcHours()" title="เช่น 20:00" aria-label="เช่น 20:00">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4 mt-4 items-end">
                         <div class="form-group">
                             <label>เวลาพัก (นาที)</label>
-                            <input  type="number" id="ot-f-break" value="0" class="ot-input-modern" oninput="WapOTManagement.calcHours()" title="Ot F Break" aria-label="Ot F Break">
+                            <input type="number" id="ot-f-break" value="0" class="ot-input-modern" oninput="WapOTManagement.calcHours()" title="Ot F Break" aria-label="Ot F Break">
                         </div>
                         <div class="digital-result-box">
                             <p>ชั่วโมงที่จะบันทึก</p>
@@ -2005,11 +2005,11 @@
                     </div>
                     <div class="form-group mt-4">
                         <label>รายละเอียดงาน / JOB NAME</label>
-                        <input  type="text" id="ot-f-job" class="ot-input-modern" placeholder="เช่น Support กะดึก, เคลียร์ Part NG" title="เช่น Support กะดึก, เคลียร์ Part NG" aria-label="เช่น Support กะดึก, เคลียร์ Part NG">
+                        <input type="text" id="ot-f-job" class="ot-input-modern" placeholder="เช่น Support กะดึก, เคลียร์ Part NG" title="เช่น Support กะดึก, เคลียร์ Part NG" aria-label="เช่น Support กะดึก, เคลียร์ Part NG">
                     </div>
                 </div>
                 <div class="console-footer">
-                    <button  onclick="WapOTManagement.save()" id="ot-save-btn" class="btn-ot-submit-ultra" title="บันทึก OT" aria-label="บันทึก OT">
+                    <button onclick="WapOTManagement.save()" id="ot-save-btn" class="btn-ot-submit-ultra" title="บันทึก OT" aria-label="บันทึก OT">
                         <span>บันทึก OT</span>
                         <div class="btn-light"></div>
                     </button>
@@ -2024,7 +2024,7 @@
                         <h3 class="chart-title-v2">MONTHLY OT TREND (HOURS)</h3>
                         <div class="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full border">
                             <span class="text-[8px] font-black text-slate-400">TARGET:</span>
-                            <input  type="number" id="ot-target-input" value="100" class="w-8 bg-transparent border-none text-[10px] font-black text-rose-500 outline-none text-center p-0" title="Ot Target Input" aria-label="Ot Target Input">
+                            <input type="number" id="ot-target-input" value="100" class="w-8 bg-transparent border-none text-[10px] font-black text-rose-500 outline-none text-center p-0" title="Ot Target Input" aria-label="Ot Target Input">
                         </div>
                     </div>
                     <div class="chart-wrap-v2"><div id="ot-trend-chart"></div></div>
@@ -2065,364 +2065,318 @@
     </div>
 </div>
 
-<div id="admin-console-content" class="hidden-view h-full flex flex-col p-4 lg:p-6 gap-5 overflow-y-auto bg-[#070c14] text-slate-200 font-mono relative select-none">
+<div id="admin-console-content" class="hidden-view h-full flex flex-col p-3 sm:p-5 lg:p-6 gap-4 overflow-y-auto bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 relative select-none">
     
-    <!-- Cyber Grid & Matrix Ambient Scanline Overlay -->
-    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/90 via-[#070c14] to-black pointer-events-none z-0"></div>
-    <div class="absolute inset-0 bg-[linear-gradient(to_right,#1e293b12_1px,transparent_1px),linear-gradient(to_bottom,#1e293b12_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none z-0"></div>
-
-    <div class="relative z-10 flex flex-col gap-5 max-w-[1700px] w-full mx-auto">
+    <div class="relative z-10 flex flex-col gap-4 max-w-[1700px] w-full mx-auto flex-1">
         
-        <!-- [HEADER COMMAND BAR & LIVE CLI STREAM TICKER] -->
-        <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-emerald-500/30 p-4 lg:p-5 shadow-2xl shadow-emerald-950/30 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 relative overflow-hidden">
-            <!-- Glowing Neon Scan Line -->
-            <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-500 via-cyan-500 to-rose-500 animate-pulse"></div>
+        <!-- [1. HEADER ACTION BAR & LIVE STATUS & SYSTEM CONTROLS] -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 p-3.5 sm:p-4 lg:p-5 shadow-xs flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 sm:gap-4 transition-all">
             
-            <div class="flex items-center gap-4">
-                <div class="relative flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-400 font-black shadow-lg shadow-emerald-500/20 shrink-0">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                    </span>
+            <!-- Left: Title & Status Badges -->
+            <div class="flex items-center gap-3 sm:gap-3.5 shrink-0">
+                <div class="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-500/20 shrink-0">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 </div>
                 <div>
                     <div class="flex items-center gap-2 flex-wrap">
-                        <h2 class="text-base font-black text-white uppercase tracking-widest flex items-center gap-2">
-                            CYBER COMMAND <span class="text-emerald-400 text-[10px] px-2 py-0.5 rounded bg-emerald-950/90 border border-emerald-500/40 font-mono tracking-wider">LEVEL 5 OVERRIDE</span>
+                        <h2 class="text-sm sm:text-base lg:text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                            Master Admin & User Control
                         </h2>
+                        <span class="text-[9.5px] sm:text-[10px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/60">
+                            ALL CLEARANCE
+                        </span>
                     </div>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-2 mt-1">
-                        <span class="text-emerald-400">● SYS_ONLINE</span> | LATENCY: <span id="cyber-ping-val" class="text-cyan-400">12ms</span> | NODE: CARRIER-SQE-MASTER
-                    </p>
+                    <div class="flex items-center gap-2 sm:gap-2.5 text-[10.5px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium flex-wrap mt-0.5">
+                        <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> SYS_ONLINE
+                        </span>
+                        <span>|</span>
+                        <span>LATENCY: <strong id="cyber-ping-val" class="text-blue-600 dark:text-blue-400 font-mono">12ms</strong></span>
+                        <span>|</span>
+                        <span>NODE: <strong class="text-slate-700 dark:text-slate-300 font-mono">CARRIER-SQE-MASTER</strong></span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Terminal Live Output Log Stream (Animated Gimmick) -->
-            <div class="flex-1 max-w-xl w-full bg-black/80 rounded-xl border border-emerald-500/30 p-2.5 font-mono text-[10px] text-emerald-400 h-14 overflow-hidden relative shadow-inner">
-                <div id="cyber-terminal-stream" class="flex flex-col gap-0.5 leading-tight text-emerald-400/90">
-                    <div class="text-emerald-500">> [SYS_INIT] Master Clearance Authenticated. Root Mode Active.</div>
-                    <div class="text-cyan-400">> [NET_MONITOR] All Database Nodes Synchronized & Active.</div>
-                </div>
-                <div class="absolute right-2 top-2 text-[8px] font-black text-slate-500 uppercase tracking-widest">LIVE CLI</div>
-            </div>
-
-            <!-- Header Quick Command Buttons -->
-            <div class="flex items-center gap-2 self-end lg:self-center shrink-0">
-                <button  onclick="WapAdminSystem.harvestFromHistory()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 shadow-lg shadow-emerald-950/20" title="Auto-Harvest Master Data from History Records" aria-label="Harvest Data">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    Harvest Data
+            <!-- Right: Action Buttons (Contained within white box) -->
+            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto justify-start lg:justify-end">
+                <input type="file" id="admin-csv-file-input" accept=".csv,text/csv" class="hidden" onchange="if(window.WapAdminSystem && typeof window.WapAdminSystem.handleCSVFileSelected === 'function') { window.WapAdminSystem.handleCSVFileSelected(event); } else if(typeof handleCSVFileSelected === 'function') { handleCSVFileSelected(event); }">
+                
+                <button onclick="WapAdminSystem.harvestFromHistory()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-700/60 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg text-[10.5px] sm:text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs shrink-0" title="ดึงข้อมูล Master จากประวัติรายการเก่า">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>ดึงจากประวัติ</span>
                 </button>
-                <button  onclick="WapAdminSystem.handleAddNew()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 shadow-lg shadow-emerald-500/30 border border-emerald-400/30" title="Add Master" aria-label="Add Master">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M12 4v16m8-8H4"/></svg>
-                    Add Master
+
+                <button id="admin-btn-sync-cloud" onclick="if(window.WapAdminSystem && typeof window.WapAdminSystem.syncAllVFRPToSupabase === 'function') { window.WapAdminSystem.syncAllVFRPToSupabase(); } else if(typeof syncAllVFRPToSupabase === 'function') { syncAllVFRPToSupabase(); } else { toast('กำลังเชื่อมต่อฐานข้อมูล...', 'info'); }" class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-700/80 rounded-lg text-[10.5px] sm:text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs shrink-0" title="ส่งข้อมูลขึ้นฐานข้อมูล Supabase (Sync Table)">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    <span>ซิงค์ Supabase</span>
+                </button>
+
+                <button onclick="if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerCSVImport === 'function') { window.WapAdminSystem.triggerCSVImport(); } else if(typeof triggerCSVImport === 'function') { triggerCSVImport(); }" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/80 rounded-lg text-[10.5px] sm:text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs shrink-0" title="นำเข้าไฟล์ CSV เพื่อทับข้อมูลเดิม">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    <span>นำเข้า CSV</span>
+                </button>
+
+                <button id="admin-btn-add-new" onclick="WapAdminSystem.handleAddNew()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10.5px] sm:text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm shadow-blue-600/25 border border-blue-500 cursor-pointer shrink-0" title="เพิ่มข้อมูลใหม่">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 4v16m8-8H4"/></svg>
+                    <span id="admin-btn-add-label">เพิ่มพนักงาน</span>
                 </button>
             </div>
         </div>
 
-        <!-- [KPI HUD METRICS ROW] -->
-        <div id="admin-stats-row" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            <!-- Dynamically populated cyber KPI cards -->
-        </div>
-
-        <!-- [EMERGENCY SYSTEM CONTROL & BROADCAST BANNER CONTROL] -->
+        <!-- [2. GLOBAL BROADCAST & EMERGENCY MAINTENANCE CONTROLS (WHITE THEME)] -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
             
             <!-- Broadcast Announcement Console -->
-            <div class="lg:col-span-2 bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-800 p-4 relative overflow-hidden flex flex-col justify-between shadow-xl">
-                <div class="flex items-center justify-between mb-3">
+            <div class="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 p-4 sm:p-5 shadow-xs flex flex-col justify-between gap-3 transition-all">
+                <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                        <h3 class="text-xs font-black text-white uppercase tracking-widest">Global Broadcast Network</h3>
+                        <span class="flex h-2.5 w-2.5 relative">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+                        </span>
+                        <h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                            <span>📢 Global Broadcast Announcement</span>
+                            <span class="text-[10px] text-slate-400 font-normal normal-case hidden sm:inline">(ระบบประกาศข้อความแจ้งเตือนส่วนกลาง)</span>
+                        </h3>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input  type="checkbox" id="admin-banner-toggle" class="sr-only peer" onchange="WapAdminSystem.toggleBanner(this.checked)" title="Admin Banner Toggle" aria-label="Admin Banner Toggle">
-                        <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500 border border-slate-700"></div>
-                        <span id="banner-status-label" class="ml-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">OFFLINE</span>
-                    </label>
+                    
+                    <div class="flex items-center gap-2 shrink-0">
+                        <label class="relative inline-flex items-center cursor-pointer" title="เปิด/ปิดการเผยแพร่ประกาศ">
+                            <input type="checkbox" id="admin-banner-toggle" class="sr-only peer" onchange="WapAdminSystem.toggleBanner(this.checked)" title="Admin Banner Toggle" aria-label="Admin Banner Toggle">
+                            <div class="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600 border border-slate-300 dark:bg-slate-700 dark:border-slate-600"></div>
+                        </label>
+                        <span id="banner-status-label" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider min-w-[50px]">OFFLINE</span>
+                    </div>
                 </div>
-                <div class="flex gap-2">
+
+                <div class="flex gap-2 items-center">
                     <div class="relative flex-1">
-                        <input  type="text" id="admin-banner-input" 
-                               class="w-full h-10 px-4 bg-black/60 border border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-cyan-500 text-cyan-300 placeholder-slate-600 font-mono"
-                               placeholder="พิมพ์ข้อความประกาศประกาศฉุกเฉินถึงเจ้าหน้าที่ทุกนาย..." title="พิมพ์ข้อความประกาศประกาศฉุกเฉินถึงเจ้าหน้าที่ทุกนาย..." aria-label="พิมพ์ข้อความประกาศประกาศฉุกเฉินถึงเจ้าหน้าที่ทุกนาย...">
+                        <input type="text" id="admin-banner-input" 
+                               class="w-full h-9 px-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 text-slate-800 dark:text-slate-100 placeholder-slate-400 transition-all"
+                               placeholder="พิมพ์ข้อความประกาศหรือข่าวสารถึงพนักงานทุกคนในระบบ..." title="พิมพ์ข้อความประกาศ" aria-label="พิมพ์ข้อความประกาศ">
                     </div>
-                    <button  onclick="WapAdminSystem.updateAnnouncement()" 
-                            class="px-5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-cyan-500/20 border border-cyan-400/30" title="Publish" aria-label="Publish">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
-                        Publish
+                    <button onclick="WapAdminSystem.updateAnnouncement()" 
+                            class="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1.5 shadow-sm shadow-blue-600/20 border border-blue-500 cursor-pointer shrink-0" title="Publish Announcement" aria-label="Publish Announcement">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>
+                        <span>เผยแพร่</span>
                     </button>
                 </div>
             </div>
 
             <!-- Emergency System Lock & Maintenance Panel -->
-            <div class="bg-rose-950/30 backdrop-blur-md rounded-2xl border border-rose-500/30 p-4 flex flex-col justify-between shadow-xl">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                        <h4 class="text-xs font-black text-rose-400 uppercase tracking-widest">Emergency Maintenance</h4>
+            <div class="lg:col-span-1 bg-white dark:bg-slate-800 rounded-2xl border border-rose-200 dark:border-rose-900/40 p-4 sm:p-5 shadow-xs flex flex-col justify-between gap-3 transition-all">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="flex h-2.5 w-2.5 relative shrink-0">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
+                        </span>
+                        <h4 class="text-xs sm:text-sm font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider truncate">
+                            🔒 Maintenance & Archive
+                        </h4>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer" title="Force Maintenance Lockout">
-                        <input  type="checkbox" id="admin-mtx-toggle" class="sr-only peer" onchange="WapAdminSystem.toggleMaintenance(this.checked)" title="Admin Mtx Toggle" aria-label="Admin Mtx Toggle">
-                        <div class="w-12 h-6 bg-slate-900 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600 border border-rose-900/80"></div>
-                    </label>
+                    
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">LOCKOUT</span>
+                        <label class="relative inline-flex items-center cursor-pointer" title="บังคับเปิดโหมด Maintenance">
+                            <input type="checkbox" id="admin-mtx-toggle" class="sr-only peer" onchange="WapAdminSystem.toggleMaintenance(this.checked)" title="Admin Maintenance Toggle" aria-label="Admin Maintenance Toggle">
+                            <div class="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600 border border-slate-300 dark:bg-slate-700 dark:border-slate-600"></div>
+                        </label>
+                    </div>
                 </div>
-                <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-rose-900/40">
-                    <button  onclick="WapAdminSystem.performFullBackup()" 
-                            class="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 bg-slate-900 hover:bg-rose-950 text-rose-300 border border-rose-800/60 rounded-xl text-[9px] font-black uppercase transition-all active:scale-95" title="Full Backup" aria-label="Full Backup">
-                        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        Full Backup
+
+                <div class="flex items-center justify-between gap-2 pt-1">
+                    <button onclick="WapAdminSystem.performFullBackup()" 
+                            class="flex-1 flex items-center justify-center gap-1.5 h-9 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-700/60 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-xl text-[11px] font-bold transition-all active:scale-95 cursor-pointer shadow-2xs" title="สำรองข้อมูล Cloud เต็มรูปแบบ" aria-label="Full Backup">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Full Backup</span>
                     </button>
-                    <div class="flex items-center gap-1">
-                        <input  type="number" id="archive-year" placeholder="2025" 
-                               class="w-16 h-8 bg-black/60 border border-rose-800/60 rounded-xl text-[10px] font-black text-center text-rose-300 outline-none focus:border-rose-500 font-mono" title="2025" aria-label="2025">
-                        <button  onclick="WapAdminSystem.performArchive()" 
-                                class="h-8 px-3 bg-rose-900/50 hover:bg-rose-800 text-rose-200 rounded-xl text-[9px] font-black uppercase transition-all border border-rose-700/50" title="Archive" aria-label="Archive">
-                            Archive
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <input type="number" id="archive-year" placeholder="2025" value="2025"
+                               class="w-16 h-9 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-center text-slate-800 dark:text-slate-200 outline-none focus:border-rose-500 font-mono" title="ปีที่ต้องการ Archive" aria-label="Archive Year">
+                        <button onclick="WapAdminSystem.performArchive()" 
+                                class="h-9 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 dark:text-rose-300 rounded-xl text-[11px] font-bold transition-all border border-rose-200 dark:border-rose-800 cursor-pointer shadow-2xs active:scale-95" title="Archive Data" aria-label="Archive Data">
+                            <span>Archive</span>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- [CYBER AUTOMATION & BACKEND SENTINEL HUB] -->
-        <div class="bg-gradient-to-r from-slate-900/90 via-cyan-950/20 to-slate-900/90 backdrop-blur-md rounded-2xl border border-cyan-500/30 p-4 lg:p-5 shadow-2xl relative overflow-hidden flex flex-col gap-4 font-mono">
+        <!-- [3. AUTOMATED SYSTEM SENTINEL & MAINTENANCE TOOLS (WHITE THEME 5-GRID)] -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 p-4 lg:p-5 shadow-xs flex flex-col gap-3.5 transition-all">
+            
             <!-- Top Status Line -->
-            <div class="flex flex-wrap justify-between items-center gap-3 border-b border-cyan-500/20 pb-3">
+            <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 dark:border-slate-700/70 pb-3">
                 <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
-                    <h3 class="text-xs font-black text-cyan-300 uppercase tracking-widest flex items-center gap-2">
-                        <span>🤖 AUTOMATED BACKEND SENTINEL</span>
-                        <span class="text-[9px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-500/40">AUTOBOT ENGINE v5.0</span>
+                    <span class="flex items-center justify-center w-6 h-6 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 font-bold">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </span>
+                    <h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>Automated System Sentinel</span>
+                        <span class="text-[9px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-700 font-mono">AUTOBOT ENGINE v5.0</span>
                     </h3>
                 </div>
-                <div class="flex items-center gap-4 text-[10px] text-slate-400">
-                    <div>DB CONNECTION: <span class="text-emerald-400 font-bold">HEALTHY (100%)</span></div>
-                    <div>AUTO-CRON: <span id="auto-cron-status" class="text-cyan-400 font-bold">ACTIVE (5m cycle)</span></div>
-                    <div>THREAT INDEX: <span class="text-emerald-400 font-bold">0.00% LOW</span></div>
+                <div class="flex items-center gap-3 sm:gap-4 text-[11px] text-slate-500 dark:text-slate-400 font-medium flex-wrap">
+                    <div>DB CONNECTION: <span class="text-emerald-600 dark:text-emerald-400 font-bold">HEALTHY (100%)</span></div>
+                    <div>AUTO-CRON: <span id="auto-cron-status" class="text-blue-600 dark:text-blue-400 font-bold">ACTIVE (5m cycle)</span></div>
+                    <div>THREAT INDEX: <span class="text-emerald-600 dark:text-emerald-400 font-bold">0.00% LOW</span></div>
                 </div>
             </div>
 
-            <!-- Automation Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+            <!-- Automation Grid (5 Clean White Cards Responsive) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 
                 <!-- Card 1: Session Sentinel -->
-                <div class="bg-black/60 border border-cyan-500/30 rounded-xl p-3 flex flex-col justify-between hover:border-cyan-400/60 transition-all">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                            ⚡ Session Auto-Purge
-                        </span>
-                        <span id="badge-auto-purge" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40">RUNNING</span>
+                <div class="bg-slate-50/70 hover:bg-white dark:bg-slate-900/60 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 flex flex-col justify-between transition-all hover:shadow-xs">
+                    <div>
+                        <div class="flex items-start justify-between gap-1 mb-1.5">
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <span class="text-amber-500">⚡</span> <span>Auto-Purge</span>
+                            </span>
+                            <span id="badge-auto-purge" class="text-[8.5px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0 uppercase tracking-tight">RUNNING</span>
+                        </div>
+                        <p class="text-[10.5px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-2 leading-relaxed">ล้างเซสชันและ Token หมดอายุทุก 5 นาที</p>
                     </div>
-                    <p class="text-[10px] text-slate-400 mb-3">ล้างเซสชันหมดอายุอัตโนมัติทุกๆ 5 นาที</p>
-                    <button  onclick="WapAdminSystem.triggerAutoPurgeSessions()" class="w-full h-8 bg-cyan-950 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/40 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1" title="Purge Stale Sessions" aria-label="Purge Stale Sessions">
+                    <button onclick="WapAdminSystem.triggerAutoPurgeSessions()" class="w-full h-8 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs shrink-0" title="Purge Stale Sessions" aria-label="Purge Stale Sessions">
                         <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        Purge Stale Sessions
+                        <span>Purge Sessions</span>
                     </button>
                 </div>
 
-                <!-- Card 2: AI Vulnerability Scan -->
-                <div class="bg-black/60 border border-emerald-500/30 rounded-xl p-3 flex flex-col justify-between hover:border-emerald-400/60 transition-all">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                            🛡️ Security Sentinel
-                        </span>
-                        <span id="badge-auto-sec" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40">SHIELD ON</span>
+                <!-- Card 2: Security Sentinel -->
+                <div class="bg-slate-50/70 hover:bg-white dark:bg-slate-900/60 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 flex flex-col justify-between transition-all hover:shadow-xs">
+                    <div>
+                        <div class="flex items-start justify-between gap-1 mb-1.5">
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <span class="text-emerald-500">🛡️</span> <span>Security Scan</span>
+                            </span>
+                            <span id="badge-auto-sec" class="text-[8.5px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shrink-0 uppercase tracking-tight">SHIELD ON</span>
+                        </div>
+                        <p class="text-[10.5px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-2 leading-relaxed">ตรวจสอบสิทธิ์ บัญชี และความปลอดภัย</p>
                     </div>
-                    <p class="text-[10px] text-slate-400 mb-3">ตรวจสอบสิทธิ์ บัญชีสุ่มเสี่ยง และคีย์รหัสผ่าน</p>
-                    <button  onclick="WapAdminSystem.triggerSecurityAuditScan()" class="w-full h-8 bg-emerald-950 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/40 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1" title="Run AI Threat Scan" aria-label="Run AI Threat Scan">
+                    <button onclick="WapAdminSystem.triggerSecurityAuditScan()" class="w-full h-8 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs shrink-0" title="Run AI Threat Scan" aria-label="Run AI Threat Scan">
                         <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                        Run AI Threat Scan
+                        <span>Run Threat Scan</span>
                     </button>
                 </div>
 
                 <!-- Card 3: Database Optimizer -->
-                <div class="bg-black/60 border border-amber-500/30 rounded-xl p-3 flex flex-col justify-between hover:border-amber-400/60 transition-all">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                            🔄 Auto DB Indexer
-                        </span>
-                        <span id="badge-auto-db" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-500/40">OPTIMAL</span>
+                <div class="bg-slate-50/70 hover:bg-white dark:bg-slate-900/60 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 flex flex-col justify-between transition-all hover:shadow-xs">
+                    <div>
+                        <div class="flex items-start justify-between gap-1 mb-1.5">
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <span class="text-blue-500">🔄</span> <span>DB Optimizer</span>
+                            </span>
+                            <span id="badge-auto-db" class="text-[8.5px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800 shrink-0 uppercase tracking-tight">OPTIMAL</span>
+                        </div>
+                        <p class="text-[10.5px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-2 leading-relaxed">ทำดรรชนีค้นหา Master Data ความเร็วสูง</p>
                     </div>
-                    <p class="text-[10px] text-slate-400 mb-3">ทำดรรชนีค้นหา Master Data ความเร็วสูง</p>
-                    <button  onclick="WapAdminSystem.triggerOptimizeDatabase()" class="w-full h-8 bg-amber-950 hover:bg-amber-900/80 text-amber-300 border border-amber-500/40 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1" title="Reindex & Sync DB" aria-label="Reindex & Sync DB">
+                    <button onclick="WapAdminSystem.triggerOptimizeDatabase()" class="w-full h-8 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs shrink-0" title="Reindex & Sync DB" aria-label="Reindex & Sync DB">
                         <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        Reindex & Sync DB
+                        <span>Reindex & Sync</span>
                     </button>
                 </div>
 
-                <!-- Card 4: Broadcast Auto Alert -->
-                <div class="bg-black/60 border border-purple-500/30 rounded-xl p-3 flex flex-col justify-between hover:border-purple-400/60 transition-all">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                            📡 Auto Incident Relay
-                        </span>
-                        <span id="badge-auto-relay" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-purple-950 text-purple-400 border border-purple-500/40">READY</span>
+                <!-- Card 4: Broadcast Auto Alert / Incident Relay -->
+                <div class="bg-slate-50/70 hover:bg-white dark:bg-slate-900/60 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 flex flex-col justify-between transition-all hover:shadow-xs">
+                    <div>
+                        <div class="flex items-start justify-between gap-1 mb-1.5">
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <span class="text-purple-500">📡</span> <span>Incident Relay</span>
+                            </span>
+                            <span id="badge-auto-relay" class="text-[8.5px] font-extrabold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800 shrink-0 uppercase tracking-tight">READY</span>
+                        </div>
+                        <p class="text-[10.5px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-2 leading-relaxed">ส่งสัญญาณทดสอบเชื่อมต่อเซิร์ฟเวอร์ Master</p>
                     </div>
-                    <p class="text-[10px] text-slate-400 mb-3">ส่งสัญญาณแจ้งเตือนระบบฉุกเฉินอัตโนมัติ</p>
-                    <button  onclick="WapAdminSystem.triggerAutoSystemRelay()" class="w-full h-8 bg-purple-950 hover:bg-purple-900/80 text-purple-300 border border-purple-500/40 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1" title="Broadcast System Status" aria-label="Broadcast System Status">
+                    <button onclick="WapAdminSystem.triggerAutoSystemRelay()" class="w-full h-8 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs shrink-0" title="Broadcast System Status" aria-label="Broadcast System Status">
                         <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m-2.828 9.9a9 9 0 010-12.728M12 12h.01"/></svg>
-                        Broadcast System Status
+                        <span>Test Relay</span>
                     </button>
                 </div>
 
-                <!-- Card 5: Daily JSON Auto Backup -->
-                <div class="bg-black/60 border border-cyan-500/40 rounded-xl p-3 flex flex-col justify-between hover:border-cyan-400/80 transition-all">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[10px] font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-                            💾 Daily JSON Backup
-                        </span>
-                        <span id="badge-auto-backup" class="text-[8px] font-black px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-500/40">READY</span>
+                <!-- Card 5: Local State & JSON Backup -->
+                <div class="bg-slate-50/70 hover:bg-white dark:bg-slate-900/60 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 flex flex-col justify-between transition-all hover:shadow-xs">
+                    <div>
+                        <div class="flex items-start justify-between gap-1 mb-1.5">
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <span class="text-teal-500">💾</span> <span>Local JSON</span>
+                            </span>
+                            <span class="text-[8.5px] font-extrabold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-400 border border-teal-200 dark:border-teal-800 shrink-0 uppercase tracking-tight">READY</span>
+                        </div>
+                        <p class="text-[10.5px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-2 leading-relaxed">สำรองสถานะระบบทั้งหมดลงในเครื่อง</p>
                     </div>
-                    <p class="text-[10px] text-slate-400 mb-3">สำรองสถานะ App State ทั้งหมดลง JSON ทุกวัน</p>
-                    <div class="flex gap-1.5">
-                        <button  onclick="LocalBackupSystem.executeBackup(true)" class="flex-1 h-8 bg-cyan-950 hover:bg-cyan-900/90 text-cyan-300 border border-cyan-500/40 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1" title="Export State Now" aria-label="Export State Now">
-                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            Export
-                        </button>
-                        <button  onclick="LocalBackupSystem.openBackupModal()" class="w-8 h-8 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-[10px] font-bold transition-all active:scale-95 flex items-center justify-center" title="Backup Center Hub" aria-label="Backup Center Hub">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                        </button>
-                    </div>
+                    <button onclick="if(window.LocalBackupSystem && typeof window.LocalBackupSystem.openModal === 'function') { window.LocalBackupSystem.openModal(); } else { WapAdminSystem.exportVFRPToCSV(); }" class="w-full h-8 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs shrink-0" title="Export Local Backup" aria-label="Export Local Backup">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Export Backup</span>
+                    </button>
                 </div>
 
             </div>
         </div>
-<!-- ลบก้อนนี้ออกได้เลย -->
-<button  onclick="WapAdminSystem.switchTab('analytics')" id="cyber-tab-analytics" class="cyber-admin-tab" title="Analytics" aria-label="Analytics">
-    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-    Analytics
-</button>
-<!-- [แก้ไขส่วนหัวของกล่องครอบ Analytics] -->
-<div class="cyber-master-frame" style="padding: 15px 20px;"> <!-- ลด Padding ลง -->
-    <div class="sentinel-header" style="border-bottom: 1px solid rgba(34, 211, 238, 0.1); margin-bottom: 12px; padding-bottom: 8px;">
-        <div class="sentinel-title-group" style="gap: 10px;"> <!-- ลดระยะห่าง -->
-            <div class="status-orb" style="width: 8px; height: 8px;"></div> <!-- ปรับขนาดจุดให้เล็กลง -->
-            <h2 style="color: #22d3ee; letter-spacing: 2px; font-size: 13px;">SYSTEM TELEMETRY HUD</h2>
+
+        <!-- [4. MAIN DATABASE CONTROL CENTER & DATA GRID TABLE] -->
+        <div id="admin-db-table-container" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs flex flex-col flex-1 overflow-hidden transition-all">
             
-            <!-- ย้าย Analytics Badge เข้ามาไว้ตรงนี้ -->
-            <div class="analytics-inline-badge">
-                <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                <span>ANALYTICS</span>
-            </div>
-
-            <span class="version-tag" style="font-size: 8px; padding: 1px 8px;">REAL-TIME MONITOR</span>
-        </div>
-    </div>
-
-    <!-- ส่วนเนื้อหา Analytics (ลบคลาส hidden-view ออกแล้วเพื่อให้โชว์ทันที) -->
-   <div id="admin-analytics-view" class="flex flex-col gap-3"> 
-        <!-- กล่อง KPI 5 ใบ -->
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <div class="cyber-kpi-v3 border-cyan-500/50">
-                <div class="flex justify-between text-slate-500 mb-1"><span class="text-[8px] font-black">SYSTEM LOAD</span> ⚙️</div>
-                <div class="text-xl font-black text-white">34.2%</div>
-                <div class="text-[8px] text-emerald-400 font-bold mt-1">● Dynamic Throttle OK</div>
-            </div>
-            <div class="cyber-kpi-v3 border-purple-500/50">
-                <div class="flex justify-between text-slate-500 mb-1"><span class="text-[8px] font-black">REQUEST VELOCITY</span> ⚡</div>
-                <div class="text-xl font-black text-white">1,420 <small class="text-[10px] opacity-50">req/s</small></div>
-                <div class="text-[8px] text-purple-400 font-bold mt-1">● Peak Rate Handled</div>
-            </div>
-            <div class="cyber-kpi-v3 border-emerald-500/50">
-                <div class="flex justify-between text-slate-500 mb-1"><span class="text-[8px] font-black">ACTIVE SESSIONS</span> 👥</div>
-                <div class="text-xl font-black text-white">312 <small class="text-[10px] opacity-50">agents</small></div>
-                <div class="text-[8px] text-emerald-400 font-bold mt-1">● Concurrent Threads</div>
-            </div>
-            <div class="cyber-kpi-v3 border-amber-500/50">
-                <div class="flex justify-between text-slate-500 mb-1"><span class="text-[8px] font-black">AVG LATENCY</span> ⏳</div>
-                <div class="text-xl font-black text-white">14.2 <small class="text-[10px] opacity-50">ms</small></div>
-                <div class="text-[8px] text-amber-400 font-bold mt-1">● API Gateway Ping</div>
-            </div>
-            <div class="cyber-kpi-v3 border-cyan-400/50">
-                <div class="flex justify-between text-slate-500 mb-1"><span class="text-[8px] font-black">UPTIME HEALTH</span> 🛡️</div>
-                <div class="text-xl font-black text-white">99.98%</div>
-                <div class="text-[8px] text-cyan-400 font-bold mt-1">● SLA 99.9% Met</div>
-            </div>
-        </div>
-
-        <!-- กล่องกราฟ 2 ฝั่ง -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div class="cyber-chart-card">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-[11px] font-black text-white uppercase flex items-center gap-2">🖥️ SERVER TELEMETRY & LATENCY</h3>
-                    <span class="text-[8px] font-mono text-slate-500">CPU Load (%) vs Latency (ms)</span>
-                </div>
-                <div id="telemetry-chart-container" style="height: 280px; width: 100%;"></div>
-            </div>
-<div class="cyber-chart-card">
-    <div class="flex justify-between items-center mb-4">
-        <h3 class="text-[11px] font-black text-white uppercase flex items-center gap-2">📊 USER ACTIVITY & REQUEST SPIKES</h3>
-        <span class="text-[8px] font-mono text-slate-500">Request Rate vs Active Agents</span>
-    </div>
-    <!-- ต้องมี ID นี้ และห้ามมี hidden-view ติดอยู่ที่นี่ -->
-    <div id="activity-spike-chart-container" style="height: 280px; width: 100%;"></div>
-</div>
-        </div>
-    </div>
-</div>
-
-        <!-- [MAIN DATABASE CONTROL CENTER & SUB-TABS] -->
-        <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl flex flex-col overflow-hidden relative">
-            
-            <!-- Cyber Navigation Sub-Tabs & Live Filter Search -->
-            <div class="px-4 py-3 border-b border-slate-800 flex flex-wrap justify-between items-center gap-3 bg-slate-950/80">
+            <!-- Sub-Tabs Navigation & Live Search Filter (Single Row Aligned) -->
+            <div class="px-3 py-2 border-b border-slate-100 dark:border-slate-700/80 flex flex-row items-center justify-between gap-2 bg-slate-50/70 dark:bg-slate-800/90 overflow-x-auto custom-scrollbar">
                 
-                <!-- Cyber Tab Switchers -->
-                <div class="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-slate-800 overflow-x-auto max-w-full">
-                    <button  onclick="WapAdminSystem.switchTab('users')" id="cyber-tab-users" class="cyber-admin-tab active" title="Agents" aria-label="Agents">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <!-- Tab Switchers -->
+                <div class="flex items-center gap-1 bg-white dark:bg-slate-900/60 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+                    <button onclick="WapAdminSystem.switchTab('users')" id="cyber-tab-users" class="cyber-admin-tab active" title="Agents">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                         Agents
                     </button>
-                    <button  onclick="WapAdminSystem.switchTab('suppliers')" id="cyber-tab-suppliers" class="cyber-admin-tab" title="Suppliers" aria-label="Suppliers">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <button onclick="WapAdminSystem.switchTab('suppliers')" id="cyber-tab-suppliers" class="cyber-admin-tab" title="Suppliers">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                         Suppliers
                     </button>
-                    <button  onclick="WapAdminSystem.switchTab('parts')" id="cyber-tab-parts" class="cyber-admin-tab" title="Parts" aria-label="Parts">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <button onclick="WapAdminSystem.switchTab('parts')" id="cyber-tab-parts" class="cyber-admin-tab" title="Parts">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                         Parts
                     </button>
-                    <button  onclick="WapAdminSystem.switchTab('defects')" id="cyber-tab-defects" class="cyber-admin-tab" title="Defects" aria-label="Defects">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <button onclick="WapAdminSystem.switchTab('defects')" id="cyber-tab-defects" class="cyber-admin-tab" title="Defects">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         Defects
                     </button>
-                    <button  onclick="WapAdminSystem.switchTab('logs')" id="cyber-tab-logs" class="cyber-admin-tab" title="Audit Logs" aria-label="Audit Logs">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <button onclick="WapAdminSystem.switchTab('logs')" id="cyber-tab-logs" class="cyber-admin-tab" title="Audit Logs">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                         Audit Logs
                     </button>
-                    <button  onclick="WapAdminSystem.switchTab('system')" id="cyber-tab-system" class="cyber-admin-tab" title="Release & Updates" aria-label="Release & Updates">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        Release & Updates
+                    <button onclick="WapAdminSystem.switchTab('system')" id="cyber-tab-system" class="cyber-admin-tab" title="VF & RP Email Dispatch">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        VF & RP Email
                     </button>
                 </div>
 
                 <!-- Live Search Filter Input & Counter -->
-                <div class="flex items-center gap-3">
-                    <div class="relative w-48 sm:w-64">
-                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500/60 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <input  type="text" id="admin-main-search-input" placeholder="QUERY DATABASE..." 
-                               class="w-full h-8 pl-8 pr-3 bg-black/80 border border-slate-700 focus:border-emerald-500 rounded-xl text-[10px] font-mono text-emerald-300 placeholder-slate-600 outline-none uppercase tracking-wider" title="QUERY DATABASE..." aria-label="QUERY DATABASE...">
+                <div class="flex items-center gap-1.5 shrink-0 ml-auto">
+                    <div class="relative w-36 sm:w-48 lg:w-56">
+                        <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" id="admin-main-search-input" placeholder="ค้นหาข้อมูล..." 
+                               class="w-full h-8 pl-8 pr-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 rounded-lg text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none transition-all" title="Search">
                     </div>
-                    <span id="admin-record-count" class="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-3 py-1 rounded-full shrink-0">0 RECORDS</span>
-                    <div id="admin-table-loader" class="hidden"><div class="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-400 rounded-full animate-spin"></div></div>
+                    <span id="admin-record-count" class="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/60 px-2.5 py-1 rounded-md shrink-0 whitespace-nowrap">0 RECORDS</span>
+                    <div id="admin-table-loader" class="hidden"><div class="w-3.5 h-3.5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div></div>
                 </div>
             </div>
 
             <!-- Table Header Title Bar -->
-            <div class="px-6 py-2.5 bg-slate-950/90 border-b border-slate-800/80 flex items-center justify-between">
-                <span id="admin-table-title" class="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> AGENT & IDENTITY CONTROL
+            <div class="px-5 py-2.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700/80 flex items-center justify-between">
+                <span id="admin-table-title" class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-blue-600"></span> AGENT & IDENTITY CONTROL
                 </span>
-                <span class="text-[9px] font-mono text-slate-500 uppercase">ENCRYPTED END-TO-END</span>
+                <span class="text-[10px] text-slate-400 font-medium">REAL-TIME DATA VIEW</span>
             </div>
 
-            <!-- Scrollable High-Tech Data Grid Table -->
-            <div class="flex-1 overflow-auto p-4 max-h-[520px] custom-scrollbar">
+            <!-- Scrollable Data Grid Table -->
+            <div class="flex-1 overflow-auto p-2 sm:p-4 max-h-[580px] custom-scrollbar">
                 <table class="w-full border-collapse text-xs">
-                    <thead id="admin-table-head" class="sticky top-0 bg-slate-950 text-slate-400 font-mono text-[10px] uppercase tracking-wider z-10">
+                    <thead id="admin-table-head" class="sticky top-0 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-[11px] font-bold uppercase tracking-wider z-10 border-b border-slate-200 dark:border-slate-700">
                         <!-- JS renders table header -->
                     </thead>
-                    <tbody id="admin-table-body" class="divide-y divide-slate-800/50 font-mono">
+                    <tbody id="admin-table-body" class="divide-y divide-slate-100 dark:divide-slate-700/60">
                         <!-- JS renders rows -->
                     </tbody>
                 </table>
@@ -2432,20 +2386,19 @@
     </div>
 </div>
 
-<!-- ADMIN MASTER MODAL (Cyber Theme Modal for adding data) -->
-<div id="admin-master-modal" class="hidden-view fixed inset-0 z-[10000] flex items-center justify-center p-4 font-mono">
-    <!-- ฉากหลังมืด -->
-    <div class="absolute inset-0 bg-black/80 backdrop-blur-md" onclick="WapAdminSystem.closeMasterModal()"></div>
+<!-- ADMIN MASTER MODAL (Pure White & Blue Theme Modal) -->
+<div id="admin-master-modal" class="hidden-view fixed inset-0 z-[10000] flex items-center justify-center p-4" onclick="if(event.target===this) WapAdminSystem.closeMasterModal()">
+    <!-- Backdrop -->
+    <div class="admin-master-modal-backdrop absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity cursor-pointer" data-admin-backdrop="true" onclick="WapAdminSystem.closeMasterModal()"></div>
     
-    <!-- ตัวกล่อง Modal -->
-    <div class="relative bg-slate-900 text-slate-100 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-emerald-500/40 transform transition-all">
-        <div class="h-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500"></div>
-        <div id="master-modal-content" class="p-6 text-center">
-            <!-- JavaScript จะฉีดเนื้อหาฟอร์ม (User/Supplier/Part/Defect) เข้าที่นี่ -->
+    <!-- Modal Dialog Box -->
+    <div id="admin-master-modal-box" class="relative bg-white text-slate-800 w-full max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-blue-200/80 transform transition-all" onclick="event.stopPropagation()">
+        <div class="h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600"></div>
+        <div id="master-modal-content" class="p-6">
+            <!-- JavaScript dynamically injects content -->
         </div>
     </div>
-<!-- ค้นหาส่วนท้ายของไฟล์ index.html และแก้ไขตามนี้ -->
-    </div> <!-- ปิด admin-master-modal -->
+</div>
 
     <!-- แก้ไขจุดนี้: ปิด div maintenance-view และเอา script ออกมาไว้ข้างนอก -->
     <div id="maintenance-view-backup" class="hidden-view"></div> 
@@ -2458,49 +2411,49 @@
         <!-- Header & Quick Stats -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 shrink-0">
             <div>
-                <h2 class="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">8D CORRECTIVE ACTION</h2>
-                <p class="text-slate-500 dark:text-slate-400 text-[11px] sm:text-xs font-bold uppercase tracking-widest mt-0.5">Quality Incident Management System</p>
+                <h2 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">8D CORRECTIVE ACTION</h2>
+                <p class="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-widest mt-0.5">Quality Incident Management System</p>
             </div>
             <div class="flex gap-2 sm:gap-3 flex-wrap">
-                <div id="card-stat-8d-total" onclick="Wap8DSystem.filterByStat('all')" class="bg-blue-50/40 dark:bg-blue-950/30 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-blue-500 hover:border-blue-600 dark:border-blue-500 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95">
-                    <p class="text-[8.5px] sm:text-[9.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">TOTAL CASES</p>
-                    <p id="stat-8d-total" class="text-base sm:text-xl font-black text-blue-600 dark:text-blue-400 mt-0.5">0</p>
+                <div id="card-stat-8d-total" onclick="Wap8DSystem.filterByStat('all')" class="bg-blue-50/60 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-blue-500 hover:border-blue-600 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95">
+                    <p class="text-[8.5px] sm:text-[9.5px] font-black text-slate-500 uppercase tracking-wider">TOTAL CASES</p>
+                    <p id="stat-8d-total" class="text-base sm:text-xl font-black text-blue-600 mt-0.5">0</p>
                 </div>
-                <div id="card-stat-8d-pending" onclick="Wap8DSystem.filterByStat('d1-d3')" class="bg-orange-50/40 dark:bg-orange-950/30 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-orange-400 hover:border-orange-500 dark:border-orange-500 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95">
-                    <p class="text-[8.5px] sm:text-[9.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">D1-D3 OPEN</p>
-                    <p id="stat-8d-pending" class="text-base sm:text-xl font-black text-orange-500 dark:text-orange-400 mt-0.5">0</p>
+                <div id="card-stat-8d-pending" onclick="Wap8DSystem.filterByStat('d1-d3')" class="bg-orange-50/60 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-orange-400 hover:border-orange-500 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95">
+                    <p class="text-[8.5px] sm:text-[9.5px] font-black text-slate-500 uppercase tracking-wider">D1-D3 OPEN</p>
+                    <p id="stat-8d-pending" class="text-base sm:text-xl font-black text-orange-500 mt-0.5">0</p>
                 </div>
-                <div id="card-stat-8d-overdue" onclick="Wap8DSystem.filterByStat('overdue')" class="bg-rose-50/40 dark:bg-rose-950/30 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-rose-400 hover:border-rose-500 dark:border-rose-500 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95">
-                    <p class="text-[8.5px] sm:text-[9.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">OVERDUE (>15D)</p>
-                    <p id="stat-8d-overdue" class="text-base sm:text-xl font-black text-rose-600 dark:text-rose-400 mt-0.5">0</p>
+                <div id="card-stat-8d-overdue" onclick="Wap8DSystem.filterByStat('overdue')" class="bg-rose-50/60 px-3.5 sm:px-4 py-2 rounded-2xl border-2 border-rose-400 hover:border-rose-500 shadow-2xs text-center min-w-[95px] sm:min-w-[105px] cursor-pointer transition-all active:scale-95">
+                    <p class="text-[8.5px] sm:text-[9.5px] font-black text-slate-500 uppercase tracking-wider">OVERDUE (>15D)</p>
+                    <p id="stat-8d-overdue" class="text-base sm:text-xl font-black text-rose-600 mt-0.5">0</p>
                 </div>
             </div>
         </div>
 
         <!-- Action Toolbar -->
-        <div class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs shrink-0">
-            <button  onclick="Wap8DSystem.openHistoryPicker()" class="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-xl text-[10.5px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95" title="Pick from History" aria-label="Pick from History">
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-2xs shrink-0">
+            <button  onclick="Wap8DSystem.openHistoryPicker()" class="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900 hover:bg-blue-600 text-white rounded-xl text-[10.5px] sm:text-[11px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer" title="Pick from History" aria-label="Pick from History">
                 <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 4v16m8-8H4"/></svg> <span>Pick from History</span>
             </button>
             <div class="relative w-full sm:w-72 md:w-80">
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                <input  type="text" id="eightDSearch" placeholder="SEARCH CASE..." class="w-full h-10 pl-9 pr-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500/20 outline-none transition-all dark:text-white" title="SEARCH CASE..." aria-label="SEARCH CASE...">
+                <input  type="text" id="eightDSearch" placeholder="SEARCH CASE..." class="w-full h-10 pl-9 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-slate-800" title="SEARCH CASE..." aria-label="SEARCH CASE...">
             </div>
         </div>
 
         <!-- Table Area -->
-        <div class="flex-1 min-h-0 bg-white dark:bg-slate-900 rounded-[20px] sm:rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden flex flex-col">
+        <div class="flex-1 min-h-0 bg-white rounded-[20px] sm:rounded-[24px] border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
             <div class="table-scroll-area flex-1 overflow-auto" id="eight-d-table-container">
                 <table class="w-full border-collapse">
                     <thead>
-                        <tr class="bg-slate-50/90 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 backdrop-blur-xs">
-                            <th class="px-4 sm:px-6 py-3.5 text-left text-[9.5px] sm:text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest">Case Profile</th>
-                            <th class="px-4 sm:px-6 py-3.5 text-left text-[9.5px] sm:text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest">Incident Detail</th>
-                            <th class="px-4 sm:px-6 py-3.5 text-center text-[9.5px] sm:text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest">Progress</th>
-                            <th class="px-4 sm:px-6 py-3.5 text-right text-[9.5px] sm:text-[10px] font-black text-slate-400 dark:text-slate-300 uppercase tracking-widest">Actions</th>
+                        <tr class="bg-slate-50/90 border-b border-slate-200 sticky top-0 z-10 backdrop-blur-xs">
+                            <th class="px-4 sm:px-6 py-3.5 text-left text-[9.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Case Profile</th>
+                            <th class="px-4 sm:px-6 py-3.5 text-left text-[9.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Incident Detail</th>
+                            <th class="px-4 sm:px-6 py-3.5 text-center text-[9.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Progress</th>
+                            <th class="px-4 sm:px-6 py-3.5 text-right text-[9.5px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="eight-d-list-body" class="divide-y divide-slate-100 dark:divide-slate-800/60"></tbody>
+                    <tbody id="eight-d-list-body" class="divide-y divide-slate-100"></tbody>
                 </table>
             </div>
         </div>
@@ -2864,6 +2817,10 @@
         </div>
     </div>
 </div>
+
+                        </div> <!-- /#content-area -->
+        </main>
+    </div> <!-- /#dashboard-view -->
 
     <!-- วาง script ไว้ก่อนปิด body เสมอเพื่อให้โหลด DOM เสร็จก่อน -->
     <script src="script.js"></script>

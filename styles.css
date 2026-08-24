@@ -2,12 +2,26 @@
   box-sizing: border-box;
 }
 
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --sidebar-w: 260px;
+  --sidebar-collapsed-w: 68px;
+}
+
 html {
   -webkit-text-size-adjust: 100%; /* สำหรับ Safari และเบราว์เซอร์ตระกูล iOS */
   -moz-text-size-adjust: 100%;    /* สำหรับ Firefox */
   -ms-text-size-adjust: 100%;     /* สำหรับ Internet Explorer เก่า */
   text-size-adjust: 100%;         /* มาตรฐานกลางสำหรับ Chrome, Edge และเบราว์เซอร์สมัยใหม่ */
   -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
 }
 
 body {
@@ -17,6 +31,12 @@ body {
   text-rendering: optimizeLegibility;
   font-variant-numeric: tabular-nums;
   line-height: 1.5;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
 }
 
 /* Ensure form controls inherit normalized font stack across all OS/browsers */
@@ -24,6 +44,106 @@ input, button, select, textarea {
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Tactile Micro-Interactions & Tap Feedback */
+button, .btn, .nav-item, .tab-btn, .action-btn, [role="button"] {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-spring), opacity 0.15s var(--ease-spring), background-color 0.15s var(--ease-smooth), box-shadow 0.15s var(--ease-smooth);
+}
+
+button:active:not(:disabled), 
+.btn:active:not(:disabled), 
+.nav-item:active, 
+.tab-btn:active, 
+.action-btn:active {
+  transform: scale(0.975) translateZ(0);
+}
+
+/* Hardware Acceleration Layer for Smooth Transitions & Anti-Jank */
+#sidebar, .modal, .custom-modal, #header, .header-bar, .toast, .modern-glass-card, 
+.fixed, .sticky, .dropdown-menu, .popover, .slide-panel, .drawer {
+  transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Layout Containment for Large Lists, Tables and Matrix to prevent DOM reflow thrashing */
+.table-container, .records-table-wrap, .matrix-container, .log-container {
+  contain: layout style;
+}
+
+tr.record-row, tr.log-row, tr.matrix-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 44px;
+}
+
+/* Sleek Modern Custom Scrollbars */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.65);
+}
+.dark *::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.22);
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+/* Smooth Responsive Modal Adaptation across Phone, Tablet and Desktop */
+@media (max-width: 768px) {
+  /* Prevent iOS Safari automatic zoom on input focus */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Responsive bottom-sheet modals on mobile */
+  .modal-dialog, .custom-modal-content, .modal-card {
+    max-width: 96vw !important;
+    width: 96vw !important;
+    max-height: 90dvh !important;
+    margin: auto !important;
+    border-radius: 18px !important;
+  }
+}
+
+/* Reduce motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 table, th, td {
@@ -13762,25 +13882,27 @@ body.dark-mode .user-row-premium:hover {
     padding: 10px 20px !important; /* ลดความอ้วนของแถว */
 }
 
-/* --- Admin Console Premium Styling --- */
-
-/* ค้นหาจุดนี้ใน styles.css */
+/* --- Admin Console Clean White & Blue Styling --- */
 #admin-console-content {
-    /* เปลี่ยนจาก #f8fafc เป็นสีดำลึก */
-    background-color: #070c14 !important; 
+    background-color: #f8fafc !important; 
     padding: 1.5rem !important;
+    color: #0f172a !important;
+}
+
+body.dark-mode #admin-console-content {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
 }
 
 /* ส่วนของตาราง: ทำให้แถวเล็กลง (Compact Row) */
 .admin-table-row {
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
     border-bottom: 1px solid #f1f5f9;
 }
 
 .admin-table-row:hover {
-    background-color: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-    transform: scale(1.002);
+    background-color: #f0f7ff !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.05);
     z-index: 10;
 }
 
@@ -13868,6 +13990,37 @@ body.dark-mode .user-row-premium:hover {
 /* ปรับแต่ง Scrollbar ในตาราง */
 .admin-scroll-area::-webkit-scrollbar { width: 4px; height: 4px; }
 .admin-scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+/* --- Admin Tabs Navigation Bar --- */
+.cyber-admin-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #475569;
+    background: transparent;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.cyber-admin-tab:hover {
+    background: #f1f5f9;
+    color: #1e40af;
+}
+.cyber-admin-tab.active {
+    background: #2563eb;
+    color: #ffffff !important;
+    border-color: #1d4ed8;
+    font-weight: 800;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+.cyber-admin-tab.active svg {
+    color: #ffffff;
+}
 
 /* --- Admin Header Mini Tools --- */
 .admin-tab-mini {
@@ -14825,74 +14978,69 @@ body.dark-mode .f-part-spinner {
 }
 
 /* ============================================================
-   CYBER HACKER COMMAND CENTER - ADMIN USER CONTROL STYLING
+   ADMIN USER CONTROL - WHITE & BLUE CLEAN STYLING
    ============================================================ */
 .cyber-admin-tab {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
+    gap: 4px;
+    padding: 4px 10px;
     border-radius: 8px;
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #94a3b8;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #64748b;
     background: transparent;
     border: 1px solid transparent;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
     cursor: pointer;
 }
 
 .cyber-admin-tab:hover {
-    color: #34d399;
-    background: rgba(16, 185, 129, 0.08);
-    border-color: rgba(16, 185, 129, 0.2);
+    color: #2563eb;
+    background: #eff6ff;
+    border-color: #dbeafe;
 }
 
 .cyber-admin-tab.active {
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.15);
-    border-color: rgba(16, 185, 129, 0.4);
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+    color: #ffffff !important;
+    background: #2563eb !important;
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
 }
 
-.cyber-kpi-card {
-    background: rgba(15, 23, 42, 0.85);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(30, 41, 59, 0.8);
-    border-radius: 16px;
-    padding: 14px 16px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.25s ease;
+body.dark-mode .cyber-admin-tab {
+    color: #94a3b8;
 }
 
-.cyber-kpi-card:hover {
-    transform: translateY(-2px);
-    border-color: rgba(16, 185, 129, 0.4);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(16, 185, 129, 0.15);
+body.dark-mode .cyber-admin-tab:hover {
+    color: #60a5fa;
+    background: rgba(37, 99, 235, 0.15);
+    border-color: rgba(37, 99, 235, 0.3);
 }
 
-.cyber-kpi-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--kpi-accent, #10b981);
-    opacity: 0.8;
+body.dark-mode .cyber-admin-tab.active {
+    color: #ffffff !important;
+    background: #2563eb !important;
+    border-color: #3b82f6 !important;
 }
 
 .cyber-table-row {
     transition: all 0.15s ease;
+    border-bottom: 1px solid #f1f5f9;
 }
 
 .cyber-table-row:hover {
-    background-color: rgba(16, 185, 129, 0.06) !important;
+    background-color: #f0f7ff !important;
+}
+
+body.dark-mode .cyber-table-row {
+    border-bottom: 1px solid #334155;
+}
+
+body.dark-mode .cyber-table-row:hover {
+    background-color: #1e293b !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -15203,172 +15351,91 @@ body.dark-mode #admin-table-body tr:hover {
     border-color: rgba(34, 211, 238, 0.3);
     transform: translateY(-2px);
 }
-/* บังคับกาง Analytics ในหน้า Admin Console เสมอ */
-#admin-console-content #admin-analytics-view {
-    display: flex !important;   /* บังคับโชว์เป็น Flex */
-    visibility: visible !important;
-    opacity: 1 !important;
-    height: auto !important;
-}
 
-/* ลบเงื่อนไขการซ่อนจากคลาสเดิม */
-#admin-console-content .hidden-view#admin-analytics-view {
-    display: flex !important;
-}
-/* --- สไตล์สำหรับปุ่ม Analytics ที่ย้ายเข้ามา --- */
-.analytics-inline-badge {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 2px 10px;
-    background: rgba(34, 211, 238, 0.1);
-    border: 1px solid rgba(34, 211, 238, 0.3);
-    border-radius: 6px;
-    color: #22d3ee;
-    font-size: 9px;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    margin-left: 5px; /* เว้นระยะห่างจากชื่อหัวข้อนิดเดียว */
-}
-
-/* --- ลดระยะห่างทั้งหมดในหน้า Admin --- */
-
-/* 1. ลดช่องว่างระหว่างกล่อง Dashboard ใหญ่ๆ */
+/* --- Comprehensive Clean White & Blue Theme for Master Admin Console --- */
 #admin-console-content {
-    padding: 15px !important; /* ลด padding รอบนอกหน้าจอ */
-    gap: 12px !important; /* ลดระยะห่างระหว่าง Sentinel Hub และ Analytics */
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #ffffff 100%) !important;
+    color: #0f172a !important;
 }
 
-/* 2. ลดช่องว่างใน Sentinel Hub */
-.cyber-sentinel-hub {
-    padding: 12px 15px !important;
-    margin-bottom: 0 !important;
+#admin-console-content .bg-white,
+#admin-console-content .dark\:bg-slate-800 {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
 }
 
-/* 3. ลดระยะห่างของแถว KPI 5 ใบด้านบนกราฟ */
-#admin-analytics-view .grid-cols-5 {
-    gap: 8px !important;
+#admin-console-content .text-slate-900,
+#admin-console-content .dark\:text-white,
+#admin-console-content .dark\:text-slate-100 {
+    color: #0f172a !important;
 }
 
-/* 4. ลดระยะห่างระหว่างกราฟซ้ายและขวา */
-#admin-analytics-view .lg\:grid-cols-2 {
-    gap: 12px !important;
+#admin-console-content .text-slate-500,
+#admin-console-content .dark\:text-slate-400 {
+    color: #475569 !important;
 }
 
-/* 5. ลดระยะห่างในกล่องตารางฐานข้อมูลด้านล่าง */
 #admin-db-table-container {
-    margin-top: -5px; /* ดึงตารางขึ้นมาชิดกราฟมากขึ้น */
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: 0 4px 20px -4px rgba(37, 99, 235, 0.08) !important;
+    margin-top: 0;
 }
 
-/* 6. ลดระยะห่างของแถบ Sub-Tabs (Agents, Suppliers...) */
-.cyber-admin-tab {
-    padding: 4px 10px !important;
-    font-size: 9px !important;
+#admin-console-content .cyber-admin-tab {
+    background: #f8fafc;
+    color: #475569;
+    border: 1px solid #e2e8f0;
 }
 
-/* บังคับให้ Browser ใช้ GPU ในการประมวลผลกล่องที่มีอนิเมชั่นเยอะๆ */
-.kpi-card-v2, 
-.white-box, 
-.exec-card-premium, 
-.glass-stat-card, 
-.sj-glass-card,
-.vf-feed-card,
-#sidebar {
-    backface-visibility: hidden;
-    transform: translateZ(0); /* เปิดใช้งาน 3D Acceleration */
-    will-change: transform, opacity;
-    
+#admin-console-content .cyber-admin-tab:hover {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
 }
 
-/* ลดภาระการคำนวณเงาขณะเลื่อน (Scroll) */
-.scroll-custom {
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
+#admin-console-content .cyber-admin-tab.active {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
 }
 
-/* ซ่อน Element ที่ไม่ได้มองเห็นให้ขาดจาก DOM Tree เพื่อประหยัด RAM */
-.hidden-view {
-    display: none !important;
-    visibility: hidden;
-    pointer-events: none;
+#admin-console-content #admin-table-head tr,
+#admin-console-content #admin-table-head th {
+    background: #f1f5f9 !important;
+    color: #1e3a8a !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    font-weight: 800 !important;
 }
 
-/* ปิดอนิเมชั่นหนักๆ สำหรับอุปกรณ์สเปกต่ำ */
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation: none !important;
-        transition: none !important;
-    }
-}
-/* ============================================================
-   ULTIMATE CYBER HUD THEME (ADMIN ONLY)
-   ============================================================ */
-
-/* บังคับพื้นหลังหน้า Admin ให้ดำสนิทตามภาพที่ 2 */
-#admin-console-content {
-    background-color: #050a0f !important; /* สีน้ำเงินเข้มเกือบดำ */
-    color: #00f2ff !important;
-    padding: 20px !important;
-    overflow-y: auto !important;
+#admin-console-content #admin-table-body tr {
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border-bottom: 1px solid #f1f5f9 !important;
 }
 
-/* ส่วนหัว HUD */
-.admin-hud-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    border-bottom: 1px solid rgba(0, 242, 255, 0.1);
-    padding-bottom: 10px;
+#admin-console-content #admin-table-body tr:hover {
+    background: #f0f7ff !important;
 }
 
-/* การ์ด KPI 5 ใบด้านบน */
-#admin-stats-row {
-    display: grid !important;
-    grid-template-columns: repeat(5, 1fr) !important;
-    gap: 15px !important;
-    margin-bottom: 20px !important;
+#admin-console-content input,
+#admin-console-content select,
+#admin-console-content textarea {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
 }
 
-.cyber-kpi-v3 {
-    background: rgba(15, 23, 42, 0.8) !important;
-    border: 1px solid rgba(0, 242, 255, 0.2) !important;
-    border-radius: 12px !important;
-    padding: 15px !important;
-    position: relative;
-    overflow: hidden;
+#admin-console-content input:focus,
+#admin-console-content select:focus,
+#admin-console-content textarea:focus {
+    border-color: #2563eb !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
 }
 
-/* เส้นสีด้านบนการ์ด KPI */
-.cyber-kpi-v3::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; height: 2px;
-    background: var(--kpi-color, #00f2ff);
-    box-shadow: 0 0 10px var(--kpi-color);
-}
-
-/* ส่วนของกราฟ (HUD Main Charts) */
-#admin-analytics-view {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 20px !important;
-}
-
-.cyber-chart-card {
-    background: rgba(10, 15, 25, 0.9) !important;
-    border: 1px solid rgba(255, 255, 255, 0.05) !important;
-    border-radius: 16px !important;
-    padding: 20px !important;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
-}
-
-/* แก้ไขตารางด้านล่างให้เข้ากับ HUD */
-#admin-db-table-container {
-    background: rgba(10, 15, 25, 0.95) !important;
-    border: 1px solid rgba(0, 242, 255, 0.1) !important;
-    margin-top: 25px !important;
-}
 /* บังคับ Tooltip ของ ApexCharts ให้เป็น HUD Style */
 .apexcharts-tooltip {
     background: rgba(5, 10, 20, 0.9) !important; /* พื้นหลังดำน้ำเงิน */
@@ -15688,11 +15755,18 @@ header {
     }
 }
 /* --- 1. จัดการโครงสร้างหลักของแอป (ห้ามเพี้ยน) --- */
-#dashboard-view {
+#dashboard-view:not(.hidden-view) {
     display: flex !important;
     width: 100vw;
     height: 100vh;
     overflow: hidden; /* ล็อคหน้าจอหลักไม่ให้มี Scrollbar ซ้อน */
+}
+
+#dashboard-view.hidden-view,
+#dashboard-view.hidden-view * {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
 
 main {
@@ -16071,26 +16145,28 @@ table thead th:hover {
     position: absolute;
     top: 100%;
     left: 0;
-    right: 0;
-    z-index: 10005;
+    z-index: 20005;
     background: white;
-    border: 1px solid #dbeafe;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-    max-height: 250px;
+    border: 1.5px solid #3b82f6;
+    border-radius: 10px;
+    box-shadow: 0 12px 30px -5px rgba(15, 23, 42, 0.18);
+    max-height: 280px;
+    min-width: 310px;
+    width: max-content;
+    max-width: 420px;
     overflow-y: auto;
     margin-top: 4px;
 }
 
 /* รายการแต่ละแถว */
 .modal-ac-item {
-    padding: 10px 15px;
+    padding: 8px 12px;
     font-size: 11.5px;
     font-weight: 600;
     color: #334155;
     cursor: pointer;
     border-bottom: 1px solid #f8fafc;
-    transition: all 0.2s;
+    transition: all 0.15s ease-out;
 }
 
 .modal-ac-item:last-child { border-bottom: none; }
@@ -16098,9 +16174,8 @@ table thead th:hover {
 /* สถานะเมื่อใช้ปุ่มลูกศรเลือก หรือเอาเมาส์วาง */
 .modal-ac-item.active, .modal-ac-item:hover {
     background-color: #eff6ff !important;
-    color: #2563eb !important;
-    padding-left: 20px; /* กิมมิกเลื่อนขวานิดๆ */
-    border-left: 4px solid #2563eb;
+    color: #1d4ed8 !important;
+    border-left: 3.5px solid #2563eb;
 }
 
 /* ==========================================================
@@ -16663,49 +16738,56 @@ body.dark-mode .cal-cat-btn.active { background: #2563eb; color: #fff; }
     border-color: #bfdbfe;
 }
 
-/* กล่องผู้รับผิดชอบ สไตล์สีน้ำเงินเข้ม พรีเมียม พร้อมไอคอน */
+/* กล่องผู้รับผิดชอบ สไตล์พรีเมียม พร้อมไอคอน */
 .cal-pic-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 10px;
-    border-radius: 9999px;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    background: linear-gradient(135deg, #0b192c 0%, #1e3a8a 100%);
-    color: #ffffff;
-    border: 1px solid rgba(96, 165, 250, 0.4);
-    box-shadow: 0 2px 5px rgba(11, 25, 44, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-    white-space: nowrap;
-    transition: all 0.2s ease;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 4px 10px !important;
+    border-radius: 6px !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em !important;
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%) !important;
+    color: #ffffff !important;
+    border: 1px solid #2563eb !important;
+    box-shadow: 0 2px 5px rgba(30, 58, 138, 0.25) !important;
+    white-space: nowrap !important;
+    line-height: 1 !important;
+    box-sizing: border-box !important;
+    vertical-align: middle !important;
+    transition: all 0.2s ease !important;
 }
 
 .cal-pic-badge:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(30, 58, 138, 0.4);
-    border-color: #93c5fd;
-    background: linear-gradient(135deg, #0f2442 0%, #1d4ed8 100%);
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(30, 58, 138, 0.35) !important;
+    border-color: #60a5fa !important;
 }
 
 .cal-pic-badge .pic-icon-wrap {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: rgba(59, 130, 246, 0.35);
-    border: 1px solid rgba(147, 197, 253, 0.4);
-    color: #93c5fd;
-    flex-shrink: 0;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 14px !important;
+    height: 14px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    flex-shrink: 0 !important;
+    line-height: 1 !important;
 }
 
 .cal-pic-badge .pic-text {
-    font-family: 'DM Sans', sans-serif;
-    color: #ffffff;
-    font-weight: 800;
-    font-size: 10.5px;
+    font-family: inherit !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+    line-height: 1 !important;
+    letter-spacing: 0.02em !important;
 }
 
 /* กล่องพรีวิวรูปภาพ */
@@ -17358,10 +17440,119 @@ html.dark .cal-doc-seal.pass,
     filter: brightness(0.95);
     box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
-.dark .cal-task-chip:hover {
-    filter: brightness(1.15);
+/* ============================================================
+   GLOBAL RESPONSIVE & DEVICE ADAPTATION SUITE (ALL SPEC & RESOLUTIONS)
+   ============================================================ */
+
+/* 1. Touch and Smooth Scrolling Optimization */
+* {
+    -webkit-tap-highlight-color: transparent;
 }
 
+.scroll-custom, .overflow-y-auto, .overflow-x-auto, .table-scroll-wrap, .console-body {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
 
+/* 2. Responsive Breakpoint: Tablet & Mobile (<= 1024px) */
+@media (max-width: 1024px) {
+    /* Main Content Area */
+    #content-area {
+        overflow-y: auto !important;
+    }
 
+    /* OT Management Mobile/Tablet Adaptations */
+    #ot-management-content:not(.hidden-view) .ot-master-layout {
+        height: auto !important;
+        min-height: 100%;
+        overflow-y: auto !important;
+        padding: 8px 10px !important;
+    }
+    .ot-kpi-row {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+        gap: 8px !important;
+    }
+    .ot-ops-grid {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    .ot-console-box {
+        width: 100% !important;
+    }
+    .analytics-bottom-split {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
 
+    /* Special Jobs Mobile/Tablet Adaptations */
+    #special-jobs-content:not(.hidden-view) .sj-fixed-layout {
+        height: auto !important;
+        min-height: 100%;
+        overflow-y: auto !important;
+        padding: 8px 10px !important;
+    }
+    .sj-kpi-grid, .sj-kpi-row {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+        gap: 8px !important;
+    }
+    .sj-main-grid {
+        flex-direction: column !important;
+    }
+
+    /* Calibration System Mobile/Tablet Adaptations */
+    #calibration-content {
+        height: auto !important;
+        min-height: 100%;
+        overflow-y: auto !important;
+    }
+    #calibration-content .flex-1.flex.overflow-hidden {
+        flex-direction: column !important;
+        overflow-y: visible !important;
+    }
+    #calibration-content .w-full.xl\\:w-96 {
+        width: 100% !important;
+    }
+
+    /* 8D Report Container */
+    #eight-d-content {
+        height: auto !important;
+        min-height: 100%;
+        overflow-y: auto !important;
+    }
+
+    /* Admin Console */
+    #admin-console-content {
+        padding: 10px !important;
+    }
+}
+
+/* 3. Small Mobile Devices (<= 640px) */
+@media (max-width: 640px) {
+    .ot-kpi-row {
+        grid-template-columns: 1fr 1fr !important;
+    }
+    .ot-card-v2 {
+        padding: 10px 12px !important;
+    }
+    .val-mega {
+        font-size: 20px !important;
+    }
+    .btn-ot-submit-ultra, .btn-sj-deploy {
+        height: 42px !important;
+        font-size: 11px !important;
+    }
+
+    /* Master Modals for Mobile */
+    #master-modal-content {
+        max-width: 95vw !important;
+        max-height: 92vh !important;
+        margin: 8px auto !important;
+    }
+}
+
+/* 4. Large Screens & 4K Displays (>= 1440px) */
+@media (min-width: 1440px) {
+    .ot-master-layout, .sj-fixed-layout {
+        max-width: 100% !important;
+    }
+}
