@@ -9689,8 +9689,8 @@ function switchSubTerminal(view) {
 
 /**
  * ═══════════════════════════════════════════════════════
- *  UNIFIED SWITCH PAGE SYSTEM (V3.0)
- *  จัดการการสลับหน้าจอทั้งหมดในระบบ (Regular Pages & Admin)
+ *  UNIFIED SWITCH PAGE SYSTEM (V3.1 - FIXED SHOW FORM)
+ *  จัดการการสลับหน้าจอและการแสดงผลปุ่มควบคุมฟอร์ม
  * ═══════════════════════════════════════════════════════
  */
 function switchPage(name, el) {
@@ -9714,13 +9714,21 @@ function switchPage(name, el) {
     const onlineBadge = document.getElementById('online-badge');
     const vendorFilter = document.getElementById('claim-vendor-filter');
     const vendorDivider = document.getElementById('vendor-divider');
+    const showFormBtn = document.getElementById('show-form-btn'); // ดึงอ้างอิงปุ่มเปิดฟอร์ม
 
-    // --- STEP 1: RESET & PRIVILEGE GUARD ---
-    // บังคับซ่อน Staff Selector ทันทีทุกครั้งที่มีการเปลี่ยนหน้า
+    // --- STEP 1: RESET GLOBAL UI STATES ---
+    // ล้างสถานะ Staff Selector
     if (staffWrap) {
         staffWrap.classList.add('hidden');
         staffWrap.classList.remove('flex');
         staffWrap.style.display = 'none'; 
+    }
+    
+    // ล้างสถานะปุ่มเปิดฟอร์ม (ซ่อนไว้ก่อนทุกหน้า)
+    if (showFormBtn) {
+        showFormBtn.classList.add('hidden');
+        showFormBtn.style.display = 'none';
+        gsap.set(showFormBtn, { opacity: 0, x: 20 }); // เตรียมพร้อมสำหรับอนิเมชั่นขาเข้า
     }
     
     if (onlineBadge) onlineBadge.classList.add('hidden');
@@ -9772,7 +9780,7 @@ function switchPage(name, el) {
         }
     }
 
-    // 2. Part Line Claim Logic (จุดสำคัญเรื่อง Staff Selector)
+    // 2. Part Line Claim Logic (จัดการ Staff Selector และปุ่ม Show Form)
     if (pageNameUpper === 'PART LINE CLAIM') {
         if (subNav) subNav.classList.remove('hidden'); 
         if (claimOpTools) { claimOpTools.classList.remove('hidden'); claimOpTools.classList.add('flex'); }
@@ -9781,16 +9789,29 @@ function switchPage(name, el) {
         // เรียกฟังก์ชันหน้าตารางย่อย
         switchSubTerminal('entry'); 
 
-        // 🛡️ RE-ENFORCE PRIVILEGE GUARD: 
-        // แสดง Staff Selector เฉพาะเมื่อเป็น Supervisor และอยู่หน้า Claim เท่านั้น
-        if (S.userRole === 'supervisor' && staffWrap) {
-            staffWrap.classList.remove('hidden');
-            staffWrap.classList.add('flex');
-            staffWrap.style.display = 'flex';
-        } else if (staffWrap) {
-            // ป้องกัน switchSubTerminal ไปสั่งเปิดมันขึ้นมาสำหรับพนักงานทั่วไป
-            staffWrap.classList.add('hidden');
-            staffWrap.style.display = 'none';
+        // 🛡️ PRIVILEGE GUARD สำหรับหน้า CLAIM
+        if (S.userRole === 'supervisor') {
+            // ถ้าเป็น Supervisor: โชว์รายชื่อพนักงาน แต่ซ่อนปุ่มเปิดฟอร์ม (เพราะแก้ไขไม่ได้)
+            if (staffWrap) {
+                staffWrap.classList.remove('hidden');
+                staffWrap.classList.add('flex');
+                staffWrap.style.display = 'flex';
+            }
+            if (showFormBtn) {
+                showFormBtn.classList.add('hidden');
+                showFormBtn.style.display = 'none';
+            }
+        } else {
+            // ถ้าเป็น Staff: ซ่อนรายชื่อพนักงาน แต่ "แสดง" ปุ่มเปิดฟอร์มกลับมา
+            if (staffWrap) {
+                staffWrap.classList.add('hidden');
+                staffWrap.style.display = 'none';
+            }
+            if (showFormBtn) {
+                showFormBtn.classList.remove('hidden');
+                showFormBtn.style.display = 'flex';
+                gsap.to(showFormBtn, { x: 0, opacity: 1, duration: 0.4, ease: "power2.out" });
+            }
         }
     } 
     else if (pageNameUpper === 'ADMIN CONSOLE' || pageNameUpper === 'ADMIN USER CONTROL') {
