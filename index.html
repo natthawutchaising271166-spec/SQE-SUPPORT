@@ -38,6 +38,13 @@
 
     <!-- 4. Local Stylesheet -->
     <link rel="stylesheet" href="styles.css">
+    <script>
+        // Global safety stubs to prevent early ReferenceError
+        window.renderEmployeeLoginDropdown = window.renderEmployeeLoginDropdown || function() {};
+        window.handleEmployeeInput = window.handleEmployeeInput || function() {};
+        window.toggleEmployeeLoginDropdown = window.toggleEmployeeLoginDropdown || function() {};
+        window.selectEmployeeLoginOption = window.selectEmployeeLoginOption || function() {};
+    </script>
 </head>
 <body>
     <div id="system-announcement" class="system-banner hidden">
@@ -175,16 +182,16 @@
        class="premium-input pr-9 text-xs font-semibold text-white bg-slate-900/90 border-blue-500/40 focus:border-blue-400 cursor-pointer" 
        autocomplete="off"
        spellcheck="false"
-       oninput="handleEmployeeInput(this.value)"
-       onfocus="renderEmployeeLoginDropdown(this.value)"
-       onclick="renderEmployeeLoginDropdown(this.value)"
+       oninput="typeof handleEmployeeInput === 'function' ? handleEmployeeInput(this.value) : (window.handleEmployeeInput && window.handleEmployeeInput(this.value))"
+       onfocus="typeof renderEmployeeLoginDropdown === 'function' ? renderEmployeeLoginDropdown(this.value) : (window.renderEmployeeLoginDropdown && window.renderEmployeeLoginDropdown(this.value))"
+       onclick="typeof renderEmployeeLoginDropdown === 'function' ? renderEmployeeLoginDropdown(this.value) : (window.renderEmployeeLoginDropdown && window.renderEmployeeLoginDropdown(this.value))"
        title="ระบุชื่อหรืออีเมลพนักงาน" 
        aria-label="ระบุชื่อหรืออีเมลพนักงาน">
             
             <!-- ปุ่มลูกศรด้านขวา (Chevron) -->
             <button type="button" 
                     id="employee-chevron-btn"
-                    onclick="toggleEmployeeLoginDropdown(event)" 
+                    onclick="typeof toggleEmployeeLoginDropdown === 'function' ? toggleEmployeeLoginDropdown(event) : (window.toggleEmployeeLoginDropdown && window.toggleEmployeeLoginDropdown(event))" 
                     class="absolute right-2 text-slate-400 hover:text-white transition-all p-1"
                     title="แสดงรายชื่อพนักงานทั้งหมด">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

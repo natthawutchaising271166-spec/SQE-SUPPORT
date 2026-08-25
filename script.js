@@ -4147,6 +4147,54 @@ const STAFF_EMAIL_MAP = {
     "Ekaraj I.": "ekaraj.inpara@carrier.com"
 };
 
+// ตารางระดับสิทธิ์ดึงตามภาพ Agent Identity และ Clearance Role
+const USER_LEVEL_MAP = {
+    // --- 1. SQE Support ---
+    "eueangkoon.seesanit@carrier.com": "1. SQE Support",
+    "sornchai.wongjanta@carrier.com": "1. SQE Support",
+
+    // --- 2. IQC ---
+    "anuchit.arnoon@carrier.com": "2. IQC",
+    "aphinan.phookrongnak@carrier.com": "2. IQC",
+    "eakkachai.butnet@carrier.com": "2. IQC",
+    "KAPTAN.YOOUSUK@carrier.com": "2. IQC",
+    "kraiwit.priawkudro@carrier.com": "2. IQC",
+    "pakon.muanglen@carrier.com": "2. IQC",
+    "panida.boonchamoi@carrier.com": "2. IQC",
+    "pratheep.ngoenon@carrier.com": "2. IQC",
+    "puriwat.sangjan@carrier.com": "2. IQC",
+    "Satthra.Onsawarng@carrier.com": "2. IQC",
+    "siriwan.sonkaew@carrier.com": "2. IQC",
+    "somchai.rukkachat@carrier.com": "2. IQC",
+    "supaporn.sata@carrier.com": "2. IQC",
+    "tawatchai.tathong@carrier.com": "2. IQC",
+    "theerapol.wanna@carrier.com": "2. IQC",
+    "ubonsak.j@carrier.com": "2. IQC",
+
+    // --- 3. EN / Engineer ---
+    "meechai.thawornpong@carrier.com": "3. EN / Engineer",
+    "naruemon.champa@carrier.com": "3. EN / Engineer",
+    "songporn.chaisim@carrier.com": "3. EN / Engineer",
+    "witsarut.singholsai@carrier.com": "3. EN / Engineer",
+
+    // --- 4. Supervisor ---
+    "Chiraphat.Khanthong@carrier.com": "4. Supervisor",
+    "jumnong.thongsom@carrier.com": "4. Supervisor",
+    "komson.namwicha@carrier.com": "4. Supervisor",
+    "pongpan.panna@carrier.com": "4. Supervisor",
+    "Siriporn.Prasongsuk@carrier.com": "4. Supervisor",
+    "suphap.m@carrier.com": "4. Supervisor",
+
+    // --- 5. Manager ---
+    "ekkalak.laksanasamrith@carrier.com": "5. Manager",
+    "nipawan.janpong@carrier.com": "5. Manager",
+    "watcharin.yawanopart@carrier.com": "5. Manager",
+
+    // --- 6. Admin ---
+    "natthawut.chaising@carrier.com": "6. Admin"
+};
+window.USER_LEVEL_MAP = USER_LEVEL_MAP;
+
 /**
  * 🧠 ระบบจัดการดรอปดาวน์สำหรับพนักงาน (SQE SUPPORT)
  */
@@ -4177,9 +4225,10 @@ function getEmployeeData() {
     });
     return list;
 }
+window.getEmployeeData = getEmployeeData;
 
 // 2. ฟังก์ชันวาดรายการ (Render) ลงในดรอปดาวน์
-window.renderEmployeeLoginDropdown = function(query = '') {
+function renderEmployeeLoginDropdown(query = '') {
     const dropdown = document.getElementById('login-employee-dropdown');
     if (!dropdown) return;
 
@@ -4188,7 +4237,7 @@ window.renderEmployeeLoginDropdown = function(query = '') {
     const q = String(query || '').trim().toLowerCase();
 
     // เช็คว่าตอนนี้ผู้ใช้กดอยู่ที่แท็บไหน
-    const isSupervisorTab = (S.loginRole === 'supervisor');
+    const isSupervisorTab = (typeof S !== 'undefined' && S && S.loginRole === 'supervisor');
 
     const filtered = allStaff.filter(item => {
         const role = item.role.toLowerCase();
@@ -4253,74 +4302,32 @@ window.renderEmployeeLoginDropdown = function(query = '') {
     });
 
     dropdown.innerHTML = html;
-};
+}
+window.renderEmployeeLoginDropdown = renderEmployeeLoginDropdown;
 
 // 3. ฟังก์ชันเมื่อพิมพ์ในช่อง Input
-window.handleEmployeeInput = function(val) {
-    window.renderEmployeeLoginDropdown(val);
-};
+function handleEmployeeInput(val) {
+    renderEmployeeLoginDropdown(val);
+}
+window.handleEmployeeInput = handleEmployeeInput;
 
 // 4. ฟังก์ชันเปิด/ปิด เมื่อกดปุ่ม Chevron หรือคลิกช่อง
-window.toggleEmployeeLoginDropdown = function(e) {
+function toggleEmployeeLoginDropdown(e) {
     if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     const dropdown = document.getElementById('login-employee-dropdown');
     if (!dropdown) return;
 
     if (dropdown.classList.contains('hidden')) {
         const input = document.getElementById('login-email');
-        window.renderEmployeeLoginDropdown(input ? input.value : '');
+        renderEmployeeLoginDropdown(input ? input.value : '');
     } else {
         dropdown.classList.add('hidden');
     }
-};
-// ตารางระดับสิทธิ์ดึงตามภาพ Agent Identity และ Clearance Role
-const USER_LEVEL_MAP = {
-    // --- 1. SQE Support ---
-    "eueangkoon.seesanit@carrier.com": "1. SQE Support",
-    "sornchai.wongjanta@carrier.com": "1. SQE Support",
+}
+window.toggleEmployeeLoginDropdown = toggleEmployeeLoginDropdown;
 
-    // --- 2. IQC ---
-    "anuchit.arnoon@carrier.com": "2. IQC",
-    "aphinan.phookrongnak@carrier.com": "2. IQC",
-    "eakkachai.butnet@carrier.com": "2. IQC",
-    "KAPTAN.YOOUSUK@carrier.com": "2. IQC",
-    "kraiwit.priawkudro@carrier.com": "2. IQC",
-    "pakon.muanglen@carrier.com": "2. IQC",
-    "panida.boonchamoi@carrier.com": "2. IQC",
-    "pratheep.ngoenon@carrier.com": "2. IQC",
-    "puriwat.sangjan@carrier.com": "2. IQC",
-    "Satthra.Onsawarng@carrier.com": "2. IQC",
-    "siriwan.sonkaew@carrier.com": "2. IQC",
-    "somchai.rukkachat@carrier.com": "2. IQC",
-    "supaporn.sata@carrier.com": "2. IQC",
-    "tawatchai.tathong@carrier.com": "2. IQC",
-    "theerapol.wanna@carrier.com": "2. IQC",
-    "ubonsak.j@carrier.com": "2. IQC",
-
-    // --- 3. EN / Engineer ---
-    "meechai.thawornpong@carrier.com": "3. EN / Engineer",
-    "naruemon.champa@carrier.com": "3. EN / Engineer",
-    "songporn.chaisim@carrier.com": "3. EN / Engineer",
-    "witsarut.singholsai@carrier.com": "3. EN / Engineer",
-
-    // --- 4. Supervisor ---
-    "Chiraphat.Khanthong@carrier.com": "4. Supervisor",
-    "jumnong.thongsom@carrier.com": "4. Supervisor",
-    "komson.namwicha@carrier.com": "4. Supervisor",
-    "pongpan.panna@carrier.com": "4. Supervisor",
-    "Siriporn.Prasongsuk@carrier.com": "4. Supervisor",
-    "suphap.m@carrier.com": "4. Supervisor",
-
-    // --- 5. Manager ---
-    "ekkalak.laksanasamrith@carrier.com": "5. Manager",
-    "nipawan.janpong@carrier.com": "5. Manager",
-    "watcharin.yawanopart@carrier.com": "5. Manager",
-
-    // --- 6. Admin ---
-    "natthawut.chaising@carrier.com": "6. Admin"
-};
 // 5. ฟังก์ชันเมื่อเลือกรายชื่อ
-window.selectEmployeeLoginOption = function(email, name) {
+function selectEmployeeLoginOption(email, name) {
     const emailInput = document.getElementById('login-email');
     const dropdown = document.getElementById('login-employee-dropdown');
     const passInput = document.getElementById('login-pass');
@@ -4328,13 +4335,15 @@ window.selectEmployeeLoginOption = function(email, name) {
     if (emailInput) {
         emailInput.value = email; // ใส่ค่าอีเมลที่เลือก
         emailInput.classList.add('valid');
+        emailInput.classList.remove('invalid');
     }
 
     if (dropdown) dropdown.classList.add('hidden'); // ปิดดรอปดาวน์
     if (passInput) setTimeout(() => passInput.focus(), 50); // ไปช่องรหัสผ่าน
 
     if (typeof toast === 'function') toast(`👤 เลือกพนักงาน: ${name}`, "success");
-};
+}
+window.selectEmployeeLoginOption = selectEmployeeLoginOption;
 
 // 6. 🛡️ คลิกข้างนอกให้ปิด (Global Click)
 document.addEventListener('mousedown', (e) => {
@@ -13621,6 +13630,30 @@ const calcNG = () => {
         ngInput.style.color = '';
         ngInput.style.fontWeight = 'normal';
     }
+
+    // อัปเดตข้อความในช่อง Note/Remark อัตโนมัติตามแบบฟอร์มมาตรฐาน
+    const remarkArea = document.querySelector('#support-form-modal textarea[name="remark"]');
+    if (remarkArea) {
+        const curVal = remarkArea.value;
+        const lotVal = (lotInput.value !== '' && lotInput.value !== null) ? lotInput.value : '0';
+        const ngVal = (ngInput.value !== '' && ngInput.value !== null) ? ngInput.value : '0';
+
+        // ตรวจสอบว่าช่อง Remark ว่างเปล่า หรือยังคงรูปแบบฟอร์มมาตรฐาน Temporary action
+        const isStandardPattern = !curVal.trim() || /Temporary action[\s\S]*SQE Support production line total\s*=\s*.*?Pcs\.\s*Found NG\s*=\s*.*?Pcs\./i.test(curVal);
+
+        if (isStandardPattern) {
+            // สกัดข้อมูลส่วน IQC re check หากผู้ใช้มีการกรอกตัวเลขไว้ ให้คงค่าเดิมไว้
+            let iqcLine = 'IQC re check part in CTC stock total =  Pcs. Found NG =  Pcs.';
+            const iqcMatch = curVal.match(/IQC re check part in CTC stock total\s*=\s*([^\n\r]*)/i);
+            if (iqcMatch) {
+                iqcLine = `IQC re check part in CTC stock total = ${iqcMatch[1].trim()}`;
+            }
+
+            remarkArea.value = `Temporary action\nSQE Support production line total = ${lotVal} Pcs. Found NG = ${ngVal} Pcs.\n${iqcLine}`;
+            remarkArea.style.height = 'auto';
+            remarkArea.style.height = (Math.max(75, remarkArea.scrollHeight)) + 'px';
+        }
+    }
 };
 
 const WapSupportLogs = (function () {
@@ -14276,6 +14309,14 @@ const WapSupportLogs = (function () {
         const supplierDatalistOptions = Array.from(allSuppliers).sort().map(s => `<option value="${_esc(s)}">`).join('');
         const defectDatalistOptions = Array.from(allDefects).sort().map(d => `<option value="${_esc(d)}">`).join('');
 
+        // เตรียมข้อมูล Note/Remark เริ่มต้นตามฟอร์มมาตรฐาน
+        let initialRemark = r.remark || '';
+        if (!initialRemark) {
+            const initLot = (r.lot !== undefined && r.lot !== null && r.lot !== '') ? r.lot : ((r.qty !== undefined && r.qty !== null && r.qty !== '') ? r.qty : '0');
+            const initNG = (r.ng !== undefined && r.ng !== null && r.ng !== '') ? r.ng : '0';
+            initialRemark = `Temporary action\nSQE Support production line total = ${initLot} Pcs. Found NG = ${initNG} Pcs.\nIQC re check part in CTC stock total =  Pcs. Found NG =  Pcs.`;
+        }
+
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
         modal.id = 'support-form-modal';
@@ -14560,41 +14601,113 @@ const WapSupportLogs = (function () {
                     </div>
 
                     <!-- ==========================================================
-                         หมวดหมู่ 3: รูปภาพหลักฐาน (Evidence Image Upload Wide Bar)
+                         หมวดหมู่ 3: รูปภาพหลักฐาน (Evidence Image Upload - 2 Modes)
                          ========================================================== -->
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div id="evidence-section-container" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+                        <!-- Header & Status Badge -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
                             <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
-                                📸 3. รูปภาพหลักฐาน (Evidence)
+                                📸 3. รูปภาพหลักฐาน (EVIDENCE)
                             </label>
                             <span id="img-status-badge" style="font-size:9.5px; font-weight:800; padding:2px 8px; border-radius:6px; transition:all 0.25s ease;"></span>
                         </div>
-                        <div id="img-dropzone" style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:10px; min-height:60px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease;">
-                            <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;" title="Img Input" aria-label="Img Input">
-                            <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
-                                ${r.imageUrl ? `<img src="${r.imageUrl}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">` : `
-                                    <div style="display:flex; align-items:center; gap:8px; color:#64748b;">
-                                        <svg width="20" height="20" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                        <span style="font-size:11px; font-weight:700;">📷 คลิกหรือลากวางรูปภาพหลักฐานเพิ่มเติมได้ที่นี่</span>
+
+                        <!-- Mode Switcher Tabs (แบบที่ 1 / แบบที่ 2) -->
+                        <div style="display:flex; background:#e2e8f0; border-radius:10px; padding:3px; gap:4px;">
+                            <button type="button" id="btn-evidence-mode-single" class="evidence-mode-tab-btn active">
+                                <span>🖼️ แบบที่ 1: แนบภาพสำเร็จรูป (1 ไฟล์)</span>
+                            </button>
+                            <button type="button" id="btn-evidence-mode-multi" class="evidence-mode-tab-btn">
+                                <span>🧩 แบบที่ 2: แนบภาพแยก (3 - 5 รูป รวมภาพอัตโนมัติ)</span>
+                            </button>
+                        </div>
+
+                        <!-- Mode 1: Single File Upload Area -->
+                        <div id="evidence-mode-single-pane" style="display:flex; flex-direction:column; gap:6px;">
+                            <div id="img-dropzone" style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:10px; min-height:75px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease;">
+                                <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;" title="Img Input" aria-label="Img Input">
+                                <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; position:relative; z-index:3;">
+                                    ${r.imageUrl ? `
+                                        <div class="evidence-single-preview-wrap">
+                                            <div style="width:100%; display:flex; justify-content:center; align-items:center; overflow:hidden;">
+                                                <img src="${r.imageUrl}" style="max-height:105px; max-width:100%; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.12); display:block; object-fit:contain;" alt="Evidence Single" />
+                                            </div>
+                                            <div class="evidence-single-actions">
+                                                <button type="button" class="evidence-preview-btn btn-rotate-single" title="หมุนรูปภาพ 90°">
+                                                    <span>↻</span> หมุน
+                                                </button>
+                                                <button type="button" class="evidence-preview-btn btn-zoom-single" title="ขยายดูภาพใหญ่">
+                                                    <span>🔍</span> ขยาย
+                                                </button>
+                                                <button type="button" class="evidence-preview-btn btn-del btn-del-single" title="ลบรูปภาพนี้">
+                                                    <span>🗑️</span> ลบ
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ` : `
+                                        <div style="display:flex; align-items:center; gap:8px; color:#64748b; pointer-events:none;">
+                                            <svg width="20" height="20" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                            <span style="font-size:11px; font-weight:700;">📷 คลิกหรือลากวางรูปภาพหลักฐานเดี่ยว (รวมรูปมาแล้ว) ได้ที่นี่</span>
+                                        </div>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mode 2: Multi-File (3-5 Photos) Upload & Auto-Stitch Area -->
+                        <div id="evidence-mode-multi-pane" style="display:none; flex-direction:column; gap:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:6px 10px;">
+                                <div style="font-size:10.5px; font-weight:700; color:#1e40af; display:flex; align-items:center; gap:5px;">
+                                    <span>💡 อัปโหลดภาพแยก <strong>3 - 5 รูป</strong> (เช่น ภาพเต็มชิ้นงาน, จุด NG, ตัวอย่าง OK, ป้าย Label)</span>
+                                </div>
+                                <span id="evidence-multi-count-badge" style="font-size:9.5px; font-weight:800; background:#d97706; color:#fff; padding:2px 8px; border-radius:6px;">(อัปโหลดแล้ว 0/5 รูป)</span>
+                            </div>
+
+                            <!-- Grid แสดงรูปภาพ 3-5 รูป และปุ่มเพิ่ม -->
+                            <div id="evidence-multi-grid" class="evidence-multi-grid">
+                                <!-- Dynamic thumbnails & Add Slot -->
+                            </div>
+                            <input type="file" id="img-multi-input" accept="image/*" multiple style="display:none;" title="Multi Img Input">
+
+                            <!-- Stitched Banner Preview Container -->
+                            <div id="evidence-stitched-wrap" style="display:none; flex-direction:column; gap:6px; margin-top:2px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                                    <span style="font-size:10.5px; font-weight:800; color:#15803d; text-transform:uppercase; display:flex; align-items:center; gap:4px;">
+                                        ✨ ภาพหลักฐานรวมอัตโนมัติ (Composite Preview):
+                                    </span>
+                                    <!-- Action Buttons บนภาพ Preview ที่รวมเสร็จแล้ว -->
+                                    <div id="evidence-composite-actions" style="display:none; gap:6px; align-items:center;">
+                                        <button type="button" id="btn-zoom-composite" class="evidence-preview-btn" style="background:#2563eb;" title="ขยายดูภาพใหญ่แบบเต็มจอ">
+                                            🔍 ขยายดูภาพใหญ่ (Zoom)
+                                        </button>
+                                        <button type="button" id="btn-download-composite" class="evidence-preview-btn btn-download" title="ดาวน์โหลดภาพหลักฐานรวมลงเครื่อง">
+                                            📥 ดาวน์โหลดภาพรวม (Download)
+                                        </button>
                                     </div>
-                                `}
+                                </div>
+                                <div id="evidence-stitched-preview-box" class="evidence-stitched-preview" style="text-align:center; min-height:60px; display:flex; align-items:center; justify-content:center; position:relative;">
+                                    <!-- Canvas composite image will be shown here -->
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- ==========================================================
-                         หมวดหมู่ 4: หมายเหตุ (Remark - Auto Expand Textarea)
+                         หมวดหมู่ 4: หมายเหตุ (Note / Remark - Auto Expand Textarea)
                          ========================================================== -->
                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
-                        <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
-                            💬 4. หมายเหตุเพิ่มเติม (Remark)
-                        </label>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
+                                💬 4. หมายเหตุเพิ่มเติม (Note / Remark)
+                            </label>
+                            <span style="font-size:9.5px; font-weight:700; color:#64748b;">(สามารถแก้ไขข้อความได้อิสระ)</span>
+                        </div>
                         <textarea name="remark" class="form-input" 
-                                  style="width:100%; min-height:38px; max-height:140px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.4; outline:none; resize:none; overflow-y:auto;" 
-                                  placeholder="พิมพ์รายละเอียดหรือหมายเหตุเพิ่มเติม (กล่องย่อ-ขยายความสูงอัตโนมัติตามข้อความ)..." 
-                                  title="Remark" 
-                                  aria-label="Remark"
-                                  oninput="this.style.height='38px'; this.style.height=(this.scrollHeight)+'px';">${_esc(r.remark || '')}</textarea>
+                                  style="width:100%; min-height:75px; max-height:180px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.5; outline:none; resize:vertical; overflow-y:auto; font-family:inherit;" 
+                                  placeholder="Temporary action..." 
+                                  title="Note / Remark" 
+                                  aria-label="Note / Remark"
+                                  oninput="this.style.height='75px'; this.style.height=(this.scrollHeight)+'px';">${_esc(initialRemark)}</textarea>
                     </div>
 
                     <!-- ปุ่มดำเนินการ -->
@@ -14908,22 +15021,440 @@ const WapSupportLogs = (function () {
             d8Cont.style.background = isActive ? (isDark ? 'rgba(225, 29, 72, 0.22)' : 'rgba(225, 29, 72, 0.08)') : (isDark ? 'rgba(225, 29, 72, 0.12)' : 'rgba(225, 29, 72, 0.04)');
         };
 
-        // --- Logic: Image Upload ---
+        // --- Logic: 3. รูปภาพหลักฐาน (Evidence Upload 2-Mode System) ---
+        let currentEvidenceMode = 'single'; // 'single' หรือ 'multi'
+        let singleImage = r.imageUrl || null;
+        let multiImages = [];
+        let stitchedMultiImage = null;
         let currentImage = r.imageUrl || null;
         modal._currentImage = currentImage;
-        const imgInput = document.getElementById('img-input');
-        const imgDropzone = document.getElementById('img-dropzone');
+        modal._evidenceMode = currentEvidenceMode;
 
-        function handleImageFile(file) {
+        const btnModeSingle = modal.querySelector('#btn-evidence-mode-single');
+        const btnModeMulti = modal.querySelector('#btn-evidence-mode-multi');
+        const paneSingle = modal.querySelector('#evidence-mode-single-pane');
+        const paneMulti = modal.querySelector('#evidence-mode-multi-pane');
+        const imgInput = modal.querySelector('#img-input');
+        const imgDropzone = modal.querySelector('#img-dropzone');
+        const imgPreviewArea = modal.querySelector('#img-preview-area');
+        const imgMultiInput = modal.querySelector('#img-multi-input');
+        const multiGrid = modal.querySelector('#evidence-multi-grid');
+        const multiCountBadge = modal.querySelector('#evidence-multi-count-badge');
+        const stitchedWrap = modal.querySelector('#evidence-stitched-wrap');
+        const stitchedBox = modal.querySelector('#evidence-stitched-preview-box');
+        const compositeActions = modal.querySelector('#evidence-composite-actions');
+        const btnZoomComposite = modal.querySelector('#btn-zoom-composite');
+        const btnDownloadComposite = modal.querySelector('#btn-download-composite');
+
+        // 🔄 ฟังก์ชันหมุนรูปภาพ 90 องศาตามเข็มนาฬิกา (Canvas 90° Clockwise Rotation)
+        function rotateImageDataUrl(dataUrl) {
+            if (!dataUrl) return Promise.resolve(dataUrl);
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const nw = img.naturalWidth || img.width || 800;
+                    const nh = img.naturalHeight || img.height || 600;
+                    canvas.width = nh;
+                    canvas.height = nw;
+                    const ctx = canvas.getContext('2d');
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate(90 * Math.PI / 180);
+                    ctx.drawImage(img, -nw / 2, -nh / 2);
+                    resolve(canvas.toDataURL('image/jpeg', 0.95));
+                };
+                img.onerror = () => resolve(dataUrl);
+                img.src = dataUrl;
+            });
+        }
+
+        // 🖼️ ฟังก์ชันเรนเดอร์ Thumbnail Preview ของ Mode 1 (พร้อมปุ่ม หมุน, ขยาย, ลบ)
+        function renderSinglePreview() {
+            if (!imgPreviewArea) return;
+            if (singleImage) {
+                imgPreviewArea.innerHTML = `
+                    <div class="evidence-single-preview-wrap">
+                        <div style="width:100%; display:flex; justify-content:center; align-items:center; overflow:hidden;">
+                            <img src="${singleImage}" style="max-height:105px; max-width:100%; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.12); display:block; object-fit:contain;" alt="Evidence Single" />
+                        </div>
+                        <div class="evidence-single-actions">
+                            <button type="button" class="evidence-preview-btn btn-rotate-single" title="หมุนรูปภาพ 90°">
+                                <span>↻</span> หมุน
+                            </button>
+                            <button type="button" class="evidence-preview-btn btn-zoom-single" title="ขยายดูภาพใหญ่">
+                                <span>🔍</span> ขยาย
+                            </button>
+                            <button type="button" class="evidence-preview-btn btn-del btn-del-single" title="ลบรูปภาพนี้">
+                                <span>🗑️</span> ลบ
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                // ผูก Event ปุ่มต่างๆ ใน Mode 1
+                const btnRot = imgPreviewArea.querySelector('.btn-rotate-single');
+                if (btnRot) {
+                    btnRot.onclick = async (e) => {
+                        e.stopPropagation();
+                        btnRot.disabled = true;
+                        btnRot.textContent = '⏳';
+                        const rotated = await rotateImageDataUrl(singleImage);
+                        singleImage = rotated;
+                        if (currentEvidenceMode === 'single') {
+                            currentImage = singleImage;
+                            modal._currentImage = currentImage;
+                        }
+                        renderSinglePreview();
+                        saveDraftData();
+                        updateSupportFormValidation();
+                        toast('🔄 หมุนรูปภาพ 90° เรียบร้อยแล้ว', 'info');
+                    };
+                }
+
+                const btnZoom = imgPreviewArea.querySelector('.btn-zoom-single');
+                if (btnZoom) {
+                    btnZoom.onclick = (e) => {
+                        e.stopPropagation();
+                        _openLightbox(singleImage);
+                    };
+                }
+
+                const btnDel = imgPreviewArea.querySelector('.btn-del-single');
+                if (btnDel) {
+                    btnDel.onclick = (e) => {
+                        e.stopPropagation();
+                        singleImage = null;
+                        if (currentEvidenceMode === 'single') {
+                            currentImage = null;
+                            modal._currentImage = null;
+                        }
+                        if (imgInput) imgInput.value = '';
+                        renderSinglePreview();
+                        saveDraftData();
+                        updateSupportFormValidation();
+                        toast('🗑️ ลบรูปภาพหลักฐานเรียบร้อย', 'info');
+                    };
+                }
+            } else {
+                imgPreviewArea.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px; color:#64748b; pointer-events:none;">
+                        <svg width="20" height="20" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span style="font-size:11px; font-weight:700;">📷 คลิกหรือลากวางรูปภาพหลักฐานเดี่ยว (รวมรูปมาแล้ว) ได้ที่นี่</span>
+                    </div>
+                `;
+            }
+        }
+
+        // ฟังก์ชันสลับโหมดการแนบรูปภาพ (แบบที่ 1 / แบบที่ 2)
+        const switchEvidenceMode = (mode) => {
+            currentEvidenceMode = mode;
+            modal._evidenceMode = mode;
+            if (mode === 'single') {
+                btnModeSingle?.classList.add('active');
+                btnModeMulti?.classList.remove('active');
+                if (paneSingle) paneSingle.style.display = 'flex';
+                if (paneMulti) paneMulti.style.display = 'none';
+                currentImage = singleImage;
+                modal._currentImage = currentImage;
+                renderSinglePreview();
+            } else {
+                btnModeMulti?.classList.add('active');
+                btnModeSingle?.classList.remove('active');
+                if (paneSingle) paneSingle.style.display = 'none';
+                if (paneMulti) paneMulti.style.display = 'flex';
+                currentImage = (multiImages.length >= 3 && stitchedMultiImage) ? stitchedMultiImage : null;
+                modal._currentImage = currentImage;
+                renderMultiGrid();
+            }
+            saveDraftData();
+            updateSupportFormValidation();
+        };
+
+        if (btnModeSingle) btnModeSingle.onclick = () => switchEvidenceMode('single');
+        if (btnModeMulti) btnModeMulti.onclick = () => switchEvidenceMode('multi');
+
+        // 🧩 ฟังก์ชันสร้าง Canvas รวมภาพ 3 - 5 รูปเป็นผืนเดียว (Proportional Width, 0 Top/Bottom Space, 0 Cropping / ไม่กินขอบ)
+        async function buildMultiCollageCanvas(imgList) {
+            if (!imgList || imgList.length < 3 || imgList.length > 5) return null;
+
+            const loadedImages = await Promise.all(imgList.map(url => {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => resolve(img);
+                    img.onerror = () => resolve(null);
+                    img.src = url;
+                });
+            }));
+
+            const validImages = loadedImages.filter(Boolean);
+            if (validImages.length < 3) return null;
+
+            const num = validImages.length;
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // 🎯 ล็อกความสูงมาตรฐานคงที่ (1080px Full HD Standard) เท่ากันเสมอทุกครั้งที่บันทึก และคำนวณความกว้างตามสัดส่วนจริงของแต่ละรูปภาพ (No Cropping / คมชัดเต็มภาพ ไม่มีพื้นที่ว่างบนล่าง)
+            const targetHeight = 1080;
+            const spacing = 3;
+            const padding = 0;
+
+            const slotWidths = validImages.map(img => {
+                const nw = img.naturalWidth || 800;
+                const nh = img.naturalHeight || 600;
+                const aspect = nw / nh;
+                return Math.max(100, Math.round(targetHeight * aspect));
+            });
+
+            const totalWidth = slotWidths.reduce((sum, w) => sum + w, 0) + (spacing * (num - 1)) + (padding * 2);
+            const totalHeight = targetHeight + (padding * 2);
+
+            canvas.width = totalWidth;
+            canvas.height = totalHeight;
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            // พื้นหลังเส้นคั่นสีเข้ม
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, totalWidth, totalHeight);
+
+            // วาดแต่ละภาพตามความกว้างสัดส่วนจริง ไม่ตัดขอบ เต็มความสูงพอดี 100% ไม่มีพื้นที่ว่าง
+            let currentX = padding;
+            validImages.forEach((img, idx) => {
+                const w = slotWidths[idx];
+                const h = targetHeight;
+                const x = currentX;
+                const y = padding;
+
+                ctx.save();
+                // วาดภาพเต็มความละเอียดและสัดส่วนจริง 100%
+                ctx.drawImage(img, x, y, w, h);
+                ctx.restore();
+
+                currentX += w + spacing;
+            });
+
+            return canvas.toDataURL('image/jpeg', 0.98);
+        }
+
+        // 🧩 ฟังก์ชันเรนเดอร์ Thumbnails ใน Mode 2 (พร้อมปุ่ม [x] ลบ และ [↻] หมุน)
+        const renderMultiGrid = () => {
+            if (!multiGrid) return;
+            multiGrid.innerHTML = '';
+
+            multiImages.forEach((imgData, idx) => {
+                const card = document.createElement('div');
+                card.className = 'evidence-thumb-card';
+                card.innerHTML = `
+                    <img src="${imgData}" alt="Evidence ${idx + 1}" />
+                    <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูปภาพ 90°" data-rot-idx="${idx}">↻</button>
+                    <button type="button" class="evidence-thumb-delete-btn" title="ลบรูปนี้" data-del-idx="${idx}">✖</button>
+                    <span class="evidence-thumb-badge">รูปที่ ${idx + 1}</span>
+                `;
+
+                // ปุ่มหมุนรูป 90°
+                const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
+                if (rotBtn) {
+                    rotBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        rotBtn.style.pointerEvents = 'none';
+                        rotBtn.textContent = '⏳';
+                        const rotated = await rotateImageDataUrl(multiImages[idx]);
+                        multiImages[idx] = rotated;
+                        await handleMultiImagesChange();
+                        toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
+                    };
+                }
+
+                // ปุ่มลบรูป
+                const delBtn = card.querySelector('.evidence-thumb-delete-btn');
+                if (delBtn) {
+                    delBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        multiImages.splice(idx, 1);
+                        await handleMultiImagesChange();
+                        toast(`🗑️ ลบรูปภาพที่ ${idx + 1} เรียบร้อย`, 'info');
+                    };
+                }
+
+                multiGrid.appendChild(card);
+            });
+
+            // ช่องกดเพิ่มรูปภาพ (ถ้ายังไม่ครบ 5 รูป)
+            if (multiImages.length < 5) {
+                const addSlot = document.createElement('div');
+                addSlot.className = 'evidence-add-slot';
+                addSlot.innerHTML = `
+                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-bottom:2px;">
+                        <path d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span style="font-size:10px; font-weight:800;">+ เพิ่มรูปภาพ</span>
+                    <span style="font-size:8.5px; opacity:0.8;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
+                `;
+                addSlot.onclick = () => {
+                    if (imgMultiInput) {
+                        imgMultiInput.value = '';
+                        imgMultiInput.click();
+                    }
+                };
+                multiGrid.appendChild(addSlot);
+            }
+
+            // 🎯 อัปเดตตัวนับจำนวนภาพใน Mode 2
+            if (multiCountBadge) {
+                if (multiImages.length >= 3 && multiImages.length <= 5) {
+                    multiCountBadge.textContent = `✔ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ครบเกณฑ์)`;
+                    multiCountBadge.style.background = '#059669';
+                } else if (multiImages.length === 0) {
+                    multiCountBadge.textContent = `(อัปโหลดแล้ว 0/5 รูป)`;
+                    multiCountBadge.style.background = '#d97706';
+                } else {
+                    multiCountBadge.textContent = `⚠️ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ต้องการ 3-5 รูป)`;
+                    multiCountBadge.style.background = '#d97706';
+                }
+            }
+        };
+
+        // 🎯 ผูก Action Buttons บนภาพรวม Composite (Zoom & Download)
+        if (btnZoomComposite) {
+            btnZoomComposite.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (stitchedMultiImage) {
+                    _openLightbox(stitchedMultiImage);
+                } else {
+                    toast('⚠️ ยังไม่มีภาพรวมที่ประมวลผลเสร็จสิ้น', 'warning');
+                }
+            };
+        }
+
+        if (btnDownloadComposite) {
+            btnDownloadComposite.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!stitchedMultiImage) {
+                    toast('⚠️ ยังไม่มีภาพรวมให้ดาวน์โหลด', 'warning');
+                    return;
+                }
+                const link = document.createElement('a');
+                link.href = stitchedMultiImage;
+                link.download = `evidence-composite-${Date.now()}.jpg`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                toast('📥 กำลังดาวน์โหลดภาพหลักฐานรวม...', 'success');
+            };
+        }
+
+        // ฟังก์ชันจัดการเมื่อรูปภาพ Mode 2 มีการเปลี่ยนแปลง
+        const handleMultiImagesChange = async () => {
+            renderMultiGrid();
+
+            if (multiImages.length >= 3 && multiImages.length <= 5) {
+                if (stitchedWrap) stitchedWrap.style.display = 'flex';
+                if (compositeActions) compositeActions.style.display = 'none';
+                
+                // 🌀 แสดง Loading Spinner ขณะกำลังประมวลผล Canvas รวมภาพ
+                if (stitchedBox) {
+                    stitchedBox.innerHTML = `
+                        <div class="evidence-stitch-loading">
+                            <div class="evidence-spinner"></div>
+                            <span>กำลังประมวลผลรวมรูปภาพ ${multiImages.length} รูป...</span>
+                        </div>
+                    `;
+                }
+
+                try {
+                    const collage = await buildMultiCollageCanvas(multiImages);
+                    if (collage) {
+                        stitchedMultiImage = collage;
+                        if (currentEvidenceMode === 'multi') {
+                            currentImage = collage;
+                            modal._currentImage = currentImage;
+                        }
+                        if (stitchedBox) {
+                            stitchedBox.innerHTML = `<img src="${collage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:6px; display:block; cursor:zoom-in;" alt="Composite Evidence" />`;
+                            const imgEl = stitchedBox.querySelector('img');
+                            if (imgEl) {
+                                imgEl.onclick = () => _openLightbox(collage);
+                            }
+                        }
+                        if (compositeActions) {
+                            compositeActions.style.display = 'flex';
+                        }
+                        toast(`✨ รวมภาพหลักฐาน ${multiImages.length} รูปเรียบร้อยแล้ว`, 'success');
+                    }
+                } catch(e) {
+                    console.error('Collage error:', e);
+                    if (stitchedBox) {
+                        stitchedBox.innerHTML = `<span style="font-size:11px; color:#ef4444; font-weight:700;">เกิดข้อผิดพลาดในการรวมรูปภาพ</span>`;
+                    }
+                }
+            } else {
+                stitchedMultiImage = null;
+                if (currentEvidenceMode === 'multi') {
+                    currentImage = null;
+                    modal._currentImage = null;
+                }
+                if (stitchedWrap) stitchedWrap.style.display = 'none';
+                if (compositeActions) compositeActions.style.display = 'none';
+                if (stitchedBox) stitchedBox.innerHTML = '';
+            }
+
+            saveDraftData();
+            updateSupportFormValidation();
+        };
+
+        // จัดการอัปโหลดรูปภาพใน Mode 2
+        if (imgMultiInput) {
+            imgMultiInput.onchange = async (e) => {
+                const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'));
+                if (files.length === 0) return;
+
+                const availableSlots = 5 - multiImages.length;
+                if (availableSlots <= 0) {
+                    toast('⚠️ แนบรูปภาพครบ 5 รูปแล้ว ไม่สามารถเพิ่มได้อีก', 'warning');
+                    return;
+                }
+
+                if (files.length > availableSlots) {
+                    toast(`⚠️ แนบรูปภาพได้ไม่เกิน 5 รูป (ระบบจะเลือกเพิ่ม ${availableSlots} รูปแรก)`, 'warning');
+                }
+
+                const filesToAdd = files.slice(0, availableSlots);
+                for (let file of filesToAdd) {
+                    const dataUrl = await new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onload = ev => resolve(ev.target.result);
+                        reader.readAsDataURL(file);
+                    });
+                    if (dataUrl) multiImages.push(dataUrl);
+                }
+
+                if (multiImages.length < 3) {
+                    toast(`💡 เพิ่มรูปภาพแล้ว ${multiImages.length} รูป (ต้องมีอย่างน้อย 3 รูปเพื่อรวมภาพ)`, 'info');
+                }
+
+                await handleMultiImagesChange();
+            };
+        }
+
+        // จัดการอัปโหลดรูปภาพใน Mode 1 (Single)
+        function handleSingleImageFile(file) {
             if (!file || !file.type.startsWith('image/')) return;
             const reader = new FileReader();
             reader.onload = (ev) => {
-                currentImage = ev.target.result;
-                modal._currentImage = currentImage;
-                const area = document.getElementById('img-preview-area');
-                if (area) area.innerHTML = `<img src="${ev.target.result}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">`;
+                singleImage = ev.target.result;
+                if (currentEvidenceMode === 'single') {
+                    currentImage = singleImage;
+                    modal._currentImage = currentImage;
+                }
+                renderSinglePreview();
                 saveDraftData();
                 updateSupportFormValidation();
+                toast('📸 อัปโหลดรูปภาพหลักฐานเรียบร้อย', 'success');
             };
             reader.readAsDataURL(file);
         }
@@ -14931,7 +15462,7 @@ const WapSupportLogs = (function () {
         if (imgInput) {
             imgInput.onchange = (e) => {
                 const file = e.target.files[0];
-                handleImageFile(file);
+                handleSingleImageFile(file);
             };
         }
 
@@ -14951,10 +15482,13 @@ const WapSupportLogs = (function () {
                 imgDropzone.style.borderColor = '#cbd5e1';
                 imgDropzone.style.background = '#ffffff';
                 if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    handleImageFile(e.dataTransfer.files[0]);
+                    handleSingleImageFile(e.dataTransfer.files[0]);
                 }
             });
         }
+
+        // เริ่มต้นเรนเดอร์ Preview ทั้ง 2 โหมด
+        renderSinglePreview();
 
         // Allow pasting image from Clipboard (Ctrl+V) into modal
         const handlePasteImage = (e) => {
@@ -14968,8 +15502,22 @@ const WapSupportLogs = (function () {
                 for (let item of itemList) {
                     if (item && item.type && item.type.indexOf('image') === 0) {
                         const blob = item.getAsFile();
-                        handleImageFile(blob);
-                        if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ', 'success');
+                        if (currentEvidenceMode === 'single') {
+                            handleSingleImageFile(blob);
+                            if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ', 'success');
+                        } else {
+                            if (multiImages.length >= 5) {
+                                toast('⚠️ แนบรูปภาพครบ 5 รูปแล้ว', 'warning');
+                                return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = async (ev) => {
+                                multiImages.push(ev.target.result);
+                                if (typeof toast === 'function') toast(`📸 วางรูปภาพจาก Clipboard (รูปที่ ${multiImages.length})`, 'success');
+                                await handleMultiImagesChange();
+                            };
+                            reader.readAsDataURL(blob);
+                        }
                         break;
                     }
                 }
@@ -15069,6 +15617,10 @@ const WapSupportLogs = (function () {
                     isSyncSpecial: syncCheck ? syncCheck.checked : false,
                     commander: commanderInput ? commanderInput.value : '',
                     is8d: d8Check ? d8Check.checked : false,
+                    evidenceMode: currentEvidenceMode,
+                    singleImage: singleImage || null,
+                    multiImages: multiImages || [],
+                    stitchedMultiImage: stitchedMultiImage || null,
                     image: currentImage || null,
                     savedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
                     savedTimestamp: Date.now()
@@ -15110,17 +15662,225 @@ const WapSupportLogs = (function () {
                     d8Check.checked = Boolean(d.is8d);
                     d8Check.dispatchEvent(new Event('change'));
                 }
-                if (d.image) {
-                    currentImage = d.image;
-                    modal._currentImage = d.image;
-                    const area = document.getElementById('img-preview-area');
-                    if (area) area.innerHTML = `<img src="${d.image}" style="max-height:75px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Image" title="Image">`;
+                
+                // คืนค่าข้อมูลรูปภาพและโหมด
+                if (d.evidenceMode === 'multi') {
+                    currentEvidenceMode = 'multi';
+                    multiImages = Array.isArray(d.multiImages) ? d.multiImages : [];
+                    stitchedMultiImage = d.stitchedMultiImage || null;
+                    currentImage = stitchedMultiImage;
+                    modal._currentImage = currentImage;
+                    switchEvidenceMode('multi');
+                    if (stitchedMultiImage && stitchedBox) {
+                        stitchedBox.innerHTML = `<img src="${stitchedMultiImage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:6px; display:block; cursor:zoom-in;" alt="Composite Evidence" />`;
+                        const imgEl = stitchedBox.querySelector('img');
+                        if (imgEl) {
+                            imgEl.onclick = () => _openLightbox(stitchedMultiImage);
+                        }
+                        if (stitchedWrap) stitchedWrap.style.display = 'flex';
+                        if (compositeActions) compositeActions.style.display = 'flex';
+                    }
+                } else {
+                    currentEvidenceMode = 'single';
+                    singleImage = d.singleImage || d.image || null;
+                    currentImage = singleImage;
+                    modal._currentImage = currentImage;
+                    switchEvidenceMode('single');
+                    renderSinglePreview();
                 }
+
                 toggleRpFieldsVisibility();
                 syncProblemSentence();
                 updateSupportFormValidation();
             } catch(e) {
                 console.warn('Draft restore error:', e);
+            }
+        }
+
+        function updateSupportFormValidation() {
+            // 1. ตรวจสอบการกรอก 🔢 รหัสพาร์ท (Part No.) เพื่อกำหนดสถานะช่อง 📅 วันที่รายงาน
+            const partNoEl = modal.querySelector('#prob-partno');
+            const hasPartNo = Boolean(partNoEl && (partNoEl.value || '').trim() !== '');
+
+            // 📅 วันที่รายงาน (ให้เป็นสีเทาหากยังไม่มี Part No. และเป็นสีเขียวเมื่อมีข้อมูล)
+            const dateEl = modal.querySelector('#f-sup-date');
+            if (dateEl) {
+                if (!hasPartNo) {
+                    dateEl.style.color = '#94a3b8';
+                    dateEl.style.backgroundColor = isDark ? '#1e293b' : '#f1f5f9';
+                    dateEl.style.borderColor = '#cbd5e1';
+                    dateEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+                } else {
+                    dateEl.style.color = '';
+                    dateEl.style.backgroundColor = '';
+                    dateEl.style.borderColor = '';
+                    const val = (dateEl.value || '').trim();
+                    if (val !== '') {
+                        dateEl.classList.add('field-glow-filled');
+                        dateEl.classList.remove('field-glow-pending', 'field-glow-error');
+                    } else {
+                        dateEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+                    }
+                }
+            }
+
+            // 2. ตรวจสอบและแสดงสถานะสีเขียว (field-glow-filled) สำหรับทุกช่อง Input และ Select ทั่วไป
+            const textFields = [
+                'prob-partno',
+                'prob-part',
+                'prob-supplier',
+                'f-sup-part-cat',
+                'prob-user',
+                'prob-defect',
+                'f-sup-action',
+                'f-sup-report',
+                'prob-commander',
+                'f-sup-commander',
+                'f-vf-vendor',
+                'f-vf-vendor-code',
+                'f-vf-po',
+                'f-vf-inv',
+                'f-vf-claim-no',
+                'f-vf-defect-class',
+                'f-vf-process',
+                'f-vf-phase',
+                'f-vf-model',
+                'f-vf-line'
+            ];
+
+            textFields.forEach(id => {
+                const el = modal.querySelector('#' + id);
+                if (!el) return;
+                const val = (el.value || '').trim();
+                const hasVal = val !== '' && val !== '--' && val !== 'Select...';
+                if (hasVal) {
+                    el.classList.add('field-glow-filled');
+                    el.classList.remove('field-glow-pending', 'field-glow-error');
+                } else {
+                    el.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+                }
+            });
+
+            // 3. Remark textarea
+            const remarkEl = modal.querySelector('textarea[name="remark"]');
+            if (remarkEl) {
+                const val = (remarkEl.value || '').trim();
+                if (val !== '') {
+                    remarkEl.classList.add('field-glow-filled');
+                    remarkEl.classList.remove('field-glow-pending', 'field-glow-error');
+                } else {
+                    remarkEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+                }
+            }
+
+            // 4. 📦 LOT NO., ✅ OK QTY, ❌ NG QTY
+            const lotEl = modal.querySelector('#f-sup-lot');
+            if (lotEl) {
+                const num = parseFloat(lotEl.value);
+                if (!isNaN(num) && num > 0) {
+                    lotEl.classList.add('field-glow-filled');
+                    lotEl.classList.remove('field-glow-pending', 'field-glow-error');
+                } else {
+                    lotEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+                }
+            }
+
+            const okEl = modal.querySelector('#f-sup-ok');
+            if (okEl) {
+                const val = (okEl.value || '').trim();
+                if (val !== '' && !isNaN(parseFloat(val))) {
+                    okEl.classList.add('field-glow-filled');
+                    okEl.classList.remove('field-glow-pending', 'field-glow-error');
+                } else {
+                    okEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+                }
+            }
+
+            const ngEl = modal.querySelector('#f-sup-ng');
+            const lotNum = parseFloat(lotEl?.value);
+            if (ngEl) {
+                const ngVal = (ngEl.value || '').trim();
+                if (!isNaN(lotNum) && lotNum > 0 && ngVal !== '' && !isNaN(parseFloat(ngVal))) {
+                    ngEl.classList.add('field-glow-filled');
+                    ngEl.classList.remove('field-glow-pending', 'field-glow-error');
+                } else {
+                    ngEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+                }
+            }
+
+            // 5. 📸 3. รูปภาพหลักฐาน (Evidence Status & Glow)
+            const statusBadge = modal.querySelector('#img-status-badge');
+            const secCont = modal.querySelector('#evidence-section-container');
+            const previewImg = modal.querySelector('#img-preview-area img');
+
+            if (currentEvidenceMode === 'single') {
+                const hasSingleImg = Boolean(currentImage || singleImage || (previewImg && previewImg.getAttribute('src')));
+                if (hasSingleImg) {
+                    if (imgDropzone) {
+                        imgDropzone.classList.add('field-glow-filled');
+                        imgDropzone.classList.remove('field-glow-pending', 'field-glow-error');
+                    }
+                    if (secCont) {
+                        secCont.classList.add('field-glow-filled');
+                        secCont.classList.remove('field-glow-pending', 'field-glow-error');
+                    }
+                    if (statusBadge) {
+                        statusBadge.textContent = '✔ แนบรูปภาพหลักฐานเรียบร้อยแล้ว';
+                        statusBadge.style.background = '#059669';
+                        statusBadge.style.color = '#ffffff';
+                    }
+                } else {
+                    if (imgDropzone) {
+                        imgDropzone.classList.add('field-glow-pending');
+                        imgDropzone.classList.remove('field-glow-filled', 'field-glow-error');
+                    }
+                    if (secCont) {
+                        secCont.classList.remove('field-glow-filled', 'field-glow-error');
+                    }
+                    if (statusBadge) {
+                        statusBadge.textContent = '⚠️ ยังไม่ได้แนบรูปภาพหลักฐาน (จำเป็นสำหรับการบันทึก)';
+                        statusBadge.style.background = isDark ? '#78350f' : '#fef3c7';
+                        statusBadge.style.color = isDark ? '#fef08a' : '#b45309';
+                    }
+                }
+            } else {
+                // Multi Mode
+                const hasMultiReady = (multiImages.length >= 3 && multiImages.length <= 5 && Boolean(stitchedMultiImage || currentImage));
+                if (hasMultiReady) {
+                    if (secCont) {
+                        secCont.classList.add('field-glow-filled');
+                        secCont.classList.remove('field-glow-pending', 'field-glow-error');
+                    }
+                    if (stitchedBox) {
+                        stitchedBox.classList.add('field-glow-filled');
+                        stitchedBox.classList.remove('field-glow-pending', 'field-glow-error');
+                    }
+                    if (statusBadge) {
+                        statusBadge.textContent = `✔ แนบรูปภาพหลักฐานครบ ${multiImages.length} รูป (รวมภาพแล้ว)`;
+                        statusBadge.style.background = '#059669';
+                        statusBadge.style.color = '#ffffff';
+                    }
+                } else if (multiImages.length === 0) {
+                    if (secCont) {
+                        secCont.classList.add('field-glow-pending');
+                        secCont.classList.remove('field-glow-filled', 'field-glow-error');
+                    }
+                    if (statusBadge) {
+                        statusBadge.textContent = '⚠️ ยังไม่ได้เลือกรูปภาพ (ต้องการ 3 - 5 รูป)';
+                        statusBadge.style.background = isDark ? '#78350f' : '#fef3c7';
+                        statusBadge.style.color = isDark ? '#fef08a' : '#b45309';
+                    }
+                } else {
+                    if (secCont) {
+                        secCont.classList.add('field-glow-pending');
+                        secCont.classList.remove('field-glow-filled', 'field-glow-error');
+                    }
+                    if (statusBadge) {
+                        statusBadge.textContent = `⏳ แนบแล้ว ${multiImages.length}/5 รูป (ต้องการอย่างน้อย 3 รูป)`;
+                        statusBadge.style.background = '#d97706';
+                        statusBadge.style.color = '#ffffff';
+                    }
+                }
             }
         }
 
@@ -15179,13 +15939,26 @@ const WapSupportLogs = (function () {
             }
 
             // ตรวจสอบรูปภาพหลักฐาน (บังคับแนบรูปภาพหลักฐานก่อนบันทึก)
-            const hasImg = Boolean(currentImage || modal._currentImage || modal.querySelector('#img-preview-area img'));
+            if (currentEvidenceMode === 'multi') {
+                if (multiImages.length < 3 || multiImages.length > 5) {
+                    const secCont = modal.querySelector('#evidence-section-container');
+                    if (secCont) {
+                        secCont.classList.add('field-glow-error');
+                        secCont.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        if (typeof shake === 'function') shake(secCont);
+                    }
+                    toast(`⚠️ แบบที่ 2 (แนบภาพแยก) ต้องแนบรูปภาพระหว่าง 3 ถึง 5 รูป (ปัจจุบันเลือกไว้ ${multiImages.length} รูป)`, 'error');
+                    return;
+                }
+            }
+
+            const hasImg = Boolean(currentImage || modal._currentImage || modal.querySelector('#img-preview-area img') || modal.querySelector('#evidence-stitched-preview-box img'));
             if (!hasImg) {
-                const imgDropzone = modal.querySelector('#img-dropzone');
-                if (imgDropzone) {
-                    imgDropzone.classList.add('field-glow-error');
-                    imgDropzone.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    if (typeof shake === 'function') shake(imgDropzone);
+                const secCont = modal.querySelector('#evidence-section-container') || modal.querySelector('#img-dropzone');
+                if (secCont) {
+                    secCont.classList.add('field-glow-error');
+                    secCont.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (typeof shake === 'function') shake(secCont);
                 }
                 toast('⚠️ กรุณาแนบรูปภาพหลักฐานก่อนทำการบันทึกรายงาน', 'error');
                 return;
@@ -15333,12 +16106,73 @@ function _openViewModal(id) {
     // --- 2. Smart Logic จัดการข้อความจริงจากฐานข้อมูล ---
     let displaySentence = (item.problem || "").trim();
 
+    // Format Note / Remark Section
+    let remarkHtml = '';
+    const rawRemark = (item.remark || '').trim();
+
+    if (!rawRemark || rawRemark === 'ไม่มีหมายเหตุเพิ่มเติม') {
+        remarkHtml = `
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px;">NOTE:</span>
+                <span style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; opacity:0.8;">ไม่มีหมายเหตุเพิ่มเติม</span>
+            </div>
+        `;
+    } else {
+        const isTempAction = /^Temporary\s*action/i.test(rawRemark) || /SQE\s*Support\s*production\s*line\s*total/i.test(rawRemark);
+        
+        if (isTempAction) {
+            let contentText = rawRemark.replace(/^Temporary\s*action[:\s-]*/i, '').trim();
+            const lines = contentText.split('\n').map(l => l.trim()).filter(Boolean);
+            
+            const formattedLines = lines.map(line => {
+                if (/SQE\s*Support\s*production\s*line\s*total/i.test(line)) {
+                    const m = line.match(/SQE\s*Support\s*production\s*line\s*total\s*=\s*(.*?)\s*Pcs\.\s*Found\s*NG\s*=\s*(.*?)\s*Pcs\./i);
+                    if (m) {
+                        const totalVal = m[1].trim();
+                        const ngVal = m[2].trim();
+                        return `<div>SQE Support production line total = <span style="font-weight:800; color:${isDark ? '#fff' : '#0f172a'};">${totalVal || ''}</span> Pcs. Found NG = <span style="font-weight:800; color:#ef4444;">${ngVal || '0'}</span> Pcs.</div>`;
+                    }
+                } else if (/IQC\s*re\s*check\s*part\s*in\s*CTC\s*stock/i.test(line)) {
+                    const m = line.match(/IQC\s*re\s*check\s*part\s*in\s*CTC\s*stock\s*total\s*=\s*(.*?)\s*Pcs\.\s*Found\s*NG\s*=\s*(.*?)\s*Pcs\./i);
+                    if (m) {
+                        const totalVal = m[1].trim();
+                        const ngVal = m[2].trim();
+                        return `<div>IQC re check part in CTC stock total = <span style="font-weight:800; color:${isDark ? '#fff' : '#0f172a'};">${totalVal}</span> Pcs. Found NG = <span style="font-weight:800; color:${ngVal && ngVal !== '0' ? '#ef4444' : (isDark ? '#fff' : '#0f172a')};">${ngVal}</span> Pcs.</div>`;
+                    }
+                }
+                return `<div>${escapeHtml(line)}</div>`;
+            }).join('');
+
+            remarkHtml = `
+                <div style="display:flex; flex-direction:column; gap:3px;">
+                    <div style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10.5px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px;">
+                        NOTE:Temporary action
+                    </div>
+                    <div style="padding-left:24px; display:flex; flex-direction:column; gap:2px; font-size:11.5px; font-weight:600; color:${theme.remarkText}; line-height:1.5;">
+                        ${formattedLines}
+                    </div>
+                </div>
+            `;
+        } else {
+            remarkHtml = `
+                <div style="display:flex; flex-direction:column; gap:3px;">
+                    <div style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10.5px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px;">
+                        NOTE:
+                    </div>
+                    <div style="padding-left:24px; color:${theme.remarkText}; font-size:11.5px; font-weight:600; line-height:1.5; white-space:pre-wrap; word-break:break-word;">
+                        ${escapeHtml(rawRemark)}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);padding:20px;`;
     
     modal.innerHTML = `
-    <div style="background:${theme.modalBg}; border:1px solid ${theme.border}; border-radius:12px; width:100%; max-width:880px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); font-family:'Inter', 'Kanit', sans-serif;">
+    <div style="background:${theme.modalBg}; border:1px solid ${theme.border}; border-radius:12px; width:100%; max-width:980px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); font-family:'Inter', 'Kanit', sans-serif;">
         
         <!-- 1. Header (ปรับเป็นสีน้ำเงินสว่างตามคำขอ) -->
         <div style="background:${theme.headerBg}; padding:8px 20px; display:flex; justify-content:space-between; align-items:center; height:36px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -15403,28 +16237,25 @@ function _openViewModal(id) {
                 </div>
             </div>
 
-            <!-- Image Section -->
-            <div style="width:100%; background:${isDark ? '#020617' : '#0f172a'}; border:1px solid ${theme.imgBorder}; border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:12px; overflow:hidden; margin-bottom:10px;">
+            <!-- Image Section (Snug edge-to-edge, zero top/bottom empty space) -->
+            <div style="width:100%; background:transparent; border:1px solid ${theme.imgBorder}; border-radius:8px; display:block; padding:0; overflow:hidden; margin-bottom:10px; box-shadow:0 4px 14px rgba(0,0,0,0.18);">
                 ${item.imageUrl 
                     ? `
-                    <div style="width:100%; max-height:480px; display:flex; justify-content:center; align-items:center;">
+                    <div style="width:100%; display:block; padding:0; margin:0; line-height:0; overflow:hidden;">
                         <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
                             onerror="handleImgError(this)"
                             onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
                             data-img-url="${escapeHtml(item.imageUrl)}"
-                            style="max-width:100%; max-height:450px; width:auto; height:auto; object-fit:contain; cursor:zoom-in; display:block; border-radius:6px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.5); image-rendering:-webkit-optimize-contrast;" 
+                            style="width:100%; height:auto; max-height:85vh; display:block; object-fit:contain; cursor:zoom-in; image-rendering:-webkit-optimize-contrast; transition:transform 0.2s ease; margin:0 auto;" 
                             alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">
                     </div>` 
-                    : `<div style="padding:40px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>`
+                    : `<div style="padding:24px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>`
                 }
             </div>
 
             <!-- Remark Section -->
-            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:6px; padding:10px 15px; display:flex; align-items:center; gap:10px;">
-                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:9px; font-weight:950; text-transform:uppercase; flex-shrink:0;">Note:</span>
-                <p style="color:${theme.remarkText}; font-size:12px; font-weight:600; margin:0; line-height:1.2;">
-                    ${item.remark || 'ไม่มีหมายเหตุเพิ่มเติม'}
-                </p>
+            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:8px; padding:10px 16px; margin-bottom:10px; font-family:'Inter', 'Kanit', sans-serif;">
+                ${remarkHtml}
             </div>
 
             <!-- Footer -->
@@ -25574,6 +26405,7 @@ function applyModalAC(type, value, inputEl) {
 function updateSupportFormValidation() {
     const modal = document.getElementById('support-form-modal');
     if (!modal) return;
+    const isDark = document.body.classList.contains('dark') || document.body.classList.contains('dark-mode');
 
     // ตรวจสอบการกรอก 🔢 รหัสพาร์ท (Part No.) เพื่อใช้กำหนดสถานะช่อง 📅 วันที่รายงาน
     const partNoEl = modal.querySelector('#prob-partno');
@@ -25584,7 +26416,7 @@ function updateSupportFormValidation() {
     if (dateEl) {
         if (!hasPartNo) {
             dateEl.style.color = '#94a3b8';
-            dateEl.style.backgroundColor = '#f1f5f9';
+            dateEl.style.backgroundColor = isDark ? '#1e293b' : '#f1f5f9';
             dateEl.style.borderColor = '#cbd5e1';
             dateEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
         } else {
@@ -25610,7 +26442,19 @@ function updateSupportFormValidation() {
         'prob-user',
         'prob-defect',
         'f-sup-action',
-        'f-sup-report'
+        'f-sup-report',
+        'prob-commander',
+        'f-sup-commander',
+        'f-vf-vendor',
+        'f-vf-vendor-code',
+        'f-vf-po',
+        'f-vf-inv',
+        'f-vf-claim-no',
+        'f-vf-defect-class',
+        'f-vf-process',
+        'f-vf-phase',
+        'f-vf-model',
+        'f-vf-line'
     ];
 
     textFields.forEach(id => {
@@ -25618,7 +26462,7 @@ function updateSupportFormValidation() {
         if (!el) return;
 
         const val = (el.value || '').trim();
-        const hasVal = val !== '' && val !== '--';
+        const hasVal = val !== '' && val !== '--' && val !== 'Select...';
 
         if (hasVal) {
             el.classList.add('field-glow-filled');
@@ -25666,7 +26510,7 @@ function updateSupportFormValidation() {
     const lotNum = parseFloat(lotEl?.value);
     if (ngEl) {
         const ngVal = (ngEl.value || '').trim();
-        if (!isNaN(lotNum) && lotNum > 0 && ngVal !== '') {
+        if (!isNaN(lotNum) && lotNum > 0 && ngVal !== '' && !isNaN(parseFloat(ngVal))) {
             ngEl.classList.add('field-glow-filled');
             ngEl.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
@@ -25674,30 +26518,53 @@ function updateSupportFormValidation() {
         }
     }
 
-    // 📸 3. รูปภาพหลักฐาน (Evidence Box) - ให้คงกรอบสีเหลืองไว้ช่องเดียวเพื่อแจ้งเตือนรอแนบรูป
+    // 📸 3. รูปภาพหลักฐาน (Evidence Box Status & Glow)
     const imgDropzone = modal.querySelector('#img-dropzone');
     const imgBadge = modal.querySelector('#img-status-badge');
+    const secCont = modal.querySelector('#evidence-section-container');
+    const stitchedBox = modal.querySelector('#evidence-stitched-preview-box');
     const previewImg = modal.querySelector('#img-preview-area img');
-    const hasImg = Boolean(modal._currentImage || (previewImg && previewImg.getAttribute('src')));
+    const hasSingleImg = Boolean(modal._currentImage || (previewImg && previewImg.getAttribute('src')));
+    const isMultiMode = modal._evidenceMode === 'multi';
 
-    if (imgDropzone) {
-        if (hasImg) {
-            imgDropzone.classList.add('field-glow-filled');
-            imgDropzone.classList.remove('field-glow-pending', 'field-glow-error');
+    if (!isMultiMode) {
+        if (hasSingleImg) {
+            if (imgDropzone) {
+                imgDropzone.classList.add('field-glow-filled');
+                imgDropzone.classList.remove('field-glow-pending', 'field-glow-error');
+            }
+            if (secCont) {
+                secCont.classList.add('field-glow-filled');
+                secCont.classList.remove('field-glow-pending', 'field-glow-error');
+            }
             if (imgBadge) {
-                imgBadge.innerHTML = '✅ แนบรูปภาพหลักฐานเรียบร้อยแล้ว';
-                imgBadge.style.background = '#d1fae5';
-                imgBadge.style.color = '#059669';
-                imgBadge.style.border = '1px solid #6ee7b7';
+                imgBadge.textContent = '✔ แนบรูปภาพหลักฐานเรียบร้อยแล้ว';
+                imgBadge.style.background = '#059669';
+                imgBadge.style.color = '#ffffff';
             }
         } else {
-            imgDropzone.classList.add('field-glow-pending');
-            imgDropzone.classList.remove('field-glow-filled', 'field-glow-error');
+            if (imgDropzone) {
+                imgDropzone.classList.add('field-glow-pending');
+                imgDropzone.classList.remove('field-glow-filled', 'field-glow-error');
+            }
+            if (secCont) {
+                secCont.classList.remove('field-glow-filled', 'field-glow-error');
+            }
             if (imgBadge) {
-                imgBadge.innerHTML = '⚠️ กรุณาแนบรูปภาพหลักฐาน (จำเป็นสำหรับการบันทึก)';
-                imgBadge.style.background = '#fef3c7';
-                imgBadge.style.color = '#d97706';
-                imgBadge.style.border = '1px solid #fcd34d';
+                imgBadge.textContent = '⚠️ ยังไม่ได้แนบรูปภาพหลักฐาน (จำเป็นสำหรับการบันทึก)';
+                imgBadge.style.background = isDark ? '#78350f' : '#fef3c7';
+                imgBadge.style.color = isDark ? '#fef08a' : '#b45309';
+            }
+        }
+    } else {
+        if (modal._currentImage) {
+            if (secCont) {
+                secCont.classList.add('field-glow-filled');
+                secCont.classList.remove('field-glow-pending', 'field-glow-error');
+            }
+            if (stitchedBox) {
+                stitchedBox.classList.add('field-glow-filled');
+                stitchedBox.classList.remove('field-glow-pending', 'field-glow-error');
             }
         }
     }
@@ -27170,19 +28037,227 @@ function updateExportAndEmailButtons() {
     }
 }
 
+/**
+ * 💌 แสดงหน้าต่างการ์ตูนโหลดระหว่างจัดเตรียมเอกสารและหน้าพรีวิวอีเมล
+ * มีอนิเมชั่นการ์ตูน Carrier Mail Bot บินส่งจดหมาย พร้อมแถบแสดงสถานะและขั้นตอนแบบสดใส
+ */
+function showEmailPreparationCartoonLoader(docNumber, reportTag, supplierName) {
+    const overlayId = 'email-prep-cartoon-overlay';
+    const existing = document.getElementById(overlayId);
+    if (existing) existing.remove();
+
+    const overlayHtml = `
+        <div id="${overlayId}" class="fixed inset-0 z-[13000] flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-fade-in select-none">
+            <div class="relative bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 w-full max-w-md rounded-3xl shadow-2xl p-6 sm:p-7 flex flex-col items-center text-center overflow-hidden transition-all">
+                
+                <!-- Background Ambient Glow & Clouds -->
+                <div class="absolute -top-16 -left-16 w-48 h-48 bg-blue-500/15 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="absolute -bottom-16 -right-16 w-48 h-48 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none"></div>
+
+                <!-- Cartoon Stage -->
+                <div class="relative w-52 h-40 flex items-center justify-center mb-1">
+                    <!-- Animated Background Clouds -->
+                    <div class="absolute top-4 left-0 w-12 h-5 bg-slate-100 dark:bg-slate-800 rounded-full cartoon-cloud-1 opacity-80 pointer-events-none"></div>
+                    <div class="absolute top-10 right-0 w-16 h-6 bg-blue-50 dark:bg-slate-800 rounded-full cartoon-cloud-2 opacity-70 pointer-events-none"></div>
+                    
+                    <!-- Twinkling Sparkles -->
+                    <div class="absolute top-2 right-6 text-amber-400 text-lg cartoon-star-1">✨</div>
+                    <div class="absolute bottom-4 left-4 text-blue-400 text-base cartoon-star-2">✦</div>
+                    <div class="absolute top-14 left-2 text-indigo-400 text-sm cartoon-star-3">★</div>
+
+                    <!-- Flying Paper Plane -->
+                    <div class="absolute top-2 left-6 text-xl cartoon-paper-plane pointer-events-none">✈️</div>
+
+                    <!-- The Main Cute Postman Bot / Carrier Mail Character (SVG) -->
+                    <div class="cartoon-loader-char relative z-10 w-32 h-32 flex items-center justify-center">
+                        <svg viewBox="0 0 160 160" width="130" height="130" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-lg">
+                            <!-- Left Flapping Wing -->
+                            <g class="cartoon-char-left-wing">
+                                <path d="M42 75C28 65 18 80 25 96C32 108 48 98 48 90" fill="#3B82F6" stroke="#1D4ED8" stroke-width="3" stroke-linecap="round"/>
+                                <path d="M30 82C24 88 28 96 36 94" stroke="#93C5FD" stroke-width="2" stroke-linecap="round"/>
+                            </g>
+                            <!-- Right Flapping Wing -->
+                            <g class="cartoon-char-right-wing">
+                                <path d="M118 75C132 65 142 80 135 96C128 108 112 98 112 90" fill="#3B82F6" stroke="#1D4ED8" stroke-width="3" stroke-linecap="round"/>
+                                <path d="M130 82C136 88 132 96 124 94" stroke="#93C5FD" stroke-width="2" stroke-linecap="round"/>
+                            </g>
+                            <!-- Cute Postman Cap / Hat -->
+                            <path d="M48 42C48 30 112 30 112 42C112 45 48 45 48 42Z" fill="#1E40AF"/>
+                            <path d="M42 42C42 42 70 36 118 42L124 46C124 46 80 43 36 46L42 42Z" fill="#1D4ED8" stroke="#172554" stroke-width="2"/>
+                            <circle cx="80" cy="38" r="5" fill="#F59E0B" stroke="#B45309" stroke-width="1.5"/>
+                            <text x="77" y="41" font-size="6" font-weight="bold" fill="#78350F">C</text>
+                            <!-- Round Body (Cute Sky-Blue Bot) -->
+                            <rect x="44" y="44" width="72" height="70" rx="35" fill="url(#bodyGradientPrep)" stroke="#1D4ED8" stroke-width="3.5"/>
+                            <!-- Screen Face / Cheeks -->
+                            <rect x="52" y="52" width="56" height="42" rx="20" fill="#0F172A" stroke="#334155" stroke-width="2"/>
+                            <!-- Cute Blinking Big Eyes -->
+                            <g class="cartoon-char-eyes">
+                                <ellipse cx="66" cy="70" rx="6" ry="8" fill="#38BDF8"/>
+                                <circle cx="68" cy="67" r="2.5" fill="#FFFFFF"/>
+                                <ellipse cx="94" cy="70" rx="6" ry="8" fill="#38BDF8"/>
+                                <circle cx="96" cy="67" r="2.5" fill="#FFFFFF"/>
+                            </g>
+                            <!-- Rosy Cheeks -->
+                            <ellipse cx="58" cy="78" rx="4" ry="2" fill="#F43F5E" opacity="0.6"/>
+                            <ellipse cx="102" cy="78" rx="4" ry="2" fill="#F43F5E" opacity="0.6"/>
+                            <!-- Smiling Mouth -->
+                            <path d="M74 77C76 81 84 81 86 77" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round"/>
+                            <!-- Animated Floating Carrier Mail Letter with Heart / Seal -->
+                            <g class="cartoon-char-envelope">
+                                <rect x="58" y="94" width="44" height="28" rx="5" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.5"/>
+                                <path d="M58 96L80 112L102 96" stroke="#2563EB" stroke-width="2" stroke-linecap="round"/>
+                                <circle cx="80" cy="110" r="5" fill="#EF4444"/>
+                                <path d="M78 109.5L80 111.5L82 109.5" fill="#FFFFFF"/>
+                            </g>
+                            <!-- Little Feet / Thrusters -->
+                            <rect x="62" y="114" width="12" height="8" rx="4" fill="#1E40AF"/>
+                            <rect x="86" y="114" width="12" height="8" rx="4" fill="#1E40AF"/>
+                            <defs>
+                                <linearGradient id="bodyGradientPrep" x1="44" y1="44" x2="116" y2="114" gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#60A5FA"/>
+                                    <stop offset="1" stop-color="#2563EB"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Badge & Header -->
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase tracking-wider mb-2">
+                    <span class="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
+                    <span id="email-prep-badge">GENERATING EMAIL PREVIEW</span>
+                </div>
+
+                <h3 id="email-prep-title" class="text-base font-black text-slate-800 dark:text-white uppercase tracking-tight mb-1">
+                    กำลังสร้างหน้าพรีวิวและเตรียมไฟล์แนบ
+                </h3>
+                <p id="email-prep-desc" class="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-xs mb-4 truncate">
+                    ${docNumber} • ${supplierName || 'Vendor'}
+                </p>
+
+                <!-- Progress Bar & Percentage -->
+                <div class="w-full space-y-2 mb-4">
+                    <div class="flex justify-between items-center text-[10.5px] font-mono font-bold text-slate-600 dark:text-slate-300">
+                        <span id="email-prep-status-step" class="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                            <span class="animate-spin text-xs">🌀</span> กำลังรวบรวมข้อมูลรายงาน...
+                        </span>
+                        <span id="email-prep-percent" class="text-slate-800 dark:text-slate-100 font-black">25%</span>
+                    </div>
+                    
+                    <div class="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200 dark:border-slate-700">
+                        <div id="email-prep-progress-bar" class="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 cartoon-progress-bar transition-all duration-300 ease-out" style="width: 25%;"></div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Steps Checklist -->
+                <div class="w-full grid grid-cols-3 gap-2 text-left pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                    <div id="prep-step-1" class="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 flex flex-col gap-0.5 transition-all">
+                        <div class="flex items-center gap-1 text-[9.5px] font-black text-blue-700 dark:text-blue-300">
+                            <span class="step-icon">🔄</span> ข้อมูลเคส
+                        </div>
+                        <span class="text-[8.5px] text-blue-600/80 dark:text-blue-400 truncate">Matrix & Info</span>
+                    </div>
+                    <div id="prep-step-2" class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 flex flex-col gap-0.5 transition-all">
+                        <div class="flex items-center gap-1 text-[9.5px] font-black text-slate-500 dark:text-slate-400">
+                            <span class="step-icon">⏳</span> สร้าง PDF
+                        </div>
+                        <span class="text-[8.5px] text-slate-400 truncate">High-Res A4</span>
+                    </div>
+                    <div id="prep-step-3" class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 flex flex-col gap-0.5 transition-all">
+                        <div class="flex items-center gap-1 text-[9.5px] font-black text-slate-500 dark:text-slate-400">
+                            <span class="step-icon">⏳</span> รูป & พรีวิว
+                        </div>
+                        <span class="text-[8.5px] text-slate-400 truncate">Email Ready</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', overlayHtml);
+
+    return {
+        updateProgress: (percent, stepText, activeStepIndex = 1) => {
+            const el = document.getElementById(overlayId);
+            if (!el) return;
+            const bar = el.querySelector('#email-prep-progress-bar');
+            const percentEl = el.querySelector('#email-prep-percent');
+            const stepEl = el.querySelector('#email-prep-status-step');
+            
+            if (bar) bar.style.width = `${percent}%`;
+            if (percentEl) percentEl.textContent = `${percent}%`;
+            if (stepEl && stepText) stepEl.innerHTML = stepText;
+
+            // Highlight step boxes
+            [1, 2, 3].forEach(stepNum => {
+                const box = el.querySelector(`#prep-step-${stepNum}`);
+                if (!box) return;
+                const icon = box.querySelector('.step-icon');
+                const titleText = box.querySelector('.text-\\[9\\.5px\\]');
+                if (stepNum < activeStepIndex) {
+                    // Completed
+                    box.className = 'p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex flex-col gap-0.5 transition-all';
+                    if (titleText) titleText.className = 'flex items-center gap-1 text-[9.5px] font-black text-emerald-700 dark:text-emerald-300';
+                    if (icon) icon.textContent = '✅';
+                } else if (stepNum === activeStepIndex) {
+                    // In Progress
+                    box.className = 'p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-300 dark:border-blue-700 shadow-sm flex flex-col gap-0.5 transition-all ring-1 ring-blue-400/40';
+                    if (titleText) titleText.className = 'flex items-center gap-1 text-[9.5px] font-black text-blue-700 dark:text-blue-300';
+                    if (icon) icon.textContent = '🔄';
+                } else {
+                    // Pending
+                    box.className = 'p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 flex flex-col gap-0.5 transition-all';
+                    if (titleText) titleText.className = 'flex items-center gap-1 text-[9.5px] font-black text-slate-500 dark:text-slate-400';
+                    if (icon) icon.textContent = '⏳';
+                }
+            });
+        },
+        complete: async () => {
+            const el = document.getElementById(overlayId);
+            if (!el) return;
+            const bar = el.querySelector('#email-prep-progress-bar');
+            const percentEl = el.querySelector('#email-prep-percent');
+            const stepEl = el.querySelector('#email-prep-status-step');
+            const titleEl = el.querySelector('#email-prep-title');
+            const badgeEl = el.querySelector('#email-prep-badge');
+            
+            if (bar) bar.style.width = '100%';
+            if (percentEl) percentEl.textContent = '100%';
+            if (badgeEl) badgeEl.textContent = 'PREVIEW READY!';
+            if (titleEl) titleEl.textContent = 'สร้างหน้าพรีวิวสำเร็จแล้ว ✨';
+            if (stepEl) stepEl.innerHTML = '<span class="text-emerald-600 dark:text-emerald-400 font-black flex items-center gap-1"><span>✅</span> เอกสารและเนื้อหาพร้อมแล้ว! กำลังเปิดหน้าต่าง...</span>';
+
+            [1, 2, 3].forEach(stepNum => {
+                const box = el.querySelector(`#prep-step-${stepNum}`);
+                if (box) {
+                    box.className = 'p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex flex-col gap-0.5 transition-all';
+                    const titleText = box.querySelector('.text-\\[9\\.5px\\]');
+                    if (titleText) titleText.className = 'flex items-center gap-1 text-[9.5px] font-black text-emerald-700 dark:text-emerald-300';
+                    const icon = box.querySelector('.step-icon');
+                    if (icon) icon.textContent = '✅';
+                }
+            });
+
+            await new Promise(r => setTimeout(r, 450));
+            el.classList.add('opacity-0', 'transition-opacity', 'duration-200');
+            await new Promise(r => setTimeout(r, 200));
+            el.remove();
+        },
+        close: () => {
+            const el = document.getElementById(overlayId);
+            if (el) el.remove();
+        }
+    };
+}
+
 // --- ฟังก์ชันส่งอีเมลแจ้งเตือน (ดึง TO จาก 3.1, CC จาก 3.1, 3.3 และ Dear Vendor ตาม Matrix อย่างแม่นยำ) ---
 // --- ปรับปรุงฟังก์ชันเตรียมข้อมูลส่งเมล ---
 /**
  * 📧 ฟังก์ชันเตรียมข้อมูลและเปิดหน้าต่างส่งอีเมล
- * ปรับปรุง: สกัด Area/Dept สำหรับ VF และคงค่ามาตรฐานสำหรับ RP
+ * ปรับปรุง: แสดงอนิเมชั่นการ์ตูนโหลดขึ้นทันที 0ms ทันทีที่กดปุ่ม แล้วค่อยประมวลผลเบื้องหลัง
  */
-function sendIssueByEmail() {
+async function sendIssueByEmail() {
     if (!_currentCase) return toast("❌ ไม่พบข้อมูลเคส", "error");
-    
-    // 1. เซฟความคืบหน้าล่าสุดลง Cloud ก่อนส่งเมล
-    if (typeof Wap8DSystem.saveCurrentProgress === 'function') {
-        Wap8DSystem.saveCurrentProgress();
-    }
     
     const c = _currentCase;
     const d = c.report_data || {};
@@ -27191,23 +28266,37 @@ function sendIssueByEmail() {
     const docNumber = getCaseControlNo(c); 
     const isRP = docNumber.includes('RP');
     const reportTag = isRP ? 'RP' : 'VF';
-
-    // 2. ดึงข้อมูลจากเอกสาร / Matrix Database
     const vendorOnDoc = document.getElementById('vf-doc-vendor')?.innerText?.trim() || vf.vendor || c.supplier || "";
+
+    // ⚡ 1. แสดงอนิเมชั่นการ์ตูนโหลดทันทีระดับ Microsecond ทันทีที่คลิกปุ่ม!
+    const loader = showEmailPreparationCartoonLoader(docNumber, reportTag, vendorOnDoc);
+    const startTime = Date.now();
+
+    // ⚡ 2. ยอมให้เบราว์เซอร์ Render หน้าจอและเริ่มหมุนอนิเมชั่น 60fps ทันทีโดยไม่สะดุด
+    await new Promise(r => setTimeout(r, 40));
+
+    loader.updateProgress(20, `<span class="animate-spin text-xs">🌀</span> กำลังบันทึกข้อมูลและดึง Matrix...`, 1);
+
+    // 3. เซฟความคืบหน้าล่าสุดลง Cloud ในเบื้องหลัง
+    if (typeof Wap8DSystem.saveCurrentProgress === 'function') {
+        try { Wap8DSystem.saveCurrentProgress(); } catch(e) {}
+    }
+    
+    // 4. ดึงข้อมูลจากเอกสาร / Matrix Database
     const vendorCodeOnDoc = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() || vf.vendor_code || c.vendor_code || "";
     
     let matrix = (typeof window.getVFRPMatrixForSupplier === 'function')
         ? window.getVFRPMatrixForSupplier(vendorOnDoc, vendorCodeOnDoc, '')
         : null;
 
-    // 3. จัดรูปแบบชื่อผู้จัดทำ (Sender) สำหรับชื่อลงท้าย
+    // 5. จัดรูปแบบชื่อผู้จัดทำ (Sender) สำหรับชื่อลงท้าย
     const emailPrefix = (S.currentUser || 'user').split('@')[0];
     const senderLastNameFirst = emailPrefix.includes('.') 
         ? `${emailPrefix.split('.')[1].toUpperCase()}, ${emailPrefix.split('.')[0].toUpperCase()}`
         : emailPrefix.toUpperCase();
     const senderFullName = emailPrefix.replace(/\./g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-    // 4. จัดการเรื่องวันที่ (Issue Date & Follow-up Date +14 วัน)
+    // 6. จัดการเรื่องวันที่ (Issue Date & Follow-up Date +14 วัน)
     const now = new Date();
     const issueDateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
     
@@ -27215,43 +28304,69 @@ function sendIssueByEmail() {
     followUpDate.setDate(now.getDate() + 14);
     const followUpDateStr = followUpDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }).replace(/ /g, ' ');
 
-    // 5. [NEW LOGIC] สกัดชื่อ "ผู้แจ้ง / พื้นที่" (Area/Dept) ออกจากประโยคปัญหา
-    // รูปแบบประโยค: "On 23-Aug-26 [Area/Dept] inform quality problem about..."
-    let extractedAreaDept = "Production Line"; // ค่าเริ่มต้นกรณีหาไม่เจอ
+    // 7. สกัดชื่อ "ผู้แจ้ง / พื้นที่" (Area/Dept) ออกจากประโยคปัญหา
+    let extractedAreaDept = "Production Line";
     
     if (!isRP) {
-        // ค้นหาข้อความที่อยู่ระหว่าง [วันที่] และคำว่า [inform]
-        const areaMatch = c.problem_title.match(/On\s+\d{1,2}\s+[A-Za-z']+\d{2}\s+(.*?)\s+inform/i);
+        const areaMatch = c.problem_title ? c.problem_title.match(/On\s+\d{1,2}\s+[A-Za-z']+\d{2}\s+(.*?)\s+inform/i) : null;
         if (areaMatch && areaMatch[1]) {
             extractedAreaDept = areaMatch[1].trim();
         } else if (vf.defect_location && vf.defect_location !== '-') {
-            // กรณีไม่มีในประโยค แต่มีระบุไว้ในฟิลด์ Defect Found Location
             extractedAreaDept = vf.defect_location;
         }
     }
 
-    // 🎯 ตัดสินค่า Found Location สำหรับแสดงในตารางอีเมล
     const finalFoundLocation = isRP ? "QAP Incoming inspection" : extractedAreaDept;
 
-    // 6. สกัดข้อมูลพาร์ทและอาการเสีย (Parsed Data)
+    // 8. สกัดข้อมูลพาร์ทและอาการเสีย (Parsed Data)
     const parsedData = (typeof parseProblemTitleForD2 === 'function') ? parseProblemTitleForD2(c.problem_title, c) : {};
     const actualPartName = (document.getElementById('vf-doc-part-name')?.innerText?.trim() || parsedData.partName || c.part_name || "PART").toUpperCase();
     const actualDrawingNo = (document.getElementById('vf-doc-drawing-no')?.innerText?.trim() || vf.drawing_no || c.part_no || "N/A").toUpperCase();
     const defectName = (vf.criteria_defect || vf.defect || parsedData.defectName || "Defect").replace(/^[:\s-]+/, '').trim();
 
-    // 7. เตรียมที่อยู่อีเมล (TO/CC) จาก Matrix
+    // 9. เตรียมที่อยู่อีเมล (TO/CC) จาก Matrix
     let finalTo = matrix ? (matrix.inform_email_to || matrix.recipient_to || "") : (vf.inform_email_to || "");
     let finalCc = matrix ? (matrix.team_member_email || matrix.inform_email_cc || "") : (vf.team_member_email || "");
     
     const cleanTo = (typeof window.parseEmailArray === 'function' ? [...new Set(window.parseEmailArray(finalTo))] : [finalTo]).filter(Boolean).join('; ');
     const cleanCc = (typeof window.parseEmailArray === 'function' ? [...new Set(window.parseEmailArray(finalCc))] : [finalCc]).filter(Boolean).join('; ');
 
-    // 8. ส่งข้อมูลทั้งหมดเข้าสู่ Modal Email Preview
+    const evidenceImg = c.report_data?.evidence_img || c.evidence_img || c.image_url || '';
+
+    loader.updateProgress(45, `<span class="animate-pulse text-xs">📄</span> กำลังเรนเดอร์รายงาน ${reportTag} (PDF)...`, 2);
+    await new Promise(r => setTimeout(r, 40));
+
+    // ทำงานคู่ขนาน: สร้าง PDF blob และแปลงรูปภาพหลักฐาน
+    const pdfPromise = generateVFPdfBlob(c.id).catch(err => {
+        console.error("Prep PDF error:", err);
+        return null;
+    });
+
+    const imgPromise = (evidenceImg && typeof _pptGetImageDataUrl === 'function')
+        ? _pptGetImageDataUrl(evidenceImg).catch(err => {
+            console.error("Prep Img error:", err);
+            return null;
+        })
+        : Promise.resolve(null);
+
+    let [preloadedVf, preloadedImgBase64] = await Promise.all([pdfPromise, imgPromise]);
+
+    loader.updateProgress(90, `<span class="animate-pulse text-xs">📸</span> จัดเตรียมภาพถ่ายหลักฐานและเนื้อหาอีเมล...`, 3);
+
+    // หน่วงเวลาอย่างน้อยให้ได้ชมอนิเมชั่นการ์ตูนนุ่มนวลอย่างน้อย 1.2 วินาที
+    const elapsed = Date.now() - startTime;
+    if (elapsed < 1200) {
+        await new Promise(r => setTimeout(r, 1200 - elapsed));
+    }
+
+    // แจ้งจบการโหลดด้วยอนิเมชั่นสำเร็จ
+    await loader.complete();
+
+    // 10. ส่งข้อมูลทั้งหมดเข้าสู่ Modal Email Preview พร้อมข้อมูลที่เตรียมไว้แล้ว
     showEmailDispatchModalWithAttachments({
         caseData: c,
         targetEmail: cleanTo,
         ccEmail: cleanCc,
-        // คำทักทาย Dear Vendor
         dearVendor: (matrix?.dear_vendor && matrix.dear_vendor !== '-') 
             ? (matrix.dear_vendor.toLowerCase().startsWith('dear') ? matrix.dear_vendor : `Dear ${matrix.dear_vendor}`) 
             : `Dear K.Suwari`,
@@ -27269,16 +28384,16 @@ function sendIssueByEmail() {
         lotTotal: c.lot_no || "0",
         ngTotal: c.ng_qty || "0",
         
-        // ข้อมูลเฉพาะสำหรับ RP
         poInvDisplay: (vf.po_no || '-') + " / " + (vf.inv_no || '-'),
         replacementQty: vf.request_replacement || c.lot_no || "0",
         
-        // 🎯 ส่งค่า Found Location ที่สกัดมาได้
         foundLocation: finalFoundLocation,
         
         isRP: isRP,
         vfFileName: `Report_${docNumber}.pdf`,
-        pptxFileName: `8D_${docNumber}.pptx`
+        pptxFileName: `8D_${docNumber}.pptx`,
+        preloadedVf: preloadedVf,
+        preloadedImgBase64: preloadedImgBase64
     });
 }
 
@@ -27315,7 +28430,9 @@ function showEmailDispatchModalWithAttachments(params) {
         isRP,
         followUpDateFormatted,
         vfFileName,
-        pptxFileName
+        pptxFileName,
+        preloadedVf,
+        preloadedImgBase64
     } = params;
 
     const modalId = 'eight-d-email-preview-modal';
@@ -27398,7 +28515,7 @@ ${senderName}`;
 
     // 2.1 ดึงรูปภาพจากกล่อง NON - CONFORMANCE DETAILS
     const evidenceImg = caseData.report_data?.evidence_img || caseData.evidence_img || caseData.image_url || '';
-    let cachedImgBase64 = null;
+    let cachedImgBase64 = preloadedImgBase64 || null;
 
     // 2.2 ฟังก์ชันสร้างเนื้อหาอีเมลแบบ HTML สำหรับ Outlook / Mail App พร้อมฝังรูปภาพ Inline (CID)
     const generateEmailHtmlBody = (include8d = false, hasInlineImg = false) => {
@@ -27620,7 +28737,7 @@ Thank you and best regards<br>
     const btnSend = modalEl.querySelector('#btn-confirm-export-send');
     const btnSendLabel = modalEl.querySelector('#btn-confirm-export-send-label');
 
-    let cachedVf = null; // เก็บ { blob, base64, filename }
+    let cachedVf = preloadedVf || null; // เก็บ { blob, base64, filename }
     let cached8d = null; // เก็บ { blob, base64, filename }
 
     // ฟังก์ชันรีเฟรชข้อความใน Preview ตามสถานะติ๊ก 8D
@@ -27694,6 +28811,10 @@ ${senderName}`;
         const photoBox = modalEl.querySelector('#email-preview-photo-box');
         if (!evidenceImg) {
             if (photoBox) photoBox.style.display = 'none';
+            return;
+        }
+        if (cachedImgBase64 && imgContainer) {
+            imgContainer.innerHTML = `<img src="${cachedImgBase64}" style="max-height: 240px; width: 100%; max-width: 680px; object-fit: contain; border-radius: 4px; border: 1px solid #475569; display: block;" alt="Non-conformance Photo" />`;
             return;
         }
         try {
@@ -30976,7 +32097,7 @@ container.innerHTML = '<div style="padding:40px; text-align:center; color:#64748
         container.innerHTML = '';
         container.style.cssText = `
             width: 960px;
-            height: 600px;
+            height: 680px;
             box-sizing: border-box; 
             display: flex; 
             flex-direction: column; 
@@ -36934,89 +38055,6 @@ function copyHistorySummary(id) {
         });
     }
 }
-
-/**
- * 🧠 ระบบ Dropdown อัจฉริยะสำหรับหน้า Login พนักงาน
- */
-
-// 1. ดึงรายชื่อพนักงานทั้งหมดมาจัดระเบียบใหม่สำหรับแสดงผลใน Dropdown
-
-
-/**
- * 🧠 ระบบจัดการดรอปดาวน์พนักงาน (SQE SUPPORT) - Consolidated Version
- */
-
-// 3. จัดการเมื่อผู้ใช้เลือกรายชื่อ
-window.selectEmployeeLoginOption = function(email, name) {
-    const emailInput = document.getElementById('login-email');
-    const dropdown = document.getElementById('login-employee-dropdown');
-    const passInput = document.getElementById('login-pass');
-
-    if (emailInput) {
-        emailInput.value = email;
-        emailInput.classList.add('valid');
-        emailInput.classList.remove('invalid');
-    }
-
-    // ปิดดรอปดาวน์ทันที
-    if (dropdown) dropdown.classList.add('hidden');
-
-    // เลื่อนไปที่ช่องรหัสผ่านอัตโนมัติ
-    if (passInput) {
-        setTimeout(() => passInput.focus(), 50); // ใส่ timeout เล็กน้อยเพื่อให้ UI อัปเดตทัน
-    }
-
-    if (typeof toast === 'function') toast(`👤 พนักงานที่เลือก: ${name}`, "info");
-};
-
-// 4. ฟังก์ชันควบคุมการพิมพ์ค้นหา
-window.handleEmployeeInput = function(val) {
-    window.renderEmployeeLoginDropdown(val);
-};
-
-// 4.1 ฟังก์ชัน เปิด/ปิด ดรอปดาวน์ (คลิกที่ปุ่มลูกศรหรือช่อง Input)
-window.toggleEmployeeLoginDropdown = function(e) {
-    // สำคัญ: หยุดการส่งต่อ Event ไปยัง Document เพื่อไม่ให้ฟังก์ชัน "คลิกที่ว่าง" ทำงานทันทีที่กดเปิด
-    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
-    
-    const dropdown = document.getElementById('login-employee-dropdown');
-    if (!dropdown) return;
-
-    const isHidden = dropdown.classList.contains('hidden');
-    if (isHidden) {
-        const input = document.getElementById('login-email');
-        window.renderEmployeeLoginDropdown(input ? input.value : '');
-        dropdown.classList.remove('hidden');
-    } else {
-        dropdown.classList.add('hidden');
-    }
-};
-
-// 5. 🛡️ ระบบตรวจจับการคลิกนอกพื้นที่ (คลิกพื้นที่ว่างให้ปิด)
-// ใช้ mousedown จะแม่นยำกว่า click ทั่วไป
-document.addEventListener('mousedown', (e) => {
-    // ระบุพื้นที่ "ห้ามปิด" (คือส่วนของช่อง Input และตัว Dropdown เอง)
-    const staffGroup = document.getElementById('email-input-group');
-    const staffDropdown = document.getElementById('login-employee-dropdown');
-    
-    if (staffDropdown && !staffDropdown.classList.contains('hidden')) {
-        // ถ้าจุดที่คลิก (e.target) ไม่ได้อยู่ในกลุ่ม staffGroup ให้สั่งปิด
-        if (staffGroup && !staffGroup.contains(e.target)) {
-            staffDropdown.classList.add('hidden');
-        }
-    }
-
-    // แถม: กรณีของ Supervisor (ถ้ามี)
-    const supGroup = document.getElementById('supervisor-quick-select-wrap');
-    const supDropdown = document.getElementById('login-supervisor-dropdown');
-    
-    if (supDropdown && !supDropdown.classList.contains('hidden')) {
-        if (supGroup && !supGroup.contains(e.target)) {
-            supDropdown.classList.add('hidden');
-        }
-    }
-});
-
 
     return {
         init,
