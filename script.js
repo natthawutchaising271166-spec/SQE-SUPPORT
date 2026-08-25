@@ -4148,6 +4148,205 @@ const STAFF_EMAIL_MAP = {
 };
 
 /**
+ * 🧠 ระบบจัดการดรอปดาวน์สำหรับพนักงาน (SQE SUPPORT)
+ */
+
+// 1. ฟังก์ชันดึงข้อมูลพนักงานจาก STAFF_TEAMS มาทำเป็น List
+function getEmployeeData() {
+    const list = [];
+    if (typeof STAFF_TEAMS === 'undefined') return [];
+
+    STAFF_TEAMS.forEach(team => {
+        team.members.forEach(name => {
+            const email = STAFF_EMAIL_MAP[name] || "";
+            const lowerEmail = email.toLowerCase();
+            
+            // ดึงระดับสิทธิ์จาก USER_LEVEL_MAP ถ้าไม่เจอจะใช้ค่าใน DB หรือค่าเริ่มต้น
+            let roleDisplay = USER_LEVEL_MAP[email] || USER_LEVEL_MAP[lowerEmail];
+
+            if (!roleDisplay && window._dbUsersRoleMap) {
+                const dbUser = window._dbUsersRoleMap.get(lowerEmail);
+                if (dbUser) roleDisplay = dbUser.role.toUpperCase();
+            }
+
+            // ถ้าหาไม่เจอจริงๆ ให้ใส่เป็น Staff ทั่วไป
+            if (!roleDisplay) roleDisplay = "SQE Staff";
+
+            list.push({ name, email, team: team.team, icon: team.icon, role: roleDisplay });
+        });
+    });
+    return list;
+}
+
+// 2. ฟังก์ชันวาดรายการ (Render) ลงในดรอปดาวน์
+window.renderEmployeeLoginDropdown = function(query = '') {
+    const dropdown = document.getElementById('login-employee-dropdown');
+    if (!dropdown) return;
+
+    dropdown.classList.remove('hidden');
+    const allStaff = getEmployeeData();
+    const q = String(query || '').trim().toLowerCase();
+
+    // เช็คว่าตอนนี้ผู้ใช้กดอยู่ที่แท็บไหน
+    const isSupervisorTab = (S.loginRole === 'supervisor');
+
+    const filtered = allStaff.filter(item => {
+        const role = item.role.toLowerCase();
+        const qMatch = !q || item.name.toLowerCase().includes(q) || item.email.toLowerCase().includes(q);
+
+        if (isSupervisorTab) {
+            // --- 🔑 หน้า SUPERVISOR: โชว์เฉพาะ 4 กลุ่มนี้ ---
+            const isManagement = role.includes('admin') || 
+                                 role.includes('engineer') || 
+                                 role.includes('supervisor') || 
+                                 role.includes('manager');
+            return qMatch && isManagement;
+        } else {
+            // --- 👤 หน้า SQE SUPPORT: โชว์เฉพาะ 3 กลุ่มนี้ ---
+            const isSupportGroup = role.includes('support') || 
+                                   role.includes('admin') || 
+                                   role.includes('iqc');
+            return qMatch && isSupportGroup;
+        }
+    });
+
+    if (filtered.length === 0) {
+        dropdown.innerHTML = `<div class="p-4 text-center text-slate-500 text-[10px] font-black uppercase tracking-widest">❌ No Matching Personnel</div>`;
+        return;
+    }
+
+    let html = '';
+    filtered.forEach(item => {
+        const safeName = item.name.replace(/'/g, "\\'");
+        const safeEmail = item.email.replace(/'/g, "\\'");
+        
+        // --- กำหนดสี Badge ตามระดับสิทธิ์ (ในโทนมืด) ---
+        let bStyle = "border-slate-700 text-slate-400 bg-slate-800/40"; 
+        if (item.role.includes("1.")) bStyle = "border-blue-400/40 text-blue-400 bg-blue-900/20"; // Support
+        if (item.role.includes("2.")) bStyle = "border-cyan-400/40 text-cyan-400 bg-cyan-900/20"; // IQC
+        if (item.role.includes("3.")) bStyle = "border-emerald-500/40 text-emerald-300 bg-emerald-900/30"; // Engineer
+        if (item.role.includes("4.")) bStyle = "border-orange-500/40 text-orange-300 bg-orange-900/30";   // Supervisor
+        if (item.role.includes("5.")) bStyle = "border-rose-500/40 text-rose-300 bg-rose-900/30";       // Manager
+        if (item.role.includes("6.")) bStyle = "border-purple-500/60 text-purple-200 bg-purple-900/40"; // Admin
+
+        html += `
+            <div class="employee-ac-item flex items-center justify-between gap-3 p-2.5 rounded-xl cursor-pointer transition-all duration-200 hover:bg-blue-900/40 border border-slate-800/40 hover:border-blue-500/50 mb-1.5 bg-slate-900/60 backdrop-blur-md"
+                 onmousedown="event.preventDefault(); window.selectEmployeeLoginOption('${safeEmail}', '${safeName}')">
+                
+                <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 flex items-center justify-center font-black text-blue-400 text-xs shrink-0">
+                        ${item.name.charAt(0)}
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                        <div class="font-bold text-[12px] text-white tracking-tight truncate">${item.name}</div>
+                        <div class="text-[10px] text-slate-400 font-mono truncate opacity-80">${item.email}</div>
+                    </div>
+                </div>
+
+                <div class="shrink-0">
+                    <span class="text-[9px] font-black px-2.5 py-1 rounded-lg border uppercase tracking-wider ${bStyle} shadow-lg">
+                        ${item.role}
+                    </span>
+                </div>
+            </div>
+        `;
+    });
+
+    dropdown.innerHTML = html;
+};
+
+// 3. ฟังก์ชันเมื่อพิมพ์ในช่อง Input
+window.handleEmployeeInput = function(val) {
+    window.renderEmployeeLoginDropdown(val);
+};
+
+// 4. ฟังก์ชันเปิด/ปิด เมื่อกดปุ่ม Chevron หรือคลิกช่อง
+window.toggleEmployeeLoginDropdown = function(e) {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    const dropdown = document.getElementById('login-employee-dropdown');
+    if (!dropdown) return;
+
+    if (dropdown.classList.contains('hidden')) {
+        const input = document.getElementById('login-email');
+        window.renderEmployeeLoginDropdown(input ? input.value : '');
+    } else {
+        dropdown.classList.add('hidden');
+    }
+};
+// ตารางระดับสิทธิ์ดึงตามภาพ Agent Identity และ Clearance Role
+const USER_LEVEL_MAP = {
+    // --- 1. SQE Support ---
+    "eueangkoon.seesanit@carrier.com": "1. SQE Support",
+    "sornchai.wongjanta@carrier.com": "1. SQE Support",
+
+    // --- 2. IQC ---
+    "anuchit.arnoon@carrier.com": "2. IQC",
+    "aphinan.phookrongnak@carrier.com": "2. IQC",
+    "eakkachai.butnet@carrier.com": "2. IQC",
+    "KAPTAN.YOOUSUK@carrier.com": "2. IQC",
+    "kraiwit.priawkudro@carrier.com": "2. IQC",
+    "pakon.muanglen@carrier.com": "2. IQC",
+    "panida.boonchamoi@carrier.com": "2. IQC",
+    "pratheep.ngoenon@carrier.com": "2. IQC",
+    "puriwat.sangjan@carrier.com": "2. IQC",
+    "Satthra.Onsawarng@carrier.com": "2. IQC",
+    "siriwan.sonkaew@carrier.com": "2. IQC",
+    "somchai.rukkachat@carrier.com": "2. IQC",
+    "supaporn.sata@carrier.com": "2. IQC",
+    "tawatchai.tathong@carrier.com": "2. IQC",
+    "theerapol.wanna@carrier.com": "2. IQC",
+    "ubonsak.j@carrier.com": "2. IQC",
+
+    // --- 3. EN / Engineer ---
+    "meechai.thawornpong@carrier.com": "3. EN / Engineer",
+    "naruemon.champa@carrier.com": "3. EN / Engineer",
+    "songporn.chaisim@carrier.com": "3. EN / Engineer",
+    "witsarut.singholsai@carrier.com": "3. EN / Engineer",
+
+    // --- 4. Supervisor ---
+    "Chiraphat.Khanthong@carrier.com": "4. Supervisor",
+    "jumnong.thongsom@carrier.com": "4. Supervisor",
+    "komson.namwicha@carrier.com": "4. Supervisor",
+    "pongpan.panna@carrier.com": "4. Supervisor",
+    "Siriporn.Prasongsuk@carrier.com": "4. Supervisor",
+    "suphap.m@carrier.com": "4. Supervisor",
+
+    // --- 5. Manager ---
+    "ekkalak.laksanasamrith@carrier.com": "5. Manager",
+    "nipawan.janpong@carrier.com": "5. Manager",
+    "watcharin.yawanopart@carrier.com": "5. Manager",
+
+    // --- 6. Admin ---
+    "natthawut.chaising@carrier.com": "6. Admin"
+};
+// 5. ฟังก์ชันเมื่อเลือกรายชื่อ
+window.selectEmployeeLoginOption = function(email, name) {
+    const emailInput = document.getElementById('login-email');
+    const dropdown = document.getElementById('login-employee-dropdown');
+    const passInput = document.getElementById('login-pass');
+
+    if (emailInput) {
+        emailInput.value = email; // ใส่ค่าอีเมลที่เลือก
+        emailInput.classList.add('valid');
+    }
+
+    if (dropdown) dropdown.classList.add('hidden'); // ปิดดรอปดาวน์
+    if (passInput) setTimeout(() => passInput.focus(), 50); // ไปช่องรหัสผ่าน
+
+    if (typeof toast === 'function') toast(`👤 เลือกพนักงาน: ${name}`, "success");
+};
+
+// 6. 🛡️ คลิกข้างนอกให้ปิด (Global Click)
+document.addEventListener('mousedown', (e) => {
+    const wrap = document.getElementById('employee-select-wrap');
+    const dropdown = document.getElementById('login-employee-dropdown');
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+        if (wrap && !wrap.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    }
+});
+/**
  * 🛡️ AUTHORITATIVE CARRIER STAFF EMAIL RESOLVER
  * ตรวจสอบและค้นหาอีเมล Carrier ที่ถูกต้อง 100% จากชื่อพนักงาน
  */
@@ -6646,12 +6845,12 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
     $id('user-display-name').textContent = namePart.replace(/\./g, ' ').toUpperCase();
     $id('user-display-email').textContent = S.currentUser;
 
-    // --- [ส่วนที่ 3: จัดการ Form Panel และสิทธิ์ Supervisor] ---
+   // --- [ส่วนที่ 3: จัดการ Form Panel และสิทธิ์ Supervisor] ---
     const staffWrap = $id('staff-selector-wrap');
-    const showFormBtn = $id('show-form-btn'); 
     const formPanel = $id('form-panel');
     const showBtn = $id('show-form-btn');
 
+    // ซ่อน Form Panel เป็นค่าเริ่มต้น
     if (formPanel && showBtn) {
         isFormHidden = true; 
         gsap.set(formPanel, { x: -350, opacity: 0, width: 0, marginRight: -12 });
@@ -6660,37 +6859,57 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         gsap.set(showBtn, { x: 0, opacity: 1 });
     }
 
+    // ตรวจสอบประเภทการ Login
     const isSupervisorSession = (S.loginRole === 'supervisor');
 
     if (isSupervisorSession) { 
+        // ==========================================
+        // 🔑 CASE: ล็อกอินผ่านหน้า SUPERVISOR
+        // ==========================================
         S.userRole = 'supervisor';
+
+        // ✅ แสดงช่องเลือกรายชื่อพนักงาน (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.remove('hidden');
-            staffWrap.classList.add('flex');
+            staffWrap.classList.add('flex'); // ใช้ flex เพื่อให้ตำแหน่งสวยงามตามดีไซน์
         }
+
         await loadStaffList(); 
-        if (typeof isFormHidden !== 'undefined' && !isFormHidden) toggleFormPanel(); 
-        if (showFormBtn) showFormBtn.style.display = 'none'; 
+
+        // จัดการ UI เพิ่มเติมสำหรับ Supervisor
+        if (showBtn) showBtn.style.display = 'none'; 
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
         if (internalCloseBtn) internalCloseBtn.style.display = 'none';
 
+        // ปิดการใช้งานฟอร์ม (Read-only)
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = true;
             el.style.opacity = '0.6';
             el.style.cursor = 'not-allowed';
         });
+
     } else {
+        // ==========================================
+        // 👤 CASE: ล็อกอินผ่านหน้า SQE SUPPORT
+        // ==========================================
         S.userRole = 'staff';
+
+        // ❌ ซ่อนช่องเลือกรายชื่อพนักงานทันที (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.add('hidden');
             staffWrap.classList.remove('flex');
         }
+
+        // บังคับให้ดูข้อมูลของตัวเองเท่านั้น
         S.viewingUser = S.currentUser;
-        if (showFormBtn) showFormBtn.style.display = 'flex';
+
+        // แสดงปุ่มเปิดฟอร์มปกติ
+        if (showBtn) showBtn.style.display = 'flex';
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
         if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
 
+        // เปิดการใช้งานฟอร์มปกติ
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = false;
@@ -9480,13 +9699,13 @@ function switchPage(name, el) {
     }
     if (typeof clearTableSelection === 'function') clearTableSelection();
     if (typeof clearAllPageFilters === 'function') clearAllPageFilters(true);
+
     const pageNameUpper = name.toUpperCase();
     const titleEl = document.getElementById('header-title');
     const subNav = document.getElementById('terminal-sub-nav'); 
     const claimOpTools = document.getElementById('claim-op-tools'); 
     const dashFilterWrap = document.getElementById('claim-dash-filter-wrap'); 
     
-    // อ้างอิงแถบเครื่องมือ Admin ใน Header ที่เพิ่มเข้าไปใหม่
     const adminHeaderTools = document.getElementById('admin-header-tools');
     const sqeHeaderTools = document.getElementById('sqe-header-tools');
 
@@ -9496,8 +9715,14 @@ function switchPage(name, el) {
     const vendorFilter = document.getElementById('claim-vendor-filter');
     const vendorDivider = document.getElementById('vendor-divider');
 
-    // --- STEP 1: RESET GLOBAL UI STATES ---
-    if (staffWrap) staffWrap.classList.add('hidden');
+    // --- STEP 1: RESET & PRIVILEGE GUARD ---
+    // บังคับซ่อน Staff Selector ทันทีทุกครั้งที่มีการเปลี่ยนหน้า
+    if (staffWrap) {
+        staffWrap.classList.add('hidden');
+        staffWrap.classList.remove('flex');
+        staffWrap.style.display = 'none'; 
+    }
+    
     if (onlineBadge) onlineBadge.classList.add('hidden');
     if (vendorFilter) vendorFilter.classList.add('hidden');
     if (vendorDivider) vendorDivider.classList.add('hidden');
@@ -9516,22 +9741,22 @@ function switchPage(name, el) {
         el.appendChild(indicator);
     }
 
-const allPages = [
-    'entry-terminal-content', 'overview-cockpit-content', 'exec-dashboard-content',
-    'attendance-logs', 'line-support-logs-content', 'five-s-content',
-    'skill-matrix-content', 'special-jobs-content', 'ot-management-content',
-    'admin-console-content', 'eight-d-content',
-    'rn-management-content',
-    'calibration-content' // <--- เพิ่ม ID นี้เข้าไปเพื่อให้ระบบสั่งซ่อนหน้าจอนี้เวลาสลับไปหน้าอื่น
-];
+    // --- STEP 3: HIDE ALL CONTENT PAGES ---
+    const allPages = [
+        'entry-terminal-content', 'overview-cockpit-content', 'exec-dashboard-content',
+        'attendance-logs', 'line-support-logs-content', 'five-s-content',
+        'skill-matrix-content', 'special-jobs-content', 'ot-management-content',
+        'admin-console-content', 'eight-d-content',
+        'rn-management-content', 'calibration-content'
+    ];
     allPages.forEach(id => {
         const pageEl = document.getElementById(id);
         if (pageEl) pageEl.classList.add('hidden-view');
     });
 
-    // --- STEP 4: HEADER & SPECIAL PAGE LOGIC (ปรับปรุงใหม่) ---
+    // --- STEP 4: HEADER & SPECIAL PAGE LOGIC ---
     
-    // 1. จัดการแถบ Admin Header Tools (คงโหมดสว่าง White & Blue Theme เสมอ)
+    // 1. Admin Console Logic
     if (pageNameUpper === 'ADMIN CONSOLE') {
         if (adminHeaderTools) {
             adminHeaderTools.classList.remove('hidden');
@@ -9547,57 +9772,53 @@ const allPages = [
         }
     }
 
-    // 2. จัดการ Title และปุ่มควบคุมอื่นๆ
+    // 2. Part Line Claim Logic (จุดสำคัญเรื่อง Staff Selector)
     if (pageNameUpper === 'PART LINE CLAIM') {
         if (subNav) subNav.classList.remove('hidden'); 
         if (claimOpTools) { claimOpTools.classList.remove('hidden'); claimOpTools.classList.add('flex'); }
         if (dashFilterWrap) dashFilterWrap.classList.add('hidden');
+        
+        // เรียกฟังก์ชันหน้าตารางย่อย
         switchSubTerminal('entry'); 
+
+        // 🛡️ RE-ENFORCE PRIVILEGE GUARD: 
+        // แสดง Staff Selector เฉพาะเมื่อเป็น Supervisor และอยู่หน้า Claim เท่านั้น
+        if (S.userRole === 'supervisor' && staffWrap) {
+            staffWrap.classList.remove('hidden');
+            staffWrap.classList.add('flex');
+            staffWrap.style.display = 'flex';
+        } else if (staffWrap) {
+            // ป้องกัน switchSubTerminal ไปสั่งเปิดมันขึ้นมาสำหรับพนักงานทั่วไป
+            staffWrap.classList.add('hidden');
+            staffWrap.style.display = 'none';
+        }
     } 
     else if (pageNameUpper === 'ADMIN CONSOLE' || pageNameUpper === 'ADMIN USER CONTROL') {
-        // ตรวจสอบสิทธิ์ก่อนเข้าใช้งานหน้า Admin Control
         const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
             ? hasAdminAccessPermission(S.currentUser, S.userRole) 
             : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
 
         if (!isAllowedAdmin) {
-            toast('⚠️ คุณไม่มีสิทธิ์เข้าถึง Admin Console (เฉพาะ Engineer, Supervisor, Manager และ Admin เท่านั้น)', 'error');
+            toast('⚠️ คุณไม่มีสิทธิ์เข้าถึง Admin Console', 'error');
             return;
         }
-
-        if (subNav) subNav.classList.add('hidden'); // ซ่อนปุ่มสลับหน้า Claim
-        if (claimOpTools) claimOpTools.classList.add('hidden');
-        if (dashFilterWrap) dashFilterWrap.classList.add('hidden');
+        if (subNav) subNav.classList.add('hidden'); 
         if (titleEl) titleEl.textContent = 'ADMIN USER CONTROL';
-        
         document.querySelectorAll('.submenu-container').forEach(s => s.classList.remove('open'));
     }
     else if (pageNameUpper === 'SQE EN' || pageNameUpper === '8D REPORT' || pageNameUpper === 'SME RECEIVABLES') {
         if (subNav) subNav.classList.add('hidden'); 
-        if (claimOpTools) claimOpTools.classList.add('hidden');
-        if (dashFilterWrap) {
-            dashFilterWrap.classList.remove('hidden');
-            dashFilterWrap.classList.add('flex');
-        }
+        if (dashFilterWrap) { dashFilterWrap.classList.remove('hidden'); dashFilterWrap.classList.add('flex'); }
         if (vendorFilter) {
             vendorFilter.classList.remove('hidden');
             if (typeof populateVendorFilter === 'function') populateVendorFilter();
         }
         if (vendorDivider) vendorDivider.classList.remove('hidden');
-        if (sqeHeaderTools) {
-            sqeHeaderTools.classList.remove('hidden');
-            sqeHeaderTools.classList.add('flex');
-        }
+        if (sqeHeaderTools) { sqeHeaderTools.classList.remove('hidden'); sqeHeaderTools.classList.add('flex'); }
         if (titleEl) titleEl.textContent = 'SQE EN';
     }
     else {
-        // หน้าปกติอื่นๆ
         if (subNav) subNav.classList.add('hidden'); 
-        if (claimOpTools) claimOpTools.classList.add('hidden');
-        if (dashFilterWrap) { 
-            dashFilterWrap.classList.remove('hidden'); 
-            dashFilterWrap.classList.add('flex'); 
-        }
         if (titleEl) titleEl.textContent = pageNameUpper;
     }
 
@@ -9619,13 +9840,14 @@ const allPages = [
         'CALIBRATION': 'calibration-content'
     };
 
-if (pageNameUpper === 'RUNNING NUMBER') {
-    $id('rn-header-tools').classList.remove('hidden');
-    $id('rn-header-tools').classList.add('flex');
-} else {
-    $id('rn-header-tools').classList.add('hidden');
-    $id('rn-header-tools').classList.remove('flex');
-}
+    if (pageNameUpper === 'RUNNING NUMBER') {
+        $id('rn-header-tools').classList.remove('hidden');
+        $id('rn-header-tools').classList.add('flex');
+    } else {
+        $id('rn-header-tools').classList.add('hidden');
+        $id('rn-header-tools').classList.remove('flex');
+    }
+
     const targetId = targetIdMap[pageNameUpper];
     if (targetId) {
         const targetEl = document.getElementById(targetId);
@@ -9633,33 +9855,22 @@ if (pageNameUpper === 'RUNNING NUMBER') {
         
         const targetUser = (S.userRole === 'supervisor') ? S.viewingUser : S.currentUser;
 
-// ค้นหาส่วนนี้ในฟังก์ชัน switchPage
-switch(pageNameUpper) {
-    case 'PART LINE CLAIM': renderTable(); break;
-    case 'EXEC DASHBOARD': initExecDashboard(); break;
-    case 'ATTENDANCE LOGS': initAttDashboard(); break;
-    case 'LINE SUPPORT LOGS': WapSupportLogs.init(targetUser); break;
-    case '5S EXCELLENCE': Wap5SExcellence.init(); break;
-    case 'SKILL MATRIX': WapSkillMatrix.init(); break;
-    case 'SPECIAL JOBS': WapSpecialJobs.init(); break;
-    case 'OT MANAGEMENT': WapOTManagement.init(); break;
-    case '8D REPORT':
-    case 'SQE EN':
-    case 'SME RECEIVABLES':
-        Wap8DSystem.init(); break;
-
-    case 'CALIBRATION': 
-    WapCalibrationSystem.init(); 
-    break;
-    case 'ADMIN CONSOLE': 
-        if (typeof WapAdminSystem !== 'undefined') WapAdminSystem.init(); 
-        break;
-    
-    // >>> เพิ่ม 3 บรรทัดนี้เข้าไป <<<
-    case 'RUNNING NUMBER':
-        if (typeof WapRNSystem !== 'undefined') WapRNSystem.init();
-        break;
-}
+        switch(pageNameUpper) {
+            case 'PART LINE CLAIM': renderTable(); break;
+            case 'EXEC DASHBOARD': initExecDashboard(); break;
+            case 'ATTENDANCE LOGS': initAttDashboard(); break;
+            case 'LINE SUPPORT LOGS': WapSupportLogs.init(targetUser); break;
+            case '5S EXCELLENCE': Wap5SExcellence.init(); break;
+            case 'SKILL MATRIX': WapSkillMatrix.init(); break;
+            case 'SPECIAL JOBS': WapSpecialJobs.init(); break;
+            case 'OT MANAGEMENT': WapOTManagement.init(); break;
+            case '8D REPORT':
+            case 'SQE EN':
+            case 'SME RECEIVABLES': Wap8DSystem.init(); break;
+            case 'CALIBRATION': WapCalibrationSystem.init(); break;
+            case 'ADMIN CONSOLE': if (typeof WapAdminSystem !== 'undefined') WapAdminSystem.init(); break;
+            case 'RUNNING NUMBER': if (typeof WapRNSystem !== 'undefined') WapRNSystem.init(); break;
+        }
     }
     
     if (window.innerWidth <= 768) toggleSidebar('close');
@@ -24688,22 +24899,26 @@ function showPasswordResetUI(email) {
             
             <div class="input-group">
                 <label class="input-tiny-label">New Security Key</label>
-                <!-- ต้องมี id="new-pass" -->
-                <input  type="password" id="new-pass" class="premium-input" placeholder="••••••••" title="••••••••" aria-label="••••••••">
+                <!-- เพิ่ม autocomplete="new-password" เพื่อป้องกันป๊อปอัพรหัสผ่านเก่า -->
+                <input type="password" id="new-pass" class="premium-input" 
+                       autocomplete="new-password" 
+                       placeholder="••••••••" title="••••••••" aria-label="••••••••">
             </div>
 
             <div class="input-group">
                 <label class="input-tiny-label">Confirm New Key</label>
-                <!-- ต้องมี id="confirm-new-pass" -->
-                <input  type="password" id="confirm-new-pass" class="premium-input" placeholder="••••••••" title="••••••••" aria-label="••••••••">
+                <!-- เพิ่ม autocomplete="new-password" เพื่อป้องกันป๊อปอัพรหัสผ่านเก่า -->
+                <input type="password" id="confirm-new-pass" class="premium-input" 
+                       autocomplete="new-password" 
+                       placeholder="••••••••" title="••••••••" aria-label="••••••••">
             </div>
 
-            <button  onclick="handlePasswordResetSubmit('${email}')" class="btn-initialize-session" title="Handle Password Reset Submit" aria-label="Handle Password Reset Submit">
+            <button onclick="handlePasswordResetSubmit('${email}')" class="btn-initialize-session" title="Handle Password Reset Submit" aria-label="Handle Password Reset Submit">
                 <div class="btn-shimmer"></div>
                 <span class="btn-text">SAVE & LOGIN</span>
             </button>
             
-            <button  onclick="window.location.reload()" class="w-full text-[9px] font-black text-slate-500 uppercase mt-2" title="Window.Location.Reload" aria-label="Window.Location.Reload">Cancel</button>
+            <button onclick="window.location.reload()" class="w-full text-[9px] font-black text-slate-500 uppercase mt-2" title="Window.Location.Reload" aria-label="Window.Location.Reload">Cancel</button>
         </div>
     `;
 }
@@ -24801,243 +25016,126 @@ function renderModalAC(type, inputEl) {
     const query = inputEl.value.trim().toLowerCase();
     let htmlContent = '';
 
-    // ============================================================
-    // กรณีที่ 1: การลงนาม (Sign-off) - ตามเงื่อนไข Matrix & หมวดหมู่ RP / VF
+// ============================================================
+    // ✍️ กรณีการลงนาม (Sign-off): ISSUE BY | CONFIRM BY | APPROVED BY
     // ============================================================
     if (type === 'staff') {
         const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
             ? Wap8DSystem.getCurrentCase()
             : null;
+        
         const vfData = curCase?.report_data?.vf_data || {};
-        const docNo = (typeof getCaseControlNo === 'function' && curCase) ? getCaseControlNo(curCase) : (curCase?.control_no || '');
+        
+        // 1. ตรวจสอบประเภทรายงานปัจจุบัน (RP หรือ VF) เพื่อใช้เลือกช่องใน Matrix
         const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
         const docTypeLabel = (document.getElementById('vf-doc-type-label')?.innerText || '').toUpperCase();
-        const isRP = reportType.includes('RP') || docNo.includes('RP') || docTypeLabel.includes('RP');
+        const isRP = reportType.includes('RP') || docTypeLabel.includes('RP');
 
+        // 2. ดึงข้อมูล Vendor จากหน้าเอกสารเพื่อไปค้นหาในฐานข้อมูล Matrix (32 Fields)
         const vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() || vfData.vendor || "";
         const vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() || vfData.vendor_code || "";
-        const matrix = (typeof window.getVFRPMatrixForSupplier === 'function') ? window.getVFRPMatrixForSupplier(vendorName, vendorCode, '') : null;
+        const matrix = (typeof window.getVFRPMatrixForSupplier === 'function') 
+            ? window.getVFRPMatrixForSupplier(vendorName, vendorCode, '') 
+            : null;
 
-        // รายชื่อทีม IQC Engineers สำหรับ RP (ISSUE BY)
-        const iqcEngineers = [
-            "Mr.Meechai T.",
-            "Mr.Anuchit A.",
-            "Mr.Eueangkoon S.",
-            "Mr.Puriwat S.",
-            "Mr.Theerapol W.",
-            "Mr.Pratheep N.",
-            "Mr.Kraiwit P.",
-            "Mr.Sornchai W.",
-            "Ms.Panida B.",
-            "Mr.Pakon M.",
-            "Ms.Siriwan S.",
-            "Ms.Supaporn S.",
-            "Mr.Kaptan Y."
-        ];
-        if (matrix && matrix.iqc_eng_name && matrix.iqc_eng_name !== '-' && !iqcEngineers.includes(matrix.iqc_eng_name)) {
-            iqcEngineers.unshift(matrix.iqc_eng_name);
-        }
-
-        // รายชื่อ Confirm RP (CONFIRM BY - Supervisor)
-        const confirmRpSupervisors = [
-            "Ms.Siriporn P.",
-            "Ms.Songporn C.",
-            "Mr.Komson N."
-        ];
-        if (matrix && matrix.confirm_rp_name && matrix.confirm_rp_name !== '-' && !confirmRpSupervisors.includes(matrix.confirm_rp_name)) {
-            confirmRpSupervisors.unshift(matrix.confirm_rp_name);
-        } else if (matrix && matrix.confirm_rp && matrix.confirm_rp !== '-' && !confirmRpSupervisors.includes(matrix.confirm_rp)) {
-            confirmRpSupervisors.unshift(matrix.confirm_rp);
-        }
-
-        // รายชื่อ Approve RP (APPROVED BY - ผู้อนุมัติหลัก)
-        const approveRpPrimary = [
-            "Mr.Ekkalak L."
-        ];
-        if (matrix && matrix.approve_rp_name && matrix.approve_rp_name !== '-' && !approveRpPrimary.includes(matrix.approve_rp_name)) {
-            approveRpPrimary.unshift(matrix.approve_rp_name);
-        } else if (matrix && matrix.approve_rp && matrix.approve_rp !== '-' && !approveRpPrimary.includes(matrix.approve_rp)) {
-            approveRpPrimary.unshift(matrix.approve_rp);
-        }
-
-        // รายชื่อ SQE Engineers สำหรับ VF (ISSUE BY)
-        const sqeEngineers = [
-            "Mr.Witsarut S.",
-            "Mr.Pongpan P.",
-            "Mr.Natthawut C.",
-            "Mr.Aphinan P.",
-            "Mr.Somchai R.",
-            "Mr.Eakkachai B.",
-            "Mr.Ubonsak J.",
-            "Mr.Thawutchai T.",
-            "Mr.Satthra O."
-        ];
-        if (matrix && matrix.engineer && matrix.engineer !== '-' && !sqeEngineers.includes(matrix.engineer)) {
-            sqeEngineers.unshift(matrix.engineer);
-        }
-
-        // รายชื่อ Confirm VF สำหรับ VF (CONFIRM BY - SQE Leader / Supervisor)
-        const confirmVfList = [
-            "Mr.Suphap M.",
-            "Mr.Witsarut S.",
-            "Mr.Pongpan P.",
-            "Mr.Natthawut C.",
-            "Mr.Aphinan P.",
-            "Mr.Somchai R.",
-            "Mr.Eakkachai B.",
-            "Mr.Ubonsak J.",
-            "Mr.Thawutchai T.",
-            "Mr.Satthra O."
-        ];
-        if (matrix && matrix.confirm_vf_name && matrix.confirm_vf_name !== '-' && !confirmVfList.includes(matrix.confirm_vf_name)) {
-            confirmVfList.unshift(matrix.confirm_vf_name);
-        }
-
-        // รายชื่อ Approve VF สำหรับ VF (APPROVED BY - ผู้อนุมัติหลัก)
-        const approveVfPrimary = [
-            "Mr.Watcharin Y.",
-            "Ms.Nipawan J.",
-            "Mr.Chiraphat K."
-        ];
-        if (matrix && matrix.approve_vf_name && matrix.approve_vf_name !== '-' && !approveVfPrimary.includes(matrix.approve_vf_name)) {
-            approveVfPrimary.unshift(matrix.approve_vf_name);
-        } else if (matrix && matrix.approve_vf && matrix.approve_vf !== '-' && !approveVfPrimary.includes(matrix.approve_vf)) {
-            approveVfPrimary.unshift(matrix.approve_vf);
-        }
-
-        // 🟣 ผู้อนุมัติร่วม (Approve VF/RP - Co-Approver สำหรับทั้ง VF และ RP ในช่อง APPROVED BY)
-        const coApprovers = [
-            "Ms.Nipawan J.",
-            "Mr.Watcharin Y.",
-            "Mr.Jumnong T."
-        ];
-        if (matrix && matrix.approve_vf_rp_name && matrix.approve_vf_rp_name !== '-' && !coApprovers.includes(matrix.approve_vf_rp_name)) {
-            coApprovers.unshift(matrix.approve_vf_rp_name);
-        } else if (matrix && matrix.approve_vfrp && matrix.approve_vfrp !== '-' && !coApprovers.includes(matrix.approve_vfrp)) {
-            coApprovers.unshift(matrix.approve_vfrp);
-        }
-
-        // Helper ฟังก์ชันเรนเดอร์แถวรายการพนักงาน
-        const renderStaffOption = (name, badgeLabel, badgeBgColor, badgeTextColor = '#ffffff', icon = '👤') => {
-            const email = (typeof resolveStaffEmail === 'function') ? resolveStaffEmail(name) : (STAFF_EMAIL_MAP[name] || '');
+        // 3. Helper: ฟังก์ชันวาดรายการพนักงาน (Standard UI)
+        const renderOption = (name, label, color, icon = '👤', emailAddr = '') => {
+            if (!name || name === '-' || name === 'N/A') return '';
+            const finalEmail = emailAddr || ((typeof resolveStaffEmail === 'function') ? resolveStaffEmail(name) : (STAFF_EMAIL_MAP[name] || ''));
             return `
                 <div class="modal-ac-item" 
-                     style="padding: 7px 12px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s ease;"
-                     onmouseover="this.style.backgroundColor='#f8fafc'"
-                     onmouseout="this.style.backgroundColor='transparent'"
+                     style="padding: 9px 12px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9;"
                      onmousedown="event.preventDefault(); applyModalAC('staff', '${name.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                    <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
-                        <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 800; font-size: 11.5px; color: #0f172a; white-space: nowrap;">
+                    <div style="display: flex; flex-direction: column; gap: 1px;">
+                        <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 800; color: #0f172a; white-space: nowrap;">
                             <span>${icon}</span> ${name}
                         </span>
-                        ${email ? `<span style="font-size: 9px; color: #64748b; font-weight: 500; padding-left: 18px; font-family: monospace;">${email}</span>` : ''}
+                        <span style="font-size: 9px; color: #64748b; padding-left: 18px; font-family: monospace;">${finalEmail}</span>
                     </div>
-                    <span style="font-size: 8px; line-height: 1; height: 18px; box-sizing: border-box; background: ${badgeBgColor}; color: ${badgeTextColor}; padding: 0 6px; border-radius: 4px; font-weight: 800; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px;">
-                        ${badgeLabel}
+                    <span style="font-size: 8px; background: ${color}; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 900; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;">
+                        ${label}
                     </span>
-                </div>
-            `;
+                </div>`;
         };
 
-        // ==========================================
-        // 🟢 เอกสาร RP (Return Part / IQC)
-        // ==========================================
-        if (isRP) {
-            if (inputEl.id === 'prob-issue-by') {
-                // ISSUE BY: กรองแสดงเฉพาะรายชื่อในหมวด 🟢 รายงาน RP (Return Part / IQC) - IQC Engineer
-                const matched = iqcEngineers.filter(m => !query || m.toLowerCase().includes(query));
-                if (matched.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #065f46; background: #ecfdf5; border-bottom: 1.5px solid #a7f3d0; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
-                        <span>🟢</span> รายงาน RP (Return Part / IQC) - IQC ENGINEER
-                    </div>`;
-                    matched.forEach(m => {
-                        htmlContent += renderStaffOption(m, 'IQC ENGINEER', '#059669', '#ffffff', '🟢');
-                    });
-                }
-            } else if (inputEl.id === 'prob-confirm-by') {
-                // CONFIRM BY: กรองแสดงเฉพาะ 🟢 หมวดรายงาน RP - Confirm RP (Supervisor)
-                const matched = confirmRpSupervisors.filter(m => !query || m.toLowerCase().includes(query));
-                if (matched.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #065f46; background: #ecfdf5; border-bottom: 1.5px solid #a7f3d0; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
-                        <span>🟢</span> หมวดรายงาน RP - CONFIRM RP (SUPERVISOR)
-                    </div>`;
-                    matched.forEach(m => {
-                        htmlContent += renderStaffOption(m, 'CONFIRM RP', '#059669', '#ffffff', '🟢');
-                    });
-                }
-            } else if (inputEl.id === 'prob-approved-by') {
-                // APPROVED BY (RP): แสดงทั้ง 🟢 Approve RP (ผู้อนุมัติหลัก) (Mr.Ekkalak L.) และ 🟣 Approve VF/RP (ผู้อนุมัติร่วม) (Ms.Nipawan J., Mr.Watcharin Y., Mr.Jumnong T.)
-                const primaryMatched = approveRpPrimary.filter(m => m && (!query || m.toLowerCase().includes(query)));
-                if (primaryMatched.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #065f46; background: #ecfdf5; border-bottom: 1.5px solid #a7f3d0; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
-                        <span>🟢</span> APPROVE RP (ผู้อนุมัติหลัก)
-                    </div>`;
-                    primaryMatched.forEach(m => {
-                        htmlContent += renderStaffOption(m, 'APPROVE RP', '#059669', '#ffffff', '🟢');
-                    });
-                }
+        // --------------------------------------------------------
+        // 🔹 [PART A]: ช่อง ISSUE BY (ดึงพนักงานทุกคนจากตาราง Agent)
+        // --------------------------------------------------------
+        if (inputEl.id === 'prob-issue-by') {
+            htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: #2563eb; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase;">👥 รายชื่อทีมงาน Agent ทั้งหมด (ALL ENGINEERS)</div>`;
 
-                const coMatched = coApprovers.filter(m => !approveRpPrimary.includes(m) && (!query || m.toLowerCase().includes(query)));
-                if (coMatched.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #581c87; background: #faf5ff; border-top: 1px solid #e9d5ff; border-bottom: 1.5px solid #e9d5ff; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
-                        <span>🟣</span> APPROVE VF/RP (ผู้อนุมัติร่วม)
-                    </div>`;
-                    coMatched.forEach(m => {
-                        htmlContent += renderStaffOption(m, 'APPROVE VF/RP', '#7c3aed', '#ffffff', '🟣');
+            // ดึงข้อมูลจาก Map ของพนักงาน (ตาราง users)
+            if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
+                Array.from(window._dbUsersRoleMap.values())
+                    .filter(u => {
+                        const searchStr = (u.display_name || u.email || "").toLowerCase();
+                        return !query || searchStr.includes(query);
+                    })
+                    .forEach(u => {
+                        const name = u.display_name || u.email.split('@')[0].toUpperCase();
+                        const roleLabel = (u.role || 'STAFF').toUpperCase();
+                        htmlContent += renderOption(name, roleLabel, '#2563eb', '👤', u.email);
                     });
-                }
-            }
-        } 
-        // ==========================================
-        // 🔵 เอกสาร VF (Vendor Failure)
-        // ==========================================
-        else {
-            if (inputEl.id === 'prob-issue-by') {
-                // ISSUE BY: กรองแสดงเฉพาะ 🔵 หมวดรายงาน VF - SQE Engineer
-                const matched = sqeEngineers.filter(m => !query || m.toLowerCase().includes(query));
-                if (matched.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #1e40af; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
-                        <span>🔵</span> หมวดรายงาน VF - SQE ENGINEER
-                    </div>`;
-                    matched.forEach(m => {
-                        htmlContent += renderStaffOption(m, 'SQE ENGINEER', '#2563eb', '#ffffff', '🔵');
-                    });
-                }
-            } else if (inputEl.id === 'prob-confirm-by') {
-                // CONFIRM BY: กรองแสดงเฉพาะ 🔵 หมวดรายงาน VF - Confirm VF (SQE Leader / Supervisor)
-                const matched = confirmVfList.filter(m => !query || m.toLowerCase().includes(query));
-                if (matched.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #1e40af; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
-                        <span>🔵</span> หมวดรายงาน VF - CONFIRM VF (SQE LEADER / SUPERVISOR)
-                    </div>`;
-                    matched.forEach(m => {
-                        htmlContent += renderStaffOption(m, 'CONFIRM VF', '#2563eb', '#ffffff', '🔵');
-                    });
-                }
-            } else if (inputEl.id === 'prob-approved-by') {
-                // APPROVED BY (VF): แสดงทั้ง 🔵 Approve VF (ผู้อนุมัติหลัก) (Mr.Watcharin Y., Ms.Nipawan J., Mr.Chiraphat K.) และ 🟣 Approve VF/RP (ผู้อนุมัติร่วม) (Ms.Nipawan J., Mr.Watcharin Y., Mr.Jumnong T.)
-                const primaryMatched = approveVfPrimary.filter(m => m && (!query || m.toLowerCase().includes(query)));
-                if (primaryMatched.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #1e40af; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
-                        <span>🔵</span> APPROVE VF (ผู้อนุมัติหลัก)
-                    </div>`;
-                    primaryMatched.forEach(m => {
-                        htmlContent += renderStaffOption(m, 'APPROVE VF', '#2563eb', '#ffffff', '🔵');
-                    });
-                }
-
-                const coMatched = coApprovers.filter(m => !approveVfPrimary.includes(m) && (!query || m.toLowerCase().includes(query)));
-                if (coMatched.length > 0) {
-                    htmlContent += `<div style="padding: 6px 12px; font-size: 9.5px; font-weight: 900; color: #581c87; background: #faf5ff; border-top: 1px solid #e9d5ff; border-bottom: 1.5px solid #e9d5ff; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
-                        <span>🟣</span> APPROVE VF/RP (ผู้อนุมัติร่วม)
-                    </div>`;
-                    coMatched.forEach(m => {
-                        htmlContent += renderStaffOption(m, 'APPROVE VF/RP', '#7c3aed', '#ffffff', '🟣');
-                    });
-                }
+            } else {
+                // Fallback: หากตาราง Agent ยังไม่โหลด ให้ใช้ STAFF_LIST พื้นฐาน
+                STAFF_LIST.filter(m => !query || m.toLowerCase().includes(query)).forEach(m => {
+                    htmlContent += renderOption(m, 'STAFF', '#64748b', '👤');
+                });
             }
         }
-    } 
+
+        // --------------------------------------------------------
+        // 🔹 [PART B]: ช่อง CONFIRM BY (ดึงตาม Matrix ของ Vendor)
+        // --------------------------------------------------------
+        else if (inputEl.id === 'prob-confirm-by') {
+            if (matrix) {
+                const title = isRP ? "🟢 CONFIRM RP (FROM MATRIX)" : "🔵 CONFIRM VF (FROM MATRIX)";
+                const confirmName = isRP ? matrix.confirm_rp_name : matrix.confirm_vf_name;
+                const color = isRP ? "#059669" : "#1e40af";
+                
+                htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">${title}</div>`;
+                
+                if (confirmName && confirmName !== '-') {
+                    htmlContent += renderOption(confirmName, 'CONFIRMER', color, '🛡️');
+                } else {
+                    htmlContent += `<div style="padding: 15px; text-align: center; color: #94a3b8; font-size: 10.5px;">ไม่พบรายชื่อผู้ตรวจสอบใน Matrix ของ ${vendorName}</div>`;
+                }
+            } else {
+                htmlContent += `<div style="padding: 12px; text-align: center; color: #f59e0b; font-size: 10px; font-weight: 800; background: #fffbeb; border-bottom: 1px solid #fde68a;">⚠️ ไม่พบข้อมูล Vendor Matrix<br><span style="font-weight:500; color:#94a3b8; font-size:9px;">กรุณาพิมพ์ระบุชื่อเอง หรือตรวจสอบชื่อผู้ขาย</span></div>`;
+            }
+        }
+
+        // --------------------------------------------------------
+        // 🔹 [PART C]: ช่อง APPROVED BY (ดึงตาม Matrix + ผู้อนุมัติร่วม)
+        // --------------------------------------------------------
+        else if (inputEl.id === 'prob-approved-by') {
+            if (matrix) {
+                const title = isRP ? "🟢 APPROVE RP (FROM MATRIX)" : "🔵 APPROVE VF (FROM MATRIX)";
+                const primaryAppr = isRP ? matrix.approve_rp_name : matrix.approve_vf_name;
+                const jointAppr = matrix.approve_vf_rp_name; // ผู้อนุมัติร่วม (Joint Approval)
+                const color = isRP ? "#059669" : "#1e40af";
+
+                htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">${title}</div>`;
+                
+                // 1. แสดงผู้อนุมัติหลัก (Primary Approver)
+                if (primaryAppr && primaryAppr !== '-') {
+                    htmlContent += renderOption(primaryAppr, 'PRIMARY APPROVER', color, '👑');
+                }
+
+                // 2. แสดงผู้อนุมัติร่วม / ผู้จัดการ (Joint Approver)
+                if (jointAppr && jointAppr !== '-' && jointAppr !== primaryAppr) {
+                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #7c3aed; background: #f5f3ff; border-top: 1px solid #ddd6fe;">🟣 ผู้มีอำนาจอนุมัติร่วม (MANAGEMENT)</div>`;
+                    htmlContent += renderOption(jointAppr, 'JOINT APPROVAL', '#7c3aed', '🟣');
+                }
+
+                if (!primaryAppr && !jointAppr) {
+                    htmlContent += `<div style="padding: 15px; text-align: center; color: #94a3b8; font-size: 10.5px;">ไม่พบรายชื่อผู้อนุมัติใน Matrix</div>`;
+                }
+            } else {
+                htmlContent += `<div style="padding: 12px; text-align: center; color: #f59e0b; font-size: 10px; font-weight: 800; background: #fffbeb;">⚠️ ไม่พบข้อมูล Vendor Matrix</div>`;
+            }
+        }
+    }
     // ============================================================
     // กรณีที่ 2: ข้อมูลทั่วไป
     // ============================================================
@@ -28332,42 +28430,57 @@ async function createNewCase(supportData) {
 
 // --- เพิ่มใน Wap8DSystem ---
 async function deleteCase(id) {
-    if (S.userRole === 'supervisor') { 
-        toast('⚠️ Supervisor Mode: Read-only access', 'error'); 
+    // 1. หาข้อมูลเคสที่ต้องการลบจากหน่วยความจำ
+    const target = _cases ? _cases.find(c => String(c.id) === String(id)) : null;
+    if (!target) {
+        toast('❌ ไม่พบข้อมูลเคสที่ต้องการลบ', 'error');
+        return;
+    }
+
+    // 2. ตรวจสอบสิทธิ์ (Security Logic)
+    // - อนุญาตถ้าเป็น เจ้าของเคส (user_id ตรงกับคนล็อกอิน)
+    // - อนุญาตถ้าเป็น Master Admin (คุณ Natthawut)
+    const isOwner = (target.user_id === S.currentUser);
+    const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+
+    // ถ้าไม่ใช่เจ้าของ และไม่ใช่ Admin และอยู่ในโหมด Supervisor (คนอื่นแอบมาดู) ถึงจะบล็อก
+    if (!isOwner && !isMasterAdmin && S.userRole === 'supervisor') { 
+        toast('⚠️ เฉพาะเจ้าของรายงานหรือ Admin เท่านั้นที่ลบรายการนี้ได้', 'error'); 
         return; 
     }
 
-    const target = _cases ? _cases.find(c => String(c.id) === String(id)) : null;
-
+    // 3. แสดงหน้าต่างยืนยันการลบ (ถ้าผ่านเงื่อนไขด้านบน)
     showCustomConfirmDialog({
         title: "ยืนยันการลบรายงาน 8D Report",
-        subtitle: "รายงานวิเคราะห์ปัญหานี้จะถูกลบออกจากฐานข้อมูล SQE ถาวร ไม่สามารถกู้คืนได้",
-        badge: "8D REPORT SYSTEM",
+        subtitle: "รายงานนี้จะถูกลบออกจากฐานข้อมูลถาวร เจ้าของงานยืนยันการลบหรือไม่?",
+        badge: "OWNER DELETE CONTROL",
         type: "danger",
         details: [
-            { label: "รหัสรายงาน 8D", value: id },
-            { label: "หัวข้อ / อาการปัญหา", value: target ? (target.problem_title || '-') : '-' },
-            { label: "ชื่อพาร์ท / กลุ่มพาร์ท", value: target ? `${target.part_name || '-'} (${target.part_group || '-'})` : '-' },
-            { label: "สถานะรายงาน", value: target ? (target.status || '-') : '-' }
+            { label: "รหัสรายงาน", value: id },
+            { label: "หัวข้อปัญหา", value: target.problem_title || '-' },
+            { label: "ผู้รับผิดชอบ", value: target.user_id || '-' }
         ],
-        confirmText: "🗑️ ยืนยันลบรายงาน 8D",
+        confirmText: "🗑️ ยืนยันลบรายงาน",
         cancelText: "ยกเลิก",
         onConfirm: async () => {
             try {
+                // ส่งคำสั่งลบไปยัง Supabase
                 const { error } = await sqeClient
-                    .from(TABLE)
+                    .from('eight_d_reports')
                     .delete()
                     .eq('id', id);
 
                 if (error) throw error;
 
-                toast("🗑️ ลบรายงาน 8D เรียบร้อยแล้ว", "success");
+                toast("🗑️ ลบรายงานสำเร็จโดยเจ้าของงาน", "success");
+                
+                // อัปเดตข้อมูลหน้าจอ
                 _cases = _cases.filter(c => c.id !== id);
                 renderDashboard();
 
             } catch (e) {
                 console.error("8D Delete Error:", e);
-                toast("❌ เกิดข้อผิดพลาดในการลบรายงาน 8D", "error");
+                toast("❌ เกิดข้อผิดพลาดในการลบ: " + e.message, "error");
             }
         }
     });
@@ -36514,6 +36627,89 @@ function copyHistorySummary(id) {
         });
     }
 }
+
+/**
+ * 🧠 ระบบ Dropdown อัจฉริยะสำหรับหน้า Login พนักงาน
+ */
+
+// 1. ดึงรายชื่อพนักงานทั้งหมดมาจัดระเบียบใหม่สำหรับแสดงผลใน Dropdown
+
+
+/**
+ * 🧠 ระบบจัดการดรอปดาวน์พนักงาน (SQE SUPPORT) - Consolidated Version
+ */
+
+// 3. จัดการเมื่อผู้ใช้เลือกรายชื่อ
+window.selectEmployeeLoginOption = function(email, name) {
+    const emailInput = document.getElementById('login-email');
+    const dropdown = document.getElementById('login-employee-dropdown');
+    const passInput = document.getElementById('login-pass');
+
+    if (emailInput) {
+        emailInput.value = email;
+        emailInput.classList.add('valid');
+        emailInput.classList.remove('invalid');
+    }
+
+    // ปิดดรอปดาวน์ทันที
+    if (dropdown) dropdown.classList.add('hidden');
+
+    // เลื่อนไปที่ช่องรหัสผ่านอัตโนมัติ
+    if (passInput) {
+        setTimeout(() => passInput.focus(), 50); // ใส่ timeout เล็กน้อยเพื่อให้ UI อัปเดตทัน
+    }
+
+    if (typeof toast === 'function') toast(`👤 พนักงานที่เลือก: ${name}`, "info");
+};
+
+// 4. ฟังก์ชันควบคุมการพิมพ์ค้นหา
+window.handleEmployeeInput = function(val) {
+    window.renderEmployeeLoginDropdown(val);
+};
+
+// 4.1 ฟังก์ชัน เปิด/ปิด ดรอปดาวน์ (คลิกที่ปุ่มลูกศรหรือช่อง Input)
+window.toggleEmployeeLoginDropdown = function(e) {
+    // สำคัญ: หยุดการส่งต่อ Event ไปยัง Document เพื่อไม่ให้ฟังก์ชัน "คลิกที่ว่าง" ทำงานทันทีที่กดเปิด
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    
+    const dropdown = document.getElementById('login-employee-dropdown');
+    if (!dropdown) return;
+
+    const isHidden = dropdown.classList.contains('hidden');
+    if (isHidden) {
+        const input = document.getElementById('login-email');
+        window.renderEmployeeLoginDropdown(input ? input.value : '');
+        dropdown.classList.remove('hidden');
+    } else {
+        dropdown.classList.add('hidden');
+    }
+};
+
+// 5. 🛡️ ระบบตรวจจับการคลิกนอกพื้นที่ (คลิกพื้นที่ว่างให้ปิด)
+// ใช้ mousedown จะแม่นยำกว่า click ทั่วไป
+document.addEventListener('mousedown', (e) => {
+    // ระบุพื้นที่ "ห้ามปิด" (คือส่วนของช่อง Input และตัว Dropdown เอง)
+    const staffGroup = document.getElementById('email-input-group');
+    const staffDropdown = document.getElementById('login-employee-dropdown');
+    
+    if (staffDropdown && !staffDropdown.classList.contains('hidden')) {
+        // ถ้าจุดที่คลิก (e.target) ไม่ได้อยู่ในกลุ่ม staffGroup ให้สั่งปิด
+        if (staffGroup && !staffGroup.contains(e.target)) {
+            staffDropdown.classList.add('hidden');
+        }
+    }
+
+    // แถม: กรณีของ Supervisor (ถ้ามี)
+    const supGroup = document.getElementById('supervisor-quick-select-wrap');
+    const supDropdown = document.getElementById('login-supervisor-dropdown');
+    
+    if (supDropdown && !supDropdown.classList.contains('hidden')) {
+        if (supGroup && !supGroup.contains(e.target)) {
+            supDropdown.classList.add('hidden');
+        }
+    }
+});
+
 
     return {
         init,

@@ -148,70 +148,82 @@
 
             <div class="login-input-area">
     <div class="space-y-5">
-        <!-- 1. Email Input พร้อม Real-time Validation & Datalist -->
-        <div id="email-input-group" class="input-group">
-            <label class="input-tiny-label">Access Email</label>
-            <input  type="email" id="login-email" list="login-email-list" class="premium-input" placeholder="name@carrier.com" oninput="validateEmail(this)" title="Name@Carrier.Com" aria-label="Name@Carrier.Com">
-            <datalist id="login-email-list"></datalist>
-            <p id="email-hint" class="hidden text-[8px] mt-1 font-bold text-rose-400 uppercase tracking-tighter">โปรดระบุอีเมลองค์กรที่ถูกต้อง</p>
+  <!-- Container หลักของระบบเลือกรายชื่อ -->
+<div id="employee-select-wrap" class="input-group relative">
+    
+    <!-- ส่วนหัว (Label & Badge) -->
+    <div class="flex items-center justify-between mb-1.5 gap-2 flex-nowrap w-full">
+        <div class="flex items-center gap-1.5 whitespace-nowrap shrink-0 min-w-0">
+            <!-- จุดสีฟ้ากระพริบ (Gimmick) -->
+            <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
+            <span class="text-[9px] font-black uppercase tracking-wider text-blue-300">Select Operator / Staff</span>
         </div>
+        <!-- Badge ขวาล่าง -->
+        <span class="text-[8.5px] font-black text-blue-400 uppercase tracking-wider bg-blue-950/70 px-2 py-0.5 rounded border border-blue-500/40 whitespace-nowrap shrink-0">
+            👤 SQE SUPPORT
+        </span>
+    </div>
 
-        <!-- Quick Select for Approvers & Engineers (4. Engineering & Reports / 5. Approval Matrix) -->
-        <div id="supervisor-quick-select-wrap" class="hidden input-group relative">
-            <div class="flex items-center justify-between mb-1.5 gap-2 flex-nowrap w-full">
-                <div class="flex items-center gap-1.5 whitespace-nowrap shrink-0 min-w-0">
-                    <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
-                    <span class="text-[9px] font-black uppercase tracking-wider text-blue-300 whitespace-nowrap">ACCESS APPROVER / ENGINEER</span>
-                </div>
-                <span class="text-[8.5px] font-black text-emerald-400 uppercase tracking-wider bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-500/40 whitespace-nowrap shrink-0">⚡ ENGINEER+ ONLY</span>
-            </div>
-            <div class="relative w-full">
-                <div class="relative flex items-center">
-                    <input type="text" 
-                           id="login-supervisor-input" 
-                           placeholder="🔍 ค้นหา / เลือกวิศวกรและหัวหน้างาน..." 
-                           class="premium-input pr-9 text-xs font-semibold text-white bg-slate-900/90 border-blue-500/40 focus:border-blue-400 cursor-pointer" 
-                           autocomplete="off"
-                           oninput="handleSupervisorInput(this.value)"
-                           onfocus="renderSupervisorLoginDropdown(this.value)"
-                           onclick="renderSupervisorLoginDropdown(this.value)"
-                           title="เลือกหัวหน้างาน / ผู้อนุมัติ / วิศวกร" 
-                           aria-label="เลือกหัวหน้างาน / ผู้อนุมัติ / วิศวกร">
-                    <button type="button" 
-                            id="login-supervisor-chevron-btn"
-                            onclick="toggleSupervisorLoginDropdown(event)" 
-                            class="absolute right-2 text-slate-400 hover:text-white transition-all p-1"
-                            title="แสดงรายชื่อ" 
-                            aria-label="แสดงรายชื่อ">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </button>
-                </div>
-                
-                <!-- Custom Dropdown Container styled like Claim Modal AC -->
-                <div id="login-supervisor-dropdown" 
-                     class="hidden absolute top-full left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-xl bg-slate-950/95 border border-blue-500/50 shadow-2xl z-[99999] backdrop-blur-xl p-1.5 custom-scrollbar text-left">
-                </div>
-            </div>
-            <select id="login-supervisor-select" onchange="handleSupervisorQuickSelect(this.value)" class="hidden">
-                <option value="">-- เลือกหัวหน้างาน / ผู้อนุมัติ / วิศวกร --</option>
-            </select>
+    <!-- ส่วน Input และปุ่มกด -->
+    <div class="relative w-full">
+        <div class="relative flex items-center">
+            <!-- ช่องค้นหา (Search Input) -->
+<!-- ช่องค้นหา (Search Input) -->
+<input type="text" 
+       id="login-email" 
+       placeholder="🔍 ค้นหาชื่อพนักงาน หรือทีมที่สังกัด..." 
+       class="premium-input pr-9 text-xs font-semibold text-white bg-slate-900/90 border-blue-500/40 focus:border-blue-400 cursor-pointer" 
+       autocomplete="off"
+       spellcheck="false"
+       oninput="handleEmployeeInput(this.value)"
+       onfocus="renderEmployeeLoginDropdown(this.value)"
+       onclick="renderEmployeeLoginDropdown(this.value)"
+       title="ระบุชื่อหรืออีเมลพนักงาน" 
+       aria-label="ระบุชื่อหรืออีเมลพนักงาน">
+            
+            <!-- ปุ่มลูกศรด้านขวา (Chevron) -->
+            <button type="button" 
+                    id="employee-chevron-btn"
+                    onclick="toggleEmployeeLoginDropdown(event)" 
+                    class="absolute right-2 text-slate-400 hover:text-white transition-all p-1"
+                    title="แสดงรายชื่อพนักงานทั้งหมด">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
         </div>
+        
+        <!-- แผงรายการผลลัพธ์ (Dropdown Panel) -->
+        <!-- ส่วนนี้จะถูกฉีด HTML เข้าไปผ่านฟังก์ชัน renderEmployeeLoginDropdown ใน JS -->
+        <div id="login-employee-dropdown" 
+             class="hidden absolute top-full left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-xl bg-slate-950/95 border border-blue-500/50 shadow-2xl z-[99999] backdrop-blur-xl p-1.5 custom-scrollbar text-left">
+            <!-- ตัวอย่างรายการที่จะแสดง (Placeholder) -->
+            <div class="p-3 text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                Initializing Directory...
+            </div>
+        </div>
+    </div>
+</div>
         
         <!-- 2. Password Input พร้อม Toggle & Caps Lock Detection -->
-        <div id="password-field" class="input-group relative">
+<div id="password-field" class="input-group relative">
     <label class="input-tiny-label">Security Key</label>
     <div class="relative">
-        <!-- ช่องกรอกรหัสผ่าน -->
-        <input  type="password" id="login-pass" class="premium-input pr-12" placeholder="••••••••" onkeyup="checkCapsLock(event)" title="••••••••" aria-label="••••••••">
+        <!-- ช่องกรอกรหัสผ่าน (เพิ่ม autocomplete="one-time-code") -->
+        <input type="password" 
+               id="login-pass" 
+               class="premium-input pr-12" 
+               placeholder="••••••••" 
+               autocomplete="one-time-code" 
+               onkeyup="checkCapsLock(event)" 
+               title="••••••••" 
+               aria-label="••••••••">
         
-        <!-- ปุ่มดวงตา (ใช้ SVG เพื่อความชัวร์) -->
-        <button  type="button" onclick="togglePassVisibility()" class="absolute right-4 top-1/2 -translate-y-1/2 z-50 text-slate-400 hover:text-white transition-all" title="Toggle Password Visibility" aria-label="Toggle Password Visibility">
+        <!-- ปุ่มดวงตา -->
+        <button type="button" onclick="togglePassVisibility()" class="absolute right-4 top-1/2 -translate-y-1/2 z-50 text-slate-400 hover:text-white transition-all" title="Toggle Password Visibility" aria-label="Toggle Password Visibility">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
-                <!-- เส้นขีดฆ่าดวงตา (มี ID เพื่อให้ JS สั่งโชว์/ซ่อนได้) -->
                 <line id="eye-slash" x1="3" y1="3" x2="21" y2="21" style="display:none;"></line>
             </svg>
         </button>
