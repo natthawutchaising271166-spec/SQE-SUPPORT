@@ -9686,14 +9686,16 @@ function switchSubTerminal(view) {
     }
 }
 
-
 /**
- * ═══════════════════════════════════════════════════════
- *  UNIFIED SWITCH PAGE SYSTEM (V3.1 - FIXED SHOW FORM)
- *  จัดการการสลับหน้าจอและการแสดงผลปุ่มควบคุมฟอร์ม
- * ═══════════════════════════════════════════════════════
+ * ══════════════════════════════════════════════════════════════════════════
+ *  UNIFIED SWITCH PAGE SYSTEM (V3.3 - FULL ACCESS & SHOW FORM)
+ *  - จัดการการสลับหน้าจอทั้งหมด
+ *  - ปลดล็อคปุ่มเปิดฟอร์ม (Show Form) ให้แสดงผลสำหรับทุกคนในหน้า Claim
+ *  - ปลดล็อคช่องกรอกข้อมูล (Form Panel) ให้ทุกคนสามารถพิมพ์ใช้งานได้ 100%
+ * ══════════════════════════════════════════════════════════════════════════
  */
 function switchPage(name, el) {
+    // ปิด Modal ที่อาจค้างอยู่
     if (typeof WapAdminSystem !== 'undefined' && typeof WapAdminSystem.closeMasterModal === 'function') {
         WapAdminSystem.closeMasterModal();
     }
@@ -9714,21 +9716,19 @@ function switchPage(name, el) {
     const onlineBadge = document.getElementById('online-badge');
     const vendorFilter = document.getElementById('claim-vendor-filter');
     const vendorDivider = document.getElementById('vendor-divider');
-    const showFormBtn = document.getElementById('show-form-btn'); // ดึงอ้างอิงปุ่มเปิดฟอร์ม
+    const showFormBtn = document.getElementById('show-form-btn'); 
 
-    // --- STEP 1: RESET GLOBAL UI STATES ---
-    // ล้างสถานะ Staff Selector
+    // --- STEP 1: RESET GLOBAL UI STATES (ล้างสถานะเดิมก่อนเริ่มหน้าใหม่) ---
     if (staffWrap) {
         staffWrap.classList.add('hidden');
         staffWrap.classList.remove('flex');
         staffWrap.style.display = 'none'; 
     }
     
-    // ล้างสถานะปุ่มเปิดฟอร์ม (ซ่อนไว้ก่อนทุกหน้า)
     if (showFormBtn) {
         showFormBtn.classList.add('hidden');
         showFormBtn.style.display = 'none';
-        gsap.set(showFormBtn, { opacity: 0, x: 20 }); // เตรียมพร้อมสำหรับอนิเมชั่นขาเข้า
+        gsap.set(showFormBtn, { opacity: 0, x: 20 }); 
     }
     
     if (onlineBadge) onlineBadge.classList.add('hidden');
@@ -9739,7 +9739,7 @@ function switchPage(name, el) {
         sqeHeaderTools.classList.add('hidden');
     }
 
-    // --- STEP 2: MANAGE SIDEBAR ACTIVE STATE ---
+    // --- STEP 2: MANAGE SIDEBAR ACTIVE STATE (อัปเดตแถบสีเมนู) ---
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
     document.querySelectorAll('.active-indicator').forEach(i => i.remove());
     if (el) {
@@ -9749,7 +9749,7 @@ function switchPage(name, el) {
         el.appendChild(indicator);
     }
 
-    // --- STEP 3: HIDE ALL CONTENT PAGES ---
+    // --- STEP 3: HIDE ALL CONTENT PAGES (ซ่อนทุกหน้าเนื้อหา) ---
     const allPages = [
         'entry-terminal-content', 'overview-cockpit-content', 'exec-dashboard-content',
         'attendance-logs', 'line-support-logs-content', 'five-s-content',
@@ -9764,7 +9764,7 @@ function switchPage(name, el) {
 
     // --- STEP 4: HEADER & SPECIAL PAGE LOGIC ---
     
-    // 1. Admin Console Logic
+    // 1. Admin Console Theme Logic
     if (pageNameUpper === 'ADMIN CONSOLE') {
         if (adminHeaderTools) {
             adminHeaderTools.classList.remove('hidden');
@@ -9780,38 +9780,35 @@ function switchPage(name, el) {
         }
     }
 
-    // 2. Part Line Claim Logic (จัดการ Staff Selector และปุ่ม Show Form)
+    // 2. 🎯 [จุดแก้ไข] PART LINE CLAIM LOGIC (เปิดให้ทุกคนใช้งานได้)
     if (pageNameUpper === 'PART LINE CLAIM') {
         if (subNav) subNav.classList.remove('hidden'); 
         if (claimOpTools) { claimOpTools.classList.remove('hidden'); claimOpTools.classList.add('flex'); }
         if (dashFilterWrap) dashFilterWrap.classList.add('hidden');
         
-        // เรียกฟังก์ชันหน้าตารางย่อย
         switchSubTerminal('entry'); 
 
-        // 🛡️ PRIVILEGE GUARD สำหรับหน้า CLAIM
-        if (S.userRole === 'supervisor') {
-            // ถ้าเป็น Supervisor: โชว์รายชื่อพนักงาน แต่ซ่อนปุ่มเปิดฟอร์ม (เพราะแก้ไขไม่ได้)
-            if (staffWrap) {
-                staffWrap.classList.remove('hidden');
-                staffWrap.classList.add('flex');
-                staffWrap.style.display = 'flex';
-            }
-            if (showFormBtn) {
-                showFormBtn.classList.add('hidden');
-                showFormBtn.style.display = 'none';
-            }
-        } else {
-            // ถ้าเป็น Staff: ซ่อนรายชื่อพนักงาน แต่ "แสดง" ปุ่มเปิดฟอร์มกลับมา
-            if (staffWrap) {
-                staffWrap.classList.add('hidden');
-                staffWrap.style.display = 'none';
-            }
-            if (showFormBtn) {
-                showFormBtn.classList.remove('hidden');
-                showFormBtn.style.display = 'flex';
-                gsap.to(showFormBtn, { x: 0, opacity: 1, duration: 0.4, ease: "power2.out" });
-            }
+        // ✅ A. เปิดปุ่ม "Show Form" ให้แสดงผลสำหรับทุกคน (Staff, Admin, Supervisor)
+        if (showFormBtn) {
+            showFormBtn.classList.remove('hidden');
+            showFormBtn.style.display = 'flex';
+            gsap.to(showFormBtn, { x: 0, opacity: 1, duration: 0.4, ease: "power2.out" });
+        }
+
+        // ✅ B. ปลดล็อคช่องกรอกข้อมูล (Form Panel) ให้ทุกคนพิมพ์งานได้
+        const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
+        formInputs.forEach(inputEl => {
+            inputEl.disabled = false;      // เปิดให้พิมพ์ได้
+            inputEl.style.opacity = '1';    // ความเข้มปกติ
+            inputEl.style.cursor = 'text';   // เคอร์เซอร์ปกติ
+        });
+
+        // C. แสดงรายชื่อพนักงาน (Staff Selector) เฉพาะระดับที่มีสิทธิ์ดูแลคนอื่น
+        const isManagement = ['admin', 'manager', 'supervisor', 'engineer'].includes(S.userRole);
+        if (isManagement && staffWrap) {
+            staffWrap.classList.remove('hidden');
+            staffWrap.classList.add('flex');
+            staffWrap.style.display = 'flex';
         }
     } 
     else if (pageNameUpper === 'ADMIN CONSOLE' || pageNameUpper === 'ADMIN USER CONTROL') {
@@ -9820,7 +9817,7 @@ function switchPage(name, el) {
             : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
 
         if (!isAllowedAdmin) {
-            toast('⚠️ คุณไม่มีสิทธิ์เข้าถึง Admin Console', 'error');
+            toast('⚠️ เฉพาะระดับบริหารจัดการเท่านั้นที่เข้าถึงส่วนนี้ได้', 'error');
             return;
         }
         if (subNav) subNav.classList.add('hidden'); 
