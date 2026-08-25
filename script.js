@@ -6745,6 +6745,23 @@ function handleLogout() {
     S.viewingUser = '';
     S.records = [];
 
+    // ============================================================
+    // 🎯 [จุดที่แก้ไขเพิ่มเติม]: รีเซ็ตระบบการกรองรายชื่อในหน้า Login
+    // ============================================================
+    S.loginRole = 'staff'; // รีเซ็ตสิทธิ์การล็อกอินกลับเป็นพนักงานทั่วไป
+    
+    // สั่งสลับหน้าตาปุ่มกด (Tab) กลับไปที่ SQE SUPPORT
+    if (typeof switchLoginTab === 'function') {
+        switchLoginTab('staff');
+    }
+
+    // ล้างเนื้อหาในดรอปดาวน์พนักงานเดิมทิ้ง เพื่อบังคับให้โหลดใหม่ตามสิทธิ์ staff
+    const empDropdown = document.getElementById('login-employee-dropdown');
+    if (empDropdown) {
+        empDropdown.classList.add('hidden');
+        empDropdown.innerHTML = ''; 
+    }
+
     // 2. ล้างค่าในฟอร์ม Login ทุกช่อง (Access Email, Approver Select, Password)
     const emailIn = document.getElementById('login-email');
     if (emailIn) {
@@ -6786,26 +6803,24 @@ function handleLogout() {
         loginError.classList.add('hidden');
     }
 
-    // 3. [จุดสำคัญ] คืนค่าแอนิเมชั่น (Reset Warp Effect)
-    // ใช้ gsap.set เพื่อคืนค่าดั้งเดิมทันที
+    // 3. คืนค่าแอนิเมชั่น (Reset Warp Effect)
     const loginCard = document.querySelector('.modern-glass-card');
     const brandHeader = document.querySelector('.login-brand-header');
     const bgScene = document.querySelector('.background-scene');
     const footerInfo = document.querySelector('.login-footer-info');
     const banner = document.getElementById('system-announcement');
 
-    // ล้างค่า inline style ที่ GSAP เคยเขียนทับไว้
-    gsap.set([loginCard, brandHeader, footerInfo], {
-        clearProps: "all" 
-    });
+    if (window.gsap) {
+        gsap.set([loginCard, brandHeader, footerInfo], {
+            clearProps: "all" 
+        });
+        gsap.set(bgScene, {
+            clearProps: "all"
+        });
+    }
 
-    gsap.set(bgScene, {
-        clearProps: "all"
-    });
-
-    // แสดง Banner กลับมา (ถ้าอยากให้โชว์ใหม่ทุกครั้งที่ Logout)
     if (banner) {
-        gsap.set(banner, { clearProps: "all" });
+        if (window.gsap) gsap.set(banner, { clearProps: "all" });
         banner.style.display = 'flex'; 
     }
 
@@ -13083,38 +13098,59 @@ function cancelEditAttRecord() {
 }
 
 async function deleteAttRecord(id) {
-    if (S.userRole === 'supervisor') { attToast('โหมดอ่านอย่างเดียว', 'info'); return; }
-    if (!navigator.onLine) { attToast('📶 ออฟไลน์: ไม่สามารถลบข้อมูลได้', 'error'); return; }
-    
+    // 1. ค้นหาข้อมูลรายการลาที่ต้องการลบ
     const target = S.attLeaveRecords ? S.attLeaveRecords.find(r => String(r.id) === String(id)) : null;
+    if (!target) {
+        attToast('❌ ไม่พบข้อมูลที่ต้องการลบ', 'error');
+        return;
+    }
 
+    // 2. ตรวจสอบสิทธิ์ (Ownership Logic)
+    // - เป็นเจ้าของรายการ (user_id ตรงกับคนที่ล็อกอิน)
+    // - หรือเป็น Master Admin (Natthawut)
+    const isOwner = (target.user_id === S.currentUser);
+    const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+
+    // บล็อกการลบเฉพาะกรณีที่เป็นคนอื่น และอยู่ในโหมด Supervisor
+    if (!isOwner && !isMasterAdmin && S.userRole === 'supervisor') { 
+        attToast('⚠️ เฉพาะเจ้าของบันทึกหรือ Admin เท่านั้นที่ลบรายการนี้ได้', 'error'); 
+        return; 
+    }
+
+    // 3. แสดงหน้าต่างยืนยันการลบแบบ Custom (เหมือนหน้าอื่นๆ)
     showCustomConfirmDialog({
         title: "ยืนยันการลบข้อมูลการลา",
-        subtitle: "รายการนี้จะถูกลบออกจาก Attendance Logs และไม่สามารถกู้คืนได้",
-        badge: "ATTENDANCE LOGS",
+        subtitle: "รายการลาหยุดนี้จะถูกลบออกจากระบบถาวร เจ้าของงานยืนยันหรือไม่?",
+        badge: "LEAVE OWNER CONTROL",
         type: "danger",
         details: [
-            { label: "วันที่ขอลา", value: target ? formatDateTH(target.event_date) : '-' },
-            { label: "ประเภทการลา", value: target ? (target.leave_type || target.shift || '-') : '-' },
-            { label: "เหตุผล / หมายเหตุ", value: target ? (target.reason || target.remark || '-') : '-' },
-            { label: "ผู้ยื่นคำขอ", value: target ? (target.user_id || S.currentUser) : S.currentUser }
+            { label: "วันที่บันทึก", value: formatDateTH(target.date) },
+            { label: "ประเภทการลา", value: attTypeMap[target.type]?.label || target.type },
+            { label: "เหตุผล/หมายเหตุ", value: target.note || '-' },
+            { label: "ผู้ยื่นคำขอ", value: target.user_id || '-' }
         ],
         confirmText: "🗑️ ยืนยันลบรายการลา",
         cancelText: "ยกเลิก",
         onConfirm: async () => {
             try {
+                // ลบข้อมูลในหน่วยความจำ (Optimistic Update)
                 S.attLeaveRecords = S.attLeaveRecords.filter(r => String(r.id) !== String(id));
-                var res = await wapClient.from(ATT_LEAVE_TABLE).delete().eq('id', id);
-                if (res.error) throw res.error;
+                
+                // ส่งคำสั่งลบไปยัง Supabase (ตาราง daily_reports)
+                const { error } = await wapClient.from('daily_reports').delete().eq('id', id);
+                if (error) throw error;
 
                 if (attEditingId === id) cancelEditAttRecord();
 
-                attToast('ลบรายการเรียบร้อย', 'success');
-                await initAttDashboard();
+                attToast('🗑️ ลบรายการลาเรียบร้อยแล้ว', 'success');
+                
+                // รีเฟรชหน้าจอทั้งหมด (ตาราง, กราฟ, ปฏิทิน)
+                await initAttDashboard(); 
+                
             } catch (e) {
-                console.error('Delete daily_reports error:', e);
+                console.error('Delete attendance error:', e);
                 attToast('ลบไม่สำเร็จ: ' + (e.message || 'เกิดข้อผิดพลาด'), 'error');
-                await initAttDashboard();
+                await initAttDashboard(); // โหลดข้อมูลกลับมาถ้าลบพลาด
             }
         }
     });
@@ -13951,136 +13987,132 @@ const WapSupportLogs = (function () {
             return `${day} ${month}'${yr}`;
         }
 
-        // Helper: Parse Problem Details thoroughly for RP and Line Claim (VF)
+        // Helper: Parse Problem Details thoroughly for RP, Records, and Line Claim (VF)
         function parseProblemDetails(rawProb, rec = {}) {
             let res = {
-                user: (rec.user || rec.informer || rec.area || rec.dept || rec.line || '').trim(),
+                user: (rec.user || rec.informer || rec.area || rec.dept || rec.line || rec._user || '').trim(),
                 partName: (rec.partName || rec.part_name || '').trim(),
-                partNo: (rec.partNo || rec.part_no || '').trim(),
+                partNo: (rec.partNo || rec.part_no || rec.drawing_no || '').trim(),
                 supplier: (rec.supplier || '').trim(),
                 defect: (rec.defect || rec.defect_detail || '').trim(),
-                dateStr: _formatProblemDateStr(rec.eventDate),
+                dateStr: _formatProblemDateStr(rec.eventDate || rec.event_date || rec.createdAt || rec.created_at),
                 isRP: false
             };
 
-            const clean = getCleanProblemTitle(rawProb || '');
+            if (rec.report_data?.vf_data) {
+                const vf = rec.report_data.vf_data;
+                if (!res.partName && vf.part_name) res.partName = String(vf.part_name).trim();
+                if (!res.partNo && vf.drawing_no) res.partNo = String(vf.drawing_no).trim();
+                if (!res.supplier && vf.vendor) res.supplier = String(vf.vendor).trim();
+                if (!res.defect && vf.defect) res.defect = String(vf.defect).trim();
+            }
+
+            let clean = (typeof getCleanProblemTitle === 'function') 
+                ? getCleanProblemTitle(rawProb || '') 
+                : String(rawProb || '').trim();
+
             if (!clean) return res;
 
-            res.isRP = (/^IQC/i.test(clean) || (rec.report || '').toString().toUpperCase().includes('RP'));
+            const repType = (rec.report || rec.report_type || '').toString().toUpperCase();
+            res.isRP = (/^IQC/i.test(clean) || repType.includes('RP') || repType.includes('IQC'));
 
             if (res.isRP) {
-                // 5. 📍 ผู้แจ้ง / พื้นที่ (Area/Dept) คือ IQC incoming inspection
                 res.user = "IQC incoming inspection";
+            }
 
-                let afterAbout = clean;
+            // 1. ตรวจหาวันที่ "On <date> ..."
+            const onDateMatch = clean.match(/^On\s+(\d{1,2}\s+[A-Za-z]{3}(?:'\d{2}|\s+\d{2,4})?)\b/i);
+            if (onDateMatch && onDateMatch[1]) {
+                res.dateStr = onDateMatch[1].trim();
+            }
+
+            // 2. แยก Prefix และ Main Content
+            let mainContent = clean;
+
+            if (/^IQC/i.test(clean)) {
+                if (/IQC judgement/i.test(clean)) {
+                    clean = clean.split(/\.?\s*IQC judgement/i)[0].trim();
+                }
                 if (/about/i.test(clean)) {
                     const parts = clean.split(/about/i);
-                    afterAbout = parts.slice(1).join('about').trim();
+                    mainContent = parts.slice(1).join('about').trim();
                 }
+            } else if (/record\s*:/i.test(clean)) {
+                // e.g. "On 25 Aug'26 V1 record: BELL-MOUNT / 1140009601 PARADISE PLASTIC CO., LTD. found defect Part deform"
+                const recordParts = clean.split(/record\s*:/i);
+                const prefix = recordParts[0].trim();
+                mainContent = recordParts.slice(1).join('record:').trim();
 
-                // ตัดส่วน ". IQC judgement..." ด้านหลัง
-                let mainPart = afterAbout;
-                if (/IQC judgement/i.test(afterAbout)) {
-                    mainPart = afterAbout.split(/\.?\s*IQC judgement/i)[0].trim();
+                let rawUser = prefix.replace(/^On\s+/i, '');
+                if (onDateMatch && onDateMatch[1]) {
+                    rawUser = rawUser.replace(onDateMatch[1], '').trim();
                 }
+                rawUser = rawUser.replace(/\b\d{1,2}\s+[A-Za-z']+\d{2}\b/gi, '').replace(/\b[A-Za-z']+\d{2}\b/gi, '').trim();
+                if (rawUser && (!res.user || res.user === 'IQC incoming inspection')) res.user = rawUser;
+                else if (rawUser) res.user = rawUser;
+            } else if (/inform(?:\s+quality\s+problem)?\s+about/i.test(clean)) {
+                const parts = clean.split(/inform(?:\s+quality\s+problem)?\s+about/i);
+                const prefix = parts[0].trim();
+                mainContent = parts.slice(1).join('about').trim();
 
-                // 2 & 3. แยกชื่อพาร์ท (หลัง about) และรหัสพาร์ท (หลัง /)
-                if (mainPart.includes('/')) {
-                    const slashParts = mainPart.split('/');
-                    res.partName = slashParts[0].trim();
-                    const rest = slashParts.slice(1).join('/').trim();
+                let rawUser = prefix.replace(/^On\s+/i, '');
+                if (onDateMatch && onDateMatch[1]) {
+                    rawUser = rawUser.replace(onDateMatch[1], '').trim();
+                }
+                rawUser = rawUser.replace(/\b\d{1,2}\s+[A-Za-z']+\d{2}\b/gi, '').replace(/\b[A-Za-z']+\d{2}\b/gi, '').trim();
+                if (rawUser && (!res.user || res.user === 'IQC incoming inspection')) res.user = rawUser;
+                else if (rawUser) res.user = rawUser;
+            } else if (/about/i.test(clean)) {
+                const parts = clean.split(/about/i);
+                const prefix = parts[0].trim();
+                mainContent = parts.slice(1).join('about').trim();
+                let rawUser = prefix.replace(/^On\s+/i, '').replace(/inform.*$/i, '').trim();
+                if (onDateMatch && onDateMatch[1]) {
+                    rawUser = rawUser.replace(onDateMatch[1], '').trim();
+                }
+                rawUser = rawUser.replace(/\b\d{1,2}\s+[A-Za-z']+\d{2}\b/gi, '').replace(/\b[A-Za-z']+\d{2}\b/gi, '').trim();
+                if (rawUser && (!res.user || res.user === 'IQC incoming inspection')) res.user = rawUser;
+                else if (rawUser) res.user = rawUser;
+            }
 
-                    if (/found defect/i.test(rest)) {
-                        const defSplit = rest.split(/found defect/i);
-                        const beforeDef = defSplit[0].trim();
-                        res.defect = defSplit.slice(1).join('found defect').trim();
-                        const tokens = beforeDef.split(/\s+/);
-                        if (tokens.length > 0 && tokens[0]) {
-                            res.partNo = tokens[0].trim();
-                            if (tokens.length > 1) {
-                                res.supplier = tokens.slice(1).join(' ').trim();
-                            }
-                        }
-                    } else {
-                        const tokens = rest.split(/\s+/);
-                        if (tokens.length > 0 && tokens[0]) {
-                            res.partNo = tokens[0].trim();
-                            if (tokens.length === 2) {
-                                res.defect = tokens[1].trim();
-                            } else if (tokens.length > 2) {
-                                res.supplier = tokens.slice(1, -1).join(' ').trim();
-                                res.defect = tokens[tokens.length - 1].trim();
-                            }
-                        }
-                    }
-                } else {
-                    if (/found defect/i.test(mainPart)) {
-                        const defSplit = mainPart.split(/found defect/i);
-                        res.partName = defSplit[0].trim();
-                        res.defect = defSplit.slice(1).join('found defect').trim();
-                    } else {
-                        res.partName = mainPart;
+            // 3. แยก Defect ออกจาก mainContent
+            let partInfoStr = mainContent;
+            let defectStr = '';
+
+            if (/found defect/i.test(mainContent)) {
+                const defSplit = mainContent.split(/found defect/i);
+                partInfoStr = defSplit[0].trim();
+                defectStr = defSplit.slice(1).join('found defect').trim();
+            } else if (/defect\s*:/i.test(mainContent)) {
+                const defSplit = mainContent.split(/defect\s*:/i);
+                partInfoStr = defSplit[0].trim();
+                defectStr = defSplit.slice(1).join('defect:').trim();
+            }
+
+            if (defectStr) {
+                res.defect = defectStr;
+            }
+
+            // 4. แยก partName, partNo, supplier จาก partInfoStr
+            if (partInfoStr.includes('/')) {
+                const slashParts = partInfoStr.split('/');
+                res.partName = slashParts[0].trim();
+                const afterSlash = slashParts.slice(1).join('/').trim();
+
+                const tokens = afterSlash.split(/\s+/);
+                if (tokens.length > 0 && tokens[0]) {
+                    res.partNo = tokens[0].trim();
+                    if (tokens.length > 1) {
+                        res.supplier = tokens.slice(1).join(' ').trim();
                     }
                 }
             } else {
-                // VF / Line Claim: e.g. "On 14 Aug'26 OSA-A1 inform quality problem about COVER-MOTOR / 1129810601 V.PARADISE found defect BROKEN"
-                const match = clean.match(/^On\s+(.*?)\s+(.*?)\s+inform quality problem about\s+(.*?)(?:\s+found defect\s+(.*))?$/i);
-                if (match) {
-                    let rawDateStr = (match[1] || '').trim();
-                    let rawUserStr = (match[2] || '').trim();
-                    rawUserStr = rawUserStr.replace(/\b\d{1,2}\s+[A-Za-z']+\d{2}\b/gi, '').replace(/\b[A-Za-z']+\d{2}\b/gi, '').trim();
-
-                    res.dateStr = getCleanProblemTitle(rawDateStr) || res.dateStr;
-                    res.user = rawUserStr;
-                    const aboutContent = (match[3] || '').trim();
-                    res.defect = (match[4] || '').trim();
-
-                    if (aboutContent.includes('/')) {
-                        const slashParts = aboutContent.split('/');
-                        res.partName = slashParts[0].trim();
-                        const rest = slashParts.slice(1).join('/').trim();
-                        const tokens = rest.split(/\s+/);
-                        if (tokens.length > 0 && tokens[0]) {
-                            res.partNo = tokens[0].trim();
-                            if (tokens.length > 1) {
-                                res.supplier = tokens.slice(1).join(' ').trim();
-                            }
-                        }
+                if (!res.partName && partInfoStr) {
+                    if (!defectStr && !mainContent.includes('/')) {
+                        if (!res.defect) res.defect = partInfoStr;
                     } else {
-                        res.partName = aboutContent;
+                        res.partName = partInfoStr;
                     }
-                } else if (/inform/i.test(clean) && /about/i.test(clean)) {
-                    const preAbout = clean.split(/about/i)[0];
-                    const postAbout = clean.split(/about/i).slice(1).join('about');
-                    const userMatch = preAbout.match(/inform/i);
-                    if (userMatch) {
-                        const beforeInform = preAbout.slice(0, userMatch.index).trim();
-                        const dateMatch = beforeInform.match(/^On\s+(.*?)\s+(.*)$/i);
-                        if (dateMatch) {
-                            res.dateStr = dateMatch[1].trim();
-                            res.user = dateMatch[2].trim();
-                        } else {
-                            res.user = beforeInform.replace(/^On\s+/i, '').trim();
-                        }
-                    }
-                    if (postAbout.includes('/')) {
-                        const slashParts = postAbout.split('/');
-                        res.partName = slashParts[0].trim();
-                        const rest = slashParts.slice(1).join('/').trim();
-                        if (/found defect/i.test(rest)) {
-                            const defSplit = rest.split(/found defect/i);
-                            const suppTokens = defSplit[0].trim().split(/\s+/);
-                            if (suppTokens.length > 0 && suppTokens[0]) res.partNo = suppTokens[0].trim();
-                            if (suppTokens.length > 1) res.supplier = suppTokens.slice(1).join(' ').trim();
-                            res.defect = defSplit.slice(1).join('found defect').trim();
-                        } else {
-                            const tokens = rest.split(/\s+/);
-                            if (tokens[0]) res.partNo = tokens[0].trim();
-                            if (tokens.length > 1) res.defect = tokens.slice(1).join(' ').trim();
-                        }
-                    }
-                } else {
-                    res.defect = clean;
                 }
             }
 
@@ -14207,11 +14239,11 @@ const WapSupportLogs = (function () {
         if (isEdit) {
             const parsed = parseProblemDetails(r.problem, r);
             parsedDateStr = parsed.dateStr || parsedDateStr;
-            parsedUser = parsed.user || "";
-            parsedPart = parsed.partName || "";
-            parsedPartNo = parsed.partNo || "";
-            parsedSupplier = parsed.supplier || "";
-            parsedDefect = parsed.defect || "";
+            parsedUser = parsed.user || r.user || r.informer || r.area || r.dept || r.line || r._user || "";
+            parsedPart = parsed.partName || r.partName || r.part_name || r.report_data?.vf_data?.part_name || "";
+            parsedPartNo = parsed.partNo || r.partNo || r.part_no || r.drawing_no || r.report_data?.vf_data?.drawing_no || "";
+            parsedSupplier = parsed.supplier || r.supplier || r.report_data?.vf_data?.vendor || "";
+            parsedDefect = parsed.defect || r.defect || r.defect_detail || r.report_data?.vf_data?.defect || "";
 
             // 4. 🏭 ผู้จำหน่าย (Supplier) ให้แสดงผลตามข้อมูล 🔢 รหัสพาร์ท (Part No.) * ที่เคยมี
             if (!parsedSupplier && parsedPartNo) {
@@ -14228,6 +14260,14 @@ const WapSupportLogs = (function () {
                 if (matchedPack && matchedPack.supplier) {
                     parsedSupplier = matchedPack.supplier;
                 }
+            }
+            if (!parsedPart && parsedPartNo) {
+                const matchedPack = partMapByNo[parsedPartNo.toLowerCase()];
+                if (matchedPack && matchedPack.partName) parsedPart = matchedPack.partName;
+            }
+            if (!parsedPartNo && parsedPart) {
+                const matchedPack = partMapByName[parsedPart.toLowerCase()];
+                if (matchedPack && matchedPack.partNo) parsedPartNo = matchedPack.partNo;
             }
         }
 
@@ -14617,19 +14657,23 @@ const WapSupportLogs = (function () {
                 if (matchedPack.partGroup && categorySelect) {
                     const rawGrp = matchedPack.partGroup.trim();
                     if (rawGrp && rawGrp !== '-' && rawGrp !== '--') {
-                        const grpLower = rawGrp.toLowerCase();
-                        let matchedOpt = Array.from(categorySelect.options).find(opt => opt.value.trim().toLowerCase() === grpLower);
-                        if (!matchedOpt) {
-                            const normGrp = grpLower.replace(/[^a-z0-9]/g, '');
-                            if (normGrp) {
-                                matchedOpt = Array.from(categorySelect.options).find(opt => {
-                                    const normOpt = opt.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-                                    return normOpt && (normOpt === normGrp || normOpt.includes(normGrp) || normGrp.includes(normOpt));
-                                });
+                        if (categorySelect.options) {
+                            const grpLower = rawGrp.toLowerCase();
+                            let matchedOpt = Array.from(categorySelect.options).find(opt => opt.value.trim().toLowerCase() === grpLower);
+                            if (!matchedOpt) {
+                                const normGrp = grpLower.replace(/[^a-z0-9]/g, '');
+                                if (normGrp) {
+                                    matchedOpt = Array.from(categorySelect.options).find(opt => {
+                                        const normOpt = opt.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                                        return normOpt && (normOpt === normGrp || normOpt.includes(normGrp) || normGrp.includes(normOpt));
+                                    });
+                                }
                             }
-                        }
-                        if (matchedOpt) {
-                            categorySelect.value = matchedOpt.value;
+                            if (matchedOpt) {
+                                categorySelect.value = matchedOpt.value;
+                            }
+                        } else {
+                            categorySelect.value = rawGrp;
                         }
                     }
                 }
@@ -15397,22 +15441,35 @@ function _openViewModal(id) {
 }
 
     function _confirmDelete(id) {
-        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        
+        // 1. ค้นหาข้อมูลรายการที่ต้องการลบ
         const target = _records ? _records.find(r => String(r.id) === String(id)) : null;
+        if (!target) return;
 
+        // 2. ตรวจสอบสิทธิ์ (Ownership Logic)
+        // - เป็นเจ้าของงาน (user_id ในฐานข้อมูลตรงกับอีเมลที่ล็อกอินปัจจุบัน)
+        // - หรือเป็น Master Admin (Natthawut)
+        const isOwner = (target._user === S.currentUser);
+        const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+
+        // บล็อกการลบเฉพาะกรณีที่เป็นคนอื่น (ไม่ใช่เจ้าของ) และไม่ใช่ Admin และอยู่ในโหมด Supervisor
+        if (!isOwner && !isMasterAdmin && S.userRole === 'supervisor') { 
+            toast('⚠️ เฉพาะเจ้าของบันทึกหรือ Admin เท่านั้นที่ลบรายการนี้ได้', 'error'); 
+            return; 
+        }
+
+        // 3. แสดงหน้าต่างยืนยันการลบ
         showCustomConfirmDialog({
             title: "ยืนยันการลบ Support Log",
-            subtitle: "รายการบันทึกผลการซัพพอร์ตนี้จะถูกลบออกจากระบบถาวร",
-            badge: "LINE SUPPORT LOGS",
+            subtitle: "รายการบันทึกผลการซัพพอร์ตนี้จะถูกลบออกจากระบบถาวร เจ้าของงานยืนยันหรือไม่?",
+            badge: "SUPPORT OWNER CONTROL",
             type: "danger",
             details: [
-                { label: "ปัญหา / อาการ", value: target ? (target.problem || target.defect || '-') : '-' },
-                { label: "การแก้ไข / การดำเนินการ", value: target ? (target.action || target.action_taken || '-') : '-' },
-                { label: "ไลน์ผลิต / กลุ่มงาน", value: target ? (target.line || target.part_group || '-') : '-' },
-                { label: "ผู้บันทึก (Inspector)", value: target ? (target.user_id || S.currentUser) : S.currentUser }
+                { label: "ปัญหา / อาการ", value: target.problem || '-' },
+                { label: "พาร์ทที่เกี่ยวข้อง", value: target.part || '-' },
+                { label: "วันที่บันทึก", value: target.eventDate || '-' },
+                { label: "ผู้บันทึก", value: target._user || '-' }
             ],
-            confirmText: "🗑️ ยืนยันลบ Support Log",
+            confirmText: "🗑️ ยืนยันลบรายการนี้",
             cancelText: "ยกเลิก",
             onConfirm: () => _doDelete(id)
         });
@@ -15629,21 +15686,44 @@ const Wap5SExcellence = (function() {
     let _chart = null;
     let _allRecords = []; // ข้อมูลดิบทั้งหมดจาก DB
     let _filteredRecords = []; // ข้อมูลที่ผ่านการกรองวันที่แล้ว
+    let _search = '';
+    let _editingId = null;
 
-   async function init() {
+    async function init() {
         // 1. ตั้งค่า Input ชื่อผู้ตรวจเริ่มต้นเป็นชื่อ User ปัจจุบัน
         const auditorIn = $id('s5-f-auditor');
-        if (auditorIn && !auditorIn.value) {
+        if (auditorIn && !auditorIn.value && S.currentUser) {
             auditorIn.value = S.currentUser.split('@')[0].toUpperCase();
         }
         
+        const monthIn = $id('s5-f-month');
+        if (monthIn && !monthIn.value) {
+            monthIn.value = new Date().toISOString().substring(0, 7);
+        }
+
+        const searchIn = $id('s5-search-input');
+        if (searchIn) {
+            searchIn.value = _search;
+        }
+
         await fetchRecords();
     }
 
     async function fetchRecords() {
-        // ดึงข้อมูลตาม User ที่กำลังเลือกดู (รองรับ Supervisor)
+        // ดึงข้อมูลตาม User ที่กำลังเลือกดู (รองรับ Supervisor / View As)
         const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-        if (!navigator.onLine) return;
+        if (!navigator.onLine) {
+            // โหลดจาก Local Storage / Cache เมื่อออฟไลน์
+            try {
+                const cached = localStorage.getItem(`wap_5s_cache_${targetUser}`);
+                if (cached) {
+                    _allRecords = JSON.parse(cached);
+                    applyDateFilter();
+                    return;
+                }
+            } catch(e) {}
+            return;
+        }
         
         try {
             const { data, error } = await wapClient
@@ -15654,23 +15734,33 @@ const Wap5SExcellence = (function() {
 
             if (error) throw error;
             _allRecords = data || [];
+
+            // Cache ข้อมูลไว้ใช้ยามออฟไลน์
+            try {
+                localStorage.setItem(`wap_5s_cache_${targetUser}`, JSON.stringify(_allRecords));
+            } catch(e) {}
             
             applyDateFilter(); // กรองวันที่ก่อนแสดงผล
         } catch (e) {
             console.error('[5S] Fetch error:', e);
-            toast('โหลดข้อมูล 5S ไม่สำเร็จ', 'error');
+            toast('โหลดข้อมูล 5S ไม่สำเร็จ: ' + (e.message || ''), 'error');
         }
     }
 
+    function setSearch(query) {
+        _search = (query || '').trim().toLowerCase();
+        renderTable();
+        updateKPIs();
+    }
+
     // ฟังก์ชันกรองข้อมูลตามวันที่จาก Header
-function applyDateFilter() {
-        // เปลี่ยนมาใช้ ID: cd-start-date และ cd-end-date ตาม HTML จริงของคุณ
+    function applyDateFilter() {
         const start = document.getElementById('cd-start-date')?.value;
         const end = document.getElementById('cd-end-date')?.value;
 
         if (start && end) {
             _filteredRecords = _allRecords.filter(r => {
-                const recordMonth = r.month + "-01"; 
+                const recordMonth = (r.month || '') + "-01"; 
                 const filterStart = start.substring(0, 7) + "-01";
                 const filterEnd = end.substring(0, 7) + "-01";
                 return recordMonth >= filterStart && recordMonth <= filterEnd;
@@ -15689,339 +15779,490 @@ function applyDateFilter() {
         renderTable();
     }
 
-function updateKPIs() {
-        // 1. คำนวณค่าตัวเลขที่ต้องการแสดงผล
-        const totalPoints = _filteredRecords.reduce((sum, r) => sum + (Number(r.issue_count) || 0), 0);
+    function updateKPIs() {
+        const totalPoints = _filteredRecords.reduce((sum, r) => sum + (Number(r.issue_count) || Number(r.points) || 0), 0);
         const recordCount = _filteredRecords.length;
 
-        // 2. ตรรกะการหา Top Auditor (คงเดิม)
+        // Top Auditor
         const auditorCounts = {};
         _filteredRecords.forEach(r => {
-            const name = r.owner || 'Unknown';
+            const name = r.owner || r.auditor || 'Unknown';
             auditorCounts[name] = (auditorCounts[name] || 0) + 1;
         });
         const topAuditor = Object.keys(auditorCounts).length > 0 
             ? Object.keys(auditorCounts).reduce((a, b) => auditorCounts[a] > auditorCounts[b] ? a : b) 
             : '-';
 
-        // 3. ตรรกะการหา Hot Area (คงเดิม)
+        // Hot Area
         const areaPoints = {};
         _filteredRecords.forEach(r => {
-            const area = r.area || 'Unknown';
-            areaPoints[area] = (areaPoints[area] || 0) + (Number(r.issue_count) || 0);
+            const area = r.area || r.location || 'Unknown';
+            areaPoints[area] = (areaPoints[area] || 0) + (Number(r.issue_count) || Number(r.points) || 0);
         });
         const hotArea = Object.keys(areaPoints).length > 0
             ? Object.keys(areaPoints).reduce((a, b) => areaPoints[a] > areaPoints[b] ? a : b)
             : '-';
 
-        // 4. --- [ส่วนที่แก้ไข: สั่งรันอนิเมชั่นตัวเลขวิ่ง] ---
-        
-        // ล้างอนิเมชั่นเก่าที่อาจค้างอยู่
-        gsap.killTweensOf("#s5-kpi-total, #s5-kpi-month");
+        if (typeof gsap !== 'undefined') {
+            gsap.killTweensOf("#s5-kpi-total, #s5-kpi-month");
+        }
 
-        // คะแนนสะสมตลอดทั้งปี
-        animateValue('s5-kpi-total', 0, totalPoints, 1000, 0, " PTS");
+        if (typeof animateValue === 'function') {
+            animateValue('s5-kpi-total', 0, totalPoints, 1000, 0, " PTS");
+            animateValue('s5-kpi-month', 0, recordCount, 1000, 0, " CASES");
+        } else {
+            const totalEl = $id('s5-kpi-total');
+            if (totalEl) totalEl.textContent = `${totalPoints} PTS`;
+            const monthEl = $id('s5-kpi-month');
+            if (monthEl) monthEl.textContent = `${recordCount} CASES`;
+        }
 
-        // จำนวนจุดที่พบในเดือนปัจจุบัน (หรือตาม Filter)
-        // หมายเหตุ: ใช้ suffix " PTS" หรือ " CASES" ตามความเหมาะสมของ UI คุณครับ
-        animateValue('s5-kpi-month', 0, recordCount, 1000, 0, " PTS"); 
-
-        // สำหรับข้อมูลที่เป็นตัวหนังสือ (ไม่ต้องใช้เลขวิ่ง) ให้แสดงผลตามปกติ
         const auditorEl = $id('s5-kpi-auditor');
         if (auditorEl) {
             auditorEl.textContent = topAuditor;
-            // เพิ่มกิมมิก: เลื่อนข้อความขึ้นเล็กน้อยเวลาเปลี่ยน
-            gsap.fromTo(auditorEl, { opacity: 0, y: 5 }, { opacity: 1, y: 0, duration: 0.4 });
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(auditorEl, { opacity: 0, y: 5 }, { opacity: 1, y: 0, duration: 0.4 });
+            }
         }
 
         const hotAreaEl = $id('s5-kpi-hotarea');
         if (hotAreaEl) {
             hotAreaEl.textContent = hotArea;
-            // เพิ่มกิมมิก: เลื่อนข้อความขึ้นเล็กน้อยเวลาเปลี่ยน
-            gsap.fromTo(hotAreaEl, { opacity: 0, y: 5 }, { opacity: 1, y: 0, duration: 0.4 });
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(hotAreaEl, { opacity: 0, y: 5 }, { opacity: 1, y: 0, duration: 0.4 });
+            }
         }
     }
 
-function renderChart() {
+    function renderChart() {
+        const chartEl = $id('s5-trend-chart');
+        if (!chartEl || typeof ApexCharts === 'undefined') return;
+
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const chartData = new Array(12).fill(0);
 
         _filteredRecords.forEach(r => {
-            const d = new Date(r.month + "-01");
+            const d = new Date((r.month || '') + "-01");
             if (!isNaN(d.getTime())) {
-                chartData[d.getMonth()] += Number(r.issue_count);
+                chartData[d.getMonth()] += Number(r.issue_count || r.points || 0);
             }
         });
 
         if (_chart) _chart.destroy();
-    _chart = new ApexCharts($id('s5-trend-chart'), {
-        series: [{ name: 'จุดที่พบ', data: chartData }],
-        chart: { 
-            type: 'area', 
-            height: '100%', 
-            width: '100%', // มั่นใจว่าเต็มความกว้าง
-            toolbar: { show: false },
-            sparkline: { enabled: false }, // ต้องเป็น false เพื่อให้โชว์แกน X (เดือน)
-            animations: { enabled: true, easing: 'easeinout', speed: 1000 }
-        },
-        // --- ส่วนที่แก้ไข: ปรับจูนระยะขอบ (Margin/Padding) ---
-        grid: {
-            show: false,
-            padding: {
-                left: -15,   // ดันกราฟไปทางซ้ายจนชิดขอบ (ค่าติดลบช่วยให้ชิดขึ้น)
-                right: 0,
-                top: 0,
-                bottom: -10  // ดันกราฟลงมาข้างล่างให้ชิดขอบขึ้น
-            }
-        },
-        // ------------------------------------------
-        colors: ['#f59e0b'],
-        stroke: { curve: 'smooth', width: 4, lineCap: 'round' },
-        fill: {
-            type: 'gradient',
-            gradient: {
-                shadeIntensity: 1,
-                opacityFrom: 0.4,
-                opacityTo: 0.02,
-                stops: [0, 90, 100]
-            }
-        },
-        dataLabels: { enabled: false },
-        xaxis: { 
-            categories: months,
-            axisBorder: { show: false },
-            axisTicks: { show: false },
-            labels: { 
-                show: true,
-                offsetY: -5, // ขยับตัวหนังสือเดือนขึ้นมาหน่อยเพื่อให้พ้นขอบล่าง
-                style: { 
-                    colors: '#94a3b8', 
-                    fontSize: '10px', 
-                    fontWeight: 700 
-                } 
+        _chart = new ApexCharts(chartEl, {
+            series: [{ name: 'จุดที่พบ', data: chartData }],
+            chart: { 
+                type: 'area', 
+                height: '100%', 
+                width: '100%',
+                toolbar: { show: false },
+                sparkline: { enabled: false },
+                animations: { enabled: true, easing: 'easeinout', speed: 800 }
             },
-            tooltip: { enabled: false } // ปิด tooltip เล็กบนแกน X
-        },
-        yaxis: { 
-            show: false,
-            padding: { left: 0, right: 0 }
-        },
-        tooltip: { 
-            theme: 'dark',
-            y: { formatter: (val) => val + " Points" }
-        }
-    });
-    _chart.render();
-}
+            grid: {
+                show: false,
+                padding: { left: -10, right: 5, top: 0, bottom: -10 }
+            },
+            colors: ['#f59e0b'],
+            stroke: { curve: 'smooth', width: 3, lineCap: 'round' },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shadeIntensity: 1,
+                    opacityFrom: 0.45,
+                    opacityTo: 0.03,
+                    stops: [0, 90, 100]
+                }
+            },
+            dataLabels: { enabled: false },
+            xaxis: { 
+                categories: months,
+                axisBorder: { show: false },
+                axisTicks: { show: false },
+                labels: { 
+                    show: true,
+                    offsetY: -4,
+                    style: { 
+                        colors: '#94a3b8', 
+                        fontSize: '10px', 
+                        fontWeight: 700 
+                    } 
+                },
+                tooltip: { enabled: false }
+            },
+            yaxis: { 
+                show: false,
+                padding: { left: 0, right: 0 }
+            },
+            tooltip: { 
+                theme: 'dark',
+                y: { formatter: (val) => val + " Points" }
+            }
+        });
+        _chart.render();
+    }
 
-
-function renderRanking() {
+    function renderRanking() {
         const areaStats = {};
         _filteredRecords.forEach(r => {
-            areaStats[r.area] = (areaStats[r.area] || 0) + Number(r.issue_count);
+            const area = r.area || r.location || 'Unknown';
+            areaStats[area] = (areaStats[area] || 0) + Number(r.issue_count || r.points || 0);
         });
 
         const sorted = Object.entries(areaStats).sort((a, b) => b[1] - a[1]).slice(0, 5);
         const listEl = $id('s5-ranking-list');
-        if (!listEl || sorted.length === 0) {
-            listEl.innerHTML = '<div class="py-10 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">No Data</div>';
+        if (!listEl) return;
+        
+        if (sorted.length === 0) {
+            listEl.innerHTML = '<div class="py-10 text-center text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest text-[10px]">No Area Findings Recorded</div>';
             return;
         }
 
-        // 1. วาดโครงสร้างใหม่ (Modern Capsule Style)
         listEl.innerHTML = sorted.map((item, i) => {
             const rowId = `s5-rank-val-${i}`;
             const barId = `s5-rank-bar-${i}`;
             
             return `
-                <div class="group mb-5 last:mb-0">
+                <div class="group mb-4 last:mb-0">
                     <div class="flex justify-between items-end mb-1.5">
                         <div class="flex items-center gap-2 overflow-hidden">
-                            <!-- อันดับตัวเลขขนาดเล็ก -->
-                            <span class="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-[10px] font-black text-slate-500">${i + 1}</span>
-                            <span class="text-[11px] font-black text-slate-700 truncate uppercase tracking-tight">${item[0]}</span>
+                            <span class="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-black text-slate-500 dark:text-slate-400">${i + 1}</span>
+                            <span class="text-[11px] font-black text-slate-700 dark:text-slate-200 truncate uppercase tracking-tight">${escapeHtml(item[0])}</span>
                         </div>
-                        <!-- ตัวเลขคะแนนแบบเน้นๆ -->
                         <div class="flex items-baseline gap-1 flex-shrink-0 ml-4">
-                            <span id="${rowId}" class="text-[16px] font-black text-slate-900 leading-none">0</span>
+                            <span id="${rowId}" class="text-[15px] font-black text-slate-900 dark:text-slate-100 leading-none">0</span>
                             <span class="text-[8px] font-black text-slate-400 uppercase tracking-tighter">PTS</span>
                         </div>
                     </div>
-                    <!-- แถบความคืบหน้าแบบ Capsule Rounded -->
-                    <div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div id="${barId}" class="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.2)]" style="width: 0%"></div>
+                    <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div id="${barId}" class="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.3)]" style="width: 0%"></div>
                     </div>
                 </div>
             `;
         }).join('');
 
-        // 2. รันอนิเมชั่นตัวเลขและแถบวิ่ง
         requestAnimationFrame(() => {
             const maxVal = sorted[0][1] || 1;
             sorted.forEach((item, i) => {
                 const score = item[1];
-                const pct = (score / maxVal) * 100;
+                const pct = Math.min(100, Math.round((score / maxVal) * 100));
 
-                // ตัวเลขวิ่ง
-                animateValue(`s5-rank-val-${i}`, 0, score, 1200);
+                if (typeof animateValue === 'function') {
+                    animateValue(`s5-rank-val-${i}`, 0, score, 1000);
+                } else {
+                    const el = $id(`s5-rank-val-${i}`);
+                    if (el) el.textContent = score;
+                }
 
-                // แถบวิ่ง (พุ่งออกมาอย่างนุ่มนวลด้วย Ease Out)
-                gsap.to(`#s5-rank-bar-${i}`, {
-                    width: pct + "%",
-                    duration: 1.5,
-                    delay: i * 0.1, // ทยอยเลื่อนขึ้นทีละรายการ
-                    ease: "expo.out"
-                });
+                if (typeof gsap !== 'undefined') {
+                    gsap.to(`#s5-rank-bar-${i}`, {
+                        width: pct + "%",
+                        duration: 1.2,
+                        delay: i * 0.08,
+                        ease: "expo.out"
+                    });
+                } else {
+                    const bar = $id(`s5-rank-bar-${i}`);
+                    if (bar) bar.style.width = pct + '%';
+                }
             });
         });
     }
 
-function renderTable() {
+    function renderTable() {
         const tbody = $id('s5-table-body');
+        const countBadge = $id('s5-table-count');
         if (!tbody) return;
-        
-        // 1. ตรวจสอบกรณีไม่มีข้อมูล
-        if (_filteredRecords.length === 0) {
+
+        let displayRecords = [..._filteredRecords];
+        if (_search) {
+            displayRecords = displayRecords.filter(r => {
+                const matchArea = (r.area || '').toLowerCase().includes(_search);
+                const matchDetail = (r.detail || r.details || '').toLowerCase().includes(_search);
+                const matchOwner = (r.owner || r.auditor || '').toLowerCase().includes(_search);
+                const matchMonth = (r.month || '').toLowerCase().includes(_search);
+                return matchArea || matchDetail || matchOwner || matchMonth;
+            });
+        }
+
+        if (countBadge) {
+            countBadge.textContent = `${displayRecords.length} RECORDS`;
+        }
+
+        if (displayRecords.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">
-                        No findings recorded
+                    <td colspan="6" class="py-12 text-center text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest text-[10px]">
+                        ${_search ? 'No matching 5S findings for "' + escapeHtml(_search) + '"' : 'No findings recorded'}
                     </td>
                 </tr>`;
             return;
         }
 
-        // 2. วาด HTML โดยใช้คลาส s5-table-row
-        tbody.innerHTML = _filteredRecords.map(r => `
-            <tr class="s5-table-row border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors" data-rid="${r.id}">
-                <td class="py-3 px-3">
-                    <div class="text-[11px] font-black text-slate-700 leading-tight uppercase tracking-tight">${r.area}</div>
-                </td>
-                <td style="text-align:center">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100 font-black text-[9px]">
-                        <span class="w-1 h-1 rounded-full bg-orange-500 shadow-[0_0_5px_rgba(249,115,22,0.8)]"></span>
-                        ${r.issue_count} PTS
-                    </span>
-                </td>
-                <td class="py-3 px-3">
-                    <p class="text-[10px] text-slate-500 font-medium leading-relaxed italic line-clamp-1" title="${r.detail || ''}">
-                        ${r.detail || '-'}
-                    </p>
-                </td>
-                <td class="py-3 px-3">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">${r.owner || '-'}</span>
-                </td>
-                <td class="py-3 px-3">
-                    <span class="font-mono text-[9px] text-slate-400 font-bold">${r.month}</span>
-                </td>
-                <td class="py-3 px-3 text-right">
-                    <button  onclick="Wap5SExcellence.remove('${r.id}')" class="text-slate-200 hover:text-rose-500 transition-all p-1" title="Wap5 S Excellence.Remove" aria-label="Wap5 S Excellence.Remove">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+        const isReadOnly = (S.userRole === 'supervisor');
 
-        // 3. รันอนิเมชั่น GSAP ให้แถวทยอยเลื่อนเข้ามา (Stagger)
+        tbody.innerHTML = displayRecords.map(r => {
+            const isCurrentEditing = (_editingId === r.id);
+            const area = escapeHtml(r.area || r.location || '-');
+            const points = Number(r.issue_count || r.points || 0);
+            const detail = escapeHtml(r.detail || r.details || '-');
+            const auditor = escapeHtml(r.owner || r.auditor || '-');
+            const month = escapeHtml(r.month || '-');
+
+            let actionButtons = '';
+            if (isReadOnly) {
+                actionButtons = `
+                    <div class="flex items-center justify-end gap-1.5">
+                        <button onclick="Wap5SExcellence.view('${r.id}')" class="text-slate-400 hover:text-blue-500 p-1 transition-colors" title="ดูรายละเอียดข้อพบเห็น" aria-label="View 5S Details">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                        <span class="text-[8px] font-black tracking-tighter px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">READ ONLY</span>
+                    </div>
+                `;
+            } else {
+                actionButtons = `
+                    <div class="flex items-center justify-end gap-1">
+                        <button onclick="Wap5SExcellence.view('${r.id}')" class="text-slate-400 hover:text-blue-500 p-1 transition-colors" title="ดูรายละเอียด" aria-label="View Details">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                        <button onclick="Wap5SExcellence.edit('${r.id}')" class="${isCurrentEditing ? 'text-orange-500' : 'text-slate-400 hover:text-orange-500'} p-1 transition-colors" title="แก้ไขรายการนี้" aria-label="Edit 5S Entry">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        <button onclick="Wap5SExcellence.remove('${r.id}')" class="text-slate-300 dark:text-slate-600 hover:text-rose-500 p-1 transition-colors" title="ลบรายการนี้" aria-label="Delete 5S Entry">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+                `;
+            }
+
+            return `
+                <tr class="s5-table-row ${isCurrentEditing ? 'bg-orange-50/70 dark:bg-orange-950/30' : ''} border-b border-slate-100 dark:border-slate-800/60 last:border-0 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors" data-rid="${r.id}">
+                    <td class="py-3 px-3">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0"></span>
+                            <span class="text-[11px] font-black text-slate-800 dark:text-slate-100 leading-tight uppercase tracking-tight truncate">${area}</span>
+                        </div>
+                    </td>
+                    <td style="text-align:center" class="py-3 px-2">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900 font-black text-[9px]">
+                            ${points} PTS
+                        </span>
+                    </td>
+                    <td class="py-3 px-3">
+                        <p class="text-[10px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed line-clamp-1 cursor-pointer" title="${detail}" onclick="Wap5SExcellence.view('${r.id}')">
+                            ${detail}
+                        </p>
+                    </td>
+                    <td class="py-3 px-3">
+                        <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">${auditor}</span>
+                    </td>
+                    <td class="py-3 px-3 text-center">
+                        <span class="font-mono text-[9px] text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">${month}</span>
+                    </td>
+                    <td class="py-3 px-3 text-right">
+                        ${actionButtons}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
         if (typeof window.animateTableRows === 'function') {
-            window.animateTableRows('.s5-table-row', { y: 6, duration: 0.28, stagger: 0.025, ease: 'power2.out' });
+            window.animateTableRows('.s5-table-row', { y: 4, duration: 0.25, stagger: 0.02, ease: 'power2.out' });
         }
         if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
     }
 
-/**
- * อัปเกรดฟังก์ชันบันทึก 5S ให้รองรับระบบออฟไลน์ (V2.0)
- */
-async function submit() {
-    // 1. ดึงค่าจาก Element ต่างๆ
-    const areaIn = document.getElementById('s5-f-area');
-    const ptsIn = document.getElementById('s5-f-points');
-    const monthIn = document.getElementById('s5-f-month');
-    const detailIn = document.getElementById('s5-f-detail');
-    const auditorIn = document.getElementById('s5-f-auditor');
+    function edit(id) {
+        if (!hasWriteAccess()) return;
 
-    const area = areaIn.value.trim();
-    const pts = ptsIn.value;
-    const monthValue = monthIn.value;
-    const detail = detailIn.value.trim();
-    const auditor = auditorIn.value.trim();
+        const target = _allRecords ? _allRecords.find(r => String(r.id) === String(id)) : null;
+        if (!target) {
+            toast('ไม่พบข้อมูลรายการที่ต้องการแก้ไข', 'error');
+            return;
+        }
 
-    // 2. ตรวจสอบความครบถ้วน
-    if (!area || !pts || !monthValue || !auditor) {
-        toast('⚠️ กรุณากรอกข้อมูลให้ครบถ้วน', 'error');
-        if(!area) shake(areaIn);
-        if(!pts) shake(ptsIn);
-        return;
+        _editingId = id;
+
+        const areaIn = $id('s5-f-area');
+        const ptsIn = $id('s5-f-points');
+        const monthIn = $id('s5-f-month');
+        const detailIn = $id('s5-f-detail');
+        const auditorIn = $id('s5-f-auditor');
+
+        if (areaIn) areaIn.value = target.area || target.location || '';
+        if (ptsIn) ptsIn.value = target.issue_count ?? target.points ?? 0;
+        if (monthIn) monthIn.value = target.month || '';
+        if (detailIn) detailIn.value = target.detail || target.details || '';
+        if (auditorIn) auditorIn.value = target.owner || target.auditor || S.currentUser.split('@')[0].toUpperCase();
+
+        const formTitle = $id('s5-form-title');
+        const formSub = $id('s5-form-subtitle');
+        const btnText = $id('s5-submit-btn-text');
+        const cancelBtn = $id('s5-cancel-edit-btn');
+
+        if (formTitle) formTitle.textContent = 'Edit 5S Finding';
+        if (formSub) formSub.textContent = `กำลังแก้ไขข้อมูล: ${target.area || id}`;
+        if (btnText) btnText.textContent = 'UPDATE 5S RECORD';
+        if (cancelBtn) cancelBtn.classList.remove('hidden');
+
+        if (areaIn) {
+            areaIn.focus();
+            areaIn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        renderTable();
+        toast(`✏️ โหลดข้อมูล "${target.area || ''}" เข้าสู่ฟอร์มแก้ไขแล้ว`, 'info');
     }
 
-    // 3. สร้าง Payload และระบุสถานะการซิงค์
-    const recordId = 'S5-' + Date.now();
-    const payload = {
-        id: recordId,
-        user_id: S.currentUser,
-        area: area,               // ตรงกับคอลัมน์ area
-        issue_count: Number(pts), // ตรงกับคอลัมน์ issue_count
-        detail: detail,           // แก้ไขจาก details -> detail (ตาม DB)
-        owner: auditor,           // แก้ไขจาก auditor -> owner (ตาม DB)
-        month: monthValue,        // แก้ไขจาก date -> month (ตาม DB)
-        created_at: new Date().toISOString(),
-        sync_status: 'pending'    // เพิ่มสถานะรอส่ง
-    };
+    function cancelEdit() {
+        _editingId = null;
 
-    try {
-        let saveMethod = '';
+        const areaIn = $id('s5-f-area');
+        const ptsIn = $id('s5-f-points');
+        const detailIn = $id('s5-f-detail');
 
-        // 4. ตรรกะการตัดสินใจ (Online vs Offline)
-        if (navigator.onLine) {
-            // โหมดออนไลน์: ส่งเข้า Supabase
-            const { error } = await wapClient.from('s5_records').insert([
-                // กรองเอาเฉพาะฟิลด์ที่ DB ต้องการ (ลบ sync_status ออกก่อนส่ง)
-                (({ sync_status, ...o }) => o)(payload)
-            ]);
-            
-            if (error) throw error;
-            payload.sync_status = 'synced';
-            saveMethod = 'cloud';
-        } else {
-            // โหมดออฟไลน์: พักใน Dexie
-            if (localDB.pending5S) {
-                await localDB.pending5S.put(payload);
-                saveMethod = 'local';
+        if (areaIn) areaIn.value = '';
+        if (ptsIn) ptsIn.value = '';
+        if (detailIn) detailIn.value = '';
+
+        const formTitle = $id('s5-form-title');
+        const formSub = $id('s5-form-subtitle');
+        const btnText = $id('s5-submit-btn-text');
+        const cancelBtn = $id('s5-cancel-edit-btn');
+
+        if (formTitle) formTitle.textContent = 'S5 Finding Entry';
+        if (formSub) formSub.textContent = 'ระบุรายละเอียดการตรวจประเมิน';
+        if (btnText) btnText.textContent = 'COMMIT 5S FINDING';
+        if (cancelBtn) cancelBtn.classList.add('hidden');
+
+        renderTable();
+    }
+
+    function view(id) {
+        const target = _allRecords ? _allRecords.find(r => String(r.id) === String(id)) : null;
+        if (!target) return;
+
+        showCustomConfirmDialog({
+            title: `📍 รายละเอียด 5S: ${target.area || 'Finding Entry'}`,
+            subtitle: "ข้อมูลบันทึกผลการตรวจประเมิน 5S Excellence จากฐานข้อมูล",
+            badge: "5S AUDIT RECORD",
+            type: "info",
+            details: [
+                { label: "พื้นที่ / แผนก (Area)", value: target.area || '-' },
+                { label: "จำนวนจุดที่พบ (Points)", value: `${target.issue_count ?? target.points ?? 0} คะแนน` },
+                { label: "เดือนที่ตรวจ (Period)", value: target.month || '-' },
+                { label: "ผู้ตรวจประเมิน (Auditor)", value: target.owner || target.auditor || '-' },
+                { label: "รายละเอียดสิ่งที่พบ", value: target.detail || target.details || '-' },
+                { label: "วันที่ลงบันทึกในระบบ", value: target.created_at ? new Date(target.created_at).toLocaleString('th-TH') : '-' }
+            ],
+            confirmText: "ตกลง (ปิดหน้าต่าง)",
+            cancelText: "",
+            onConfirm: () => {}
+        });
+    }
+
+    /**
+     * บันทึกหรืออัปเดตข้อมูล 5S
+     */
+    async function submit() {
+        if (!hasWriteAccess()) return;
+
+        const areaIn = $id('s5-f-area');
+        const ptsIn = $id('s5-f-points');
+        const monthIn = $id('s5-f-month');
+        const detailIn = $id('s5-f-detail');
+        const auditorIn = $id('s5-f-auditor');
+
+        const area = areaIn ? areaIn.value.trim() : '';
+        const pts = ptsIn ? ptsIn.value : '';
+        const monthValue = monthIn ? monthIn.value : '';
+        const detail = detailIn ? detailIn.value.trim() : '';
+        const auditor = auditorIn ? auditorIn.value.trim() : '';
+
+        // ตรวจสอบความครบถ้วน
+        if (!area || !pts || !monthValue || !auditor) {
+            toast('⚠️ กรุณากรอกข้อมูลให้ครบถ้วน (พื้นที่, จำนวนจุด, เดือน และชื่อผู้ตรวจ)', 'error');
+            if (!area && typeof shake === 'function') shake(areaIn);
+            if (!pts && typeof shake === 'function') shake(ptsIn);
+            if (!monthValue && typeof shake === 'function') shake(monthIn);
+            return;
+        }
+
+        const isEditing = Boolean(_editingId);
+        const recordId = isEditing ? _editingId : ('S5-' + Date.now());
+
+        const payload = {
+            id: recordId,
+            user_id: S.currentUser,
+            area: area,
+            issue_count: Number(pts),
+            detail: detail,
+            owner: auditor,
+            month: monthValue,
+            created_at: new Date().toISOString()
+        };
+
+        try {
+            let saveMethod = '';
+
+            if (navigator.onLine) {
+                if (isEditing) {
+                    const { error } = await wapClient
+                        .from(TABLE)
+                        .update({
+                            area: payload.area,
+                            issue_count: payload.issue_count,
+                            detail: payload.detail,
+                            owner: payload.owner,
+                            month: payload.month,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', recordId);
+                    if (error) throw error;
+                } else {
+                    const { error } = await wapClient.from(TABLE).insert([payload]);
+                    if (error) throw error;
+                }
+                saveMethod = 'cloud';
             } else {
-                throw new Error("Local Database Table not found");
+                if (window.localDB && localDB.pending5S) {
+                    await localDB.pending5S.put({ ...payload, sync_status: 'pending' });
+                    saveMethod = 'local';
+                }
             }
-        }
 
-        // 5. [Optimistic Update] อัปเดตข้อมูลใน Memory และหน้าจอทันที
-        // สมมติว่า _allRecords คือตัวแปรเก็บข้อมูลดิบในโมดูล Wap5SExcellence
-        if (typeof _allRecords !== 'undefined') {
-            _allRecords.unshift(payload); 
-            // เรียกฟังก์ชันกรองและวาดตารางใหม่ (ที่มีอยู่ในโมดูล)
-            if (typeof applyDateFilter === 'function') applyDateFilter();
-        }
+            // Optimistic update ใน _allRecords
+            if (isEditing) {
+                const idx = _allRecords.findIndex(r => String(r.id) === String(recordId));
+                if (idx >= 0) {
+                    _allRecords[idx] = { ..._allRecords[idx], ...payload };
+                }
+                cancelEdit();
+                toast(saveMethod === 'cloud' ? '✅ อัปเดตข้อมูล 5S เรียบร้อยแล้ว' : '📶 บันทึกการแก้ไขในเครื่องแล้ว', 'success');
+            } else {
+                _allRecords.unshift(payload);
+                if (areaIn) areaIn.value = '';
+                if (ptsIn) ptsIn.value = '';
+                if (detailIn) detailIn.value = '';
+                toast(saveMethod === 'cloud' ? '✅ บันทึกข้อมูล 5S ออนไลน์สำเร็จ' : '📶 บันทึกในเครื่องแล้ว (จะซิงค์เมื่อมีเน็ต)', 'success');
+            }
 
-        // 6. ล้างฟอร์ม (Reset Form)
-        areaIn.value = '';
-        ptsIn.value = '';
-        detailIn.value = '';
-        
-        // 7. แจ้งเตือนผู้ใช้
-        if (saveMethod === 'cloud') {
-            toast('✅ บันทึกข้อมูลออนไลน์สำเร็จ', 'success');
-            // เล่นอนิเมชั่นบินข้อมูล (ถ้ามี)
-            if(typeof playCommitAnimation === 'function') playCommitAnimation();
-        } else {
-            toast('📶 บันทึกในเครื่องแล้ว (จะซิงค์เมื่อมีเน็ต)', 'info');
-        }
+            // อัปเดตแคช
+            try {
+                localStorage.setItem(`wap_5s_cache_${S.currentUser}`, JSON.stringify(_allRecords));
+            } catch(e) {}
 
-    } catch (e) {
-        console.error('Submit 5S Error:', e);
-        toast('❌ บันทึกล้มเหลว: ' + (e.message || 'Error'), 'error');
+            applyDateFilter();
+            if (typeof playCommitAnimation === 'function') playCommitAnimation();
+
+        } catch (e) {
+            console.error('Submit 5S Error:', e);
+            toast('❌ บันทึกล้มเหลว: ' + (e.message || 'Error'), 'error');
+        }
     }
-}
 
-   async function remove(id) {
-        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
+    async function remove(id) {
+        if (!hasWriteAccess()) return;
         
         const target = _allRecords ? _allRecords.find(r => String(r.id) === String(id)) : null;
 
@@ -16032,19 +16273,29 @@ async function submit() {
             type: "danger",
             details: [
                 { label: "พื้นที่ / โซนตรวจ", value: target ? (target.area || target.location || '-') : '-' },
-                { label: "คะแนน / ผลตรวจ", value: target ? `${target.score || target.points || 0} คะแนน` : '-' },
-                { label: "รายละเอียดข้อพบเห็น", value: target ? (target.detail || target.remark || '-') : '-' },
-                { label: "ผู้ประเมิน", value: target ? (target.user_id || S.currentUser) : S.currentUser }
+                { label: "คะแนน / จำนวนจุดที่พบ", value: target ? `${target.issue_count ?? target.points ?? 0} คะแนน` : '-' },
+                { label: "รายละเอียดข้อพบเห็น", value: target ? (target.detail || target.details || '-') : '-' },
+                { label: "ผู้ประเมิน", value: target ? (target.owner || target.auditor || S.currentUser) : S.currentUser },
+                { label: "เดือนที่ตรวจ", value: target ? (target.month || '-') : '-' }
             ],
             confirmText: "🗑️ ยืนยันลบรายการ 5S",
             cancelText: "ยกเลิก",
             onConfirm: async () => {
                 try {
                     _allRecords = _allRecords.filter(r => String(r.id) !== String(id));
+                    if (_editingId === id) cancelEdit();
                     applyDateFilter();
-                    const { error } = await wapClient.from(TABLE).delete().eq('id', id);
-                    if (error) throw error;
-                    toast('ลบเรียบร้อย', 'success');
+
+                    if (navigator.onLine) {
+                        const { error } = await wapClient.from(TABLE).delete().eq('id', id);
+                        if (error) throw error;
+                    }
+                    
+                    try {
+                        localStorage.setItem(`wap_5s_cache_${S.currentUser}`, JSON.stringify(_allRecords));
+                    } catch(e) {}
+
+                    toast('ลบรายการ 5S เรียบร้อยแล้ว', 'success');
                     await fetchRecords();
                 } catch (e) {
                     console.error('[5S Delete Error]:', e);
@@ -16055,7 +16306,17 @@ async function submit() {
         });
     }
 
-    return { init, fetchRecords, remove, applyDateFilter,submit  };
+    return { 
+        init, 
+        fetchRecords, 
+        remove, 
+        edit,
+        cancelEdit,
+        view,
+        applyDateFilter, 
+        submit,
+        setSearch
+    };
 })();
 
 /**
@@ -25693,11 +25954,18 @@ function updateStars() {
     requestAnimationFrame(updateStars);
 }
 
-// ฟังก์ชันล้างข้อความหัวข้อปัญหาให้กระชับ และแก้ปัญหาวันที่แสดงซ้ำซ้อน
-// ฟังก์ชันล้างข้อความหัวข้อปัญหาให้กระชับ และแก้ปัญหาวันที่แสดงซ้ำซ้อน (ฉบับปรับปรุง V2)
+// ฟังก์ชันล้างข้อความหัวข้อปัญหาให้กระชับ และแก้ปัญหาวันที่แสดงซ้ำซ้อน (ฉบับปรับปรุง V3)
 function getCleanProblemTitle(title) {
     if (!title) return "";
     let str = String(title).trim();
+
+    // 0. ล้างข้อความ Nested/Duplicate prefix ซ้ำซ้อน เช่น "record: found defect On 25 Aug'26 ..."
+    let prevStr = '';
+    while (str !== prevStr && (/record\s*:\s*found defect/i.test(str) || /inform quality problem about\s+(?:On\s+)/i.test(str))) {
+        prevStr = str;
+        str = str.replace(/record\s*:\s*found defect\s+(?:On\s+[\w'\s]+\s+(?:record:\s*)?)?/gi, 'record: ').trim();
+        str = str.replace(/inform quality problem about\s+(?:On\s+[\w'\s]+\s+(?:inform quality problem about\s*)?)?/gi, 'inform quality problem about ').trim();
+    }
 
     // 1. แก้ไขปัญหาวันที่ซ้ำกัน (เช่น "11 Aug'26 Aug'26 Aug'26") 
     // โดยหา Pattern วันที่แบบ DD Mon'YY แล้วเก็บไว้แค่ตัวเดียวที่ตำแหน่งแรกสุด
@@ -25726,6 +25994,27 @@ function getCleanProblemTitle(title) {
             // ตรวจสอบว่ามี "On " นำหน้าหรือไม่
             const finalPrefix = prefix.toLowerCase().startsWith('on') ? prefix : `On ${prefix}`;
             str = `${finalPrefix} ${keyword} ${suffix}`;
+        }
+    }
+
+    // 4. จัดการส่วน "record:" ไม่ให้ซ้ำซ้อน
+    if (/record\s*:/i.test(str)) {
+        const parts = str.split(/record\s*:/i);
+        if (parts.length > 2) {
+            const prefix = parts[0].trim();
+            const suffix = parts[parts.length - 1].trim();
+            const finalPrefix = prefix.toLowerCase().startsWith('on') ? prefix : `On ${prefix}`;
+            str = `${finalPrefix} record: ${suffix}`;
+        }
+    }
+
+    // 5. จัดการ "found defect" ซ้ำซ้อน
+    if (/found defect/i.test(str)) {
+        const parts = str.split(/found defect/i);
+        if (parts.length > 2) {
+            const before = parts[0].trim();
+            const defText = parts.slice(1).join(' ').replace(/found defect/gi, '').trim();
+            str = `${before} found defect ${defText}`;
         }
     }
 

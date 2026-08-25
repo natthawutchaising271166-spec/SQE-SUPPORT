@@ -705,39 +705,6 @@
             </button>
         </div>
     </div>
-
-    <!-- เพิ่มต่อจากส่วนชื่อหน้าใน <header> -->
-<div id="admin-header-tools" class="hidden items-center gap-2 ml-4 flex-nowrap">
-    <!-- กลุ่ม Tabs ย่อจิ๋ว -->
-    <div class="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
-        <button  onclick="WapAdminSystem.switchTab('users')" id="tab-adm-users" class="admin-tab-mini active" title="Users" aria-label="Users">Users</button>
-        <button  onclick="WapAdminSystem.switchTab('suppliers')" id="tab-adm-suppliers" class="admin-tab-mini" title="Suppliers" aria-label="Suppliers">Suppliers</button>
-        <button  onclick="WapAdminSystem.switchTab('parts')" id="tab-adm-parts" class="admin-tab-mini" title="Parts" aria-label="Parts">Parts</button>
-        <button  onclick="WapAdminSystem.switchTab('defects')" id="tab-adm-defects" class="admin-tab-mini" title="Defects" aria-label="Defects">Defects</button>
-        <button  onclick="WapAdminSystem.switchTab('logs')" id="tab-adm-logs" class="admin-tab-mini" title="Audit Logs" aria-label="Audit Logs">Audit Logs</button>
-        <button  onclick="WapAdminSystem.switchTab('system')" id="tab-adm-system" class="admin-tab-mini" title="System" aria-label="System">System</button>
-    </div>
-
-    <!-- ช่องค้นหาย่อส่วน -->
-    <div class="relative w-32 lg:w-48">
-        <svg class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        <input  type="text" id="admin-search-input" placeholder="Search..." 
-               class="w-full h-7 pl-7 pr-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-[9px] font-bold focus:ring-2 focus:ring-blue-500/20 outline-none" title="Search..." aria-label="Search...">
-    </div>
-
-<!-- ปุ่ม Import CSV Data -->
-<button onclick="if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerCSVImport === 'function') { window.WapAdminSystem.triggerCSVImport(); } else if(typeof triggerCSVImport === 'function') { triggerCSVImport(); }" class="btn-admin-mini text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white" title="Import CSV Data (นำเข้าข้อมูล CSV)" aria-label="Import CSV">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-</button>
-
-<!-- ปุ่ม Add New -->
-<!-- เปลี่ยนให้เรียก handleGlobalAdd() เพื่อให้ใช้ได้ทุกหน้า -->
-<button  onclick="handleGlobalAdd()" class="btn-admin-mini bg-blue-600 text-white border-transparent hover:bg-blue-700" title="Add New" aria-label="Action">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-</button>
-</div>
 </header>
                         
             
@@ -1673,8 +1640,8 @@
             <!-- แบบฟอร์มบันทึก (ฝั่งซ้าย) -->
             <div class="s5-glass-panel form-side border-t-orange">
                 <div class="panel-header-sticky">
-                    <h3 class="panel-title">S5 Finding Entry</h3>
-                    <p class="panel-sub">ระบุรายละเอียดการตรวจประเมิน</p>
+                    <h3 class="panel-title" id="s5-form-title">S5 Finding Entry</h3>
+                    <p class="panel-sub" id="s5-form-subtitle">ระบุรายละเอียดการตรวจประเมิน</p>
                 </div>
                 <!-- Invisible Scroll Form Body -->
                 <div class="panel-body-scroll scroll-hide">
@@ -1686,7 +1653,7 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div class="s5-group">
                                 <label class="s5-label">🔢 จำนวนจุดที่พบ</label>
-                                <input  type="number" id="s5-f-points" class="s5-input" title="S5 F Points" aria-label="S5 F Points">
+                                <input  type="number" id="s5-f-points" class="s5-input" placeholder="0" title="S5 F Points" aria-label="S5 F Points">
                             </div>
                             <div class="s5-group">
                                 <label class="s5-label">🗓️ เดือนที่ตรวจ</label>
@@ -1699,34 +1666,48 @@
                         </div>
                         <div class="s5-group">
                             <label class="s5-label">👤 ชื่อผู้ตรวจ (Auditor)</label>
-                            <input  type="text" id="s5-f-auditor" class="s5-input" title="S5 F Auditor" aria-label="S5 F Auditor">
+                            <input  type="text" id="s5-f-auditor" class="s5-input" placeholder="ชื่อผู้ตรวจประเมิน" title="S5 F Auditor" aria-label="S5 F Auditor">
                         </div>
                     </div>
                 </div>
-                <div class="panel-footer-action">
-                    <button  onclick="Wap5SExcellence.submit()" class="btn-s5-submit" title="COMMIT 5S FINDING" aria-label="COMMIT 5S FINDING">
+                <div class="panel-footer-action flex flex-col gap-2">
+                    <button  id="s5-submit-btn" onclick="Wap5SExcellence.submit()" class="btn-s5-submit" title="COMMIT 5S FINDING" aria-label="COMMIT 5S FINDING">
                         <div class="btn-glow"></div>
-                        <span>COMMIT 5S FINDING</span>
+                        <span id="s5-submit-btn-text">COMMIT 5S FINDING</span>
+                    </button>
+                    <button id="s5-cancel-edit-btn" onclick="Wap5SExcellence.cancelEdit()" class="hidden w-full py-2 px-3 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all cursor-pointer text-center" title="ยกเลิกการแก้ไข">
+                        ✖ ยกเลิกการแก้ไข
                     </button>
                 </div>
             </div>
 
             <!-- ทะเบียนรายการ (ฝั่งขวาขยายใหญ่) -->
             <div class="s5-glass-panel table-side">
-                <div class="panel-header-flex">
-                    <h3 class="panel-title">Findings Registry</h3>
-                    <span id="s5-table-count" class="cyber-badge">0 RECORDS</span>
+                <div class="panel-header-flex items-center justify-between gap-3 flex-wrap">
+                    <div class="flex items-center gap-2.5">
+                        <h3 class="panel-title font-black">Findings Registry</h3>
+                        <span id="s5-table-count" class="cyber-badge">0 RECORDS</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <!-- Quick Search Box -->
+                        <div class="relative w-44 sm:w-56">
+                            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            <input type="text" id="s5-search-input" oninput="Wap5SExcellence.setSearch(this.value)" placeholder="ค้นหารายการ 5S..." 
+                                   class="w-full h-8 pl-8 pr-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" title="Search 5S">
+                        </div>
+                    </div>
                 </div>
                 <!-- Invisible Scroll Table -->
                 <div class="table-container scroll-hide" id="s5-table-container">
-                    <table class="s5-cyber-table">
+                    <table class="s5-cyber-table w-full">
                         <thead>
                             <tr>
-                                <th style="width: 150px;">AREA / LOCATION</th>
-                                <th style="width: 100px; text-align: center;">POINTS</th>
+                                <th style="width: 140px;">AREA / LOCATION</th>
+                                <th style="width: 90px; text-align: center;">POINTS</th>
                                 <th>DETAIL DESCRIPTION</th>
                                 <th style="width: 120px;">AUDITOR</th>
-                                <th style="width: 80px; text-align: right;">ACTION</th>
+                                <th style="width: 90px; text-align: center;">PERIOD</th>
+                                <th style="width: 95px; text-align: right;">ACTION</th>
                             </tr>
                         </thead>
                         <tbody id="s5-table-body"></tbody>
