@@ -5340,14 +5340,14 @@ document.addEventListener('contextmenu', e => e.preventDefault());
 const $id = id => document.getElementById(id);
 
 function hasWriteAccess() {
-    // เพิ่มบรรทัดนี้: ถ้าเป็น Master Admin ให้ผ่านตลอด
-    if (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com') return true;
+    // ถ้าเป็น Master Admin ให้ผ่านตลอด
+    if (S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com') return true;
 
-    if (S.userRole === 'supervisor') {
-        toast('⚠️ โหมดหัวหน้างาน: อ่านข้อมูลได้อย่างเดียวไม่สามารถแก้ไขได้', 'error'); 
-        return false;
-    }
-    return true;
+    // ถ้าเข้าสู่ระบบในโหมด SQE Support หรือบทบาทไม่ใช่ supervisor ให้มีสิทธิ์แก้ไข/จัดการงานของตนเอง
+    if (S.userRole !== 'supervisor') return true;
+
+    toast('⚠️ โหมดหัวหน้างาน: อ่านข้อมูลได้อย่างเดียวไม่สามารถแก้ไขได้ ยกเว้นงานของตนเอง', 'error'); 
+    return false;
 }
 
 function generateUUID() {
@@ -8319,11 +8319,18 @@ function resetInputForm() {
 
 
 async function submitEntry() {
-    const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+    const isMasterAdmin = (S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+    const existingRow = S.editingId ? S.records.find(r => String(r.id) === String(S.editingId)) : null;
+    const isOwner = existingRow && (
+        !existingRow.inspector ||
+        (existingRow.inspector && existingRow.inspector.toLowerCase() === (S.currentUser || '').toLowerCase()) ||
+        (existingRow.user && existingRow.user.toLowerCase() === (S.currentUser || '').toLowerCase()) ||
+        (existingRow.user_email && existingRow.user_email.toLowerCase() === (S.currentUser || '').toLowerCase())
+    );
 
-    // 🛡️ [เพิ่มส่วนนี้]: ปลดล็อคให้ Master Admin บันทึกได้ แม้อยู่ในโหมด Supervisor
-    if (S.userRole === 'supervisor' && !isMasterAdmin) { 
-        toast('Supervisor เป็นโหมดดูอย่างเดียว (Read-only)', 'info'); 
+    // ปลดล็อคให้ผู้ใช้ในโหมด SQE Support, Master Admin หรือเจ้าของงาน สามารถบันทึก/แก้ไขได้
+    if (S.userRole === 'supervisor' && !isMasterAdmin && !isOwner) { 
+        toast('Supervisor เป็นโหมดดูอย่างเดียว ยกเว้นรายการของตนเอง', 'info'); 
         return; 
     }
 
@@ -8359,7 +8366,6 @@ async function submitEntry() {
     btn.style.opacity = '0.7';
 
     const recordId = S.editingId || generateUUID();
-    const existingRow = S.editingId ? S.records.find(r => String(r.id) === String(S.editingId)) : null;
     const originalCreatedAt = existingRow ? (existingRow.created_at || existingRow.createdAt) : null;
 
     // ข้อมูลที่จะบันทึก
@@ -8871,13 +8877,23 @@ function showCustomConfirmDialog(options = {}) {
 
 // --- ยืนยันก่อนลบรายการเดี่ยวใน Part Line Claim ---
 function confirmDelete(id) {
-    if (S.userRole === 'supervisor') {
-        toast('Supervisor เป็นโหมดดูอย่างเดียว (Read-only)', 'info');
-        return;
-    }
     const targetRecord = S.records.find(r => String(r.id) === String(id));
     if (!targetRecord) {
         toast('❌ ไม่พบรายการที่ต้องการลบ', 'error');
+        return;
+    }
+
+    const isMasterAdmin = (S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+    const isOwner = (
+        !targetRecord.inspector ||
+        (targetRecord.inspector && targetRecord.inspector.toLowerCase() === (S.currentUser || '').toLowerCase()) ||
+        (targetRecord.user && targetRecord.user.toLowerCase() === (S.currentUser || '').toLowerCase()) ||
+        (targetRecord.user_email && targetRecord.user_email.toLowerCase() === (S.currentUser || '').toLowerCase())
+    );
+
+    // ถ้าเข้าโหมด Supervisor และไม่ใช่เจ้าของงาน/Admin ให้บล็อก
+    if (S.userRole === 'supervisor' && !isMasterAdmin && !isOwner) {
+        toast('Supervisor เป็นโหมดดูอย่างเดียว (Read-only) ยกเว้นงานของตนเอง', 'info');
         return;
     }
 
@@ -9744,6 +9760,7 @@ function switchPage(name, el) {
     
     const adminHeaderTools = document.getElementById('admin-header-tools');
     const sqeHeaderTools = document.getElementById('sqe-header-tools');
+    const rnHeaderTools = document.getElementById('rn-header-tools');
 
     // อ้างอิง UI Elements ส่วนกลาง
     const staffWrap = document.getElementById('staff-selector-wrap');
@@ -9771,6 +9788,10 @@ function switchPage(name, el) {
     if (sqeHeaderTools) {
         sqeHeaderTools.classList.remove('flex');
         sqeHeaderTools.classList.add('hidden');
+    }
+    if (rnHeaderTools) {
+        rnHeaderTools.classList.remove('flex');
+        rnHeaderTools.classList.add('hidden');
     }
 
     // --- STEP 2: MANAGE SIDEBAR ACTIVE STATE (อัปเดตแถบสีเมนู) ---
@@ -9869,6 +9890,55 @@ function switchPage(name, el) {
         if (vendorDivider) vendorDivider.classList.remove('hidden');
         if (sqeHeaderTools) { sqeHeaderTools.classList.remove('hidden'); sqeHeaderTools.classList.add('flex'); }
         if (titleEl) titleEl.textContent = 'SQE EN';
+    }
+    else if (pageNameUpper === 'RUNNING NUMBER') {
+        if (subNav) subNav.classList.add('hidden');
+        if (titleEl) titleEl.textContent = 'RUNNING NUMBER REGISTRY';
+        
+        // โชว์แถบสลับหน้า VF / RP ใน Header
+        if (rnHeaderTools) { 
+            rnHeaderTools.classList.remove('hidden'); 
+            rnHeaderTools.classList.add('flex'); 
+        }
+
+        // โชว์ฟิลเตอร์ Vendor และวันที่
+        if (dashFilterWrap) { 
+            dashFilterWrap.classList.remove('hidden'); 
+            dashFilterWrap.classList.add('flex'); 
+        }
+        if (vendorFilter) {
+            vendorFilter.classList.remove('hidden');
+            if (typeof populateVendorFilter === 'function') populateVendorFilter();
+        }
+        if (vendorDivider) vendorDivider.classList.remove('hidden');
+
+        if (typeof WapRNSystem !== 'undefined') {
+            WapRNSystem.init(); 
+            WapRNSystem.switchRnTab('vf'); // บังคับเริ่มที่ VF ทุกครั้งที่กดจาก Sidebar
+        }
+    }
+    // 3. JOB SUPPORT & SUMMARY PAGES (แสดงผลฟิลเตอร์วันที่ทันทีเมื่อเปิดเข้าทุกหน้า)
+    else if ([
+        'EXEC DASHBOARD', 'DASHBOARD SUPPORT', 'ATTENDANCE LOGS', 
+        'LINE SUPPORT LOGS', 'SUPPORT LINE', '5S EXCELLENCE', 
+        'SKILL MATRIX', 'SPECIAL JOBS', 'OT MANAGEMENT'
+    ].includes(pageNameUpper)) {
+        if (subNav) subNav.classList.add('hidden');
+        if (titleEl) titleEl.textContent = pageNameUpper;
+
+        // ✅ แสดงผลฟิลเตอร์วันที่ (Today, 7 Days, Month, Range) ทันทีในหมวด Job Support
+        if (dashFilterWrap) {
+            dashFilterWrap.classList.remove('hidden');
+            dashFilterWrap.classList.add('flex');
+        }
+
+        // แสดง Staff Selector สำหรับระดับบริหาร/Supervisor ในหน้าที่เกี่ยวข้อง
+        const isManagement = ['admin', 'manager', 'supervisor', 'engineer'].includes(S.userRole);
+        if (isManagement && staffWrap && ['EXEC DASHBOARD', 'ATTENDANCE LOGS', 'LINE SUPPORT LOGS', '5S EXCELLENCE', 'SPECIAL JOBS', 'OT MANAGEMENT'].includes(pageNameUpper)) {
+            staffWrap.classList.remove('hidden');
+            staffWrap.classList.add('flex');
+            staffWrap.style.display = 'flex';
+        }
     }
     else {
         if (subNav) subNav.classList.add('hidden'); 
@@ -11276,6 +11346,13 @@ const updateAllModuleFilters = () => {
     if (currentTitle.includes('SQE') || currentTitle.includes('8D') || currentTitle.includes('VF') || currentTitle.includes('SME')) {
         if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.renderDashboard) {
             Wap8DSystem.renderDashboard();
+        }
+    }
+
+    // 9. หน้า RUNNING NUMBER REGISTRY
+    if (currentTitle.includes('RUNNING')) {
+        if (typeof WapRNSystem !== 'undefined' && typeof WapRNSystem.renderTable === 'function') {
+            WapRNSystem.renderTable();
         }
     }
 };
@@ -15073,53 +15150,79 @@ const WapSupportLogs = (function () {
                             <span style="font-size:18px;">✏️</span>
                             <div>
                                 <h3 style="font-size:14px; font-weight:900; margin:0; color:#0f172a;" class="dark:text-white">Evidence Defect Annotator (ใส่สัญลักษณ์ & ข้อความชี้จุดบกพร่อง)</h3>
-                                <p style="font-size:11px; margin:0; color:#64748b;" class="dark:text-slate-400">ลากวาดลูกศร, วงกลม, กรอบสี่เหลี่ยม, ปากกา, พิมพ์ข้อความ พร้อมระบบ Pan & Zoom ส่องตรวจความละเอียดสูง</p>
+                                <p style="font-size:11px; margin:0; color:#64748b;" class="dark:text-slate-400">ลากวาดลูกศร, วงกลม, กรอบสี่เหลี่ยม, เส้นตรง, ปากกา, พิมพ์ข้อความ พร้อมระบบ Pan & Zoom ส่องตรวจความละเอียดสูง</p>
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <button type="button" class="annot-btn" id="btn-annot-cancel" style="background:#f1f5f9; color:#475569;" title="ยกเลิก">✕ ปิด</button>
-                            <button type="button" class="annot-btn" id="btn-annot-save" style="background:#16a34a; color:#ffffff; font-weight:900;" title="บันทึกรูปภาพที่แก้ไข">💾 บันทึกลงเอกสาร</button>
+                            <button type="button" class="annot-btn" id="btn-annot-cancel" style="background:#f1f5f9; color:#475569; padding:0 12px; height:30px;" title="ยกเลิกการแก้ไขและปิดหน้าต่าง">✕ ปิด</button>
+                            <button type="button" class="annot-btn" id="btn-annot-save" style="background:#16a34a; color:#ffffff; font-weight:900; padding:0 14px; height:30px; box-shadow:0 2px 4px rgba(22,163,74,0.3);" title="บันทึกรูปภาพที่แก้ไขลงเอกสารหลักฐาน">💾 บันทึกลงเอกสาร</button>
                         </div>
                     </div>
 
                     <div class="evidence-annotator-toolbar">
-                        <!-- Drawing, Pan & Crop Tools -->
-                        <div class="annot-tool-group">
-<button type="button" class="annot-btn active" data-tool="arrow"><span>➔</span></button>
-<button type="button" class="annot-btn" data-tool="circle"><span>⭕</span></button>
-<button type="button" class="annot-btn" data-tool="rect"><span>🔲</span></button>
-<button type="button" class="annot-btn" data-tool="pen"><span>🖊️</span></button>
-<button type="button" class="annot-btn" data-tool="text"><span>🔤</span></button>
-<button type="button" class="annot-btn" data-tool="crop"><span>✂️</span></button>
-<button type="button" class="annot-btn" data-tool="pan"><span>✋</span></button>
+                        <!-- 1. Drawing, Text, Crop & Pan Tools -->
+                        <div class="annot-tool-group" title="เครื่องมือวาดและชี้จุดเสีย">
+                            <button type="button" class="annot-btn active" data-tool="arrow" title="➔ ลูกศรชี้จุดบกพร่อง (Arrow)"><span>➔</span></button>
+                            <button type="button" class="annot-btn" data-tool="circle" title="⭕ วงกลมล้อมจุดบกพร่อง (Circle)"><span>⭕</span></button>
+                            <button type="button" class="annot-btn" data-tool="rect" title="🔲 กรอบสี่เหลี่ยมชี้จุดเสีย (Rectangle)"><span>🔲</span></button>
+                            <button type="button" class="annot-btn" data-tool="line" title="📏 เส้นตรงชี้แนวระนาบ (Line)"><span>📏</span></button>
+                            <button type="button" class="annot-btn" data-tool="pen" title="🖊️ ปากกาวาดอิสระ (Pen)"><span>🖊️</span></button>
+                            <button type="button" class="annot-btn" data-tool="text" title="🔤 พิมพ์ข้อความชี้จุดเสีย (Text)"><span>🔤</span></button>
+                            <button type="button" class="annot-btn" data-tool="crop" title="✂️ ครอบตัดรูปภาพ (Crop)"><span>✂️</span></button>
+                            <button type="button" class="annot-btn" data-tool="pan" title="✋ เลื่อนดูภาพ (Pan)"><span>✋</span></button>
                         </div>
 
+                        <!-- 2. Rotate & Flip Tools -->
+                        <div class="annot-tool-group" title="หมุนและพลิกรูปภาพ">
+                            <button type="button" class="annot-btn" id="btn-annot-rotate-left" title="↺ หมุนทวนเข็ม 90° (Rotate Left -90°)">
+                                <span>↺</span>
+                            </button>
+                            <button type="button" class="annot-btn" id="btn-annot-rotate-right" title="↻ หมุนตามเข็ม 90° (Rotate Right +90°)">
+                                <span>↻</span>
+                            </button>
+                            <button type="button" class="annot-btn" id="btn-annot-flip-h" title="⇄ พลิกรูปภาพแนวนอน (Flip Horizontal)">
+                                <span>⇄</span>
+                            </button>
+                        </div>
 
-                        <!-- Colors -->
-                        <div class="annot-tool-group" style="gap:4px; padding:2px 5px;">
+                        <!-- 3. Colors & Custom Palette -->
+                        <div class="annot-tool-group" style="gap:4px;" title="เลือกสีสัญลักษณ์">
                             <div class="annot-color-dot active" data-color="#ef4444" style="background:#ef4444;" title="สีแดง (Defect Red)"></div>
                             <div class="annot-color-dot" data-color="#eab308" style="background:#eab308;" title="สีเหลือง (Warning Yellow)"></div>
-                            <div class="annot-color-dot" data-color="#22c55e" style="background:#22c55e;" title="สีเขียว (Pass/Green)"></div>
-                            <div class="annot-color-dot" data-color="#3b82f6" style="background:#3b82f6;" title="สีฟ้า (Blue)"></div>
+                            <div class="annot-color-dot" data-color="#22c55e" style="background:#22c55e;" title="สีเขียว (Pass Green)"></div>
+                            <div class="annot-color-dot" data-color="#3b82f6" style="background:#3b82f6;" title="สีน้ำเงิน (Carrier Blue)"></div>
                             <div class="annot-color-dot" data-color="#ffffff" style="background:#ffffff; border-color:#94a3b8;" title="สีขาว (White)"></div>
                             <div class="annot-color-dot" data-color="#000000" style="background:#000000;" title="สีดำ (Black)"></div>
+                            <label class="annot-color-dot" id="annot-custom-color-wrap" title="🎨 เลือกสีอื่นๆ กำหนดเอง (Custom Color)" style="background:conic-gradient(red, yellow, lime, aqua, blue, magenta, red); cursor:pointer; overflow:hidden; display:inline-block;">
+                                <input type="color" id="annot-custom-color" value="#ef4444" style="opacity:0; width:100%; height:100%; position:absolute; inset:0; cursor:pointer; padding:0; border:none;">
+                            </label>
                         </div>
 
-                        <!-- Stroke Size -->
+                        <!-- 4. Stroke Size Presets -->
+                        <div class="annot-tool-group" title="ขนาดความหนาเส้น">
+                            <button type="button" class="annot-btn" data-size="2" title="ขนาดเส้นบาง 2px (Thin)">2px</button>
+                            <button type="button" class="annot-btn active" data-size="4" title="ขนาดเส้นมาตรฐาน 4px (Normal)">4px</button>
+                            <button type="button" class="annot-btn" data-size="7" title="ขนาดเส้นหนา 7px (Bold)">7px</button>
+                        </div>
 
-<div class="annot-tool-group" style="padding:2px 4px; gap:2px;">
-    <button type="button" class="annot-btn" data-size="3">3px</button>
-    <button type="button" class="annot-btn active" data-size="5">5px</button>
-    <button type="button" class="annot-btn" data-size="8">8px</button>
-</div>
+                        <!-- 5. Zoom & View Controls -->
+                        <div class="annot-tool-group annot-zoom-group" title="มุมมองและระดับการซูม">
+                            <button type="button" class="annot-btn" id="btn-annot-zoom-out" title="➖ ซูมออก (-25%)"><span>➖</span></button>
+                            <span class="annot-zoom-badge" id="annot-zoom-level-label" title="ระดับการซูมปัจจุบัน">100%</span>
+                            <button type="button" class="annot-btn" id="btn-annot-zoom-in" title="➕ ซูมเข้า (+25%)"><span>➕</span></button>
+                            <button type="button" class="annot-btn" id="btn-annot-zoom-fit" title="⛶ ปรับขนาดพอดีหน้าจอ (Fit Screen)"><span>⛶</span></button>
+                        </div>
 
-                        <!-- Actions (Undo, Clear) -->
-                        <div class="annot-tool-group" style="margin-left:auto; flex-shrink:0;">
-                            <button type="button" class="annot-btn" id="btn-annot-undo" title="ย้อนกลับ (Undo - Ctrl+Z)">
-                                <span>↩️</span> เลิกทำ
+                        <!-- 6. History & Clear Actions -->
+                        <div class="annot-tool-group" style="margin-left:auto;" title="คำสั่งจัดการภาพ">
+                            <button type="button" class="annot-btn" id="btn-annot-undo" title="↩️ ย้อนกลับคำสั่งล่าสุด (Undo - Ctrl+Z)">
+                                <span>↩️</span>
                             </button>
-                            <button type="button" class="annot-btn" id="btn-annot-clear" title="ล้างการวาดทั้งหมด (Clear All)" style="color:#dc2626;">
-                                <span>🗑️</span> ล้างภาพ
+                            <button type="button" class="annot-btn" id="btn-annot-redo" title="↪️ ทำซ้ำคำสั่งที่ยกเลิก (Redo - Ctrl+Y)">
+                                <span>↪️</span>
+                            </button>
+                            <button type="button" class="annot-btn" id="btn-annot-clear" title="🗑️ ล้างสัญลักษณ์ทั้งหมด (Clear All)" style="color:#dc2626;">
+                                <span>🗑️</span>
                             </button>
                         </div>
                     </div>
@@ -15167,8 +15270,9 @@ const WapSupportLogs = (function () {
             let cropRect = null; // { x, y, w, h }
             let isCropping = false;
 
-            // History Stack for Undo
+            // History & Redo Stacks
             let historyStack = [];
+            let redoStack = [];
 
             function updateTransform() {
                 canvasWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
@@ -15194,36 +15298,21 @@ const WapSupportLogs = (function () {
                 updateTransform();
             }
 
-// ค้นหาและแทนที่ฟังก์ชัน resetZoom เดิมด้วยโค้ดชุดนี้
-function resetZoom() {
-    if (!canvas || !stageContainer) return;
+            function resetZoom() {
+                if (!canvas || !stageContainer) return;
+                const stageRect = stageContainer.getBoundingClientRect();
+                const padding = 50; 
+                const availW = Math.max(100, stageRect.width - padding);
+                const availH = Math.max(100, stageRect.height - padding);
+                const scaleW = availW / canvas.width;
+                const scaleH = availH / canvas.height;
+                const fitScale = Math.min(scaleW, scaleH, 1.0);
 
-    // 1. ดึงขนาดของพื้นที่แสดงผล (Stage)
-    const stageRect = stageContainer.getBoundingClientRect();
-    
-    // 2. กำหนดระยะห่างจากขอบ (Padding) เพื่อไม่ให้รูปติดขอบเกินไป (เช่น 60px)
-    const padding = 60; 
-    const availW = stageRect.width - padding;
-    const availH = stageRect.height - padding;
-
-    // 3. คำนวณอัตราส่วนการย่อเพื่อให้รูปพอดีกับพื้นที่
-    const scaleW = availW / canvas.width;
-    const scaleH = availH / canvas.height;
-    
-    // เลือกค่าที่น้อยที่สุดเพื่อให้รูปแสดงครบทั้งใบ (Contain) 
-    // และไม่ให้ขยายเกิน 100% (1.0) ถ้ารูปเล็กกว่าจอ
-    const fitScale = Math.min(scaleW, scaleH, 1.0);
-
-    // 4. ตั้งค่าระดับการซูมเริ่มต้น
-    zoomLevel = fitScale;
-    
-    // 5. รีเซ็ตตำแหน่งให้อยู่กึ่งกลาง
-    panX = 0;
-    panY = 0;
-
-    // 6. อัปเดตการแสดงผล
-    updateTransform();
-}
+                zoomLevel = fitScale;
+                panX = 0;
+                panY = 0;
+                updateTransform();
+            }
 
             function updateCursor() {
                 if (isPanning) {
@@ -15247,7 +15336,8 @@ function resetZoom() {
             function saveHistory() {
                 if (canvas.width > 0 && canvas.height > 0) {
                     historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-                    if (historyStack.length > 25) historyStack.shift();
+                    if (historyStack.length > 30) historyStack.shift();
+                    redoStack = []; // Reset redo on new action
                 }
             }
 
@@ -15343,6 +15433,20 @@ function resetZoom() {
 
                 context.beginPath();
                 context.rect(x, y, w, h);
+                context.stroke();
+                context.restore();
+            }
+
+            // Draw Straight Line (เส้นตรงชี้แนวระนาบ)
+            function drawLine(context, fromX, fromY, toX, toY, color, width) {
+                context.save();
+                context.strokeStyle = color;
+                context.lineWidth = width;
+                context.lineCap = 'round';
+                context.lineJoin = 'round';
+                context.beginPath();
+                context.moveTo(fromX, fromY);
+                context.lineTo(toX, toY);
                 context.stroke();
                 context.restore();
             }
@@ -15507,6 +15611,8 @@ function resetZoom() {
                     drawCircle(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
                 } else if (currentTool === 'rect') {
                     drawRect(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
+                } else if (currentTool === 'line') {
+                    drawLine(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
                 } else if (currentTool === 'pen') {
                     freehandPoints.push(pos);
                     ctx.save();
@@ -15729,29 +15835,121 @@ function resetZoom() {
             });
 
             // Color Selection
-            overlay.querySelectorAll('.annot-color-dot').forEach(dot => {
+            overlay.querySelectorAll('.annot-color-dot[data-color]').forEach(dot => {
                 dot.onclick = () => {
                     overlay.querySelectorAll('.annot-color-dot').forEach(d => d.classList.remove('active'));
                     dot.classList.add('active');
                     currentColor = dot.dataset.color;
+                    const customWrap = overlay.querySelector('#annot-custom-color-wrap');
+                    if (customWrap) customWrap.style.boxShadow = '0 0 0 1px #cbd5e1';
                 };
             });
+
+            // Custom Color Picker
+            const customColorInput = overlay.querySelector('#annot-custom-color');
+            const customColorWrap = overlay.querySelector('#annot-custom-color-wrap');
+            if (customColorInput) {
+                customColorInput.oninput = (e) => {
+                    currentColor = e.target.value;
+                    overlay.querySelectorAll('.annot-color-dot').forEach(d => d.classList.remove('active'));
+                    if (customColorWrap) {
+                        customColorWrap.classList.add('active');
+                        customColorWrap.style.boxShadow = `0 0 0 2px ${currentColor}, 0 2px 5px rgba(0,0,0,0.3)`;
+                    }
+                };
+            }
 
             // Line Width Selection
             overlay.querySelectorAll('.annot-btn[data-size]').forEach(btn => {
                 btn.onclick = () => {
                     overlay.querySelectorAll('.annot-btn[data-size]').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    currentLineWidth = parseInt(btn.dataset.size, 10) || 5;
+                    currentLineWidth = parseInt(btn.dataset.size, 10) || 4;
                 };
             });
+
+            // 🔄 ฟังก์ชันหมุนรูปภาพบน Canvas 90 องศา (Rotate Canvas with all drawn annotations)
+            function rotateCanvas(degrees = 90) {
+                if (typeof cancelCropSelection === 'function') cancelCropSelection();
+
+                // สร้าง Canvas สำรองเพื่อคัดลอกภาพและสัญลักษณ์ที่วาดไว้ทั้งหมด
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(canvas, 0, 0);
+
+                const rad = (degrees * Math.PI) / 180;
+                const isSwap = (Math.abs(degrees) % 180 !== 0);
+                const newW = isSwap ? canvas.height : canvas.width;
+                const newH = isSwap ? canvas.width : canvas.height;
+
+                canvas.width = newW;
+                canvas.height = newH;
+
+                ctx.clearRect(0, 0, newW, newH);
+                ctx.save();
+                ctx.translate(newW / 2, newH / 2);
+                ctx.rotate(rad);
+                ctx.drawImage(tempCanvas, -tempCanvas.width / 2, -tempCanvas.height / 2);
+                ctx.restore();
+
+                // ปรับปรุง baseImg ให้เป็นภาพที่หมุนแล้ว
+                const rotatedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                baseImg = new Image();
+                baseImg.crossOrigin = 'anonymous';
+                baseImg.src = rotatedDataUrl;
+
+                saveHistory();
+                resetZoom();
+                toast(`↻ หมุนรูปภาพ ${degrees > 0 ? '+' : ''}${degrees}° เรียบร้อยแล้ว`, 'info');
+            }
+
+            // ⇄ ฟังก์ชันพลิกรูปภาพแนวนอน (Flip Horizontal)
+            function flipCanvasHorizontal() {
+                if (typeof cancelCropSelection === 'function') cancelCropSelection();
+
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(canvas, 0, 0);
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(tempCanvas, 0, 0);
+                ctx.restore();
+
+                const flippedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                baseImg = new Image();
+                baseImg.crossOrigin = 'anonymous';
+                baseImg.src = flippedDataUrl;
+
+                saveHistory();
+                toast('⇄ พลิกรูปภาพแนวนอนเรียบร้อยแล้ว', 'info');
+            }
+
+            const btnRotLeft = overlay.querySelector('#btn-annot-rotate-left');
+            const btnRotRight = overlay.querySelector('#btn-annot-rotate-right');
+            const btnFlipH = overlay.querySelector('#btn-annot-flip-h');
+            if (btnRotLeft) btnRotLeft.onclick = () => rotateCanvas(-90);
+            if (btnRotRight) btnRotRight.onclick = () => rotateCanvas(90);
+            if (btnFlipH) btnFlipH.onclick = () => flipCanvasHorizontal();
 
             // Undo Button (Ctrl+Z)
             const undoBtn = overlay.querySelector('#btn-annot-undo');
             const handleUndo = () => {
                 if (historyStack.length > 1) {
-                    historyStack.pop(); // Remove current
+                    const popped = historyStack.pop(); // Remove current
+                    redoStack.push(popped);
                     const prev = historyStack[historyStack.length - 1];
+                    if (canvas.width !== prev.width || canvas.height !== prev.height) {
+                        canvas.width = prev.width;
+                        canvas.height = prev.height;
+                        resetZoom();
+                    }
                     ctx.putImageData(prev, 0, 0);
                     toast('↩️ ย้อนกลับคำสั่งล่าสุด', 'info');
                 } else if (historyStack.length === 1) {
@@ -15760,6 +15958,23 @@ function resetZoom() {
                 }
             };
             if (undoBtn) undoBtn.onclick = handleUndo;
+
+            // Redo Button (Ctrl+Y / Ctrl+Shift+Z)
+            const redoBtn = overlay.querySelector('#btn-annot-redo');
+            const handleRedo = () => {
+                if (redoStack.length > 0) {
+                    const nextState = redoStack.pop();
+                    historyStack.push(nextState);
+                    if (canvas.width !== nextState.width || canvas.height !== nextState.height) {
+                        canvas.width = nextState.width;
+                        canvas.height = nextState.height;
+                        resetZoom();
+                    }
+                    ctx.putImageData(nextState, 0, 0);
+                    toast('↪️ ทำซ้ำคำสั่งที่ยกเลิก', 'info');
+                }
+            };
+            if (redoBtn) redoBtn.onclick = handleRedo;
 
             // Keyboard Shortcuts
             const handleKeydown = (e) => {
@@ -15770,7 +15985,14 @@ function resetZoom() {
                     updateCursor();
                 } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
                     e.preventDefault();
-                    handleUndo();
+                    if (e.shiftKey) {
+                        handleRedo();
+                    } else {
+                        handleUndo();
+                    }
+                } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                    e.preventDefault();
+                    handleRedo();
                 } else if (e.key === 'Escape') {
                     closeAnnotator();
                 } else if (e.key === '+' || e.key === '=') {
@@ -15801,6 +16023,7 @@ function resetZoom() {
                 clearBtn.onclick = () => {
                     redrawBase();
                     historyStack = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
+                    redoStack = [];
                     toast('🗑️ ล้างสัญลักษณ์ทั้งหมดบนภาพแล้ว', 'info');
                 };
             }
@@ -17317,9 +17540,12 @@ function _openViewModal(id) {
 
         // 2. ตรวจสอบสิทธิ์ (Ownership Logic)
         // - เป็นเจ้าของงาน (user_id ในฐานข้อมูลตรงกับอีเมลที่ล็อกอินปัจจุบัน)
+        // - หรือเข้าใช้งานในโหมด SQE Support
         // - หรือเป็น Master Admin (Natthawut)
-        const isOwner = (target._user === S.currentUser);
-        const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+        const myEmail = (S.currentUser || '').toLowerCase();
+        const targetUser = (target._user || target.user_id || '').toLowerCase();
+        const isOwner = !targetUser || (targetUser === myEmail) || (S.userRole !== 'supervisor');
+        const isMasterAdmin = (myEmail === 'natthawut.chaising@carrier.com');
 
         // บล็อกการลบเฉพาะกรณีที่เป็นคนอื่น (ไม่ใช่เจ้าของ) และไม่ใช่ Admin และอยู่ในโหมด Supervisor
         if (!isOwner && !isMasterAdmin && S.userRole === 'supervisor') { 
@@ -34798,25 +35024,26 @@ const WapRNSystem = (function() {
         renderTable();
     }
 
+// ค้นหาฟังก์ชัน switchRnTab ใน WapRNSystem
     function switchRnTab(tab) {
         _activeTab = tab;
         const btnVf = document.getElementById('btn-rn-tab-vf');
         const btnRp = document.getElementById('btn-rn-tab-rp');
-        const accent = document.getElementById('rn-table-accent');
         const title = document.getElementById('rn-table-title');
 
         if (tab === 'vf') {
-            if(btnVf) btnVf.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all bg-blue-600 text-white shadow-sm";
-            if(btnRp) btnRp.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-blue-600";
-            if(accent) accent.className = "h-1.5 w-full bg-blue-600 transition-all duration-500";
+            // ปรับปุ่ม VF เป็นสีน้ำเงิน / ปุ่ม RP เป็นสีพื้นปกติ
+            btnVf.className = "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all bg-blue-600 text-white shadow-sm";
+            btnRp.className = "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all text-slate-500 hover:text-blue-600";
             if(title) title.textContent = "VF Running Number Registry";
         } else {
-            if(btnRp) btnRp.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all bg-rose-600 text-white shadow-sm";
-            if(btnVf) btnVf.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-rose-600";
-            if(accent) accent.className = "h-1.5 w-full bg-rose-600 transition-all duration-500";
+            // ปรับปุ่ม RP เป็นสีแดง (Rose) / ปุ่ม VF เป็นสีพื้นปกติ
+            btnRp.className = "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all bg-rose-600 text-white shadow-sm";
+            btnVf.className = "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all text-slate-500 hover:text-rose-600";
             if(title) title.textContent = "RP Running Number Registry";
         }
-        renderTable();
+        
+        renderTable(); // สั่งวาดตารางใหม่เพื่อกรองข้อมูลตาม Tab ที่เลือก
     }
 
     function renderTable() {
@@ -34831,9 +35058,44 @@ const WapRNSystem = (function() {
         });
 
         const allCases = (typeof Wap8DSystem !== 'undefined') ? Wap8DSystem.getCases() : [];
+        
+        // ดึงค่าตัวกรองวันที่และ Vendor จาก Header
+        const startDateStr = (typeof claimDashFilterDate !== 'undefined' && claimDashFilterDate.start) || document.getElementById('cd-start-date')?.value || '';
+        const endDateStr = (typeof claimDashFilterDate !== 'undefined' && claimDashFilterDate.end) || document.getElementById('cd-end-date')?.value || '';
+        const vendorSelectEl = document.getElementById('claim-vendor-filter');
+        const vendorVal = (vendorSelectEl && !vendorSelectEl.classList.contains('hidden') && vendorSelectEl.value !== 'ALL') ? vendorSelectEl.value.trim().toUpperCase() : '';
+
         const filteredCases = allCases.filter(c => {
-            const type = (c.report_data?.source_report_type || c.report_type || '').toUpperCase();
-            return _activeTab === 'vf' ? (type === 'VF') : (type === 'RP');
+            const d = c.report_data || {};
+            const vf = d.vf_data || {};
+
+            // 1. กรองประเภท Tab (VF vs RP)
+            const type = (d.source_report_type || c.report_type || '').toUpperCase();
+            const tabMatch = _activeTab === 'vf' ? (type === 'VF') : (type === 'RP');
+            if (!tabMatch) return false;
+
+            // 2. กรองวันที่ (Date Range)
+            if (startDateStr || endDateStr) {
+                let caseDate = c.date || d.event_date || (c.created_at ? c.created_at.split('T')[0] : '');
+                if (caseDate) {
+                    if (startDateStr && caseDate < startDateStr) return false;
+                    if (endDateStr && caseDate > endDateStr) return false;
+                }
+            }
+
+            // 3. กรอง Vendor
+            if (vendorVal) {
+                const parsedInfo = (typeof parseProblemTitleForD2 === 'function') 
+                                   ? parseProblemTitleForD2(c.problem_title, c) 
+                                   : { supplier: '-' };
+                const vName = (vf.vendor || d.supplier || c.supplier || parsedInfo.supplier || '').trim().toUpperCase();
+                const vCode = (vf.vendor_code || '').trim().toUpperCase();
+                if (!vName.includes(vendorVal) && !vCode.includes(vendorVal) && vendorVal !== vName && vendorVal !== vCode) {
+                    return false;
+                }
+            }
+
+            return true;
         }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
         if (document.getElementById('rn-record-count')) {
@@ -35002,9 +35264,10 @@ const progressDropdown = `
 return { 
     init, 
     switchRnTab, 
+    renderTable,
     updateStatus, 
     updateCompleteDate,
-    updatePPMCount // เพิ่มบรรทัดนี้
+    updatePPMCount
 };
 })();
 

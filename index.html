@@ -506,16 +506,16 @@
 </div>
 </aside>
 <div id="sidebar-backdrop" onclick="toggleSidebar('close')"></div>
-        <main class="flex-1 flex flex-col overflow-hidden bg-slate-50 min-w-0">
-<header class="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-2 sm:px-3 md:px-4 h-14 min-h-[56px] flex items-center justify-between gap-1.5 sm:gap-2 relative z-50 overflow-visible min-w-0">
+        <main class="flex-1 flex flex-col overflow-hidden bg-slate-50 min-w-0 relative">
+<header class="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-2 sm:px-3 md:px-3.5 h-13 sm:h-14 min-h-[52px] sm:min-h-[56px] flex items-center justify-between gap-1 sm:gap-1.5 md:gap-2 sticky top-0 z-[100] shrink-0 overflow-visible min-w-0">
     <!-- [กลุ่มฝั่งซ้าย]: ปุ่มเมนูมือถือ + หัวข้อหน้า + ปุ่มสลับแท็บ SQE EN -->
-    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
         <button  onclick="toggleSidebar('open')" class="sm:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200 mr-1" title="Toggle Sidebar" aria-label="Toggle Sidebar">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
         <div class="min-w-0 shrink-0 hidden sm:block">
             <p class="text-[7px] text-slate-400 font-bold uppercase tracking-widest leading-none">CLAIM OPERATIONS</p>
-            <h2 id="header-title" class="font-bold text-slate-800 dark:text-slate-100 text-[10px] sm:text-[11px] truncate uppercase max-w-[100px] xs:max-w-[130px] sm:max-w-[170px] md:max-w-none">PART LINE CLAIM</h2>
+            <h2 id="header-title" class="font-bold text-slate-800 dark:text-slate-100 text-[10px] sm:text-[11px] truncate uppercase max-w-[100px] xs:max-w-[130px] sm:max-w-[160px] md:max-w-[190px] xl:max-w-[240px]">PART LINE CLAIM</h2>
         </div>
 
         <!-- [แถบสลับหน้า SQE EN]: วางต่อท้าย CLAIM OPERATIONS / SQE EN -->
@@ -597,7 +597,7 @@
 
 
     <!-- [กลุ่มฝั่งขวาสุด]: Online Badge + Staff Selector + Filter Bar -->
-    <div class="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0 flex-nowrap">
+    <div id="header-right-tools" class="flex items-center gap-1 sm:gap-1.5 ml-auto shrink-0 flex-nowrap min-w-0">
         <!-- ดรอปดาวน์พนักงาน (Custom Dropdown สำหรับ Supervisor) -->
         <div id="staff-selector-wrap" class="hidden items-center gap-1 shrink-0 relative z-50">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">:</span>
@@ -605,12 +605,12 @@
                 <button type="button" 
                         id="staff-custom-select-btn" 
                         onclick="window.toggleStaffCustomDropdown(event)"
-                        class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-2xs transition-all duration-150 cursor-pointer min-w-[170px] max-w-[240px] justify-between"
+                        class="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 h-6.5 sm:h-7 text-[10px] sm:text-[10.5px] font-semibold rounded-lg bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-2xs transition-all duration-150 cursor-pointer min-w-[115px] max-w-[160px] sm:min-w-[130px] sm:max-w-[185px] lg:max-w-[215px] justify-between"
                         title="เลือกผู้ปฏิบัติงาน"
                         aria-label="เลือกผู้ปฏิบัติงาน">
-                    <div class="flex items-center gap-1.5 truncate">
+                    <div class="flex items-center gap-1 sm:gap-1.5 truncate">
                         <span class="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 shrink-0"></span>
-                        <span id="staff-custom-select-label" class="truncate font-bold">-- เลือกผู้ปฏิบัติงาน --</span>
+                        <span id="staff-custom-select-label" class="truncate font-bold max-w-[85px] sm:max-w-[120px] lg:max-w-[150px]">-- เลือกผู้ปฏิบัติงาน --</span>
                     </div>
                     <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0 transition-transform duration-200" id="staff-select-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -669,46 +669,46 @@
         </div>
 
         <!-- [FILTER TOOLBAR]: เฉพาะหน้า DASHBOARD -->
-        <div id="claim-dash-filter-wrap" class="hidden items-center gap-1 sm:gap-1.5 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-md p-0.5 sm:p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex-nowrap shrink-0 max-w-full">
+        <div id="claim-dash-filter-wrap" class="hidden items-center gap-0.5 sm:gap-1 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-md p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex-nowrap shrink-0 max-w-full">
             <!-- ปุ่ม Preset -->
-            <div class="flex items-center gap-1 shrink-0">
-                <button  id="cd-preset-today" onclick="applyClaimDashPreset('today')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8.5px] sm:text-[9px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Today" aria-label="Today">Today</button>
-                <button  id="cd-preset-7days" onclick="applyClaimDashPreset('7days')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8.5px] sm:text-[9px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Last 7 Days" aria-label="Last 7 Days">7 Days</button>
-                <button  id="cd-preset-month" onclick="applyClaimDashPreset('month')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8.5px] sm:text-[9px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Month" aria-label="Month">Month</button>
+            <div class="flex items-center gap-0.5 sm:gap-1 shrink-0">
+                <button  id="cd-preset-today" onclick="applyClaimDashPreset('today')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8px] sm:text-[8.5px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Today" aria-label="Today">Today</button>
+                <button  id="cd-preset-7days" onclick="applyClaimDashPreset('7days')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8px] sm:text-[8.5px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Last 7 Days" aria-label="Last 7 Days">7 Days</button>
+                <button  id="cd-preset-month" onclick="applyClaimDashPreset('month')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8px] sm:text-[8.5px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Month" aria-label="Month">Month</button>
             </div>
 
-            <div class="w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
+            <div class="w-[1px] h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
 
             <!-- ส่วนเลือกวันที่เอง (Custom Range) -->
-            <div class="cd-date-range-box flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-700 shrink-0">
-                <input  type="date" id="cd-start-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[9px] sm:text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[68px] xs:w-[74px] sm:w-[80px] md:w-[84px] h-5 cursor-pointer px-0.5" title="Cd Start Date" aria-label="Cd Start Date">
-                <svg class="cd-date-arrow w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-width="2.5" stroke-linecap="round"></path></svg>
-                <input  type="date" id="cd-end-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[9px] sm:text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[68px] xs:w-[74px] sm:w-[80px] md:w-[84px] h-5 cursor-pointer px-0.5" title="Cd End Date" aria-label="Cd End Date">
+            <div class="cd-date-range-box flex items-center gap-0.5 px-1 py-0.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-700 shrink-0 h-5.5 sm:h-6">
+                <input  type="date" id="cd-start-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[8.5px] sm:text-[9.5px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[60px] xs:w-[66px] sm:w-[72px] md:w-[76px] h-4.5 cursor-pointer px-0.5" title="Cd Start Date" aria-label="Cd Start Date">
+                <svg class="cd-date-arrow w-2.5 h-2.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-width="2.5" stroke-linecap="round"></path></svg>
+                <input  type="date" id="cd-end-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[8.5px] sm:text-[9.5px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[60px] xs:w-[66px] sm:w-[72px] md:w-[76px] h-4.5 cursor-pointer px-0.5" title="Cd End Date" aria-label="Cd End Date">
             </div>
 
-            <div id="vendor-divider" class="hidden w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
-            <select  id="claim-vendor-filter" onchange="updateAllModuleFilters()" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-extrabold text-blue-600 dark:text-blue-400 outline-none h-6 px-1.5 cursor-pointer max-w-[100px] truncate shrink-0" title="Claim Vendor Filter" aria-label="Claim Vendor Filter">
+            <div id="vendor-divider" class="hidden w-[1px] h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
+            <select  id="claim-vendor-filter" onchange="updateAllModuleFilters()" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[9.5px] font-extrabold text-blue-600 dark:text-blue-400 outline-none h-5.5 sm:h-6 px-1 cursor-pointer max-w-[90px] truncate shrink-0" title="Claim Vendor Filter" aria-label="Claim Vendor Filter">
                 <option value="ALL">ALL VENDORS</option>
             </select>
 
-            <div class="w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
+            <div class="w-[1px] h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
 
             <!-- ปุ่ม Reset -->
             <button  onclick="resetClaimDashFilter()" class="h-5.5 w-5.5 sm:h-6 sm:w-6 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 dark:hover:bg-rose-950/50 dark:hover:text-rose-400 transition-all shrink-0" title="Reset Filters" data-i18n-title="btn_reset_filter" aria-label="Action">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <svg class="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
             </button>
 
-            <div class="w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
+            <div class="w-[1px] h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
 
             <!-- กระดิ่งแจ้งเตือนเครื่องมือที่เลยกำหนดเทียบ (Overdue / Expired Notification Bell) -->
-            <button id="cal-overdue-bell-btn" onclick="WapCalibrationSystem.goToOverdue()" class="h-5.5 px-1.5 sm:h-6 sm:px-2 flex items-center gap-1.5 bg-white dark:bg-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-600 dark:text-slate-200 hover:text-rose-600 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-rose-300 transition-all shadow-2xs shrink-0 cursor-pointer group" title="รายการเครื่องมือที่เลยกำหนดเทียบ (Overdue / Expired Instruments)" aria-label="Overdue Instruments Notification">
+            <button id="cal-overdue-bell-btn" onclick="WapCalibrationSystem.goToOverdue()" class="h-5.5 px-1.5 sm:h-6 sm:px-2 flex items-center gap-1 bg-white dark:bg-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-600 dark:text-slate-200 hover:text-rose-600 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-rose-300 transition-all shadow-2xs shrink-0 cursor-pointer group" title="รายการเครื่องมือที่เลยกำหนดเทียบ (Overdue / Expired Instruments)" aria-label="Overdue Instruments Notification">
                 <div class="relative flex items-center justify-center">
-                    <svg class="cal-bell-icon w-3.5 h-3.5 text-amber-500 group-hover:text-rose-500 transition-colors" fill="currentColor" viewBox="0 0 24 24">
+                    <svg class="cal-bell-icon w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500 group-hover:text-rose-500 transition-colors" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
                     </svg>
                     <span id="cal-overdue-bell-dot" class="hidden absolute -top-1 -right-1 w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping"></span>
                 </div>
-                <span id="cal-overdue-bell-count" class="px-1.5 py-0.5 bg-rose-500 text-white rounded-full text-[9px] font-black leading-none min-w-[15px] text-center shadow-xs">0</span>
+                <span id="cal-overdue-bell-count" class="px-1 py-0.5 bg-rose-500 text-white rounded-full text-[8.5px] font-black leading-none min-w-[14px] text-center shadow-xs">0</span>
             </button>
         </div>
     </div>
