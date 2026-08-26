@@ -5340,6 +5340,9 @@ document.addEventListener('contextmenu', e => e.preventDefault());
 const $id = id => document.getElementById(id);
 
 function hasWriteAccess() {
+    // เพิ่มบรรทัดนี้: ถ้าเป็น Master Admin ให้ผ่านตลอด
+    if (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com') return true;
+
     if (S.userRole === 'supervisor') {
         toast('⚠️ โหมดหัวหน้างาน: อ่านข้อมูลได้อย่างเดียวไม่สามารถแก้ไขได้', 'error'); 
         return false;
@@ -6882,9 +6885,9 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         showBtn.classList.remove('hidden');
         gsap.set(showBtn, { x: 0, opacity: 1 });
     }
-
-    // ตรวจสอบประเภทการ Login
+// --- [ส่วนที่แก้ไข]: ตรวจสอบสิทธิ์ Master Admin ---
     const isSupervisorSession = (S.loginRole === 'supervisor');
+    const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
 
     if (isSupervisorSession) { 
         // ==========================================
@@ -6892,48 +6895,57 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         // ==========================================
         S.userRole = 'supervisor';
 
-        // ✅ แสดงช่องเลือกรายชื่อพนักงาน (Staff Selector)
+        // ✅ แสดงช่องเลือกรายชื่อพนักงานเสมอ (เพื่อให้ Admin เลือกบันทึกงานแทนคนอื่นได้)
         if (staffWrap) {
             staffWrap.classList.remove('hidden');
-            staffWrap.classList.add('flex'); // ใช้ flex เพื่อให้ตำแหน่งสวยงามตามดีไซน์
+            staffWrap.classList.add('flex');
         }
 
         await loadStaffList(); 
 
-        // จัดการ UI เพิ่มเติมสำหรับ Supervisor
-        if (showBtn) showBtn.style.display = 'none'; 
-        const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
-        if (internalCloseBtn) internalCloseBtn.style.display = 'none';
+        // 🎯 [เงื่อนไขพิเศษสำหรับ Master Admin]
+        if (isMasterAdmin) {
+            // แอดมิน: ให้แสดงปุ่มเปิดฟอร์ม และเปิดให้พิมพ์ได้เหมือน IQC
+            if (showBtn) showBtn.style.display = 'flex';
+            const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
+            if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
 
-        // ปิดการใช้งานฟอร์ม (Read-only)
-        const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
-        formInputs.forEach(el => {
-            el.disabled = true;
-            el.style.opacity = '0.6';
-            el.style.cursor = 'not-allowed';
-        });
+            const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
+            formInputs.forEach(el => {
+                el.disabled = false;
+                el.style.opacity = '1';
+                el.style.cursor = 'default';
+            });
+            console.log("Master Admin: Write Access Granted in Supervisor Mode");
+        } else {
+            // หัวหน้างานทั่วไป: ปิดการใช้งานฟอร์ม (Read-only)
+            if (showBtn) showBtn.style.display = 'none'; 
+            const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
+            if (internalCloseBtn) internalCloseBtn.style.display = 'none';
+
+            const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
+            formInputs.forEach(el => {
+                el.disabled = true;
+                el.style.opacity = '0.6';
+                el.style.cursor = 'not-allowed';
+            });
+        }
 
     } else {
         // ==========================================
-        // 👤 CASE: ล็อกอินผ่านหน้า SQE SUPPORT
+        // 👤 CASE: ล็อกอินผ่านหน้า SQE SUPPORT (Staff/IQC)
         // ==========================================
         S.userRole = 'staff';
-
-        // ❌ ซ่อนช่องเลือกรายชื่อพนักงานทันที (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.add('hidden');
             staffWrap.classList.remove('flex');
         }
-
-        // บังคับให้ดูข้อมูลของตัวเองเท่านั้น
         S.viewingUser = S.currentUser;
 
-        // แสดงปุ่มเปิดฟอร์มปกติ
         if (showBtn) showBtn.style.display = 'flex';
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
         if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
 
-        // เปิดการใช้งานฟอร์มปกติ
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = false;
@@ -8307,7 +8319,13 @@ function resetInputForm() {
 
 
 async function submitEntry() {
-    if (S.userRole === 'supervisor') { toast('Supervisor เป็นโหมดดูอย่างเดียว (Read-only)', 'info'); return; }
+    const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+
+    // 🛡️ [เพิ่มส่วนนี้]: ปลดล็อคให้ Master Admin บันทึกได้ แม้อยู่ในโหมด Supervisor
+    if (S.userRole === 'supervisor' && !isMasterAdmin) { 
+        toast('Supervisor เป็นโหมดดูอย่างเดียว (Read-only)', 'info'); 
+        return; 
+    }
 
     const dateIn = $id('f-date');
     const partIn = $id('f-part');
@@ -8319,6 +8337,7 @@ async function submitEntry() {
     const btn = $id('btn-commit');
     const btnText = $id('btn-commit-text');
 
+    // ... (โค้ดส่วน Validation อื่นๆ คงเดิม) ...
     const ref = refIn.value.trim();
     const qty = parseInt(qtyIn.value) || 0;
     const partNoVal = partIn.value.trim();
@@ -8343,6 +8362,7 @@ async function submitEntry() {
     const existingRow = S.editingId ? S.records.find(r => String(r.id) === String(S.editingId)) : null;
     const originalCreatedAt = existingRow ? (existingRow.created_at || existingRow.createdAt) : null;
 
+    // ข้อมูลที่จะบันทึก
     const rowData = {
         id: recordId, 
         date: selectedDate, 
@@ -8357,11 +8377,12 @@ async function submitEntry() {
         defect: $id('f-defect').value.trim(), 
         remark: $id('f-remark').value.trim(),
         judgment: jdgSel.value, 
-        inspector: S.currentUser,
+        inspector: S.currentUser, // จะบันทึกเป็นชื่อ natthawut.chaising@...
         sync_status: 'pending',
         created_at: originalCreatedAt || new Date().toISOString()
     };
 
+    // ... (โค้ดส่วนการบันทึก SaveMethod และ Sync คงเดิม) ...
     try {
         let saveMethod = '';
         if (isOnline()) {
@@ -8383,10 +8404,8 @@ async function submitEntry() {
         if (S.editingId) S.records = S.records.map(r => r.id === recordId ? rowData : r);
         else S.records.unshift(rowData);
 
-        // 1. สั่งวาดตารางทันทีเพื่อให้แถวใหม่เกิดขึ้นใน DOM
         renderTable(); 
 
-        // 2. แสดง Feedback Toast
         if (saveMethod === 'cloud') {
             btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
             btnText.textContent = '✅ ONLINE SECURED';
@@ -8396,23 +8415,9 @@ async function submitEntry() {
             btnText.textContent = '📶 SAVED LOCALLY';
             toast('📶 บันทึกในเครื่องแล้ว', 'info');
         }
-playCommitAnimation(); 
-        // 3. >>> ส่วนไฮไลท์แถวใหม่แบบนีออน <<<
-setTimeout(() => {
-    // ค้นหาแถวที่มี attribute data-rid ตรงกับ id ที่เพิ่งบันทึก
-    // (หมายเหตุ: ในฟังก์ชัน buildRow ของคุณต้องมีบรรทัด <tr data-rid="${r.id}"> ด้วยนะครับ)
-    const targetRow = document.querySelector(`tr[data-rid="${recordId}"]`);
-    
-    if (targetRow) {
-        // เติมคลาสนีออน
-        targetRow.classList.add('row-highlight-neon');
         
-        // กิมมิก: สั่งให้ตารางเลื่อนมาหาแถวนี้โดยอัตโนมัติ (กรณีเราบันทึกแบบคัดลอกหรือแก้ไข)
-        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-}, 100);
-        
-        // รีเซ็ตฟอร์ม
+        playCommitAnimation(); 
+
         setTimeout(() => {
             resetInputForm();
             btn.disabled = false;
@@ -8431,7 +8436,6 @@ setTimeout(() => {
         btnText.textContent = originalText;
     }
 }
-
 // ฟังก์ชันซิงค์ข้อมูลที่ค้างอยู่ในเครื่องขึ้น Cloud
 // แก้ไขบรรทัดแรกของฟังก์ชัน backgroundSync
 async function backgroundSync() {
@@ -9719,6 +9723,12 @@ function switchSubTerminal(view) {
  * ══════════════════════════════════════════════════════════════════════════
  */
 function switchPage(name, el) {
+    // --- 🎯 STEP 0: DATA RESET PROTOCOL (เพิ่มส่วนนี้) ---
+    // เมื่อมีการเปลี่ยนหน้า ให้ล้างข้อมูลในฟอร์มคีย์งานด้านซ้ายเสมอ เพื่อป้องกันข้อมูลเก่าค้างสับสน
+    if (typeof resetInputForm === 'function') {
+        resetInputForm();
+    }
+
     // ปิด Modal ที่อาจค้างอยู่
     if (typeof WapAdminSystem !== 'undefined' && typeof WapAdminSystem.closeMasterModal === 'function') {
         WapAdminSystem.closeMasterModal();
@@ -9788,7 +9798,6 @@ function switchPage(name, el) {
 
     // --- STEP 4: HEADER & SPECIAL PAGE LOGIC ---
     
-    // 1. Admin Console Theme Logic
     if (pageNameUpper === 'ADMIN CONSOLE') {
         if (adminHeaderTools) {
             adminHeaderTools.classList.remove('hidden');
@@ -9804,7 +9813,7 @@ function switchPage(name, el) {
         }
     }
 
-    // 2. 🎯 [จุดแก้ไข] PART LINE CLAIM LOGIC (เปิดให้ทุกคนใช้งานได้)
+    // 2. PART LINE CLAIM LOGIC
     if (pageNameUpper === 'PART LINE CLAIM') {
         if (subNav) subNav.classList.remove('hidden'); 
         if (claimOpTools) { claimOpTools.classList.remove('hidden'); claimOpTools.classList.add('flex'); }
@@ -9812,22 +9821,24 @@ function switchPage(name, el) {
         
         switchSubTerminal('entry'); 
 
-        // ✅ A. เปิดปุ่ม "Show Form" ให้แสดงผลสำหรับทุกคน (Staff, Admin, Supervisor)
-        if (showFormBtn) {
+        // ✅ ปลดล็อคให้ Master Admin (Natthawut) เห็นปุ่ม Show Form เสมอ
+        const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+        if (showFormBtn && (S.userRole !== 'supervisor' || isMasterAdmin)) {
             showFormBtn.classList.remove('hidden');
             showFormBtn.style.display = 'flex';
             gsap.to(showFormBtn, { x: 0, opacity: 1, duration: 0.4, ease: "power2.out" });
         }
 
-        // ✅ B. ปลดล็อคช่องกรอกข้อมูล (Form Panel) ให้ทุกคนพิมพ์งานได้
+        // ปลดล็อคฟอร์มให้ Master Admin แม้อยู่ในโหมด Supervisor
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(inputEl => {
-            inputEl.disabled = false;      // เปิดให้พิมพ์ได้
-            inputEl.style.opacity = '1';    // ความเข้มปกติ
-            inputEl.style.cursor = 'text';   // เคอร์เซอร์ปกติ
+            if (isMasterAdmin || S.userRole !== 'supervisor') {
+                inputEl.disabled = false;
+                inputEl.style.opacity = '1';
+                inputEl.style.cursor = 'text';
+            }
         });
 
-        // C. แสดงรายชื่อพนักงาน (Staff Selector) เฉพาะระดับที่มีสิทธิ์ดูแลคนอื่น
         const isManagement = ['admin', 'manager', 'supervisor', 'engineer'].includes(S.userRole);
         if (isManagement && staffWrap) {
             staffWrap.classList.remove('hidden');
@@ -9881,14 +9892,6 @@ function switchPage(name, el) {
         'RUNNING NUMBER': 'rn-management-content',
         'CALIBRATION': 'calibration-content'
     };
-
-    if (pageNameUpper === 'RUNNING NUMBER') {
-        $id('rn-header-tools').classList.remove('hidden');
-        $id('rn-header-tools').classList.add('flex');
-    } else {
-        $id('rn-header-tools').classList.add('hidden');
-        $id('rn-header-tools').classList.remove('flex');
-    }
 
     const targetId = targetIdMap[pageNameUpper];
     if (targetId) {
@@ -15024,7 +15027,14 @@ const WapSupportLogs = (function () {
         // --- Logic: 3. รูปภาพหลักฐาน (Evidence Upload 2-Mode System) ---
         let currentEvidenceMode = 'single'; // 'single' หรือ 'multi'
         let singleImage = r.imageUrl || null;
+        let singleImageOriginal = r.imageUrl || null;
+        let singleImageAnnotated = null;
+        let singleImageShowAnnot = true;
+
         let multiImages = [];
+        let multiImagesOriginal = [];
+        let multiImagesAnnotated = [];
+        let multiImagesShowAnnot = [];
         let stitchedMultiImage = null;
         let currentImage = r.imageUrl || null;
         modal._currentImage = currentImage;
@@ -15046,39 +15056,923 @@ const WapSupportLogs = (function () {
         const btnZoomComposite = modal.querySelector('#btn-zoom-composite');
         const btnDownloadComposite = modal.querySelector('#btn-download-composite');
 
-        // 🔄 ฟังก์ชันหมุนรูปภาพ 90 องศาตามเข็มนาฬิกา (Canvas 90° Clockwise Rotation)
-        function rotateImageDataUrl(dataUrl) {
-            if (!dataUrl) return Promise.resolve(dataUrl);
-            return new Promise((resolve) => {
+        // 🎨 MASTER EVIDENCE PHOTO ANNOTATION LAYER (HTML5 Canvas Defect Marker with Pan & Zoom)
+        function openEvidenceAnnotator(initialDataUrl, onSaveCallback) {
+            if (!initialDataUrl) {
+                toast('⚠️ ไม่พบรูปภาพที่ต้องการใส่สัญลักษณ์/ข้อความ', 'warning');
+                return;
+            }
+
+            const overlay = document.createElement('div');
+            overlay.className = 'evidence-annotator-overlay';
+
+            overlay.innerHTML = `
+                <div class="evidence-annotator-modal">
+                    <div class="evidence-annotator-header">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-size:18px;">✏️</span>
+                            <div>
+                                <h3 style="font-size:14px; font-weight:900; margin:0; color:#0f172a;" class="dark:text-white">Evidence Defect Annotator (ใส่สัญลักษณ์ & ข้อความชี้จุดบกพร่อง)</h3>
+                                <p style="font-size:11px; margin:0; color:#64748b;" class="dark:text-slate-400">ลากวาดลูกศร, วงกลม, กรอบสี่เหลี่ยม, ปากกา, พิมพ์ข้อความ พร้อมระบบ Pan & Zoom ส่องตรวจความละเอียดสูง</p>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <button type="button" class="annot-btn" id="btn-annot-cancel" style="background:#f1f5f9; color:#475569;" title="ยกเลิก">✕ ปิด</button>
+                            <button type="button" class="annot-btn" id="btn-annot-save" style="background:#16a34a; color:#ffffff; font-weight:900;" title="บันทึกรูปภาพที่แก้ไข">💾 บันทึกลงเอกสาร</button>
+                        </div>
+                    </div>
+
+                    <div class="evidence-annotator-toolbar">
+                        <!-- Drawing, Pan & Crop Tools -->
+                        <div class="annot-tool-group">
+<button type="button" class="annot-btn active" data-tool="arrow"><span>➔</span></button>
+<button type="button" class="annot-btn" data-tool="circle"><span>⭕</span></button>
+<button type="button" class="annot-btn" data-tool="rect"><span>🔲</span></button>
+<button type="button" class="annot-btn" data-tool="pen"><span>🖊️</span></button>
+<button type="button" class="annot-btn" data-tool="text"><span>🔤</span></button>
+<button type="button" class="annot-btn" data-tool="crop"><span>✂️</span></button>
+<button type="button" class="annot-btn" data-tool="pan"><span>✋</span></button>
+                        </div>
+
+
+                        <!-- Colors -->
+                        <div class="annot-tool-group" style="gap:4px; padding:2px 5px;">
+                            <div class="annot-color-dot active" data-color="#ef4444" style="background:#ef4444;" title="สีแดง (Defect Red)"></div>
+                            <div class="annot-color-dot" data-color="#eab308" style="background:#eab308;" title="สีเหลือง (Warning Yellow)"></div>
+                            <div class="annot-color-dot" data-color="#22c55e" style="background:#22c55e;" title="สีเขียว (Pass/Green)"></div>
+                            <div class="annot-color-dot" data-color="#3b82f6" style="background:#3b82f6;" title="สีฟ้า (Blue)"></div>
+                            <div class="annot-color-dot" data-color="#ffffff" style="background:#ffffff; border-color:#94a3b8;" title="สีขาว (White)"></div>
+                            <div class="annot-color-dot" data-color="#000000" style="background:#000000;" title="สีดำ (Black)"></div>
+                        </div>
+
+                        <!-- Stroke Size -->
+
+<div class="annot-tool-group" style="padding:2px 4px; gap:2px;">
+    <button type="button" class="annot-btn" data-size="3">3px</button>
+    <button type="button" class="annot-btn active" data-size="5">5px</button>
+    <button type="button" class="annot-btn" data-size="8">8px</button>
+</div>
+
+                        <!-- Actions (Undo, Clear) -->
+                        <div class="annot-tool-group" style="margin-left:auto; flex-shrink:0;">
+                            <button type="button" class="annot-btn" id="btn-annot-undo" title="ย้อนกลับ (Undo - Ctrl+Z)">
+                                <span>↩️</span> เลิกทำ
+                            </button>
+                            <button type="button" class="annot-btn" id="btn-annot-clear" title="ล้างการวาดทั้งหมด (Clear All)" style="color:#dc2626;">
+                                <span>🗑️</span> ล้างภาพ
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="evidence-annotator-body" id="annot-stage-container">
+                        <div class="annot-canvas-stage-wrapper" id="annot-canvas-wrapper">
+                            <canvas class="annot-canvas-stage" id="annot-canvas"></canvas>
+                        </div>
+                        <div class="annot-stage-hint">💡 หมุนล้อเมาส์เพื่อซูมเข้า-ออก | กด Spacebar ค้างไว้หรือเลือก ✋ เพื่อลากเลื่อนภาพ (Pan)</div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            const canvas = overlay.querySelector('#annot-canvas');
+            const ctx = canvas.getContext('2d');
+            const canvasWrapper = overlay.querySelector('#annot-canvas-wrapper');
+            const stageContainer = overlay.querySelector('#annot-stage-container');
+
+            let baseImg = new Image();
+            baseImg.crossOrigin = 'anonymous';
+
+            let currentTool = 'arrow';
+            let currentColor = '#ef4444';
+            let currentLineWidth = 5;
+
+            // Pan & Zoom State
+            let zoomLevel = 1.0;
+            let panX = 0;
+            let panY = 0;
+            let isPanning = false;
+            let panStartX = 0;
+            let panStartY = 0;
+            let isSpacePressed = false;
+            let touchStartDistance = null;
+            let touchStartZoom = 1.0;
+
+            let isDrawing = false;
+            let startX = 0;
+            let startY = 0;
+            let freehandPoints = [];
+
+            // Crop Tool State
+            let cropRect = null; // { x, y, w, h }
+            let isCropping = false;
+
+            // History Stack for Undo
+            let historyStack = [];
+
+            function updateTransform() {
+                canvasWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+                const pct = Math.round(zoomLevel * 100) + '%';
+                const zoomLabel = overlay.querySelector('#annot-zoom-level-label');
+                if (zoomLabel) zoomLabel.textContent = pct;
+                updateCursor();
+            }
+
+            function applyZoom(newZoom, originClientX, originClientY) {
+                newZoom = Math.max(0.25, Math.min(6.0, newZoom));
+                if (Math.abs(newZoom - zoomLevel) < 0.001) return;
+
+                if (originClientX !== undefined && originClientY !== undefined) {
+                    const stageRect = stageContainer.getBoundingClientRect();
+                    const originX = originClientX - (stageRect.left + stageRect.width / 2) - panX;
+                    const originY = originClientY - (stageRect.top + stageRect.height / 2) - panY;
+                    const factor = newZoom / zoomLevel;
+                    panX -= originX * (factor - 1);
+                    panY -= originY * (factor - 1);
+                }
+                zoomLevel = newZoom;
+                updateTransform();
+            }
+
+// ค้นหาและแทนที่ฟังก์ชัน resetZoom เดิมด้วยโค้ดชุดนี้
+function resetZoom() {
+    if (!canvas || !stageContainer) return;
+
+    // 1. ดึงขนาดของพื้นที่แสดงผล (Stage)
+    const stageRect = stageContainer.getBoundingClientRect();
+    
+    // 2. กำหนดระยะห่างจากขอบ (Padding) เพื่อไม่ให้รูปติดขอบเกินไป (เช่น 60px)
+    const padding = 60; 
+    const availW = stageRect.width - padding;
+    const availH = stageRect.height - padding;
+
+    // 3. คำนวณอัตราส่วนการย่อเพื่อให้รูปพอดีกับพื้นที่
+    const scaleW = availW / canvas.width;
+    const scaleH = availH / canvas.height;
+    
+    // เลือกค่าที่น้อยที่สุดเพื่อให้รูปแสดงครบทั้งใบ (Contain) 
+    // และไม่ให้ขยายเกิน 100% (1.0) ถ้ารูปเล็กกว่าจอ
+    const fitScale = Math.min(scaleW, scaleH, 1.0);
+
+    // 4. ตั้งค่าระดับการซูมเริ่มต้น
+    zoomLevel = fitScale;
+    
+    // 5. รีเซ็ตตำแหน่งให้อยู่กึ่งกลาง
+    panX = 0;
+    panY = 0;
+
+    // 6. อัปเดตการแสดงผล
+    updateTransform();
+}
+
+            function updateCursor() {
+                if (isPanning) {
+                    stageContainer.style.cursor = 'grabbing';
+                    canvas.style.cursor = 'grabbing';
+                } else if (isSpacePressed || currentTool === 'pan') {
+                    stageContainer.style.cursor = 'grab';
+                    canvas.style.cursor = 'grab';
+                } else if (currentTool === 'crop') {
+                    stageContainer.style.cursor = 'default';
+                    canvas.style.cursor = 'crosshair';
+                } else if (currentTool === 'text') {
+                    stageContainer.style.cursor = 'default';
+                    canvas.style.cursor = 'text';
+                } else {
+                    stageContainer.style.cursor = 'default';
+                    canvas.style.cursor = 'crosshair';
+                }
+            }
+
+            function saveHistory() {
+                if (canvas.width > 0 && canvas.height > 0) {
+                    historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+                    if (historyStack.length > 25) historyStack.shift();
+                }
+            }
+
+            function redrawBase() {
+                if (!baseImg.complete) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(baseImg, 0, 0, canvas.width, canvas.height);
+            }
+
+            baseImg.onload = () => {
+                const nw = baseImg.naturalWidth || 1024;
+                const nh = baseImg.naturalHeight || 768;
+                canvas.width = nw;
+                canvas.height = nh;
+                redrawBase();
+                saveHistory(); // Snapshot state 0
+                resetZoom();
+            };
+            baseImg.src = initialDataUrl;
+
+            // Coordinate conversion from viewport/client mouse coords to canvas pixels
+            function getCanvasCoordinates(e) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY
+                };
+            }
+
+            // Draw Arrow with clean arrowhead
+            function drawArrow(context, fromX, fromY, toX, toY, color, width) {
+                const headLen = Math.max(16, width * 3.5);
+                const angle = Math.atan2(toY - fromY, toX - fromX);
+
+                context.save();
+                context.strokeStyle = color;
+                context.fillStyle = color;
+                context.lineWidth = width;
+                context.lineCap = 'round';
+                context.lineJoin = 'round';
+
+                // Main arrow shaft
+                context.beginPath();
+                context.moveTo(fromX, fromY);
+                context.lineTo(toX, toY);
+                context.stroke();
+
+                // Arrow head filled triangle
+                context.beginPath();
+                context.moveTo(toX, toY);
+                context.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
+                context.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
+                context.closePath();
+                context.fill();
+
+                context.restore();
+            }
+
+            // Draw Circle / Ellipse
+            function drawCircle(context, fromX, fromY, toX, toY, color, width) {
+                context.save();
+                context.strokeStyle = color;
+                context.lineWidth = width;
+                context.lineCap = 'round';
+
+                const rx = Math.abs(toX - fromX) / 2;
+                const ry = Math.abs(toY - fromY) / 2;
+                const cx = Math.min(fromX, toX) + rx;
+                const cy = Math.min(fromY, toY) + ry;
+
+                context.beginPath();
+                context.ellipse(cx, cy, Math.max(1, rx), Math.max(1, ry), 0, 0, 2 * Math.PI);
+                context.stroke();
+                context.restore();
+            }
+
+            // Draw Rectangle
+            function drawRect(context, fromX, fromY, toX, toY, color, width) {
+                context.save();
+                context.strokeStyle = color;
+                context.lineWidth = width;
+                context.lineCap = 'round';
+                context.lineJoin = 'round';
+
+                const x = Math.min(fromX, toX);
+                const y = Math.min(fromY, toY);
+                const w = Math.abs(toX - fromX);
+                const h = Math.abs(toY - fromY);
+
+                context.beginPath();
+                context.rect(x, y, w, h);
+                context.stroke();
+                context.restore();
+            }
+
+            // Draw Text Callout directly onto canvas
+            function drawTextCallout(context, text, x, y, color, baseSize) {
+                if (!text || !text.trim()) return;
+                context.save();
+
+                const fontSize = Math.max(18, Math.round(canvas.width * 0.024));
+                context.font = `bold ${fontSize}px sans-serif, "Noto Sans Thai"`;
+                context.textBaseline = 'top';
+
+                const lines = text.split('\n');
+                const padding = fontSize * 0.45;
+                let maxLineWidth = 0;
+                lines.forEach(l => {
+                    const metrics = context.measureText(l);
+                    if (metrics.width > maxLineWidth) maxLineWidth = metrics.width;
+                });
+
+                const boxW = maxLineWidth + padding * 2;
+                const boxH = (lines.length * fontSize * 1.3) + padding * 1.5;
+
+                // Semi-transparent dark background badge with vibrant outline
+                context.fillStyle = 'rgba(15, 23, 42, 0.88)';
+                context.strokeStyle = color;
+                context.lineWidth = 2.5;
+
+                context.beginPath();
+                if (typeof context.roundRect === 'function') {
+                    context.roundRect(x, y, boxW, boxH, 8);
+                } else {
+                    context.rect(x, y, boxW, boxH);
+                }
+                context.fill();
+                context.stroke();
+
+                // Text Content
+                context.fillStyle = '#ffffff';
+                lines.forEach((l, idx) => {
+                    context.fillText(l, x + padding, y + padding + (idx * fontSize * 1.3));
+                });
+
+                context.restore();
+            }
+
+            // --- Mouse / Touch Drawing & Pan Handlers ---
+            function onPointerDown(e) {
+                // Multi-touch pinch detection
+                if (e.touches && e.touches.length === 2) {
+                    isDrawing = false;
+                    isPanning = false;
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    touchStartDistance = Math.sqrt(dx * dx + dy * dy);
+                    touchStartZoom = zoomLevel;
+                    return;
+                }
+
+                const isMiddleBtn = e.button === 1;
+                if (currentTool === 'pan' || isSpacePressed || isMiddleBtn) {
+                    isPanning = true;
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    panStartX = clientX - panX;
+                    panStartY = clientY - panY;
+                    updateCursor();
+                    return;
+                }
+
+                if (currentTool === 'text') {
+                    handleTextPrompt(e);
+                    return;
+                }
+
+                isDrawing = true;
+                const pos = getCanvasCoordinates(e);
+                startX = pos.x;
+                startY = pos.y;
+                freehandPoints = [pos];
+            }
+
+            function onPointerMove(e) {
+                // Multi-touch pinch-to-zoom
+                if (e.touches && e.touches.length === 2 && touchStartDistance) {
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const currentDist = Math.sqrt(dx * dx + dy * dy);
+                    const scaleFactor = currentDist / touchStartDistance;
+                    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                    applyZoom(touchStartZoom * scaleFactor, midX, midY);
+                    return;
+                }
+
+                if (isPanning) {
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    panX = clientX - panStartX;
+                    panY = clientY - panStartY;
+                    updateTransform();
+                    return;
+                }
+
+                if (!isDrawing) return;
+                const pos = getCanvasCoordinates(e);
+
+                // Restore last committed state to show live rubber-band preview
+                if (historyStack.length > 0) {
+                    ctx.putImageData(historyStack[historyStack.length - 1], 0, 0);
+                }
+
+                if (currentTool === 'crop') {
+                    // Draw dimming mask outside crop rectangle
+                    const x = Math.min(startX, pos.x);
+                    const y = Math.min(startY, pos.y);
+                    const w = Math.abs(pos.x - startX);
+                    const h = Math.abs(pos.y - startY);
+                    cropRect = { x, y, w, h };
+
+                    ctx.save();
+                    // Dim surrounding area
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    // Clear the crop selection area
+                    if (w > 0 && h > 0) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(x, y, w, h);
+                        ctx.clip();
+                        if (historyStack.length > 0) {
+                            ctx.putImageData(historyStack[historyStack.length - 1], 0, 0);
+                        }
+                        ctx.restore();
+
+                        // Crop border line & grid (rule of thirds)
+                        ctx.strokeStyle = '#38bdf8';
+                        ctx.lineWidth = Math.max(2, Math.round(canvas.width * 0.002));
+                        ctx.setLineDash([6, 4]);
+                        ctx.strokeRect(x, y, w, h);
+
+                        // Rule of thirds lines
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([3, 3]);
+                        ctx.beginPath();
+                        ctx.moveTo(x + w / 3, y);
+                        ctx.lineTo(x + w / 3, y + h);
+                        ctx.moveTo(x + (2 * w) / 3, y);
+                        ctx.lineTo(x + (2 * w) / 3, y + h);
+                        ctx.moveTo(x, y + h / 3);
+                        ctx.lineTo(x + w, y + h / 3);
+                        ctx.moveTo(x, y + (2 * h) / 3);
+                        ctx.lineTo(x + w, y + (2 * h) / 3);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                } else if (currentTool === 'arrow') {
+                    drawArrow(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
+                } else if (currentTool === 'circle') {
+                    drawCircle(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
+                } else if (currentTool === 'rect') {
+                    drawRect(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
+                } else if (currentTool === 'pen') {
+                    freehandPoints.push(pos);
+                    ctx.save();
+                    ctx.strokeStyle = currentColor;
+                    ctx.lineWidth = currentLineWidth;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(freehandPoints[0].x, freehandPoints[0].y);
+                    for (let i = 1; i < freehandPoints.length; i++) {
+                        ctx.lineTo(freehandPoints[i].x, freehandPoints[i].y);
+                    }
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            function removeCropActions() {
+                const oldActions = canvasWrapper.querySelector('.annot-crop-actions');
+                if (oldActions) oldActions.remove();
+                cropRect = null;
+                isCropping = false;
+            }
+
+            function showCropActions(cx, cy, cw, ch) {
+                removeCropActions();
+                isCropping = true;
+
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = rect.width / canvas.width;
+                const scaleY = rect.height / canvas.height;
+
+                const actionsWrap = document.createElement('div');
+                actionsWrap.className = 'annot-crop-actions';
+                
+                // Position popup directly beneath the crop rect or inside it
+                const posX = (cx + cw / 2) * scaleX;
+                const posY = Math.min(rect.height - 40, (cy + ch) * scaleY + 10);
+                actionsWrap.style.left = `${posX}px`;
+                actionsWrap.style.top = `${posY}px`;
+
+                actionsWrap.innerHTML = `
+                    <button type="button" class="annot-crop-confirm-btn" id="btn-confirm-crop">
+                        <span>✂️</span> ยืนยันการครอบ (${Math.round(cw)}×${Math.round(ch)}px)
+                    </button>
+                    <button type="button" class="annot-crop-cancel-btn" id="btn-cancel-crop">
+                        ยกเลิก
+                    </button>
+                `;
+
+                canvasWrapper.appendChild(actionsWrap);
+
+                const btnConfirm = actionsWrap.querySelector('#btn-confirm-crop');
+                const btnCancel = actionsWrap.querySelector('#btn-cancel-crop');
+
+                btnConfirm.onclick = (ev) => {
+                    ev.stopPropagation();
+                    executeCrop(cx, cy, cw, ch);
+                };
+
+                btnCancel.onclick = (ev) => {
+                    ev.stopPropagation();
+                    cancelCropSelection();
+                };
+            }
+
+            function cancelCropSelection() {
+                removeCropActions();
+                if (historyStack.length > 0) {
+                    ctx.putImageData(historyStack[historyStack.length - 1], 0, 0);
+                }
+            }
+
+            function executeCrop(cx, cy, cw, ch) {
+                if (cw < 10 || ch < 10) {
+                    toast('⚠️ กรุณาลากครอบพื้นที่ขนาดใหญ่กว่านี้', 'warning');
+                    cancelCropSelection();
+                    return;
+                }
+
+                // Get cropped pixel data from latest committed state
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = cw;
+                tempCanvas.height = ch;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                // Draw the cropped region from current canvas
+                if (historyStack.length > 0) {
+                    ctx.putImageData(historyStack[historyStack.length - 1], 0, 0);
+                }
+                tempCtx.drawImage(canvas, cx, cy, cw, ch, 0, 0, cw, ch);
+
+                // Update canvas to new cropped dimension
+                canvas.width = cw;
+                canvas.height = ch;
+                ctx.drawImage(tempCanvas, 0, 0);
+
+                removeCropActions();
+                saveHistory();
+                resetZoom();
+                toast(`✂️ ครอบตัดภาพสำเร็จ (${Math.round(cw)}×${Math.round(ch)}px)`, 'success');
+
+                // Switch back to Arrow tool for convenient next action
+                const arrowBtn = overlay.querySelector('.annot-btn[data-tool="arrow"]');
+                if (arrowBtn) arrowBtn.click();
+            }
+
+            function onPointerUp(e) {
+                if (touchStartDistance && (!e.touches || e.touches.length < 2)) {
+                    touchStartDistance = null;
+                }
+                if (isPanning) {
+                    isPanning = false;
+                    updateCursor();
+                    return;
+                }
+                if (!isDrawing) return;
+                isDrawing = false;
+
+                if (currentTool === 'crop') {
+                    if (cropRect && cropRect.w > 15 && cropRect.h > 15) {
+                        showCropActions(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+                    } else {
+                        cancelCropSelection();
+                    }
+                    return;
+                }
+
+                saveHistory();
+            }
+
+            // Create editable interactive floating text input box on canvas
+            function handleTextPrompt(e) {
+                const pos = getCanvasCoordinates(e);
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = rect.width / canvas.width;
+                const scaleY = rect.height / canvas.height;
+
+                // Existing text inputs removal
+                const oldInput = canvasWrapper.querySelector('.annot-text-input-overlay');
+                if (oldInput) oldInput.remove();
+
+                const input = document.createElement('textarea');
+                input.className = 'annot-text-input-overlay';
+                input.rows = 2;
+                input.placeholder = 'พิมพ์ข้อความชี้จุดเสีย... (กด Shift+Enter ขึ้นบรรทัดใหม่, คลิกข้างนอกเพื่อวาง)';
+                input.style.left = `${(pos.x * scaleX)}px`;
+                input.style.top = `${(pos.y * scaleY)}px`;
+                input.style.borderColor = currentColor;
+
+                canvasWrapper.appendChild(input);
+                setTimeout(() => input.focus(), 50);
+
+                const commitText = () => {
+                    const val = input.value.trim();
+                    if (val) {
+                        drawTextCallout(ctx, val, pos.x, pos.y, currentColor, currentLineWidth);
+                        saveHistory();
+                    }
+                    input.remove();
+                };
+
+                input.onblur = commitText;
+                input.onkeydown = (ev) => {
+                    if (ev.key === 'Enter' && !ev.shiftKey) {
+                        ev.preventDefault();
+                        commitText();
+                    } else if (ev.key === 'Escape') {
+                        input.remove();
+                    }
+                };
+            }
+
+            // Pointer event listeners on canvas and stage
+            canvas.addEventListener('mousedown', onPointerDown);
+            stageContainer.addEventListener('mousedown', (e) => {
+                if (e.target === stageContainer || currentTool === 'pan' || isSpacePressed || e.button === 1) {
+                    onPointerDown(e);
+                }
+            });
+            window.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('mouseup', onPointerUp);
+
+            canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+            stageContainer.addEventListener('touchstart', onPointerDown, { passive: false });
+            window.addEventListener('touchmove', onPointerMove, { passive: false });
+            window.addEventListener('touchend', onPointerUp, { passive: false });
+
+            // Wheel event on stage container for smooth mouse wheel zoom
+            const onWheelZoom = (e) => {
+                e.preventDefault();
+                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+                applyZoom(zoomLevel * zoomFactor, e.clientX, e.clientY);
+            };
+            stageContainer.addEventListener('wheel', onWheelZoom, { passive: false });
+
+            // Zoom Toolbar Buttons
+            const btnZoomIn = overlay.querySelector('#btn-annot-zoom-in');
+            const btnZoomOut = overlay.querySelector('#btn-annot-zoom-out');
+            const btnZoomFit = overlay.querySelector('#btn-annot-zoom-fit');
+            const btnFloatZoomIn = overlay.querySelector('#btn-float-zoom-in');
+            const btnFloatZoomOut = overlay.querySelector('#btn-float-zoom-out');
+            const btnFloatZoomFit = overlay.querySelector('#btn-float-zoom-fit');
+
+            if (btnZoomIn) btnZoomIn.onclick = () => applyZoom(zoomLevel * 1.25);
+            if (btnZoomOut) btnZoomOut.onclick = () => applyZoom(zoomLevel / 1.25);
+            if (btnZoomFit) btnZoomFit.onclick = resetZoom;
+
+            // Tool Switching Buttons
+            overlay.querySelectorAll('.annot-btn[data-tool]').forEach(btn => {
+                btn.onclick = () => {
+                    overlay.querySelectorAll('.annot-btn[data-tool]').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentTool = btn.dataset.tool;
+                    if (currentTool !== 'crop') {
+                        cancelCropSelection();
+                    }
+                    updateCursor();
+                };
+            });
+
+            // Color Selection
+            overlay.querySelectorAll('.annot-color-dot').forEach(dot => {
+                dot.onclick = () => {
+                    overlay.querySelectorAll('.annot-color-dot').forEach(d => d.classList.remove('active'));
+                    dot.classList.add('active');
+                    currentColor = dot.dataset.color;
+                };
+            });
+
+            // Line Width Selection
+            overlay.querySelectorAll('.annot-btn[data-size]').forEach(btn => {
+                btn.onclick = () => {
+                    overlay.querySelectorAll('.annot-btn[data-size]').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentLineWidth = parseInt(btn.dataset.size, 10) || 5;
+                };
+            });
+
+            // Undo Button (Ctrl+Z)
+            const undoBtn = overlay.querySelector('#btn-annot-undo');
+            const handleUndo = () => {
+                if (historyStack.length > 1) {
+                    historyStack.pop(); // Remove current
+                    const prev = historyStack[historyStack.length - 1];
+                    ctx.putImageData(prev, 0, 0);
+                    toast('↩️ ย้อนกลับคำสั่งล่าสุด', 'info');
+                } else if (historyStack.length === 1) {
+                    redrawBase();
+                    toast('↩️ คืนค่าภาพต้นฉบับ', 'info');
+                }
+            };
+            if (undoBtn) undoBtn.onclick = handleUndo;
+
+            // Keyboard Shortcuts
+            const handleKeydown = (e) => {
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+                if (e.code === 'Space' && !isSpacePressed) {
+                    e.preventDefault();
+                    isSpacePressed = true;
+                    updateCursor();
+                } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    handleUndo();
+                } else if (e.key === 'Escape') {
+                    closeAnnotator();
+                } else if (e.key === '+' || e.key === '=') {
+                    applyZoom(zoomLevel * 1.25);
+                } else if (e.key === '-' || e.key === '_') {
+                    applyZoom(zoomLevel / 1.25);
+                } else if (e.key === '0') {
+                    resetZoom();
+                }
+            };
+
+            const handleKeyup = (e) => {
+                if (e.code === 'Space') {
+                    isSpacePressed = false;
+                    if (isPanning && currentTool !== 'pan') {
+                        isPanning = false;
+                    }
+                    updateCursor();
+                }
+            };
+
+            window.addEventListener('keydown', handleKeydown);
+            window.addEventListener('keyup', handleKeyup);
+
+            // Clear Button
+            const clearBtn = overlay.querySelector('#btn-annot-clear');
+            if (clearBtn) {
+                clearBtn.onclick = () => {
+                    redrawBase();
+                    historyStack = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
+                    toast('🗑️ ล้างสัญลักษณ์ทั้งหมดบนภาพแล้ว', 'info');
+                };
+            }
+
+            // Close / Cancel
+            function closeAnnotator() {
+                window.removeEventListener('mousemove', onPointerMove);
+                window.removeEventListener('mouseup', onPointerUp);
+                window.removeEventListener('touchmove', onPointerMove);
+                window.removeEventListener('touchend', onPointerUp);
+                window.removeEventListener('keydown', handleKeydown);
+                window.removeEventListener('keyup', handleKeyup);
+                stageContainer.removeEventListener('wheel', onWheelZoom);
+                overlay.remove();
+            }
+
+            const cancelBtn = overlay.querySelector('#btn-annot-cancel');
+            if (cancelBtn) cancelBtn.onclick = closeAnnotator;
+
+            // Save & Commit Button
+            const saveBtn = overlay.querySelector('#btn-annot-save');
+            if (saveBtn) {
+                saveBtn.onclick = async () => {
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = '⏳ กำลังประมวลผล...';
+                    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                    const finalDataUrl = await compressAndOptimizeImage(rawDataUrl, 1400, 480 * 1024);
+                    if (typeof onSaveCallback === 'function') {
+                        onSaveCallback(finalDataUrl || rawDataUrl);
+                    }
+                    closeAnnotator();
+                    toast('✨ บันทึกสัญลักษณ์ข้อความลงบนรูปภาพหลักฐานเรียบร้อยแล้ว', 'success');
+                };
+            }
+        }
+        window.openEvidenceAnnotator = openEvidenceAnnotator;
+
+        // ⚡ ฟังก์ชันลดขนาดและบีบอัดรูปภาพให้เบา ไม่กินเน็ต คมชัดเทียบเท่าไฟล์ที่ผ่านโปรแกรม Paint (จำกัดขนาดรวมไม่เกิน 500KB)
+        function compressAndOptimizeImage(source, maxDimension = 1400, maxSizeBytes = 480 * 1024) {
+            if (!source) return Promise.resolve(null);
+            return new Promise(async (resolve) => {
+                let dataUrl = '';
+                if (typeof source === 'string') {
+                    dataUrl = source;
+                } else if (source instanceof Blob || source instanceof File) {
+                    dataUrl = await new Promise((res) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => res(e.target.result);
+                        reader.onerror = () => res(null);
+                        reader.readAsDataURL(source);
+                    });
+                }
+                if (!dataUrl) {
+                    resolve(null);
+                    return;
+                }
+
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
                 img.onload = () => {
+                    let nw = img.naturalWidth || img.width || 800;
+                    let nh = img.naturalHeight || img.height || 600;
+
+                    // ปรับสัดส่วนขนาดภาพให้กะทัดรัด (Downscale ถ้าขนาดภาพใหญ่เกิน maxDimension)
+                    if (nw > maxDimension || nh > maxDimension) {
+                        if (nw >= nh) {
+                            nh = Math.round((nh * maxDimension) / nw);
+                            nw = maxDimension;
+                        } else {
+                            nw = Math.round((nw * maxDimension) / nh);
+                            nh = maxDimension;
+                        }
+                    }
+
                     const canvas = document.createElement('canvas');
-                    const nw = img.naturalWidth || img.width || 800;
-                    const nh = img.naturalHeight || img.height || 600;
-                    canvas.width = nh;
-                    canvas.height = nw;
+                    canvas.width = nw;
+                    canvas.height = nh;
                     const ctx = canvas.getContext('2d');
-                    ctx.translate(canvas.width / 2, canvas.height / 2);
-                    ctx.rotate(90 * Math.PI / 180);
-                    ctx.drawImage(img, -nw / 2, -nh / 2);
-                    resolve(canvas.toDataURL('image/jpeg', 0.95));
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, nw, nh);
+
+                    // คำนวณขนาด byte คร่าวๆ จาก base64 string
+                    const getByteSize = (str) => {
+                        const base64Str = str.split(',')[1] || str;
+                        return Math.round((base64Str.length * 3) / 4);
+                    };
+
+                    // บีบอัดแบบ Adaptive คุณภาพสูง โดยควบคุมให้ขนาดไม่เกิน maxSizeBytes (~480KB)
+                    let quality = 0.88;
+                    let result = canvas.toDataURL('image/jpeg', quality);
+
+                    while (getByteSize(result) > maxSizeBytes && quality > 0.40) {
+                        quality -= 0.08;
+                        result = canvas.toDataURL('image/jpeg', quality);
+                    }
+
+                    // ถ้ารูปภาพยังมีขนาดเกิน ให้ย่อ Canvas ลงอีกเล็กน้อย
+                    if (getByteSize(result) > maxSizeBytes) {
+                        const scaledCanvas = document.createElement('canvas');
+                        scaledCanvas.width = Math.round(nw * 0.75);
+                        scaledCanvas.height = Math.round(nh * 0.75);
+                        const sCtx = scaledCanvas.getContext('2d');
+                        sCtx.imageSmoothingEnabled = true;
+                        sCtx.imageSmoothingQuality = 'high';
+                        sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+                        result = scaledCanvas.toDataURL('image/jpeg', 0.75);
+                    }
+
+                    resolve(result);
                 };
                 img.onerror = () => resolve(dataUrl);
                 img.src = dataUrl;
             });
         }
 
-        // 🖼️ ฟังก์ชันเรนเดอร์ Thumbnail Preview ของ Mode 1 (พร้อมปุ่ม หมุน, ขยาย, ลบ)
+        // 🔄 ฟังก์ชันหมุนรูปภาพ 90 องศาตามเข็มนาฬิกา (Canvas 90° Clockwise Rotation พร้อมปรับขนาดให้กะทัดรัด)
+        function rotateImageDataUrl(dataUrl) {
+            if (!dataUrl) return Promise.resolve(dataUrl);
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    const nw = img.naturalWidth || img.width || 800;
+                    const nh = img.naturalHeight || img.height || 600;
+                    canvas.width = nh;
+                    canvas.height = nw;
+                    const ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate(90 * Math.PI / 180);
+                    ctx.drawImage(img, -nw / 2, -nh / 2);
+                    const rotated = canvas.toDataURL('image/jpeg', 0.92);
+                    const compressed = await compressAndOptimizeImage(rotated, 1400, 480 * 1024);
+                    resolve(compressed || rotated);
+                };
+                img.onerror = () => resolve(dataUrl);
+                img.src = dataUrl;
+            });
+        }
+
+        // 🖼️ ฟังก์ชันเรนเดอร์ Thumbnail Preview ของ Mode 1 (พร้อมปุ่ม สลับดูต้นฉบับ/สัญลักษณ์, หมุน, ขยาย, ใส่สัญลักษณ์, ลบ)
         function renderSinglePreview() {
             if (!imgPreviewArea) return;
-            if (singleImage) {
+            const rawImg = singleImageOriginal || singleImage;
+            const annotImg = singleImageAnnotated;
+            const hasAnnot = Boolean(annotImg && annotImg !== rawImg);
+            const isAnnotShowing = hasAnnot ? Boolean(singleImageShowAnnot !== false) : false;
+            const displayImg = (isAnnotShowing && annotImg) ? annotImg : rawImg;
+            singleImage = displayImg;
+            if (currentEvidenceMode === 'single') {
+                currentImage = singleImage;
+                modal._currentImage = currentImage;
+            }
+
+            if (displayImg) {
                 imgPreviewArea.innerHTML = `
                     <div class="evidence-single-preview-wrap">
                         <div style="width:100%; display:flex; justify-content:center; align-items:center; overflow:hidden;">
-                            <img src="${singleImage}" style="max-height:105px; max-width:100%; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.12); display:block; object-fit:contain;" alt="Evidence Single" />
+                            <img src="${displayImg}" style="max-height:105px; max-width:100%; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.12); display:block; object-fit:contain;" alt="Evidence Single" />
                         </div>
                         <div class="evidence-single-actions">
+                            ${hasAnnot ? `
+                                <button type="button" class="evidence-preview-btn btn-toggle-annot btn-toggle-annot-single ${isAnnotShowing ? 'active' : ''}" title="${isAnnotShowing ? 'คลิกเพื่อดูรูปต้นฉบับ (ซ่อนสัญลักษณ์)' : 'คลิกเพื่อดูรูปพร้อมสัญลักษณ์ (แสดงสัญลักษณ์)'}">
+                                    <span>${isAnnotShowing ? '👁️' : '👁️‍🗨️'}</span> ${isAnnotShowing ? 'ดูต้นฉบับ' : 'ดูสัญลักษณ์'}
+                                </button>
+                            ` : ''}
+                            <button type="button" class="evidence-preview-btn btn-annotate btn-annotate-single" title="ใส่สัญลักษณ์/ข้อความชี้จุดเสีย">
+                                <span>✏️</span> ทำเครื่องหมาย/วาด
+                            </button>
                             <button type="button" class="evidence-preview-btn btn-rotate-single" title="หมุนรูปภาพ 90°">
                                 <span>↻</span> หมุน
                             </button>
@@ -15093,14 +15987,52 @@ const WapSupportLogs = (function () {
                 `;
 
                 // ผูก Event ปุ่มต่างๆ ใน Mode 1
+                const btnToggleAnnot = imgPreviewArea.querySelector('.btn-toggle-annot-single');
+                if (btnToggleAnnot) {
+                    btnToggleAnnot.onclick = (e) => {
+                        e.stopPropagation();
+                        singleImageShowAnnot = !singleImageShowAnnot;
+                        renderSinglePreview();
+                        saveDraftData();
+                        updateSupportFormValidation();
+                        toast(singleImageShowAnnot ? '👁️ แสดงสัญลักษณ์ชี้จุดเสียบนรูปภาพ' : '🖼️ ซ่อนสัญลักษณ์และแสดงรูปต้นฉบับ (บันทึกสัญลักษณ์เดิมไว้)', 'info');
+                    };
+                }
+
+                const btnAnnot = imgPreviewArea.querySelector('.btn-annotate-single');
+                if (btnAnnot) {
+                    btnAnnot.onclick = (e) => {
+                        e.stopPropagation();
+                        const imgToAnnotate = singleImageAnnotated || singleImageOriginal || singleImage;
+                        openEvidenceAnnotator(imgToAnnotate, (annotatedDataUrl) => {
+                            if (!singleImageOriginal) singleImageOriginal = singleImage;
+                            singleImageAnnotated = annotatedDataUrl;
+                            singleImageShowAnnot = true;
+                            singleImage = annotatedDataUrl;
+                            if (currentEvidenceMode === 'single') {
+                                currentImage = singleImage;
+                                modal._currentImage = currentImage;
+                            }
+                            renderSinglePreview();
+                            saveDraftData();
+                            updateSupportFormValidation();
+                        });
+                    };
+                }
+
                 const btnRot = imgPreviewArea.querySelector('.btn-rotate-single');
                 if (btnRot) {
                     btnRot.onclick = async (e) => {
                         e.stopPropagation();
                         btnRot.disabled = true;
                         btnRot.textContent = '⏳';
-                        const rotated = await rotateImageDataUrl(singleImage);
-                        singleImage = rotated;
+                        if (singleImageOriginal) {
+                            singleImageOriginal = await rotateImageDataUrl(singleImageOriginal);
+                        }
+                        if (singleImageAnnotated) {
+                            singleImageAnnotated = await rotateImageDataUrl(singleImageAnnotated);
+                        }
+                        singleImage = (singleImageShowAnnot && singleImageAnnotated) ? singleImageAnnotated : singleImageOriginal;
                         if (currentEvidenceMode === 'single') {
                             currentImage = singleImage;
                             modal._currentImage = currentImage;
@@ -15125,6 +16057,9 @@ const WapSupportLogs = (function () {
                     btnDel.onclick = (e) => {
                         e.stopPropagation();
                         singleImage = null;
+                        singleImageOriginal = null;
+                        singleImageAnnotated = null;
+                        singleImageShowAnnot = true;
                         if (currentEvidenceMode === 'single') {
                             currentImage = null;
                             modal._currentImage = null;
@@ -15174,7 +16109,7 @@ const WapSupportLogs = (function () {
         if (btnModeSingle) btnModeSingle.onclick = () => switchEvidenceMode('single');
         if (btnModeMulti) btnModeMulti.onclick = () => switchEvidenceMode('multi');
 
-        // 🧩 ฟังก์ชันสร้าง Canvas รวมภาพ 3 - 5 รูปเป็นผืนเดียว (Proportional Width, 0 Top/Bottom Space, 0 Cropping / ไม่กินขอบ)
+        // 🧩 ฟังก์ชันสร้าง Canvas รวมภาพ 3 - 5 รูปเป็นผืนเดียว (Proportional Width, 0 Top/Bottom Space, ไม่กินขอบ ขนาดรวมไม่เกิน 500KB)
         async function buildMultiCollageCanvas(imgList) {
             if (!imgList || imgList.length < 3 || imgList.length > 5) return null;
 
@@ -15195,8 +16130,8 @@ const WapSupportLogs = (function () {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            // 🎯 ล็อกความสูงมาตรฐานคงที่ (1080px Full HD Standard) เท่ากันเสมอทุกครั้งที่บันทึก และคำนวณความกว้างตามสัดส่วนจริงของแต่ละรูปภาพ (No Cropping / คมชัดเต็มภาพ ไม่มีพื้นที่ว่างบนล่าง)
-            const targetHeight = 1080;
+            // 🎯 ล็อกความสูงมาตรฐาน 720px เพื่อให้ขนาดภาพรวมทั้ง 3-5 รูปสมดุล คมชัด และขนาดไฟล์รวมไม่เกิน 500KB เสมอ
+            const targetHeight = 720;
             const spacing = 3;
             const padding = 0;
 
@@ -15236,44 +16171,135 @@ const WapSupportLogs = (function () {
                 currentX += w + spacing;
             });
 
-            return canvas.toDataURL('image/jpeg', 0.98);
+            const getByteSize = (str) => {
+                const base64Str = str.split(',')[1] || str;
+                return Math.round((base64Str.length * 3) / 4);
+            };
+
+            let quality = 0.88;
+            let collageDataUrl = canvas.toDataURL('image/jpeg', quality);
+
+            while (getByteSize(collageDataUrl) > 480 * 1024 && quality > 0.40) {
+                quality -= 0.08;
+                collageDataUrl = canvas.toDataURL('image/jpeg', quality);
+            }
+
+            if (getByteSize(collageDataUrl) > 500 * 1024) {
+                const scaledCanvas = document.createElement('canvas');
+                scaledCanvas.width = Math.round(totalWidth * 0.75);
+                scaledCanvas.height = Math.round(totalHeight * 0.75);
+                const sCtx = scaledCanvas.getContext('2d');
+                sCtx.imageSmoothingEnabled = true;
+                sCtx.imageSmoothingQuality = 'high';
+                sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+                collageDataUrl = scaledCanvas.toDataURL('image/jpeg', 0.75);
+            }
+
+            return collageDataUrl;
         }
 
-        // 🧩 ฟังก์ชันเรนเดอร์ Thumbnails ใน Mode 2 (พร้อมปุ่ม [x] ลบ และ [↻] หมุน)
+        // 🧩 ฟังก์ชันเรนเดอร์ Thumbnails ใน Mode 2 (แถบเครื่องมือด้านบนแบบ Flex ไม่ซ้อนทับกัน)
         const renderMultiGrid = () => {
             if (!multiGrid) return;
             multiGrid.innerHTML = '';
 
             multiImages.forEach((imgData, idx) => {
+                const rawImg = multiImagesOriginal[idx] || imgData;
+                const annotImg = multiImagesAnnotated[idx] || null;
+                const hasAnnot = Boolean(annotImg && annotImg !== rawImg);
+                const isAnnotShowing = hasAnnot ? Boolean(multiImagesShowAnnot[idx] !== false) : false;
+                const displayImg = (isAnnotShowing && annotImg) ? annotImg : rawImg;
+                multiImages[idx] = displayImg;
+
                 const card = document.createElement('div');
                 card.className = 'evidence-thumb-card';
                 card.innerHTML = `
-                    <img src="${imgData}" alt="Evidence ${idx + 1}" />
-                    <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูปภาพ 90°" data-rot-idx="${idx}">↻</button>
-                    <button type="button" class="evidence-thumb-delete-btn" title="ลบรูปนี้" data-del-idx="${idx}">✖</button>
-                    <span class="evidence-thumb-badge">รูปที่ ${idx + 1}</span>
+                    <div class="evidence-thumb-img-wrap">
+                        <img src="${displayImg}" alt="Evidence ${idx + 1}" />
+                    </div>
+                    <div class="evidence-thumb-top-bar">
+                        <span class="evidence-thumb-tag">#${idx + 1}</span>
+                        <div class="evidence-thumb-actions">
+                            ${hasAnnot ? `
+                                <button type="button" class="evidence-thumb-action-btn btn-annot-toggle ${isAnnotShowing ? 'is-defect' : 'is-raw'}" title="${isAnnotShowing ? '👁️ กำลังแสดงสัญลักษณ์ (คลิกสลับดูรูปต้นฉบับ)' : '👁️‍🗨️ กำลังแสดงต้นฉบับ (คลิกแสดงสัญลักษณ์)'}" data-toggle-idx="${idx}">
+                                    <span>${isAnnotShowing ? '👁️' : '👁️‍🗨️'}</span>
+                                </button>
+                            ` : ''}
+                            <button type="button" class="evidence-thumb-action-btn btn-annot" title="วาด/ชี้จุดบกพร่องรูปนี้" data-annot-idx="${idx}">✏️</button>
+                            <button type="button" class="evidence-thumb-action-btn btn-rot" title="หมุนรูปภาพ 90°" data-rot-idx="${idx}">↻</button>
+                            <button type="button" class="evidence-thumb-action-btn btn-del" title="ลบรูปนี้" data-del-idx="${idx}">✖</button>
+                        </div>
+                    </div>
+                    <div class="evidence-thumb-bottom-bar">
+                        <span class="evidence-thumb-status ${hasAnnot ? (isAnnotShowing ? 'status-defect' : 'status-raw') : ''}">
+                            ${hasAnnot ? (isAnnotShowing ? '✏️ Defect' : '📷 Raw') : `รูปที่ ${idx + 1}`}
+                        </span>
+                    </div>
                 `;
 
+                // ปุ่มสลับดูต้นฉบับ / สัญลักษณ์ (Toggle Raw vs Annotation)
+                const toggleBtn = card.querySelector('.btn-annot-toggle');
+                if (toggleBtn) {
+                    toggleBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        multiImagesShowAnnot[idx] = !multiImagesShowAnnot[idx];
+                        multiImages[idx] = (multiImagesShowAnnot[idx] && multiImagesAnnotated[idx]) ? multiImagesAnnotated[idx] : (multiImagesOriginal[idx] || multiImages[idx]);
+                        await handleMultiImagesChange();
+                        if (multiImagesShowAnnot[idx]) {
+                            toast(`👁️ แสดงสัญลักษณ์รูปที่ ${idx + 1}`, 'info');
+                        } else {
+                            toast(`🖼️ แสดงรูปต้นฉบับรูปที่ ${idx + 1} (บันทึกสัญลักษณ์เดิมไว้)`, 'info');
+                        }
+                    };
+                }
+
+                // ปุ่มวาด/ชี้จุดบกพร่อง (Annotate)
+                const annotBtn = card.querySelector('.btn-annot');
+                if (annotBtn) {
+                    annotBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        const imgToAnnotate = multiImagesAnnotated[idx] || multiImagesOriginal[idx] || multiImages[idx];
+                        openEvidenceAnnotator(imgToAnnotate, async (annotatedDataUrl) => {
+                            if (!multiImagesOriginal[idx]) {
+                                multiImagesOriginal[idx] = multiImages[idx];
+                            }
+                            multiImagesAnnotated[idx] = annotatedDataUrl;
+                            multiImagesShowAnnot[idx] = true;
+                            multiImages[idx] = annotatedDataUrl;
+                            await handleMultiImagesChange();
+                            toast(`✨ อัปเดตสัญลักษณ์บนรูปที่ ${idx + 1} เรียบร้อย (กดปุ่มสลับดูรูปต้นฉบับได้ตลอดเวลา)`, 'success');
+                        });
+                    };
+                }
+
                 // ปุ่มหมุนรูป 90°
-                const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
+                const rotBtn = card.querySelector('.btn-rot');
                 if (rotBtn) {
                     rotBtn.onclick = async (e) => {
                         e.stopPropagation();
                         rotBtn.style.pointerEvents = 'none';
                         rotBtn.textContent = '⏳';
-                        const rotated = await rotateImageDataUrl(multiImages[idx]);
-                        multiImages[idx] = rotated;
+                        if (multiImagesOriginal[idx]) {
+                            multiImagesOriginal[idx] = await rotateImageDataUrl(multiImagesOriginal[idx]);
+                        }
+                        if (multiImagesAnnotated[idx]) {
+                            multiImagesAnnotated[idx] = await rotateImageDataUrl(multiImagesAnnotated[idx]);
+                        }
+                        multiImages[idx] = (multiImagesShowAnnot[idx] && multiImagesAnnotated[idx]) ? multiImagesAnnotated[idx] : (multiImagesOriginal[idx] || multiImages[idx]);
                         await handleMultiImagesChange();
                         toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
                     };
                 }
 
                 // ปุ่มลบรูป
-                const delBtn = card.querySelector('.evidence-thumb-delete-btn');
+                const delBtn = card.querySelector('.btn-del');
                 if (delBtn) {
                     delBtn.onclick = async (e) => {
                         e.stopPropagation();
                         multiImages.splice(idx, 1);
+                        multiImagesOriginal.splice(idx, 1);
+                        multiImagesAnnotated.splice(idx, 1);
+                        multiImagesShowAnnot.splice(idx, 1);
                         await handleMultiImagesChange();
                         toast(`🗑️ ลบรูปภาพที่ ${idx + 1} เรียบร้อย`, 'info');
                     };
@@ -15384,7 +16410,7 @@ const WapSupportLogs = (function () {
                         if (compositeActions) {
                             compositeActions.style.display = 'flex';
                         }
-                        toast(`✨ รวมภาพหลักฐาน ${multiImages.length} รูปเรียบร้อยแล้ว`, 'success');
+                        toast(`✨ รวมภาพหลักฐาน ${multiImages.length} รูปเรียบร้อยแล้ว (ขนาดไฟล์ < 500KB)`, 'success');
                     }
                 } catch(e) {
                     console.error('Collage error:', e);
@@ -15425,12 +16451,13 @@ const WapSupportLogs = (function () {
 
                 const filesToAdd = files.slice(0, availableSlots);
                 for (let file of filesToAdd) {
-                    const dataUrl = await new Promise(resolve => {
-                        const reader = new FileReader();
-                        reader.onload = ev => resolve(ev.target.result);
-                        reader.readAsDataURL(file);
-                    });
-                    if (dataUrl) multiImages.push(dataUrl);
+                    const optimizedUrl = await compressAndOptimizeImage(file, 1200, 400 * 1024);
+                    if (optimizedUrl) {
+                        multiImagesOriginal.push(optimizedUrl);
+                        multiImagesAnnotated.push(null);
+                        multiImagesShowAnnot.push(true);
+                        multiImages.push(optimizedUrl);
+                    }
                 }
 
                 if (multiImages.length < 3) {
@@ -15442,21 +16469,22 @@ const WapSupportLogs = (function () {
         }
 
         // จัดการอัปโหลดรูปภาพใน Mode 1 (Single)
-        function handleSingleImageFile(file) {
-            if (!file || !file.type.startsWith('image/')) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                singleImage = ev.target.result;
-                if (currentEvidenceMode === 'single') {
-                    currentImage = singleImage;
-                    modal._currentImage = currentImage;
-                }
-                renderSinglePreview();
-                saveDraftData();
-                updateSupportFormValidation();
-                toast('📸 อัปโหลดรูปภาพหลักฐานเรียบร้อย', 'success');
-            };
-            reader.readAsDataURL(file);
+        async function handleSingleImageFile(file) {
+            if (!file || (!file.type?.startsWith('image/') && !(file instanceof Blob))) return;
+            const optimizedUrl = await compressAndOptimizeImage(file, 1400, 480 * 1024);
+            if (!optimizedUrl) return;
+            singleImageOriginal = optimizedUrl;
+            singleImageAnnotated = null;
+            singleImageShowAnnot = true;
+            singleImage = optimizedUrl;
+            if (currentEvidenceMode === 'single') {
+                currentImage = singleImage;
+                modal._currentImage = currentImage;
+            }
+            renderSinglePreview();
+            saveDraftData();
+            updateSupportFormValidation();
+            toast('📸 อัปโหลดและปรับขนาดภาพหลักฐานเรียบร้อย (ขนาดไฟล์ < 500KB)', 'success');
         }
 
         if (imgInput) {
@@ -15491,7 +16519,7 @@ const WapSupportLogs = (function () {
         renderSinglePreview();
 
         // Allow pasting image from Clipboard (Ctrl+V) into modal
-        const handlePasteImage = (e) => {
+        const handlePasteImage = async (e) => {
             if (!document.body.contains(modal)) {
                 window.removeEventListener('paste', handlePasteImage);
                 return;
@@ -15503,20 +16531,22 @@ const WapSupportLogs = (function () {
                     if (item && item.type && item.type.indexOf('image') === 0) {
                         const blob = item.getAsFile();
                         if (currentEvidenceMode === 'single') {
-                            handleSingleImageFile(blob);
-                            if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ', 'success');
+                            await handleSingleImageFile(blob);
+                            if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานและปรับขนาดเรียบร้อย', 'success');
                         } else {
                             if (multiImages.length >= 5) {
                                 toast('⚠️ แนบรูปภาพครบ 5 รูปแล้ว', 'warning');
                                 return;
                             }
-                            const reader = new FileReader();
-                            reader.onload = async (ev) => {
-                                multiImages.push(ev.target.result);
+                            const optimizedUrl = await compressAndOptimizeImage(blob, 1200, 400 * 1024);
+                            if (optimizedUrl) {
+                                multiImagesOriginal.push(optimizedUrl);
+                                multiImagesAnnotated.push(null);
+                                multiImagesShowAnnot.push(true);
+                                multiImages.push(optimizedUrl);
                                 if (typeof toast === 'function') toast(`📸 วางรูปภาพจาก Clipboard (รูปที่ ${multiImages.length})`, 'success');
                                 await handleMultiImagesChange();
-                            };
-                            reader.readAsDataURL(blob);
+                            }
                         }
                         break;
                     }
@@ -15619,7 +16649,13 @@ const WapSupportLogs = (function () {
                     is8d: d8Check ? d8Check.checked : false,
                     evidenceMode: currentEvidenceMode,
                     singleImage: singleImage || null,
+                    singleImageOriginal: singleImageOriginal || null,
+                    singleImageAnnotated: singleImageAnnotated || null,
+                    singleImageShowAnnot: singleImageShowAnnot,
                     multiImages: multiImages || [],
+                    multiImagesOriginal: multiImagesOriginal || [],
+                    multiImagesAnnotated: multiImagesAnnotated || [],
+                    multiImagesShowAnnot: multiImagesShowAnnot || [],
                     stitchedMultiImage: stitchedMultiImage || null,
                     image: currentImage || null,
                     savedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -15667,6 +16703,9 @@ const WapSupportLogs = (function () {
                 if (d.evidenceMode === 'multi') {
                     currentEvidenceMode = 'multi';
                     multiImages = Array.isArray(d.multiImages) ? d.multiImages : [];
+                    multiImagesOriginal = Array.isArray(d.multiImagesOriginal) ? d.multiImagesOriginal : [...multiImages];
+                    multiImagesAnnotated = Array.isArray(d.multiImagesAnnotated) ? d.multiImagesAnnotated : multiImages.map(() => null);
+                    multiImagesShowAnnot = Array.isArray(d.multiImagesShowAnnot) ? d.multiImagesShowAnnot : multiImages.map(() => true);
                     stitchedMultiImage = d.stitchedMultiImage || null;
                     currentImage = stitchedMultiImage;
                     modal._currentImage = currentImage;
@@ -15683,6 +16722,9 @@ const WapSupportLogs = (function () {
                 } else {
                     currentEvidenceMode = 'single';
                     singleImage = d.singleImage || d.image || null;
+                    singleImageOriginal = d.singleImageOriginal || singleImage;
+                    singleImageAnnotated = d.singleImageAnnotated || null;
+                    singleImageShowAnnot = d.singleImageShowAnnot !== undefined ? d.singleImageShowAnnot : true;
                     currentImage = singleImage;
                     modal._currentImage = currentImage;
                     switchEvidenceMode('single');
@@ -16112,9 +17154,9 @@ function _openViewModal(id) {
 
     if (!rawRemark || rawRemark === 'ไม่มีหมายเหตุเพิ่มเติม') {
         remarkHtml = `
-            <div style="display:flex; align-items:center; gap:8px;">
-                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px;">NOTE:</span>
-                <span style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; opacity:0.8;">ไม่มีหมายเหตุเพิ่มเติม</span>
+            <div style="font-size:11.5px; font-weight:600; color:${theme.remarkText}; line-height:1.5; text-align:left; margin:0; padding:0;">
+                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px; margin-right:6px; display:inline;">NOTE:</span>
+                <span style="opacity:0.8;">ไม่มีหมายเหตุเพิ่มเติม</span>
             </div>
         `;
     } else {
@@ -16144,24 +17186,21 @@ function _openViewModal(id) {
             }).join('');
 
             remarkHtml = `
-                <div style="display:flex; flex-direction:column; gap:3px;">
-                    <div style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10.5px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px;">
-                        NOTE:Temporary action
+                <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                    <div style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
+                        <span>NOTE:</span>
+                        <span style="color:${theme.remarkText}; font-weight:800; font-size:11px; text-transform:none;">Temporary action</span>
                     </div>
-                    <div style="padding-left:24px; display:flex; flex-direction:column; gap:2px; font-size:11.5px; font-weight:600; color:${theme.remarkText}; line-height:1.5;">
+                    <div style="padding-left:18px; display:flex; flex-direction:column; gap:3px; font-size:11.5px; font-weight:600; color:${theme.remarkText}; line-height:1.5; text-align:left;">
                         ${formattedLines}
                     </div>
                 </div>
             `;
         } else {
+            // ข้อความทั่วไป (เช่น Rework support...): แสดงต่อท้าย NOTE: บนบรรทัดเดียวกันทันที (Inline flow)
             remarkHtml = `
-                <div style="display:flex; flex-direction:column; gap:3px;">
-                    <div style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10.5px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px;">
-                        NOTE:
-                    </div>
-                    <div style="padding-left:24px; color:${theme.remarkText}; font-size:11.5px; font-weight:600; line-height:1.5; white-space:pre-wrap; word-break:break-word;">
-                        ${escapeHtml(rawRemark)}
-                    </div>
+                <div style="font-size:11.5px; font-weight:600; color:${theme.remarkText}; line-height:1.5; text-align:left; word-break:break-word; white-space:pre-wrap; margin:0; padding:0;">
+                    <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px; margin-right:6px; display:inline;">NOTE:</span>${escapeHtml(rawRemark)}
                 </div>
             `;
         }
@@ -24986,24 +26025,37 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         list = window.WapAdminSystem.getEmailRules();
     } 
     
-    if ((!list || !list.length) && window.VF_RP_MASTER_DATA) {
+    if ((!list || !list.length) && window._data && Array.isArray(window._data.system) && window._data.system.length > 0) {
+        list = window._data.system;
+    }
+
+    if ((!list || !list.length) && window.VF_RP_MASTER_DATA && window.VF_RP_MASTER_DATA.length > 0) {
         list = window.VF_RP_MASTER_DATA;
     }
 
     // 2. Fallback: ค้นหาจาก LocalStorage (กรณีเปิดไฟล์ตรงๆ หรือออฟไลน์)
     if (!list || !list.length) {
         try {
-            // สแกนหาจากทุก Key ที่เป็นไปได้ที่ระบบอาจจะบันทึกไว้
-            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_cache', 'carrier_latest_app_state_backup'];
+            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_config', 'vf_rp_master_cache', 'carrier_latest_app_state_backup'];
             for (const key of backupKeys) {
                 const cached = localStorage.getItem(key);
                 if (cached) {
                     const parsed = JSON.parse(cached);
-                    // รองรับทั้งแบบ Array ตรงๆ และแบบ Snapshot Object
-                    const actualData = parsed.app_state ? (parsed.app_state.eight_d_cases || []) : parsed;
+                    let actualData = null;
+                    if (parsed && typeof parsed === 'object') {
+                        if (Array.isArray(parsed)) {
+                            actualData = parsed;
+                        } else if (parsed.app_state) {
+                            actualData = parsed.app_state.vf_rp_email_rules || parsed.app_state.system || parsed.app_state.email_rules || null;
+                        } else if (parsed.data && Array.isArray(parsed.data)) {
+                            actualData = parsed.data;
+                        } else if (parsed.vf_rp_email_rules && Array.isArray(parsed.vf_rp_email_rules)) {
+                            actualData = parsed.vf_rp_email_rules;
+                        }
+                    }
                     if (Array.isArray(actualData) && actualData.length > 0) {
                         list = actualData;
-                        window.VF_RP_MASTER_DATA = list; // กู้คืนกลับเข้า Memory
+                        window.VF_RP_MASTER_DATA = list;
                         break;
                     }
                 }
@@ -25013,9 +26065,7 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         }
     }
     
-    // หากยังไม่พบฐานข้อมูลเลย ให้คืนค่า null เพื่อให้ระบบ Sign-off ใช้รายชื่อ Staff ทั้งหมดแทน
     if (!list || !list.length) {
-        console.warn("⚠️ [Matrix Search] No rule database found. Standard staff list will be used.");
         return null;
     }
 
@@ -25023,7 +26073,8 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
     const deepClean = (val) => {
         if (!val || val === '-' || val === '--') return "";
         return String(val).trim().toLowerCase()
-            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V. นำหน้า
+            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V_ หรือ V- นำหน้า
+            .replace(/^v(?=[a-z0-9])/i, '') // ตัด V นำหน้า เช่น VMCP -> MCP, V1005 -> 1005
             .replace(/\b(co\.,\s*ltd|co\.,ltd|co\s+ltd|ltd|company\s+limited|inc|corp|corporation|จำกัด|บริษัท)\b/gi, '') 
             .replace(/[^a-z0-9ก-๙]/gi, '') // ลบสัญลักษณ์พิเศษทั้งหมด
             .trim();
@@ -25033,27 +26084,26 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
     const targetCode = deepClean(vendorCode);
     const targetInit = deepClean(initials);
 
-    // ป้องกันการค้นหาด้วยค่าว่าง
     if (!targetName && !targetCode && !targetInit) return null;
 
     // 4. เริ่มการค้นหาแบบลำดับความสำคัญ (Matching Logic)
     return list.find(r => {
         const dbName = deepClean(r.supplier_name || r.supplier || '');
         const dbCode = deepClean(r.vendor_code || r.supplier_code || '');
-        const dbInit = deepClean(r.initials_name || '');
+        const dbInit = deepClean(r.initials_name || r.initials || '');
 
         // กฎที่ 1: รหัส Vendor ตรงกัน (แม่นยำที่สุด)
-        if (targetCode && dbCode === targetCode) return true;
+        if (targetCode && dbCode && dbCode === targetCode) return true;
 
         // กฎที่ 2: ตัวย่อ (Initials) ตรงกัน
-        if (targetInit && dbInit === targetInit) return true;
+        if (targetInit && dbInit && dbInit === targetInit) return true;
 
         // กฎที่ 3: ชื่อบริษัทตรงกันเป๊ะ หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา
         if (targetName) {
-            if (dbName === targetName) return true;
-            if (dbInit === targetName) return true;
+            if (dbName && dbName === targetName) return true;
+            if (dbInit && dbInit === targetName) return true;
             // กฎที่ 4: ค้นหาแบบบางส่วน (Fuzzy)
-            if (dbName.includes(targetName) || targetName.includes(dbName)) return true;
+            if (dbName && (dbName.includes(targetName) || targetName.includes(dbName))) return true;
         }
 
         return false;
@@ -25062,7 +26112,7 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
 
 // --- แก้ไขฟังก์ชันซิงค์ข้อมูลเมื่อมีการแก้ไข VENDOR บนหน้าเอกสาร (Document Sync Engine) ---
 window.onVfDocVendorChange = function(el) {
-    const rawVal = (el ? el.innerText : '').trim();
+    const rawVal = (el ? (el.innerText || el.value || '') : '').trim();
     if (!rawVal) return;
 
     // 1. ค้นหา Matrix จากชื่อซัพพลายเออร์ที่เพิ่งพิมพ์ลงไป
@@ -25071,7 +26121,6 @@ window.onVfDocVendorChange = function(el) {
         : null;
 
     // 2. อัปเดตข้อมูลเข้าสู่สถานะตัวแปรปัจจุบัน (Internal State Update)
-    // จุดนี้สำคัญมาก! เพราะหน้าส่งเมล์จะดึงข้อมูลจาก currentCase ไปใช้
     const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
         ? Wap8DSystem.getCurrentCase()
         : null;
@@ -25079,17 +26128,23 @@ window.onVfDocVendorChange = function(el) {
         if (!curCase.report_data.vf_data) curCase.report_data.vf_data = {};
         const vf = curCase.report_data.vf_data;
 
-        // บันทึกชื่อซัพพลายเออร์ที่แก้ไขลงในหน่วยความจำ
         vf.vendor = rawVal; 
 
         if (matrix) {
-            // ถ้าเจอใน Matrix ให้หยอดค่าที่เกี่ยวข้องลงใน Data Object ทันที
             vf.vendor_code = matrix.vendor_code || vf.vendor_code;
             vf.part_group = matrix.parts_group || vf.part_group;
-            
-            // หยอดอีเมลที่แมปมาจาก Matrix เข้าไปเก็บไว้ใน Case เพื่อให้ปุ่มส่งเมล์มองเห็น
             vf.inform_email_to = matrix.inform_email_to || matrix.recipient_to;
-            vf.team_member_email = matrix.team_member_email; // 3.3 ที่คุณต้องการ
+            vf.team_member_email = matrix.team_member_email;
+            
+            const isRP = (curCase.report_data?.source_report_type || curCase.report_type || '').toString().toUpperCase().includes('RP');
+            if (!vf.confirm_sig_active) {
+                const confName = isRP ? (matrix.confirm_rp_name || matrix.confirm_rp) : (matrix.confirm_vf_name || matrix.confirm_vf);
+                if (confName && confName !== '-') vf.confirm_by = confName;
+            }
+            if (!vf.approved_sig_active) {
+                const apprName = isRP ? (matrix.approve_rp_name || matrix.approve_rp) : (matrix.approve_vf_name || matrix.approve_vf);
+                if (apprName && apprName !== '-') vf.approved_by = apprName;
+            }
         }
     }
 
@@ -25099,17 +26154,26 @@ window.onVfDocVendorChange = function(el) {
         const ccEl = document.getElementById('vf-doc-cc-display');
         const vCodeEl = document.getElementById('vf-doc-vendor-code');
         const partGrpEl = document.getElementById('vf-doc-part-group');
+        const confInput = document.getElementById('prob-confirm-by');
+        const apprInput = document.getElementById('prob-approved-by');
 
-        // แสดงผลหัวกระดาษ (To/CC/Code/Group)
         if (toEl && matrix.to_vf_rp_report && matrix.to_vf_rp_report !== '-') toEl.innerText = matrix.to_vf_rp_report;
         if (ccEl && matrix.cc_vf_rp_report && matrix.cc_vf_rp_report !== '-') ccEl.innerText = matrix.cc_vf_rp_report;
         if (vCodeEl && matrix.vendor_code && matrix.vendor_code !== '-') vCodeEl.innerText = matrix.vendor_code;
         if (partGrpEl && matrix.parts_group && matrix.parts_group !== '-') partGrpEl.innerText = matrix.parts_group;
 
-        toast(`🔗 เชื่อมโยงข้อมูล ${rawVal} สำเร็จ (พร้อมส่งอีเมล)`, "success");
-    } else {
-        // กรณีพิมพ์ชื่อแล้วหาใน Matrix ไม่เจอ
-        console.warn(`[Matrix] Supplier "${rawVal}" not found in master database.`);
+        const isRP = (_currentCase?.report_data?.source_report_type || _currentCase?.report_type || '').toString().toUpperCase().includes('RP');
+        const vf = _currentCase?.report_data?.vf_data || {};
+        if (confInput && !vf.confirm_sig_active) {
+            const defaultConf = isRP ? (matrix.confirm_rp_name || matrix.confirm_rp) : (matrix.confirm_vf_name || matrix.confirm_vf);
+            if (defaultConf && defaultConf !== '-') confInput.value = defaultConf;
+        }
+        if (apprInput && !vf.approved_sig_active) {
+            const defaultAppr = isRP ? (matrix.approve_rp_name || matrix.approve_rp) : (matrix.approve_vf_name || matrix.approve_vf);
+            if (defaultAppr && defaultAppr !== '-') apprInput.value = defaultAppr;
+        }
+
+        toast(`🔗 เชื่อมโยงข้อมูล Matrix ของ ${rawVal} สำเร็จ`, "success");
     }
 
     // 4. บันทึกความคืบหน้าลง Cloud ทันที (Auto-Save)
@@ -25119,7 +26183,7 @@ window.onVfDocVendorChange = function(el) {
 };
 
 window.onVfDocVendorCodeChange = function(el) {
-    const rawCode = (el ? el.innerText : '').trim();
+    const rawCode = (el ? (el.innerText || el.value || '') : '').trim();
     if (!rawCode) return;
     const matrix = (typeof window.getVFRPMatrixForSupplier === 'function')
         ? window.getVFRPMatrixForSupplier('', rawCode, '')
@@ -25129,10 +26193,25 @@ window.onVfDocVendorCodeChange = function(el) {
         const ccEl = document.getElementById('vf-doc-cc-display');
         const vEl = document.getElementById('vf-doc-vendor');
         const partGrpEl = document.getElementById('vf-doc-part-group');
+        const confInput = document.getElementById('prob-confirm-by');
+        const apprInput = document.getElementById('prob-approved-by');
+
         if (toEl && matrix.to_vf_rp_report && matrix.to_vf_rp_report !== '-') toEl.innerText = matrix.to_vf_rp_report;
         if (ccEl && matrix.cc_vf_rp_report && matrix.cc_vf_rp_report !== '-') ccEl.innerText = matrix.cc_vf_rp_report;
         if (vEl && matrix.supplier) vEl.innerText = matrix.supplier.toUpperCase();
         if (partGrpEl && matrix.parts_group && matrix.parts_group !== '-') partGrpEl.innerText = matrix.parts_group;
+
+        const isRP = (_currentCase?.report_data?.source_report_type || _currentCase?.report_type || '').toString().toUpperCase().includes('RP');
+        const vf = _currentCase?.report_data?.vf_data || {};
+        if (confInput && !vf.confirm_sig_active) {
+            const defaultConf = isRP ? (matrix.confirm_rp_name || matrix.confirm_rp) : (matrix.confirm_vf_name || matrix.confirm_vf);
+            if (defaultConf && defaultConf !== '-') confInput.value = defaultConf;
+        }
+        if (apprInput && !vf.approved_sig_active) {
+            const defaultAppr = isRP ? (matrix.approve_rp_name || matrix.approve_rp) : (matrix.approve_vf_name || matrix.approve_vf);
+            if (defaultAppr && defaultAppr !== '-') apprInput.value = defaultAppr;
+        }
+
         if (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.saveCurrentProgress === 'function') {
             Wap8DSystem.saveCurrentProgress();
         }
@@ -26093,6 +27172,42 @@ let currentModalACIndex = -1;
 let tempAvatarBase64 = null; // ตัวแปรพักรูปภาพ
 
 /**
+ * 🧹 ปิดดรอปดาวน์ Modal Autocomplete ทั้งหมดทันที
+ */
+function closeAllModalAC() {
+    document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
+        if (dd.style.display !== 'none') {
+            dd.style.display = 'none';
+        }
+    });
+    currentOpenModalDropdown = null;
+    currentModalACIndex = -1;
+}
+window.closeAllModalAC = closeAllModalAC;
+
+// ⚡ ตรวจจับการคลิกพื้นที่ว่างหรือภายนอก เพื่อปิดดรอปดาวน์ทันที (Instant Outside Click Dismissal)
+if (typeof document !== 'undefined') {
+    document.addEventListener('pointerdown', (e) => {
+        // หากคลิกภายในตัว dropdown ไม่ต้องปิด (อนุญาตให้เลือกหรือ scroll)
+        if (e.target.closest('.modal-ac-dropdown')) return;
+
+        // หากคลิกที่ช่อง input ที่กำลังเปิด dropdown อยู่ ไม่ต้องปิด
+        const activeInput = e.target.closest('input') || e.target.closest('textarea');
+        if (activeInput && activeInput === currentOpenModalDropdown) return;
+
+        // คลิกพื้นที่ว่าง พื้นหลัง หรือปุ่มอื่นๆ -> ปิด dropdown ทันที
+        closeAllModalAC();
+    }, { passive: true });
+
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.modal-ac-dropdown')) return;
+        const activeInput = e.target.closest('input') || e.target.closest('textarea');
+        if (activeInput && activeInput === currentOpenModalDropdown) return;
+        closeAllModalAC();
+    });
+}
+
+/**
  * 🧠 MASTER MODAL AUTO-COMPLETE ENGINE (Strict Matrix Integration)
  * อัปเดต: ดึงหมวดหมู่พาร์ทจาก Proficiency Breakdown (Skill Matrix)
  */
@@ -26172,9 +27287,18 @@ function renderModalAC(type, inputEl) {
         // 🔹 [PART A]: ช่อง ISSUE BY (ดึงพนักงานทุกคนจากตาราง Agent)
         // --------------------------------------------------------
         if (inputEl.id === 'prob-issue-by') {
-            htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: #2563eb; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase;">👥 รายชื่อทีมงาน Agent ทั้งหมด (ALL ENGINEERS)</div>`;
+            htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: #2563eb; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase;">👥 รายชื่อผู้จัดทำ (ISSUE BY)</div>`;
 
-            // ดึงข้อมูลจาก Map ของพนักงาน (ตาราง users)
+            // 1. ถ้ามี Matrix ให้แสดง Assigned Engineer ประจำ Vendor ที่ด้านบนสุด
+            if (matrix) {
+                const assignedEng = isRP ? (matrix.iqc_eng_name || matrix.iqc_engineer) : (matrix.engineer || matrix.sqe_engineer);
+                if (assignedEng && assignedEng !== '-' && (!query || assignedEng.toLowerCase().includes(query))) {
+                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #0284c7; background: #f0f9ff;">🎯 ASSIGNED ${isRP ? 'IQC' : 'SQE'} ENGINEER (MATRIX)</div>`;
+                    htmlContent += renderOption(assignedEng, isRP ? 'IQC ENG' : 'SQE ENG', '#0284c7', '⭐');
+                }
+            }
+
+            // 2. ดึงข้อมูลจาก Map ของพนักงาน (ตาราง users / Agent)
             if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
                 Array.from(window._dbUsersRoleMap.values())
                     .filter(u => {
@@ -26187,7 +27311,6 @@ function renderModalAC(type, inputEl) {
                         htmlContent += renderOption(name, roleLabel, '#2563eb', '👤', u.email);
                     });
             } else {
-                // Fallback: หากตาราง Agent ยังไม่โหลด ให้ใช้ STAFF_LIST พื้นฐาน
                 STAFF_LIST.filter(m => !query || m.toLowerCase().includes(query)).forEach(m => {
                     htmlContent += renderOption(m, 'STAFF', '#64748b', '👤');
                 });
@@ -26198,20 +27321,43 @@ function renderModalAC(type, inputEl) {
         // 🔹 [PART B]: ช่อง CONFIRM BY (ดึงตาม Matrix ของ Vendor)
         // --------------------------------------------------------
         else if (inputEl.id === 'prob-confirm-by') {
+            const title = isRP ? "🟢 CONFIRM RP (FROM MATRIX)" : "🔵 CONFIRM VF (FROM MATRIX)";
+            const color = isRP ? "#059669" : "#1e40af";
+
             if (matrix) {
-                const title = isRP ? "🟢 CONFIRM RP (FROM MATRIX)" : "🔵 CONFIRM VF (FROM MATRIX)";
-                const confirmName = isRP ? matrix.confirm_rp_name : matrix.confirm_vf_name;
-                const color = isRP ? "#059669" : "#1e40af";
+                const confirmName = isRP ? (matrix.confirm_rp_name || matrix.confirm_rp) : (matrix.confirm_vf_name || matrix.confirm_vf);
+                const assignedEng = isRP ? (matrix.iqc_eng_name || matrix.iqc_engineer) : (matrix.engineer || matrix.sqe_engineer);
                 
                 htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">${title}</div>`;
                 
-                if (confirmName && confirmName !== '-') {
-                    htmlContent += renderOption(confirmName, 'CONFIRMER', color, '🛡️');
-                } else {
-                    htmlContent += `<div style="padding: 15px; text-align: center; color: #94a3b8; font-size: 10.5px;">ไม่พบรายชื่อผู้ตรวจสอบใน Matrix ของ ${vendorName}</div>`;
+                let renderedCount = 0;
+                if (confirmName && confirmName !== '-' && (!query || confirmName.toLowerCase().includes(query))) {
+                    htmlContent += renderOption(confirmName, 'AUTHORIZED CONFIRMER', color, '🛡️');
+                    renderedCount++;
+                }
+
+                if (assignedEng && assignedEng !== '-' && assignedEng !== confirmName && (!query || assignedEng.toLowerCase().includes(query))) {
+                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #0284c7; background: #f0f9ff; border-top: 1px solid #e0f2fe;">📋 วิศวกรผู้รับผิดชอบ (REVIEWER)</div>`;
+                    htmlContent += renderOption(assignedEng, isRP ? 'IQC ENG' : 'SQE ENG', '#0284c7', '🔍');
+                    renderedCount++;
+                }
+
+                if (renderedCount === 0 && !query) {
+                    htmlContent += `<div style="padding: 12px; text-align: center; color: #94a3b8; font-size: 10.5px;">ไม่พบรายชื่อผู้ตรวจสอบใน Matrix ของ ${vendorName || 'Vendor'}</div>`;
+                }
+
+                // ถ้ามีการพิมพ์ค้นหา ให้แสดงรายชื่อหัวหน้า/วิศวกรคนอื่นในระบบด้วย
+                if (query) {
+                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #64748b; background: #f1f5f9; border-top: 1px solid #cbd5e1;">🔎 ผลการค้นหาอื่นๆ ในระบบ</div>`;
+                    STAFF_LIST.filter(m => m.toLowerCase().includes(query) && m !== confirmName && m !== assignedEng).forEach(m => {
+                        htmlContent += renderOption(m, 'SUPERVISOR', '#64748b', '👤');
+                    });
                 }
             } else {
-                htmlContent += `<div style="padding: 12px; text-align: center; color: #f59e0b; font-size: 10px; font-weight: 800; background: #fffbeb; border-bottom: 1px solid #fde68a;">⚠️ ไม่พบข้อมูล Vendor Matrix<br><span style="font-weight:500; color:#94a3b8; font-size:9px;">กรุณาพิมพ์ระบุชื่อเอง หรือตรวจสอบชื่อผู้ขาย</span></div>`;
+                htmlContent += `<div style="padding: 10px 12px; text-align: left; color: #b45309; font-size: 10px; font-weight: 800; background: #fffbeb; border-bottom: 1px solid #fde68a;">⚠️ ไม่พบ Matrix ของ "${vendorName || 'ไม่ระบุ Vendor'}" (แสดงรายชื่อที่สามารถเลือกได้)</div>`;
+                STAFF_LIST.filter(m => !query || m.toLowerCase().includes(query)).forEach(m => {
+                    htmlContent += renderOption(m, 'SUPERVISOR', '#64748b', '👤');
+                });
             }
         }
 
@@ -26219,30 +27365,47 @@ function renderModalAC(type, inputEl) {
         // 🔹 [PART C]: ช่อง APPROVED BY (ดึงตาม Matrix + ผู้อนุมัติร่วม)
         // --------------------------------------------------------
         else if (inputEl.id === 'prob-approved-by') {
+            const title = isRP ? "🟢 APPROVE RP (FROM MATRIX)" : "🔵 APPROVE VF (FROM MATRIX)";
+            const color = isRP ? "#059669" : "#1e40af";
+
             if (matrix) {
-                const title = isRP ? "🟢 APPROVE RP (FROM MATRIX)" : "🔵 APPROVE VF (FROM MATRIX)";
-                const primaryAppr = isRP ? matrix.approve_rp_name : matrix.approve_vf_name;
-                const jointAppr = matrix.approve_vf_rp_name; // ผู้อนุมัติร่วม (Joint Approval)
-                const color = isRP ? "#059669" : "#1e40af";
+                const primaryAppr = isRP ? (matrix.approve_rp_name || matrix.approve_rp) : (matrix.approve_vf_name || matrix.approve_vf);
+                const jointAppr = matrix.approve_vf_rp_name || matrix.approve_vf_rp; // ผู้อนุมัติร่วม (Joint Approval)
 
                 htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">${title}</div>`;
                 
+                let renderedCount = 0;
                 // 1. แสดงผู้อนุมัติหลัก (Primary Approver)
-                if (primaryAppr && primaryAppr !== '-') {
+                if (primaryAppr && primaryAppr !== '-' && (!query || primaryAppr.toLowerCase().includes(query))) {
                     htmlContent += renderOption(primaryAppr, 'PRIMARY APPROVER', color, '👑');
+                    renderedCount++;
                 }
 
                 // 2. แสดงผู้อนุมัติร่วม / ผู้จัดการ (Joint Approver)
-                if (jointAppr && jointAppr !== '-' && jointAppr !== primaryAppr) {
+                if (jointAppr && jointAppr !== '-' && jointAppr !== primaryAppr && (!query || jointAppr.toLowerCase().includes(query))) {
                     htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #7c3aed; background: #f5f3ff; border-top: 1px solid #ddd6fe;">🟣 ผู้มีอำนาจอนุมัติร่วม (MANAGEMENT)</div>`;
-                    htmlContent += renderOption(jointAppr, 'JOINT APPROVAL', '#7c3aed', '🟣');
+                    htmlContent += renderOption(jointAppr, 'JOINT APPROVAL', '#7c3aed', '👑');
+                    renderedCount++;
                 }
 
-                if (!primaryAppr && !jointAppr) {
-                    htmlContent += `<div style="padding: 15px; text-align: center; color: #94a3b8; font-size: 10.5px;">ไม่พบรายชื่อผู้อนุมัติใน Matrix</div>`;
+                if (renderedCount === 0 && !query) {
+                    htmlContent += `<div style="padding: 12px; text-align: center; color: #94a3b8; font-size: 10.5px;">ไม่พบรายชื่อผู้อนุมัติใน Matrix</div>`;
+                }
+
+                // ถ้ามีการพิมพ์ค้นหา ให้แสดงรายชื่อผู้อนุมัติคนอื่นในกลุ่ม Management
+                if (query) {
+                    const approvedTeam = STAFF_TEAMS.find(t => t.team === 'Approved')?.members || [];
+                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #64748b; background: #f1f5f9; border-top: 1px solid #cbd5e1;">🔎 ผู้อนุมัติอื่นในระบบ Management</div>`;
+                    approvedTeam.filter(m => m.toLowerCase().includes(query) && m !== primaryAppr && m !== jointAppr).forEach(m => {
+                        htmlContent += renderOption(m, 'MANAGEMENT', '#7c3aed', '👑');
+                    });
                 }
             } else {
-                htmlContent += `<div style="padding: 12px; text-align: center; color: #f59e0b; font-size: 10px; font-weight: 800; background: #fffbeb;">⚠️ ไม่พบข้อมูล Vendor Matrix</div>`;
+                htmlContent += `<div style="padding: 10px 12px; text-align: left; color: #b45309; font-size: 10px; font-weight: 800; background: #fffbeb; border-bottom: 1px solid #fde68a;">⚠️ ไม่พบ Matrix ของ "${vendorName || 'ไม่ระบุ Vendor'}" (แสดงรายชื่อผู้อนุมัติ)</div>`;
+                const approvedTeam = STAFF_TEAMS.find(t => t.team === 'Approved')?.members || STAFF_LIST;
+                approvedTeam.filter(m => !query || m.toLowerCase().includes(query)).forEach(m => {
+                    htmlContent += renderOption(m, 'MANAGEMENT', '#7c3aed', '👑');
+                });
             }
         }
     }
