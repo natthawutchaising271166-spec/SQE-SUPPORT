@@ -14693,12 +14693,14 @@ const WapSupportLogs = (function () {
                         </div>
 
                         <!-- Mode Switcher Tabs (แบบที่ 1 / แบบที่ 2) -->
-                        <div style="display:flex; background:#e2e8f0; border-radius:10px; padding:3px; gap:4px;">
+                        <div class="evidence-mode-switcher-container">
                             <button type="button" id="btn-evidence-mode-single" class="evidence-mode-tab-btn active">
-                                <span>🖼️ แบบที่ 1: แนบภาพสำเร็จรูป (1 ไฟล์)</span>
+                                <span class="evidence-tab-icon">🖼️</span>
+                                <span class="evidence-tab-label">แบบที่ 1: แนบภาพสำเร็จรูป (1 ไฟล์)</span>
                             </button>
                             <button type="button" id="btn-evidence-mode-multi" class="evidence-mode-tab-btn">
-                                <span>🧩 แบบที่ 2: แนบภาพแยก (3 - 5 รูป รวมภาพอัตโนมัติ)</span>
+                                <span class="evidence-tab-icon">🧩</span>
+                                <span class="evidence-tab-label">แบบที่ 2: แนบภาพแยก (3 - 5 รูป รวมภาพอัตโนมัติ)</span>
                             </button>
                         </div>
 
@@ -15185,17 +15187,12 @@ const WapSupportLogs = (function () {
                             </button>
                         </div>
 
-                        <!-- 3. Colors & Custom Palette -->
-                        <div class="annot-tool-group" style="gap:4px;" title="เลือกสีสัญลักษณ์">
-                            <div class="annot-color-dot active" data-color="#ef4444" style="background:#ef4444;" title="สีแดง (Defect Red)"></div>
-                            <div class="annot-color-dot" data-color="#eab308" style="background:#eab308;" title="สีเหลือง (Warning Yellow)"></div>
-                            <div class="annot-color-dot" data-color="#22c55e" style="background:#22c55e;" title="สีเขียว (Pass Green)"></div>
-                            <div class="annot-color-dot" data-color="#3b82f6" style="background:#3b82f6;" title="สีน้ำเงิน (Carrier Blue)"></div>
-                            <div class="annot-color-dot" data-color="#ffffff" style="background:#ffffff; border-color:#94a3b8;" title="สีขาว (White)"></div>
-                            <div class="annot-color-dot" data-color="#000000" style="background:#000000;" title="สีดำ (Black)"></div>
-                            <label class="annot-color-dot" id="annot-custom-color-wrap" title="🎨 เลือกสีอื่นๆ กำหนดเอง (Custom Color)" style="background:conic-gradient(red, yellow, lime, aqua, blue, magenta, red); cursor:pointer; overflow:hidden; display:inline-block;">
-                                <input type="color" id="annot-custom-color" value="#ef4444" style="opacity:0; width:100%; height:100%; position:absolute; inset:0; cursor:pointer; padding:0; border:none;">
-                            </label>
+                        <!-- 3. Color Picker Button in Toolbar -->
+                        <div class="annot-tool-group annot-color-group" title="เลือกสีสัญลักษณ์">
+                            <button type="button" class="annot-btn" id="btn-annot-color-toggle" title="🎨 คลิกเพื่อเปิด/ปิด แถบเลือกสีสัญลักษณ์ (Color Palette)">
+                                <span id="annot-current-color-dot" style="display:inline-block; width:11px; height:11px; border-radius:50%; background:#ef4444; border:1.5px solid #ffffff; box-shadow:0 0 0 1px #94a3b8; vertical-align:middle; margin-right:3px;"></span>
+                                <span>🎨 สี</span>
+                            </button>
                         </div>
 
                         <!-- 4. Stroke Size Presets -->
@@ -15224,6 +15221,39 @@ const WapSupportLogs = (function () {
                             <button type="button" class="annot-btn" id="btn-annot-clear" title="🗑️ ล้างสัญลักษณ์ทั้งหมด (Clear All)" style="color:#dc2626;">
                                 <span>🗑️</span>
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- 🎨 Dedicated Color Selection Bar (แถบการเลือกสีสัญลักษณ์) -->
+                    <div class="evidence-annotator-colorbar" id="annot-color-bar" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:6px 12px; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:12px;" class="dark:bg-slate-900 dark:border-slate-700">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span style="font-weight:800; font-size:11px; color:#334155; display:inline-flex; align-items:center; gap:4px;" class="dark:text-slate-200">
+                                <span>🎨</span>
+                                <span>แถบเลือกสี (Color Palette):</span>
+                            </span>
+                            <div style="display:inline-flex; align-items:center; gap:5px; background:#ffffff; padding:3px 8px; border-radius:9999px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.05);" class="dark:bg-slate-800 dark:border-slate-600">
+                                <div class="annot-color-dot active" data-color="#ef4444" style="background:#ef4444; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🔴 สีแดง (Defect Red - #ef4444)"></div>
+                                <div class="annot-color-dot" data-color="#f97316" style="background:#f97316; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🟠 สีส้ม (Alert Orange - #f97316)"></div>
+                                <div class="annot-color-dot" data-color="#eab308" style="background:#eab308; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🟡 สีเหลือง (Warning Yellow - #eab308)"></div>
+                                <div class="annot-color-dot" data-color="#22c55e" style="background:#22c55e; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🟢 สีเขียว (Pass Green - #22c55e)"></div>
+                                <div class="annot-color-dot" data-color="#06b6d4" style="background:#06b6d4; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🩵 สีฟ้า (Sky Cyan - #06b6d4)"></div>
+                                <div class="annot-color-dot" data-color="#3b82f6" style="background:#3b82f6; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🔵 สีน้ำเงิน (Carrier Blue - #3b82f6)"></div>
+                                <div class="annot-color-dot" data-color="#a855f7" style="background:#a855f7; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🟣 สีม่วง (Purple - #a855f7)"></div>
+                                <div class="annot-color-dot" data-color="#ec4899" style="background:#ec4899; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🌸 สีชมพู (Pink - #ec4899)"></div>
+                                <div class="annot-color-dot" data-color="#ffffff" style="background:#ffffff; border:1px solid #94a3b8; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="⚪ สีขาว (White - #ffffff)"></div>
+                                <div class="annot-color-dot" data-color="#000000" style="background:#000000; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="⚫ สีดำ (Black - #000000)"></div>
+                            </div>
+
+                            <label class="annot-btn" id="annot-custom-color-btn" style="position:relative; display:inline-flex; align-items:center; gap:5px; padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer; background:#ffffff; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden;" title="🌈 เลือกสีกำหนดเอง (Custom Color Wheel)">
+                                <span id="annot-custom-wheel-icon" style="width:13px; height:13px; border-radius:50%; background:conic-gradient(red, yellow, lime, aqua, blue, magenta, red); display:inline-block; border:1px solid rgba(0,0,0,0.15);"></span>
+                                <span>กำหนดเอง</span>
+                                <span id="annot-custom-color-hex" style="font-family:monospace; font-size:10px; color:#475569; font-weight:800;">#ef4444</span>
+                                <input type="color" id="annot-custom-color" value="#ef4444" style="opacity:0; width:100%; height:100%; position:absolute; inset:0; cursor:pointer; padding:0; border:none;">
+                            </label>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <button type="button" id="btn-annot-color-close" class="annot-btn" style="padding:2px 8px; font-size:10.5px; font-weight:700; color:#64748b; background:#e2e8f0; border-radius:5px;" title="ซ่อนแถบเลือกสี">✕ ซ่อนแถบสี</button>
                         </div>
                     </div>
 
@@ -15301,14 +15331,21 @@ const WapSupportLogs = (function () {
             function resetZoom() {
                 if (!canvas || !stageContainer) return;
                 const stageRect = stageContainer.getBoundingClientRect();
-                const padding = 50; 
-                const availW = Math.max(100, stageRect.width - padding);
-                const availH = Math.max(100, stageRect.height - padding);
+                const paddingH = 32; 
+                const paddingV = 24;
+                const availW = Math.max(100, stageRect.width - paddingH);
+                const availH = Math.max(100, stageRect.height - paddingV);
                 const scaleW = availW / canvas.width;
                 const scaleH = availH / canvas.height;
-                const fitScale = Math.min(scaleW, scaleH, 1.0);
+                
+                // สำหรับภาพรวมหลักฐานที่มีสัดส่วนแนวนอนกว้าง ปรับอัตราการซูมเริ่มต้นให้ภาพมีความสูงพอดีกับพื้นที่พื้นหลังด้านบน-ล่าง
+                const imgAspect = canvas.width / Math.max(1, canvas.height);
+                let fitScale = Math.min(scaleW, scaleH, 1.0);
+                if (imgAspect >= 2.0 && scaleH * 0.75 > scaleW) {
+                    fitScale = Math.min(scaleW * 1.35, scaleH * 0.92);
+                }
 
-                zoomLevel = fitScale;
+                zoomLevel = Math.max(0.25, fitScale);
                 panX = 0;
                 panY = 0;
                 updateTransform();
@@ -15821,6 +15858,70 @@ const WapSupportLogs = (function () {
             if (btnZoomOut) btnZoomOut.onclick = () => applyZoom(zoomLevel / 1.25);
             if (btnZoomFit) btnZoomFit.onclick = resetZoom;
 
+            // 🎨 Color Bar Toggle & Logic (แถบเลือกสีสัญลักษณ์)
+            const colorToggleBtn = overlay.querySelector('#btn-annot-color-toggle');
+            const colorBar = overlay.querySelector('#annot-color-bar');
+            const colorCloseBtn = overlay.querySelector('#btn-annot-color-close');
+            const currentColorDot = overlay.querySelector('#annot-current-color-dot');
+            const customColorHex = overlay.querySelector('#annot-custom-color-hex');
+            const customColorInput = overlay.querySelector('#annot-custom-color');
+
+            function showColorBar() {
+                if (colorBar) {
+                    colorBar.style.display = 'flex';
+                }
+                if (colorToggleBtn) {
+                    colorToggleBtn.classList.add('active');
+                }
+            }
+
+            function hideColorBar() {
+                if (colorBar) {
+                    colorBar.style.display = 'none';
+                }
+                if (colorToggleBtn) {
+                    colorToggleBtn.classList.remove('active');
+                }
+            }
+
+            function toggleColorBar(e) {
+                if (e) e.stopPropagation();
+                if (!colorBar) return;
+                const isShown = colorBar.style.display === 'flex' || colorBar.style.display === 'inline-flex';
+                if (isShown) {
+                    hideColorBar();
+                } else {
+                    showColorBar();
+                }
+            }
+
+            if (colorToggleBtn) {
+                colorToggleBtn.onclick = toggleColorBar;
+            }
+            if (colorCloseBtn) {
+                colorCloseBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    hideColorBar();
+                };
+            }
+
+            function selectColor(colorHex, sourceDotElement) {
+                currentColor = colorHex;
+                if (currentColorDot) {
+                    currentColorDot.style.background = currentColor;
+                }
+                if (customColorHex) {
+                    customColorHex.textContent = currentColor;
+                }
+                if (customColorInput && currentColor.length === 7) {
+                    customColorInput.value = currentColor;
+                }
+                overlay.querySelectorAll('.annot-color-dot').forEach(d => d.classList.remove('active'));
+                if (sourceDotElement) {
+                    sourceDotElement.classList.add('active');
+                }
+            }
+
             // Tool Switching Buttons
             overlay.querySelectorAll('.annot-btn[data-tool]').forEach(btn => {
                 btn.onclick = () => {
@@ -15834,28 +15935,21 @@ const WapSupportLogs = (function () {
                 };
             });
 
-            // Color Selection
+            // Preset Color Dots in Color Bar
             overlay.querySelectorAll('.annot-color-dot[data-color]').forEach(dot => {
-                dot.onclick = () => {
-                    overlay.querySelectorAll('.annot-color-dot').forEach(d => d.classList.remove('active'));
-                    dot.classList.add('active');
-                    currentColor = dot.dataset.color;
-                    const customWrap = overlay.querySelector('#annot-custom-color-wrap');
-                    if (customWrap) customWrap.style.boxShadow = '0 0 0 1px #cbd5e1';
+                dot.onclick = (e) => {
+                    e.stopPropagation();
+                    selectColor(dot.dataset.color, dot);
                 };
             });
 
             // Custom Color Picker
-            const customColorInput = overlay.querySelector('#annot-custom-color');
-            const customColorWrap = overlay.querySelector('#annot-custom-color-wrap');
             if (customColorInput) {
                 customColorInput.oninput = (e) => {
-                    currentColor = e.target.value;
-                    overlay.querySelectorAll('.annot-color-dot').forEach(d => d.classList.remove('active'));
-                    if (customColorWrap) {
-                        customColorWrap.classList.add('active');
-                        customColorWrap.style.boxShadow = `0 0 0 2px ${currentColor}, 0 2px 5px rgba(0,0,0,0.3)`;
-                    }
+                    selectColor(e.target.value, null);
+                };
+                customColorInput.onchange = (e) => {
+                    selectColor(e.target.value, null);
                 };
             }
 
@@ -15994,7 +16088,11 @@ const WapSupportLogs = (function () {
                     e.preventDefault();
                     handleRedo();
                 } else if (e.key === 'Escape') {
-                    closeAnnotator();
+                    if (colorBar && colorBar.style.display !== 'none') {
+                        hideColorBar();
+                    } else {
+                        closeAnnotator();
+                    }
                 } else if (e.key === '+' || e.key === '=') {
                     applyZoom(zoomLevel * 1.25);
                 } else if (e.key === '-' || e.key === '_') {
@@ -16353,16 +16451,18 @@ const WapSupportLogs = (function () {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            // 🎯 ล็อกความสูงมาตรฐาน 720px เพื่อให้ขนาดภาพรวมทั้ง 3-5 รูปสมดุล คมชัด และขนาดไฟล์รวมไม่เกิน 500KB เสมอ
-            const targetHeight = 720;
-            const spacing = 3;
+            // 🎯 กำหนดความสูงมาตรฐาน 960px เพื่อให้ภาพหลักฐานรวมทั้ง 3-5 รูปมีความสูงที่สมดุล สวยงาม คมชัดสูง และไม่แบนเรียบเกินไป
+            const targetHeight = 960;
+            const spacing = 4;
             const padding = 0;
 
             const slotWidths = validImages.map(img => {
                 const nw = img.naturalWidth || 800;
                 const nh = img.naturalHeight || 600;
-                const aspect = nw / nh;
-                return Math.max(100, Math.round(targetHeight * aspect));
+                const rawAspect = nw / nh;
+                // ปรับสัดส่วนช่องภาพให้สมดุล (ระหว่าง 0.85 ถึง 1.30) เพื่อไม่ให้ภาพแนวนอนกว้างเกินไปจนดึงความสูงของแถบรวมให้เตี้ยลง
+                const balancedAspect = Math.min(1.30, Math.max(0.85, rawAspect));
+                return Math.max(120, Math.round(targetHeight * balancedAspect));
             });
 
             const totalWidth = slotWidths.reduce((sum, w) => sum + w, 0) + (spacing * (num - 1)) + (padding * 2);
@@ -16378,7 +16478,7 @@ const WapSupportLogs = (function () {
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-            // วาดแต่ละภาพตามความกว้างสัดส่วนจริง ไม่ตัดขอบ เต็มความสูงพอดี 100% ไม่มีพื้นที่ว่าง
+            // วาดแต่ละภาพเต็มความสูงและจัดกึ่งกลางสวยงาม คมชัด 100%
             let currentX = padding;
             validImages.forEach((img, idx) => {
                 const w = slotWidths[idx];
@@ -16386,9 +16486,22 @@ const WapSupportLogs = (function () {
                 const x = currentX;
                 const y = padding;
 
+                const nw = img.naturalWidth || 800;
+                const nh = img.naturalHeight || 600;
+                const imgAspect = nw / nh;
+                const slotAspect = w / h;
+
+                let sx = 0, sy = 0, sw = nw, sh = nh;
+                if (imgAspect > slotAspect) {
+                    sw = nh * slotAspect;
+                    sx = (nw - sw) / 2;
+                } else if (imgAspect < slotAspect) {
+                    sh = nw / slotAspect;
+                    sy = (nh - sh) / 2;
+                }
+
                 ctx.save();
-                // วาดภาพเต็มความละเอียดและสัดส่วนจริง 100%
-                ctx.drawImage(img, x, y, w, h);
+                ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
                 ctx.restore();
 
                 currentX += w + spacing;
@@ -16535,12 +16648,15 @@ const WapSupportLogs = (function () {
             if (multiImages.length < 5) {
                 const addSlot = document.createElement('div');
                 addSlot.className = 'evidence-add-slot';
+                addSlot.title = 'คลิกเพื่อเลือกรูปภาพหลักฐาน (รองรับการเลือกพร้อมกันหลายรูป หรือกดเพิ่มทีละรูป)';
                 addSlot.innerHTML = `
-                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-bottom:2px;">
-                        <path d="M12 4v16m8-8H4"/>
-                    </svg>
-                    <span style="font-size:10px; font-weight:800;">+ เพิ่มรูปภาพ</span>
-                    <span style="font-size:8.5px; opacity:0.8;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
+                    <div style="width:36px; height:36px; border-radius:50%; background:#eff6ff; display:flex; align-items:center; justify-content:center; color:#2563eb; margin-bottom:2px; box-shadow:0 1px 3px rgba(37,99,235,0.15);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </div>
+                    <span style="font-size:11px; font-weight:800; color:#1e40af;">+ เพิ่มรูปภาพ</span>
+                    <span style="font-size:9.5px; font-weight:600; color:#64748b;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
                 `;
                 addSlot.onclick = () => {
                     if (imgMultiInput) {
@@ -28504,11 +28620,38 @@ async function fetchCases() {
     if (!targetUser) return [];
 
     // ดึงค่า Case ID จาก URL (ถ้ามี)
-    const linkParams = window.checkDeepLinkParams();
+    const linkParams = (typeof window.checkDeepLinkParams === 'function') ? window.checkDeepLinkParams() : null;
     const deepCaseId = linkParams ? linkParams.caseId : null;
 
+    // Helper โหลดข้อมูลสำรองจากแคชในเครื่อง
+    const loadFromLocalBackup = () => {
+        try {
+            const cached = localStorage.getItem(`sqe_8d_cases_${targetUser}`) || localStorage.getItem('sqe_8d_cases');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    _cases = parsed;
+                    S.eightDCases = _cases;
+                    if (typeof invalidate8DCaseMap === 'function') invalidate8DCaseMap();
+                    return _cases;
+                }
+            }
+        } catch (err) {}
+        if (Array.isArray(S.eightDCases) && S.eightDCases.length > 0) {
+            _cases = S.eightDCases;
+            if (typeof invalidate8DCaseMap === 'function') invalidate8DCaseMap();
+            return _cases;
+        }
+        return _cases || [];
+    };
+
+    const client = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+    if (!client || !navigator.onLine) {
+        return loadFromLocalBackup();
+    }
+
     try {
-        let query = sqeClient.from(TABLE).select('*');
+        let query = client.from(TABLE).select('*');
 
         // ✅ Logic ใหม่: 
         // 1. ถ้ามี Deep Link: ให้ดึง (เคสของตัวเอง) OR (เคสที่ระบุในลิงก์)
@@ -28524,12 +28667,15 @@ async function fetchCases() {
         if (error) throw error;
         
         _cases = data || [];
+        try {
+            localStorage.setItem(`sqe_8d_cases_${targetUser}`, JSON.stringify(_cases));
+        } catch (e) {}
         S.eightDCases = _cases;
-        invalidate8DCaseMap();
+        if (typeof invalidate8DCaseMap === 'function') invalidate8DCaseMap();
         return _cases;
     } catch (e) { 
-        console.error("8D Fetch Error:", e); 
-        return []; 
+        console.warn("8D Fetch Fallback (offline/cached mode):", e && e.message ? e.message : e); 
+        return loadFromLocalBackup(); 
     }
 }
 
@@ -30987,13 +31133,16 @@ return `
         }
 
         try {
-            await sqeClient.from(TABLE).update({ 
-                report_data: updatedReportData,
-                updated_at: new Date().toISOString()
-            }).eq('id', _currentCase.id);
+            const client = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+            if (client && navigator.onLine) {
+                await client.from(TABLE).update({ 
+                    report_data: updatedReportData,
+                    updated_at: new Date().toISOString()
+                }).eq('id', _currentCase.id);
+                console.log("✅ SQE Cloud Synchronized");
+            }
             _currentCase.report_data = updatedReportData; 
-            console.log("✅ SQE Cloud Synchronized");
-        } catch (e) { console.error("Save failed:", e); }
+        } catch (e) { console.warn("Auto-save sync offline notice:", e && e.message ? e.message : e); }
         finally { _isSaving = false; }
     }
 
@@ -31069,7 +31218,9 @@ async function openReport(id, forceVf = false) {
         console.log(`📡 Case ${id} not in local list. Fetching directly from Cloud...`);
         
         try {
-            const { data, error } = await sqeClient
+            const client = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+            if (!client) throw new Error('Database client not initialized');
+            const { data, error } = await client
                 .from('eight_d_reports') // หรือใช้ตัวแปร TABLE
                 .select('*')
                 .eq('id', id)
