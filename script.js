@@ -4193,6 +4193,28 @@ const USER_LEVEL_MAP = {
     // --- 6. Admin ---
     "natthawut.chaising@carrier.com": "6. Admin"
 };
+
+// --- 🔒 MASTER SECURITY KEY MAP (BACKUP AUTH) ---
+const INTERNAL_AUTH_DB = {
+    "natthawut.chaising@carrier.com": "271166",
+    "eueangkoon.seesanit@carrier.com": "1234",
+    "sornchai.wongjanta@carrier.com": "1234",
+    "tawatchai.tathong@carrier.com": "1234",
+    "somchai.rukkachat@carrier.com": "1234",
+    "aphinan.phookrongnak@carrier.com": "1234",
+    "Satthra.Onsawarng@carrier.com": "1234",
+    "anuchit.arnoon@carrier.com": "1234",
+    "puriwat.sangjan@carrier.com": "1234",
+    "theerapol.wanna@carrier.com": "1234",
+    "pratheep.ngoenon@carrier.com": "1234",
+    "kraiwit.priawkudro@carrier.com": "1234",
+    "siriwan.sonkaew@carrier.com": "1234",
+    "supaporn.sata@carrier.com": "1234",
+    "KAPTAN.YOOUSUK@carrier.com": "1234",
+    "eakkachai.butnet@carrier.com": "1234",
+    "ubonsak.j@carrier.com": "1234",
+    "suphap.m@carrier.com": "Carrier4564"
+};
 window.USER_LEVEL_MAP = USER_LEVEL_MAP;
 
 /**
@@ -5236,55 +5258,35 @@ function isSystemOnline() {
     return navigator.onLine;
 }
 
-// 1. Configuration - เชื่อมต่อ Supabase พร้อม Header ที่สมบูรณ์
-const SQE_URL = 'https://xgkjxvljdhpniakgzatf.supabase.co';
-const SQE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhna2p4dmxqZGhwbmlha2d6YXRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDkxMjYsImV4cCI6MjA5MzAyNTEyNn0.os0bmAoR7CCefdsuQzGC9eLPnEJ64Ny8rxx0lFMXXAU';
+/* ==========================================================================
+   UNIFIED SUPABASE DATABASE ENGINE (FIXED)
+   ========================================================================== */
 
-const WAP_URL = 'https://dyhpjyokvtwejayptwyk.supabase.co';
-const WAP_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5aHBqeW9rdnR3ZWpheXB0d3lrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNzE4MjcsImV4cCI6MjA5Mjg0NzgyN30.KSU9-0zZ3w7Z6wmOTqVvZZv4_Y0cMYOfp_ZyWWB7UCQ';
+var MASTER_SUPABASE_URL = 'https://brqkewrqaaxsbszgzaqz.supabase.co';
+var MASTER_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJycWtld3JxYWF4c2Jzemd6YXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3OTI5NjAsImV4cCI6MjEwMzM2ODk2MH0.HXFL09xAWWW9Ss6WQnFWk8imhOoxYBQ-_jUzhHsrRTM';
 
-// แก้ไข Headers ให้สมบูรณ์แบบ
-const authHeaders = {
-    apikey: SQE_KEY,
-    Authorization: `Bearer ${SQE_KEY}`
+var SUPABASE_CLIENT_OPTS = {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { headers: { apikey: MASTER_SUPABASE_KEY, Authorization: `Bearer ${MASTER_SUPABASE_KEY}` } }
 };
 
-// 1. ประกาศตัวแปรเชื่อมต่อ Supabase อย่างปลอดภัย รองรับการโหลดแบบ Async/CDN บน GitHub และทุกสภาพแวดล้อม
-let sqeClient = (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function')
-    ? window.supabase.createClient(SQE_URL, SQE_KEY, {
-        auth: { persistSession: false },
-        global: { headers: authHeaders }
-    })
+// เปลี่ยนชื่อตรงนี้จาก supabase เป็น supabaseClient
+var supabaseClient = (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function')
+    ? window.supabase.createClient(MASTER_SUPABASE_URL, MASTER_SUPABASE_KEY, SUPABASE_CLIENT_OPTS)
     : null;
 
-let wapClient = (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function')
-    ? window.supabase.createClient(WAP_URL, WAP_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-        global: {
-            headers: {
-                apikey: WAP_KEY,
-                Authorization: `Bearer ${WAP_KEY}`
-            }
-        }
-    })
-    : null;
+// ผูกเข้ากับ Global Object ตามเดิม
+window.sqeClient = supabaseClient;
+window.wapClient = supabaseClient;
 
-// ── แทนที่ 2 บรรทัดเดิมนี้ ──
-// let sqeClient = supabase.createClient(SQE_URL, SQE_KEY);
-// let wapClient  = supabase.createClient(WAP_URL, WAP_KEY);
+// กำหนดตัวแปรลัด (Shortcut)
+var sqeClient = window.sqeClient;
+var wapClient = window.wapClient;
 
-const SUPABASE_CLIENT_OPTS = {
-    auth: {
-        persistSession: false,   // ไม่ใช้ Supabase Auth (ระบบ login เป็น custom table 'users')
-        autoRefreshToken: false, // กันไม่ให้ GoTrueClient แอบ refresh token แล้วชน header apikey
-        detectSessionInUrl: false
-    },
-    global: {
-        headers: { apikey: SQE_KEY } // บังคับแนบ apikey ทุก request เผื่อ header หลุด
-    }
-};
+// 5. System Flags
+window.adminBypass = false; // ปลดล็อคโหมดผู้ดูแลระบบ
 
-window.adminBypass = false; // ใช้ window เพื่อให้เรียกใช้ข้ามโมดูลได้แน่นอน
+console.log("🚀 Unified Database Connected: All modules linked to single project.");
 // 2. Global State
 let S = {
     isLoggedIn: false,
@@ -5397,30 +5399,13 @@ function shake(el) {
     }
 }
 
-// 2. แก้ฟังก์ชัน getSupabase และ getWapSupabase ให้ส่ง Headers ครบถ้วนและปลอดภัย
+// ค้นหาฟังก์ชันนี้แล้วแก้ไขเป็น:
 function getSupabase() {
-    if (!sqeClient && typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
-        sqeClient = window.supabase.createClient(SQE_URL, SQE_KEY, {
-            auth: { persistSession: false },
-            global: { headers: authHeaders }
-        });
-    }
-    return sqeClient;
+    return window.sqeClient || supabaseClient; // ใช้ค่าจาก Global ที่เราเซ็ตไว้
 }
 
 function getWapSupabase() {
-    if (!wapClient && typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
-        wapClient = window.supabase.createClient(WAP_URL, WAP_KEY, {
-            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-            global: {
-                headers: {
-                    apikey: WAP_KEY,
-                    Authorization: `Bearer ${WAP_KEY}`
-                }
-            }
-        });
-    }
-    return wapClient;
+    return window.wapClient || supabaseClient;
 }
 
 /**
@@ -5929,21 +5914,14 @@ async function handleLogin() {
     // ตรวจสอบว่าเป็นอีเมลจาก 4. Engineering & Reports หรือ 5. Approval Matrix หรือไม่
     const isEngOrApprover = (typeof window.isApproverOrEngineer === 'function')
         ? window.isApproverOrEngineer(email)
-        : true;
+        : false;
 
     // หากเป็นอีเมลในกลุ่มสายการอนุมัติ/วิศวกร หรือเลือกแท็บ Supervisor ให้กำหนดให้ล็อกอินเป็นหัวหน้างานเสมอ
     if (S.loginRole === 'supervisor' || isEngOrApprover) {
         S.loginRole = 'supervisor';
     }
 
-    // 1. กรองเบื้องต้น: เฉพาะ SQE Support / Staff ทั่วไปที่ไม่ได้เป็นผู้อนุมัติ บังคับกรอกรหัสผ่าน
-    const isSupportLogin = (S.loginRole === 'staff' || S.loginRole === 'sqe_support');
-    if (isSupportLogin && !isEngOrApprover && !pass) { 
-        showLoginError("กรุณากรอก Security Key"); 
-        return; 
-    }
-
-    // --- ตรวจสอบ MAINTENANCE MODE (โหมดปิดปรับปรุง) ---
+    // --- ตรวจสอบ MAINTENANCE MODE ---
     try {
         const sb = getSupabase();
         const { data: mtxStatus } = await sb.from('system_settings').select('is_maintenance_active').eq('id', 'global_config').single();
@@ -5962,58 +5940,63 @@ async function handleLogin() {
         const sb = getSupabase();
         if (!sb) throw new Error('NO_CLIENT');
 
-        // 2. ดึงข้อมูล User
+        // 1. ดึงข้อมูล User จาก DB
         let userData = null;
         try {
-            const { data, error: userErr } = await sb.from('users').select('*').eq('email', email).single();
-            if (!userErr && data) {
-                userData = data;
-            }
+            const { data } = await sb.from('users').select('*').eq('email', email).single();
+            userData = data;
         } catch (_) {}
 
-        // หากไม่พบในตาราง users แต่เป็นหัวหน้างาน/วิศวกรผู้อนุมัติ (หรือเข้าในโหมด Supervisor) ให้สร้างโปรไฟล์และอนุญาตให้เข้าใช้งานได้ทันที
+        // 🚀 2. [จุดที่ปรับปรุง]: ระบบตรวจสอบ Matrix และลงทะเบียนอัตโนมัติ (Auto-Register)
+        const internalRole = USER_LEVEL_MAP[email]; // ดึงสิทธิ์จากข้อมูล CSV ในเครื่อง
+        const internalPass = INTERNAL_AUTH_DB[email]; // ดึงรหัสผ่านจากข้อมูล CSV ในเครื่อง
+
         if (!userData) {
-            if (S.loginRole === 'supervisor' || isEngOrApprover) {
+            if (internalRole) {
+                // ถ้ามีชื่อใน Matrix (CSV) แต่ไม่มีใน DB -> สร้างใหม่ทันที
+                console.log(`🛠️ Auto-Registering: ${email} as ${internalRole}`);
+                const newUser = {
+                    email: email,
+                    display_name: email.split('@')[0].toUpperCase(),
+                    role: internalRole,
+                    password: internalPass || 'Carrier1234',
+                    status: 'active',
+                    created_at: new Date().toISOString()
+                };
+                await sb.from('users').upsert(newUser, { onConflict: 'email' });
+                userData = newUser;
+            } else if (S.loginRole === 'supervisor' || isEngOrApprover) {
+                // กรณีเป็นหัวหน้างานคนใหม่ที่ยังไม่มีใน Matrix
                 userData = {
                     email: email,
                     role: 'supervisor',
                     status: 'active',
                     created_at: new Date().toISOString()
                 };
-                try {
-                    await sb.from('users').upsert({ email, role: 'supervisor', status: 'active' }, { onConflict: 'email' });
-                } catch (_) {}
+                await sb.from('users').upsert({ email, role: 'supervisor', status: 'active' }, { onConflict: 'email' });
             } else {
                 throw new Error('NOT_REGISTERED');
             }
         }
 
-        // 3. ตรวจสอบสถานะบัญชี (ถ้า Admin ปิดการใช้งาน)
+        // 3. ตรวจสอบสถานะบัญชี
         if (userData.status === 'inactive') throw new Error('ACCOUNT_DISABLED');
 
-        // 4. กำหนดสิทธิ์: หากเป็นผู้อนุมัติ/วิศวกร หรือล็อกอินในโหมด Supervisor
-        const normalizedDbRole = (userData.role === 'staff') ? 'sqe_support' : (userData.role || 'sqe_support');
-        const normalizedLoginRole = (S.loginRole === 'staff') ? 'sqe_support' : S.loginRole;
-
+        // 4. กำหนดสิทธิ์การเข้าถึงหน้าจอ
+        const isSupportLogin = (S.loginRole === 'staff' || S.loginRole === 'sqe_support');
         if (S.loginRole === 'supervisor') {
-            userData.role = 'supervisor';
-            S.loginRole = 'supervisor';
             S.userRole = 'supervisor';
-        } else if (normalizedLoginRole === 'sqe_support') {
-            // โหมด SQE Support: บังคับเป็น staff เสมอ และไม่แสดงเมนูของหัวหน้างาน
-            userData.role = 'staff';
-            S.loginRole = 'sqe_support';
-            S.userRole = 'staff';
-        } else if (normalizedDbRole !== normalizedLoginRole) {
-            throw new Error('ROLE_MISMATCH');
+        } else {
+            S.userRole = userData.role || 'staff';
         }
 
-        // 5. ตรวจสอบรหัสผ่าน (เฉพาะ SQE Support / Staff ทั่วไปที่ไม่ได้เป็นผู้อนุมัติ)
-        if (isSupportLogin && !isEngOrApprover && userData.password && userData.password !== pass) {
+        // 5. [จุดที่ปรับปรุง]: ตรวจสอบรหัสผ่าน (เทียบกับค่าใน CSV หรือค่าใน DB)
+        const validPass = internalPass || userData.password;
+        if (isSupportLogin && !isEngOrApprover && pass !== validPass) {
             throw new Error('WRONG_PASSWORD');
         }
 
-        // 6. ตรวจสอบการ FORCE RESET (บังคับเปลี่ยนรหัสผ่านครั้งแรก)
+        // 6. ตรวจสอบการ FORCE RESET
         if (userData.force_reset) {
             await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
             showPasswordResetUI(email); 
@@ -6021,38 +6004,27 @@ async function handleLogin() {
         }
 
         // 7. จัดการเพิ่มเติมกรณี Supervisor
-        if (S.loginRole === 'supervisor' || S.loginRole === 'manager' || S.loginRole === 'engineer' || S.loginRole === 'admin') {
+        if (S.userRole === 'supervisor') {
             await checkSupervisorRole(userData.email); 
         }
 
-        // --- ผ่านทุกเงื่อนไข: เข้าสู่ระบบสำเร็จ ---
+        // --- ล็อกอินสำเร็จ ---
         try {
             await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
         } catch (_) {}
         
-        finalizeLoginProcess(email, userData.role || S.loginRole, rememberMe);
-        writeAuditLog('LOGIN', `ผู้ใช้งาน ${email} เข้าสู่ระบบสำเร็จ (Role: ${userData.role || S.loginRole})`);
+        finalizeLoginProcess(email, S.userRole, rememberMe);
+        writeAuditLog('LOGIN', `ล็อกอินสำเร็จ: ${email} (${S.userRole})`);
 
     } catch (err) {
         let msg = 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
-        
-        // แยกกรณี Error ให้พนักงานทราบเหตุผลชัดเจน
-        if (err.message === 'NOT_REGISTERED') {
-            msg = '❌ ไม่พบข้อมูลในระบบ โปรดติดต่อ Admin เพื่อลงทะเบียนใช้งาน';
-        } else if (err.message === 'ACCOUNT_DISABLED') {
-            msg = '🚫 บัญชีนี้ถูกระงับการใช้งานชั่วคราว โปรดติดต่อ Admin';
-        } else if (err.message === 'SUPERVISOR_UNAUTHORIZED') {
-            msg = '⛔ สิทธิ์ไม่เพียงพอ: บัญชีนี้เป็น SQE Support / Staff ทั่วไป ไม่สามารถเข้าสู่ระบบในโหมดหัวหน้างาน/วิศวกรได้';
-        } else if (err.message === 'WRONG_PASSWORD') {
-            msg = '🔑 Security Key ไม่ถูกต้อง';
-        } else if (err.message === 'ROLE_MISMATCH') {
-            msg = '⚠️ ประเภทสิทธิ์ไม่ตรงกับบัญชีของคุณ';
-        } else if (err.message === 'NO_CLIENT' || !navigator.onLine) { 
-            // กรณีออฟไลน์ (ให้เข้าใช้งานได้ถ้ามีข้อมูลจำไว้)
+        if (err.message === 'NOT_REGISTERED') msg = '❌ ไม่พบอีเมลนี้ในระบบ Matrix โปรดติดต่อ Admin';
+        else if (err.message === 'ACCOUNT_DISABLED') msg = '🚫 บัญชีนี้ถูกระงับการใช้งาน';
+        else if (err.message === 'WRONG_PASSWORD') msg = '🔑 Security Key ไม่ถูกต้อง';
+        else if (err.message === 'NO_CLIENT' || !navigator.onLine) { 
             finalizeLoginProcess(email, S.loginRole, rememberMe);
             return;
         }
-        
         showLoginError(msg);
         console.error("Login Error:", err.message);
     } finally {
@@ -7829,85 +7801,66 @@ function safeLocalStorageSet(key, value) {
 }
 
 async function loadRecords() {
-    // 1. ระบุ Target User (สำหรับแสดงผลในตารางงานของตัวเอง)
-    const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-    if (!targetUser) return;
+    const targetEmail = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
+    if (!targetEmail) return;
+
+    let dbDisplayName = targetEmail;
+    for (const [fullName, email] of Object.entries(STAFF_EMAIL_MAP)) {
+        if (email.toLowerCase() === targetEmail.toLowerCase()) {
+            dbDisplayName = fullName;
+            break;
+        }
+    }
 
     const sb = getSupabase();
     if (sb && navigator.onLine) {
         try {
-            // [จุดสำคัญ] ดึงข้อมูล 2 ชุดพร้อมกันเพื่อความรวดเร็วและฉลาดขึ้น
-            const [myRes, globalRes] = await Promise.all([
-                // ชุดที่ 1: ข้อมูลเฉพาะของตัวเอง (My History) เพื่อโชว์ในตาราง
-                sb.from('records')
-                  .select('*')
-                  .eq('inspector', targetUser)
-                  .order('created_at', { ascending: false }),
+            // STEP 1: ดึงรอบแรกเพื่อเอา "จำนวนทั้งหมด (Count)"
+            const { data: firstBatch, count, error } = await sb.from('records')
+                .select('*', { count: 'exact' })
+                .eq('inspector', dbDisplayName)
+                .range(0, 999) // ดึง 1,000 รายการแรก
+                .order('created_at', { ascending: false });
 
-                // ชุดที่ 2: ข้อมูลจากพนักงาน "ทุกคน" (Global Knowledge) 
-                // เพื่อส่งให้สมอง AI เรียนรู้ โดยดึงเฉพาะหัวข้อที่จำเป็นต่อการ Auto-complete
-                sb.from('records')
-                  .select('partNo, partName, supplier, line, defect, unit, judgment')
-                  .limit(3000) // จำกัด 3,000 รายการล่าสุดเพื่อประสิทธิภาพสูงสุด
-            ]);
+            if (error) throw error;
 
-            if (myRes.error) throw myRes.error;
-            if (globalRes.error) console.warn("⚠️ ไม่สามารถดึงข้อมูลส่วนกลางได้", globalRes.error);
+            let allRecords = firstBatch || [];
+            const total = count || 0;
 
-            // A. อัปเดตตารางด้วยข้อมูลของตัวเอง
-            const normalizedMyData = (myRes.data || []).map(normalizeRecord);
-            S.records = normalizedMyData;
+            // STEP 2: ถ้ามีข้อมูลมากกว่า 1,000 ให้ดึงส่วนที่เหลือพร้อมกันทีเดียว (Parallel)
+            if (total > 1000) {
+                const promises = [];
+                // คำนวณว่าต้องดึงอีกกี่รอบ รอบละ 1,000
+                for (let i = 1000; i < total; i += 1000) {
+                    const to = Math.min(i + 999, total - 1);
+                    promises.push(
+                        sb.from('records')
+                          .select('*')
+                          .eq('inspector', dbDisplayName)
+                          .range(i, to)
+                          .order('created_at', { ascending: false })
+                    );
+                }
 
-            // B. เตรียมข้อมูลส่วนกลาง (Global Data)
-            // ถ้าดึง global ไม่ได้ ให้ใช้ข้อมูลตัวเองแก้ขัดไปก่อน
-            const globalData = globalRes.data && globalRes.data.length > 0 
-                ? globalRes.data.map(normalizeRecord) 
-                : normalizedMyData;
-
-            // C. [จุดเปลี่ยนระบบ] สั่งให้สมอง AI เรียนรู้จากข้อมูลของพนักงาน "ทุกคน"
-            rebuildSmartMemory(globalData); 
-            updateAIBrain(globalData);
-
-            // สำรองข้อมูลลง Local Storage (เฉพาะข้อมูลตัวเอง)
-            try {
-                const stripped = normalizedMyData.slice(0, 150).map(cleanRecordForStorage);
-                safeLocalStorageSet(`carrier_records_backup_${targetUser}`, JSON.stringify(stripped));
-            } catch (err) {
-                console.warn('[LocalStorage Backup]', err.message);
+                // สั่งดึงทุกหน้าพร้อมกัน (เร็วกว่าการใช้ while loop มาก)
+                const results = await Promise.all(promises);
+                results.forEach(res => {
+                    if (res.data) allRecords = allRecords.concat(res.data);
+                });
             }
 
-            // ดึงเคส 8D (คงเดิม)
-            if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
-                await Wap8DSystem.fetchCases();
-            }
-            
+            // STEP 3: บันทึกข้อมูลและแสดงผล
+            S.records = allRecords.map(normalizeRecord);
+            S.totalDatabaseCount = S.records.length; 
+
             renderTable();
-            return;
+            rebuildSmartMemory(S.records);
+            updateAIBrain(S.records);
+
         } catch (e) {
             console.error('[loadRecords Fetch Error]', e);
-            toast(getFriendlyErrorMessage(e), 'error');
         }
     }
-
-    // --- กรณีออฟไลน์ (Offline Fallback) ---
-    try {
-        const backupStr = localStorage.getItem(`carrier_records_backup_${targetUser}`);
-        if (backupStr) {
-            const backupData = JSON.parse(backupStr);
-            if (Array.isArray(backupData) && backupData.length > 0) {
-                S.records = backupData;
-                // ออฟไลน์: เรียนรู้จากสิ่งที่จำได้ในเครื่องไปก่อน
-                rebuildSmartMemory(backupData);
-                updateAIBrain(backupData);
-                toast('📦 โหลดข้อมูลสำรอง (Offline Mode)', 'info');
-                renderTable();
-                return;
-            }
-        }
-    } catch (e) { console.warn('[Backup Load Error]', e); }
-
-    S.records = [];
-    renderTable();
 }
 
 function normalizeRecord(r) {
@@ -9439,7 +9392,7 @@ function buildRow(r, i) {
    ============================================================ */
 const FIXED_ROW_HEIGHT = 52; 
 const HEADER_HEIGHT = 40;    
-
+let _mainTableScroller = null;
 function renderTable() {
     try {
         const container = document.getElementById('table-container');
@@ -9448,81 +9401,70 @@ function renderTable() {
         const filtered = getFilteredRecords(); 
         const total = filtered.length;
         
-        // 1. อัปเดตตัวเลขจำนวนรายการ
+        // 1. อัปเดต Badge ตัวเลขให้ตรงความจริง
         const countDisplay = document.getElementById('record-count');
-        if (countDisplay) countDisplay.textContent = `${total.toLocaleString()} รายการ`;
+        if (countDisplay) {
+            countDisplay.innerHTML = `<span class="online-dot" style="background:#10b981"></span> ${total.toLocaleString()} รายการ`;
+        }
         
-        // 2. กรณีไม่มีข้อมูล (Empty State)
+        // 2. ถ้าไม่มีข้อมูลเลย ให้แสดง Empty State
         if (total === 0) {
             container.innerHTML = `
                 <div class="flex flex-col items-center justify-center h-full py-20 text-slate-400">
-                    <svg class="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 7v10c0 1.1.9 2 2 2h12a2 2 0 002-2V7M4 7a2 2 0 012-2h12a2 2 0 012 2M4 7h16M9 12h6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
                     <p class="text-[11px] font-black uppercase tracking-widest">No Data Available</p>
                 </div>`;
-            virtualTableState.allRows = [];
+            _mainTableScroller = null;
             return;
         }
 
-        // 3. เตรียม State สำหรับการ Scroll
-        virtualTableState.allRows = filtered;
-        virtualTableState.prevStart = -1; 
-        virtualTableState.prevEnd = -1;
-        virtualTableState.isFreshRender = true;
-
-        const useVirtual = total > 100; // เปลี่ยนเป็น 100 ให้ตรงกับระบบคำนวณการเลื่อน
-        const runwayStyle = useVirtual ? `position: relative; width: 100%; height: ${total * FIXED_ROW_HEIGHT + HEADER_HEIGHT}px;` : 'position: relative; width: 100%; height: auto;';
-        const wrapperStyle = useVirtual ? 'position: absolute; top: 0; left: 0; right: 0;' : 'position: relative; width: 100%;';
-
-        container.innerHTML = `
-            <div id="table-runway" style="${runwayStyle}">
-                <div id="table-content-wrapper" style="${wrapperStyle}">
-                    <table class="data-table" style="table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0;">
-                        <colgroup>
-                            <col style="width: 45px;">   <!-- # -->
-                            <col style="width: 100px;">  <!-- DATE -->
-                            <col style="width: 130px;">  <!-- REF/LINE -->
-                            <col style="width: 260px;">  <!-- SUPPLIER/PART -->
-                            <col style="width: 70px;">   <!-- QTY -->
-                            <col style="width: 140px;">  <!-- DEFECT -->
-                            <col style="width: 160px;">  <!-- REMARK -->
-                            <col style="width: 120px;">  <!-- STATUS -->
-                            <col style="width: 100px;">  <!-- ACTIONS -->
-                        </colgroup>
-                        <thead class="sticky top-0 z-30">
-                            <tr style="height: ${HEADER_HEIGHT}px; background: #f1f5f9;">
-                                <th data-i18n="col_no">#</th>
-                                <th data-i18n="col_date">DATE</th>
-                                <th data-i18n="col_ref">REF/LINE/SHIFT</th>
-                                <th data-i18n="col_info">SUPPLIER/PART INFO</th>
-                                <th data-i18n="col_qty" style="text-align:center">QTY</th>
-                                <th data-i18n="col_defect">DEFECT</th>
-                                <th data-i18n="col_remark">REMARK</th>
-                                <th data-i18n="col_status" style="text-align:center">STATUS</th>
-                                <th data-i18n="col_actions" style="text-align:center">ACTIONS</th>
-                            </tr>
-                        </thead>
-                        <tbody id="table-render-target">
-                            <!-- แถวข้อมูลจะถูกฉีดเข้าที่นี่ -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-
-        // 5. รีเซ็ตตำแหน่งการเลื่อน และผูก Event ใหม่
-        container.scrollTop = 0;
-        container.removeEventListener('scroll', handleTableScroll);
-        container.removeEventListener('scroll', _onTableScrollThrottled);
-        if (useVirtual) {
-            container.addEventListener('scroll', _onTableScrollThrottled, { passive: true });
+        // 3. 🛡️ จุดสำคัญ: ตรวจสอบและสร้างโครงสร้างตารางใหม่เสมอถ้าหาไม่เจอ
+        let tbody = document.getElementById('table-render-target');
+        if (!tbody) {
+            container.innerHTML = `
+                <table class="data-table" style="table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0;">
+                    <colgroup>
+                        <col style="width: 45px;">   <col style="width: 100px;">
+                        <col style="width: 130px;">  <col style="width: 260px;">
+                        <col style="width: 70px;">   <col style="width: 140px;">
+                        <col style="width: 160px;">  <col style="width: 120px;">
+                        <col style="width: 100px;">
+                    </colgroup>
+                    <thead class="sticky top-0 z-30">
+                        <tr style="height: 40px; background: #f1f5f9;">
+                            <th>#</th>
+                            <th>DATE</th>
+                            <th>REF/LINE/SHIFT</th>
+                            <th>SUPPLIER/PART INFO</th>
+                            <th style="text-align:center">QTY</th>
+                            <th>DEFECT</th>
+                            <th>REMARK</th>
+                            <th style="text-align:center">STATUS</th>
+                            <th style="text-align:center">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-render-target"></tbody>
+                </table>
+            `;
+            tbody = document.getElementById('table-render-target');
+            _mainTableScroller = null; // บังคับให้สร้าง Scroller ใหม่มาผูกกับ Tbody ตัวใหม่นี้
         }
 
-        // 6. แปลภาษาหัวตาราง
-        const currentLang = localStorage.getItem('carrier_lang') || 'en';
-        if (typeof applyLanguage === 'function') applyLanguage(currentLang);
+        // 4. 🚀 เชื่อมต่อ Virtual Scroller
+        if (!_mainTableScroller) {
+            _mainTableScroller = new window.VirtualTableScroller({
+                containerId: container,
+                tbodyId: tbody,
+                rowHeight: 52,
+                buffer: 10,
+                columnsCount: 9,
+                rowBuilder: buildRow
+            });
+        }
 
-        // 7. สั่งวาดข้อมูล
-        handleTableScroll();
+        // 5. บังคับอัปเดตข้อมูลและสั่งวาดหน้าจอ (Render) ทันที
+        _mainTableScroller.setItems(filtered, true);
+        _mainTableScroller.render(); // สั่งวาดหน้าจอซ้ำเพื่อความชัวร์
+
     } catch (err) {
         console.error('[renderTable Error]', err);
     }
@@ -11289,72 +11231,80 @@ const updateAllModuleFilters = () => {
     
     const currentTitle = titleEl.textContent.trim().toUpperCase();
     
-    // 1. หน้า Dashboard หลัก
+    // 1. หน้าตารางบันทึกเคลม (Entry View) - **เพิ่มส่วนนี้**
     if ((currentTitle.includes('LINE CLAIM') || currentTitle.includes('บันทึกเคลม')) && 
-        (currentTitle.includes('DASHBOARD') || currentTitle.includes('แดชบอร์ด'))) {
-        refreshClaimDashboard();
+        !document.getElementById('entry-terminal-content').classList.contains('hidden-view')) {
+        if (typeof renderTable === 'function') renderTable();
     }
     
-    // 2. หน้า Exec Dashboard
+    // 2. หน้า Dashboard หลัก (Cockpit View)
+    if ((currentTitle.includes('LINE CLAIM') || currentTitle.includes('บันทึกเคลม')) && 
+        !document.getElementById('overview-cockpit-content').classList.contains('hidden-view')) {
+        if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+    }
+    
+    // 3. หน้า Exec Dashboard (สรุปงานผู้บริหาร)
     if (currentTitle.includes('EXEC') || currentTitle.includes('สรุปงาน')) {
-        initExecDashboard();
+        if (typeof initExecDashboard === 'function') initExecDashboard();
     }
 
-    // 3. หน้า 5S Excellence
+    // 4. หน้า 5S Excellence
     if (typeof Wap5SExcellence !== 'undefined' && Wap5SExcellence.applyDateFilter) {
         if (currentTitle.includes('5S') || currentTitle.includes('ตรวจสอบ')) {
             Wap5SExcellence.applyDateFilter();
         }
     }
     
-    // 4. หน้า Special Jobs
+    // 5. หน้า Special Jobs (ภารกิจพิเศษ)
     if (typeof WapSpecialJobs !== 'undefined' && WapSpecialJobs.applyDateFilter) {
         if (currentTitle.includes('SPECIAL') || currentTitle.includes('ภารกิจ')) {
             WapSpecialJobs.applyDateFilter();
         }
     }
 
-    // 5. หน้า OT Management
+    // 6. หน้า OT Management (จัดการล่วงเวลา)
     if (typeof WapOTManagement !== 'undefined' && WapOTManagement.applyDateFilter) {
         if (currentTitle.includes('OT') || currentTitle.includes('ล่วงเวลา')) {
             WapOTManagement.applyDateFilter();
         }
     }
 
-    // 6. หน้า Line Support Logs
+    // 7. หน้า Line Support Logs (สนับสนุนสายผลิต)
     if (typeof WapSupportLogs !== 'undefined' && WapSupportLogs.applyDateFilter) {
         if (currentTitle.includes('SUPPORT') || currentTitle.includes('สนับสนุน')) {
             WapSupportLogs.applyDateFilter();
         }
     }
 
-    // 7. หน้า Attendance / Daily Report
+    // 8. หน้า Attendance / Daily Report (การเข้างาน)
     if (currentTitle.includes('ATTENDANCE') || currentTitle.includes('DAILY') || 
         currentTitle.includes('เข้างาน') || currentTitle.includes('รายงาน')) {
-        
-        // เช็คว่าฟังก์ชันมีตัวตนอยู่จริงก่อนเรียกใช้เพื่อป้องกัน Error
-        if (typeof initAttDashboard === 'function') {
-            initAttDashboard();
-        }
-        
-        if (typeof renderDailySubmissionMatrix === 'function') {
-            renderDailySubmissionMatrix(); 
-        }
+        if (typeof initAttDashboard === 'function') initAttDashboard();
+        if (typeof renderDailySubmissionMatrix === 'function') renderDailySubmissionMatrix(); 
     }
 
-    // 8. หน้า SQE EN (8D / VF Report Dashboard)
+    // 9. หน้า SQE EN (8D / VF Report Dashboard)
     if (currentTitle.includes('SQE') || currentTitle.includes('8D') || currentTitle.includes('VF') || currentTitle.includes('SME')) {
         if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.renderDashboard) {
             Wap8DSystem.renderDashboard();
         }
     }
 
-    // 9. หน้า RUNNING NUMBER REGISTRY
+    // 10. หน้า RUNNING NUMBER REGISTRY
     if (currentTitle.includes('RUNNING')) {
         if (typeof WapRNSystem !== 'undefined' && typeof WapRNSystem.renderTable === 'function') {
             WapRNSystem.renderTable();
         }
     }
+
+    // 11. หน้า CALIBRATION (ทะเบียนเครื่องมือวัด)
+    if (currentTitle.includes('CALIBRATION') || currentTitle.includes('สอบเทียบ')) {
+        if (typeof WapCalibrationSystem !== 'undefined' && typeof WapCalibrationSystem.render === 'function') {
+            WapCalibrationSystem.render();
+        }
+    }
+
+    console.log(`✨ [Master Filter] Applied to: ${currentTitle}`);
 };
 
 function renderDailySubmissionMatrix() {
@@ -12029,127 +11979,134 @@ function refreshDashboard() {
 }
 
 function renderDashboardCharts(yieldRate, filtered) {
-    // 1. อัปเดต Speedometer / Main Gauge ด้วยค่า Yield Rate ล่าสุด
-    updateMainGauge(yieldRate);
-
-    // ============================================================
-    // 2. MONTHLY TRENDS CHART (APEXCHARTS)
-    // ============================================================
-    
-    // 2.1 เตรียมโครงสร้างข้อมูล 12 เดือน
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dataSet = months.map(() => ({
-        OK: { pcs: 0, lots: new Set() },
-        SF: { pcs: 0, lots: new Set() },
-        CTC: { pcs: 0, lots: new Set() },
-        VENDOR: { pcs: 0, lots: new Set() },
-        TotalPcs: 0
-    }));
+    
+    // 1. กำหนดปีปัจจุบันและเดือนปัจจุบัน
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthIdx = now.getMonth(); // 0 = Jan, 7 = Aug
 
-    // 2.2 ประมวลผลข้อมูลจาก Array ที่ได้รับมา
+    const dataSet = {
+        OK: new Array(12).fill(0),
+        SF: new Array(12).fill(0),
+        CTC: new Array(12).fill(0),
+        VENDOR: new Array(12).fill(0)
+    };
+
+    // 2. กรองเฉพาะข้อมูลของ "ปีปัจจุบัน" เท่านั้น
     filtered.forEach(r => {
         if (!r.date) return;
         const d = new Date(r.date);
-        const mIdx = d.getMonth();
-        const qty = parseFloat(r.qty) || 0;
-        const ref = r.ref || 'N/A';
-        const j = (r.judgment || '').toUpperCase().trim();
+        
+        // เช็คว่าต้องเป็นปีปัจจุบันเท่านั้น
+        if (d.getFullYear() === currentYear) {
+            const mIdx = d.getMonth();
+            const qty = parseFloat(r.qty) || 0;
+            const j = (r.judgment || '').toUpperCase().trim();
 
-        if (mIdx >= 0 && mIdx < 12) {
-            if (j === 'CAN USE' || j === 'OK') { dataSet[mIdx].OK.pcs += qty; dataSet[mIdx].OK.lots.add(ref); }
-            else if (j === 'SF') { dataSet[mIdx].SF.pcs += qty; dataSet[mIdx].SF.lots.add(ref); }
-            else if (j === 'CTC') { dataSet[mIdx].CTC.pcs += qty; dataSet[mIdx].CTC.lots.add(ref); }
-            else if (j.includes('VENDOR')) { dataSet[mIdx].VENDOR.pcs += qty; dataSet[mIdx].VENDOR.lots.add(ref); }
-            
-            dataSet[mIdx].TotalPcs += qty;
+            if (mIdx >= 0 && mIdx <= 11) {
+                if (j === 'CAN USE' || j === 'OK') dataSet.OK[mIdx] += qty;
+                else if (j === 'SF') dataSet.SF[mIdx] += qty;
+                else if (j === 'CTC') dataSet.CTC[mIdx] += qty;
+                else if (j.includes('VENDOR')) dataSet.VENDOR[mIdx] += qty;
+            }
         }
     });
 
-    // 2.3 อัปเดตตัวเลขสถิติประกอบกราฟ Trend ด้วย animateValue
-    const totalsArray = dataSet.map(d => d.TotalPcs);
-    const activeData = totalsArray.filter(t => t > 0);
-    const maxVal = totalsArray.length ? Math.max(...totalsArray) : 0;
-    const minVal = activeData.length ? Math.min(...activeData) : 0;
-    const avgVal = activeData.length ? Math.round(activeData.reduce((a, b) => a + b, 0) / activeData.length) : 0;
-    const totalPcsVal = totalsArray.reduce((a, b) => a + b, 0);
+    // 3. 🛡️ จุดสำคัญ: ล้างข้อมูลเดือนที่ยังมาไม่ถึงให้เป็น null เพื่อให้เส้นกราฟ "ตัดจบ"
+    // ถ้าเราอยู่ในเดือน 8 (Aug) เดือน 9-12 จะไม่แสดงเส้นวิ่งไปที่เลข 0
+    for (let i = 0; i < 12; i++) {
+        if (i > currentMonthIdx) {
+            dataSet.OK[i] = null;
+            dataSet.SF[i] = null;
+            dataSet.CTC[i] = null;
+            dataSet.VENDOR[i] = null;
+        }
+    }
 
-    animateValue('trend-max', 0, maxVal, 1000);
-    animateValue('trend-min', 0, minVal, 1000);
-    animateValue('trend-avg', 0, avgVal, 1000);
+    // 4. คำนวณสถิติเฉพาะเดือนที่มีข้อมูลจริง (Jan - ปัจจุบัน)
+    const monthlyTotals = months.map((_, i) => {
+        if (i > currentMonthIdx) return null;
+        return (dataSet.OK[i] || 0) + (dataSet.SF[i] || 0) + (dataSet.CTC[i] || 0) + (dataSet.VENDOR[i] || 0);
+    });
+
+    const validTotals = monthlyTotals.filter(v => v !== null);
+    const totalPcsVal = validTotals.reduce((a, b) => a + b, 0);
+    const maxVal = validTotals.length ? Math.max(...validTotals) : 0;
+    const minVal = validTotals.length ? Math.min(...validTotals) : 0;
+    const avgVal = validTotals.length ? Math.round(totalPcsVal / validTotals.length) : 0;
+
+    // อัปเดตตัวเลขบน UI
     animateValue('trend-total-pcs', 0, totalPcsVal, 1000, 0, "", "PCS ");
+    animateValue('trend-max', 0, maxVal, 1000, 0, "", "Max: ");
+    animateValue('trend-min', 0, minVal, 1000, 0, "", "Min: ");
+    animateValue('trend-avg', 0, avgVal, 1000, 0, "", "Avg: ");
 
-    // 2.4 วาดกราฟ Area ด้วย ApexCharts
-    const trendChartEl = $id("trend-chart");
+    // 5. วาดกราฟ
+    const trendChartEl = document.getElementById("trend-chart");
     if (trendChartEl) {
         if (charts.trend) charts.trend.destroy();
-        charts.trend = new ApexCharts(trendChartEl, {
-            series: [
-                { name: 'OK', data: dataSet.map(d => d.OK.pcs) },
-                { name: 'SF', data: dataSet.map(d => d.SF.pcs) },
-                { name: 'CTC', data: dataSet.map(d => d.CTC.pcs) },
-                { name: 'VENDOR', data: dataSet.map(d => d.VENDOR.pcs) }
-            ],
-            chart: {
-                type: 'area',
-                height: '100%',
-                toolbar: { show: false },
-                sparkline: { enabled: false },
-                animations: { enabled: true, easing: 'easeinout', speed: 800 }
-            },
-            grid: { 
-                show: true, 
-                borderColor: '#f1f5f9', 
-                strokeDashArray: 4,
-                padding: { top: 5, bottom: 5, left: 10, right: 10 }
-            },
-            colors: ['#10b981', '#f97316', '#2563eb', '#ef4444'],
-            stroke: { curve: 'smooth', width: 2.5 }, 
-            fill: { 
-                type: 'gradient', 
-                gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.02, stops: [0, 90, 100] } 
-            },
-            dataLabels: { enabled: false },
-            xaxis: { 
-                categories: months, 
-                labels: { 
-                    offsetY: -5,
-                    style: { colors: '#94a3b8', fontSize: '9px', fontWeight: 400 } 
-                },
-                axisBorder: { show: false },
-                axisTicks: { show: false }
-            },
-            yaxis: { 
-                labels: { 
-                    style: { colors: '#94a3b8', fontSize: '9px', fontWeight: 400 },
-                    formatter: val => val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val 
-                } 
-            },
-            legend: { show: false },
-            tooltip: {
-                shared: true,
-                intersect: false,
-                custom: function ({ dataPointIndex }) {
-                    const d = dataSet[dataPointIndex];
-                    const totalPcs = d.TotalPcs || 1;
-                    const formatRow = (label, color, dataObj) => {
-                        const pct = ((dataObj.pcs / totalPcs) * 100).toFixed(1) + '%';
-                        return `
-                            <div class="tooltip-row" style="color: ${color}">
-                                <span class="flex items-center"><span class="dot-indicator" style="background: ${color}"></span>${label}</span>
-                                <span class="font-mono text-right">: ${dataObj.lots.size}L | ${dataObj.pcs.toLocaleString()}P | ${pct}</span>
-                            </div>`;
-                    };
-                    return `
-                        <div class="custom-chart-tooltip">
-                            <div class="tooltip-header"><p class="text-[11px] font-black text-blue-900 uppercase">📊 PERIOD: ${months[dataPointIndex].toUpperCase()}</p></div>
-                            ${formatRow('OK', '#059669', d.OK)}
-                            ${formatRow('CTC', '#2563eb', d.CTC)}
-                            ${formatRow('SF', '#ea580c', d.SF)}
-                            ${formatRow('VENDOR', '#e11d48', d.VENDOR)}
-                        </div>`;
-                }
+        
+        // ... โค้ดส่วนคำนวณด้านบนเหมือนเดิม ...
+
+charts.trend = new ApexCharts(trendChartEl, {
+    series: [
+        { name: 'OK', data: dataSet.OK },
+        { name: 'SF', data: dataSet.SF },
+        { name: 'CTC', data: dataSet.CTC },
+        { name: 'VENDOR', data: dataSet.VENDOR }
+    ],
+    chart: {
+        type: 'area',
+        height: '100%',
+        toolbar: { show: false },
+        animations: { enabled: true }
+    },
+    // 1. ❌ ปิดกล่องตัวเลขบนกราฟ
+    dataLabels: {
+        enabled: false 
+    },
+    // 2. 🟢 เพิ่มจุด (Markers) บนเส้นกราฟ
+    markers: {
+        size: 4,               // ขนาดของจุด
+        strokeColors: '#fff',  // ขอบสีขาวรอบจุด
+        strokeWidth: 2,
+        hover: {
+            size: 6            // ขนาดจุดเมื่อเอาเมาส์ไปชี้
+        }
+    },
+    // 3. 🎯 ตั้งค่าให้แสดงผลเมื่อเมาส์ชี้ (Tooltip)
+    tooltip: {
+        enabled: true,
+        shared: true,          // แสดงข้อมูลทุกเส้นพร้อมกันเมื่อชี้ที่เดือนนั้น
+        intersect: false,
+        theme: 'dark',
+        y: {
+            formatter: function (val) {
+                return val !== null ? val.toLocaleString() + " PCS" : null;
             }
-        });
+        }
+    },
+    // ... ส่วนการตั้งค่าอื่นๆ (colors, stroke, xaxis, yaxis) คงเดิม ...
+    colors: ['#10b981', '#f97316', '#2563eb', '#ef4444'],
+    stroke: { curve: 'smooth', width: 3 },
+    fill: {
+        type: 'gradient',
+        gradient: { opacityFrom: 0.4, opacityTo: 0.05 }
+    },
+    xaxis: {
+        categories: months,
+        labels: { style: { colors: '#94a3b8', fontSize: '10px' } }
+    },
+    yaxis: {
+        labels: {
+            style: { colors: '#94a3b8', fontSize: '10px' },
+            formatter: val => val ? val.toLocaleString() : 0
+        }
+    },
+    grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+    legend: { show: false }
+});
         charts.trend.render();
     }
 }
@@ -20757,15 +20714,13 @@ function onClaimDashDateChange() {
         claimDashFilterDate.start = startVal;
         claimDashFilterDate.end = endVal;
 
-        // ล้างสถานะปุ่ม Preset
+        // ล้างสีปุ่ม Preset เพราะเป็นการเลือกเอง (Custom)
         document.querySelectorAll('#claim-dash-filter-wrap button').forEach(b => {
             b.classList.remove('bg-blue-600', 'text-white');
             b.classList.add('bg-white', 'text-slate-500');
         });
 
-        // เรียกใช้ฟังก์ชันอัปเดตรวมที่คุณมีอยู่แล้ว
         updateAllModuleFilters(); 
-        toast(`📅 กรองข้อมูล: ${startVal} ถึง ${endVal}`, 'info');
     }
 }
 
@@ -20774,45 +20729,38 @@ function applyClaimDashPreset(type) {
     let start = new Date();
     let end = new Date();
 
-    // ล้างสีปุ่มเดิม
+    // 1. จัดการสีปุ่ม (UI Feedback)
     document.querySelectorAll('#claim-dash-filter-wrap button').forEach(b => {
         b.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
         b.classList.add('bg-white', 'text-slate-500');
     });
-
-    if (type === 'today') {
-        start = now;
-        const btn = document.getElementById('cd-preset-today');
-        if (btn) {
-            btn.classList.replace('bg-white', 'bg-blue-600');
-            btn.classList.replace('text-slate-500', 'text-white');
-        }
-    } else if (type === '7days') {
-        start = new Date();
-        start.setDate(now.getDate() - 6);
-        const btn = document.getElementById('cd-preset-7days');
-        if (btn) {
-            btn.classList.replace('bg-white', 'bg-blue-600');
-            btn.classList.replace('text-slate-500', 'text-white');
-        }
-    } else if (type === 'month') {
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const btn = document.getElementById('cd-preset-month');
-        if (btn) {
-            btn.classList.replace('bg-white', 'bg-blue-600');
-            btn.classList.replace('text-slate-500', 'text-white');
-        }
+    const activeBtn = document.getElementById(`cd-preset-${type}`);
+    if (activeBtn) {
+        activeBtn.classList.replace('bg-white', 'bg-blue-600');
+        activeBtn.classList.replace('text-slate-500', 'text-white');
     }
 
-    claimDashFilterDate.start = start.toISOString().split('T')[0];
-    claimDashFilterDate.end = end.toISOString().split('T')[0];
+    // 2. คำนวณช่วงวันที่
+    if (type === 'today') {
+        start = now;
+    } else if (type === '7days') {
+        start.setDate(now.getDate() - 6);
+    } else if (type === 'month') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
 
-    // อัปเดตค่าในช่อง Input Date ให้ตรงกับปุ่ม Preset ด้วย
-    document.getElementById('cd-start-date').value = claimDashFilterDate.start;
-    document.getElementById('cd-end-date').value = claimDashFilterDate.end;
+    // 3. หยอดค่าลงในช่อง Input ปฏิทิน
+    const startIso = start.toISOString().split('T')[0];
+    const endIso = end.toISOString().split('T')[0];
+    
+    document.getElementById('cd-start-date').value = startIso;
+    document.getElementById('cd-end-date').value = endIso;
 
-    const typeLabel = type === 'today' ? 'วันนี้' : (type === '7days' ? '7 วันล่าสุด' : 'เดือนนี้');
-    toast(`📅 แสดงข้อมูล: ${typeLabel}`, 'info');
+    // 4. บันทึกลงตัวแปร Global และสั่งอัปเดตทุกหน้า
+    claimDashFilterDate.start = startIso;
+    claimDashFilterDate.end = endIso;
+    
+    toast(`📅 แสดงข้อมูล: ${type.toUpperCase()}`, 'info');
     updateAllModuleFilters(); 
 }
 
