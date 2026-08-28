@@ -7742,66 +7742,66 @@ function handleLogout() {
     toast('Logged out successfully', 'info');
 }
 
-async function showDashboard(isDeepLink = false) { // 1. เพิ่ม parameter เพื่อรับสถานะลิงก์
-    // --- [ส่วนที่ 1: จัดการธีม] ---
+async function showDashboard(isDeepLink = false) {
+    // --- [ส่วนที่ 1: จัดการธีมและการแสดงผล Sidebar] ---
     const savedTheme = localStorage.getItem('carrier_theme');
     const isDark = (savedTheme === 'dark');
-    if (isDark) {
-        document.body.classList.add('dark-mode');
-    } else {
-        document.body.classList.remove('dark-mode');
-    }
-    if (typeof updateThemeIcon === 'function') {
-        updateThemeIcon(isDark);
-    }
+    document.body.classList.toggle('dark-mode', isDark);
+    if (typeof updateThemeIcon === 'function') updateThemeIcon(isDark);
 
-    // --- [ส่วนที่ 2: สลับหน้าจอและตั้งค่า Sidebar] ---
     $id('login-view').classList.add('hidden-view');
     $id('dashboard-view').classList.remove('hidden-view');
     
-    const namePart = S.currentUser.split('@')[0] || 'USER';
-    const initial = namePart.charAt(0).toUpperCase();
-    $id('user-avatar').textContent = initial;
-    $id('user-display-name').textContent = namePart.replace(/\./g, ' ').toUpperCase();
-    $id('user-display-email').textContent = S.currentUser;
+    // 🎯 1. ล็อคชื่อ Sidebar เป็นชื่อคนลอกอินปัจจุบัน (S.currentUser) ตลอดกาล
+    if (typeof updateSidebarUserUI === 'function') {
+        updateSidebarUserUI(); 
+    }
 
-   // --- [ส่วนที่ 3: จัดการ Form Panel และสิทธิ์ Supervisor] ---
+    // --- [ส่วนที่ 2: อ้างอิง UI Elements] ---
     const staffWrap = $id('staff-selector-wrap');
     const formPanel = $id('form-panel');
     const showBtn = $id('show-form-btn');
+    const labelEl = document.getElementById('staff-custom-select-label');
+    const adminFooterBtn = document.getElementById('admin-footer-access');
 
-    // ซ่อน Form Panel เป็นค่าเริ่มต้น
+    // รีเซ็ตสถานะ Form Panel (ซ่อนไว้ก่อน)
     if (formPanel && showBtn) {
         isFormHidden = true; 
         gsap.set(formPanel, { x: -350, opacity: 0, width: 0, marginRight: -12 });
         formPanel.classList.add('hidden');
         showBtn.classList.remove('hidden');
-        gsap.set(showBtn, { x: 0, opacity: 1 });
     }
 
-    // ตรวจสอบประเภทการ Login
+    // --- [ส่วนที่ 3: Logic แยกตามประเภทการ Login (พนักงาน vs หัวหน้างาน)] ---
     const isSupervisorSession = (S.loginRole === 'supervisor');
 
     if (isSupervisorSession) { 
-        // ==========================================
-        // 🔑 CASE: ล็อกอินผ่านหน้า SUPERVISOR
-        // ==========================================
+        // ============================================================
+        // 🔑 CASE 1: ล็อกอินผ่านหน้า SUPERVISOR (หัวหน้างานมาตรวจงาน)
+        // ============================================================
         S.userRole = 'supervisor';
+        
+        /**
+         * 🎯 [จุดสำคัญ]: บังคับหน้าว่างตอนเริ่มต้น 
+         * ล้างข้อมูลในหน่วยความจำทิ้งเพื่อความปลอดภัย
+         */
+        S.viewingUser = ''; 
+        S.records = []; 
+        S.wapData = { achievements: [], score5s: [], skills: [], specialJobs: [] };
 
-        // ✅ แสดงช่องเลือกรายชื่อพนักงาน (Staff Selector)
+        // แสดงช่องเลือกรายชื่อพนักงาน (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.remove('hidden');
-            staffWrap.classList.add('flex'); // ใช้ flex เพื่อให้ตำแหน่งสวยงามตามดีไซน์
+            staffWrap.classList.add('flex');
+            staffWrap.style.display = 'flex';
         }
+        if (labelEl) labelEl.textContent = '-- เลือกผู้ปฏิบัติงาน --';
 
+        // โหลดรายชื่อ 32 คนเข้า Dropdown
         await loadStaffList(); 
 
-        // จัดการ UI เพิ่มเติมสำหรับ Supervisor
+        // ล็อคฟอร์ม (หัวหน้างาน "ดู" ได้อย่างเดียว ห้าม "แก้ไข")
         if (showBtn) showBtn.style.display = 'none'; 
-        const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
-        if (internalCloseBtn) internalCloseBtn.style.display = 'none';
-
-        // ปิดการใช้งานฟอร์ม (Read-only)
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = true;
@@ -7810,26 +7810,29 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         });
 
     } else {
-        // ==========================================
-        // 👤 CASE: ล็อกอินผ่านหน้า SQE SUPPORT
-        // ==========================================
+        // ============================================================
+        // 👤 CASE 2: ล็อกอินผ่านหน้า SQE SUPPORT (พนักงาน & ADMIN)
+        // ============================================================
         S.userRole = 'staff';
+        
+        /**
+         * 🎯 [จุดสำคัญ]: ไม่ว่าจะเป็น Admin หรือใครก็ตาม 
+         * ถ้าลอกอินผ่านหน้านี้ viewingUser จะต้องเท่ากับชื่อตัวเองเสมอ
+         * และ staffWrap (ดรอปดาวน์เลือกคนอื่น) จะต้องถูกซ่อน 100%
+         */
+        S.viewingUser = S.currentUser;
 
-        // ❌ ซ่อนช่องเลือกรายชื่อพนักงานทันที (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.add('hidden');
             staffWrap.classList.remove('flex');
+            staffWrap.style.display = 'none';
         }
 
-        // บังคับให้ดูข้อมูลของตัวเองเท่านั้น
-        S.viewingUser = S.currentUser;
-
-        // แสดงปุ่มเปิดฟอร์มปกติ
+        // เปิดให้ใช้งานฟอร์มได้ตามปกติ (สิทธิ์ผู้จัดทำ)
         if (showBtn) showBtn.style.display = 'flex';
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
         if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
 
-        // เปิดการใช้งานฟอร์มปกติ
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = false;
@@ -7838,39 +7841,32 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         });
     }
 
-    // --- [ส่วนที่ 4: ตรวจสอบ Admin Access (เฉพาะ Admin, Manager, Supervisor, Engineer)] ---
-    const adminFooterBtn = document.getElementById('admin-footer-access');
-    const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
-        ? hasAdminAccessPermission(S.currentUser, S.userRole) 
-        : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
-
-    if (isAllowedAdmin) {
-        if (adminFooterBtn) adminFooterBtn.classList.remove('hidden');
-    } else {
-        if (adminFooterBtn) adminFooterBtn.classList.add('hidden');
+    // --- [ส่วนที่ 4: ตรวจสอบ Admin Access] ---
+    // (เฉพาะแอดมิน natthawut เท่านั้นที่จะเห็นปุ่ม Admin User Control ที่ล่างสุดของ Sidebar)
+    const isAllowedAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+    if (adminFooterBtn) {
+        adminFooterBtn.classList.toggle('hidden', !isAllowedAdmin);
     }
     
     updateOnlineBadge();
 
-    // --- [ส่วนที่ 5: ซิงค์ข้อมูลชุดใหญ่] ---
+    // --- [ส่วนที่ 5: เริ่มซิงค์ข้อมูลตาม ViewingUser ที่ระบุไว้ด้านบน] ---
     toast("📡 กำลังเชื่อมต่อฐานข้อมูล Online...", "info");
 
     try {
+        /**
+         * 💡 หากเป็นพนักงาน: loadRecords ดึงงานตัวเอง
+         * 💡 หากเป็นหัวหน้างาน: S.viewingUser เป็นค่าว่าง loadRecords จะ Return หน้าเปล่าทันที
+         */
         await Promise.all([
             loadRecords(),
             fetchWAPData()
         ]);
 
-        // >>> [จุดสำคัญที่สุด]: การตัดสินใจเลือกหน้าที่จะแสดง <<<
+        // จัดการเปลี่ยนหน้าไปที่หน้าแรก
         if (!isDeepLink) {
-            // ถ้าเป็นการ Login ปกติ ให้ไปหน้าแรก (PART LINE CLAIM)
             const firstMenuBtn = document.querySelector('.nav-item');
             switchPage('Part line claim', firstMenuBtn);
-            console.log("Standard entry: Redirecting to Home.");
-        } else {
-            // ถ้ามาจาก Deep Link ไม่ต้องสั่ง switchPage
-            // ปล่อยให้ Logic ใน launchDirectWarp พาไปที่หน้า 8D/VF เอง
-            console.log("Deep link entry: Hold redirection.");
         }
         
         toast("✅ ซิงค์ข้อมูลสำเร็จ", "success");
@@ -7880,39 +7876,41 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
 
     } catch (error) {
         console.error("Critical Sync Error:", error);
-        toast("❌ การโหลดข้อมูลบางส่วนล้มเหลว", "error");
-        
-        // แม้จะ Error ถ้าไม่ใช่ลิงก์ ก็ควรพาไปหน้าแรก
-        if (!isDeepLink) {
-            const firstMenuBtn = document.querySelector('.nav-item');
-            switchPage('Part line claim', firstMenuBtn);
-        }
+        toast("❌ การโหลดข้อมูลขัดข้อง", "error");
     }
 }
 
 async function onStaffSelect(email) {
+    // 🎯 1. กำหนด viewingUser
     if (!email) {
-        S.viewingUser = S.currentUser;
+        // ถ้ากดล้างตัวเลือก (All)
+        // - หัวหน้างาน: ให้เป็นค่าว่าง (เพื่อให้หน้าจอว่างเปล่าตามโจทย์)
+        // - พนักงาน/แอดมิน: กลับมาเป็นชื่อตัวเอง
+        S.viewingUser = (S.userRole === 'supervisor') ? '' : S.currentUser;
     } else {
         S.viewingUser = email;
     }
     
-    toast(`🔍 กำลังซิงค์ข้อมูลของ: ${S.viewingUser.split('@')[0]}`, "info");
+    const displayShort = S.viewingUser ? S.viewingUser.split('@')[0] : 'Total';
+    toast(`🔍 กำลังซิงค์ข้อมูลของ: ${displayShort}`, "info");
     
     try {
+        // 2. ดึงข้อมูลใหม่ตาม viewingUser ที่ตั้งไว้
         await Promise.all([
             loadRecords(),   
             fetchWAPData()   
         ]);
 
-        // >>> [เพิ่มบรรทัดนี้] สั่งให้ AI เรียนรู้ข้อมูลของพนักงานคนใหม่ทันที <<<
+        // 3. สั่งให้ AI เรียนรู้ข้อมูลใหม่
         rebuildSmartMemory();
         updateAIBrain();
 
+        // 4. สั่งวาดหน้าจอใหม่ 
+        // (ฟังก์ชันนี้จะเรียก updateSidebarUserUI() ที่เราล็อคชื่อไว้แล้วให้โดยอัตโนมัติ)
         triggerGlobalRefresh();
         
-        const display = S.viewingUser.split('@')[0].replace(/\./g, ' ').toUpperCase();
-        $id('user-display-name').innerHTML = `${display} <span class="text-[9px] text-orange-500">(VIEWING)</span>`;
+        // ❌ ลบโค้ดส่วนที่เคยแก้ไข $id('user-display-name') ทิ้งทั้งหมด
+        // เพื่อป้องกันการนำชื่อพนักงานที่เลือกดูไปทับชื่อจริงที่แถบ Sidebar
         
         toast("อัปเดตข้อมูลพนักงานเรียบร้อย", "success");
     } catch (error) {
@@ -8756,135 +8754,120 @@ async function loadRecords() {
     const sb = getSupabase();
     if (!sb) return;
 
-    const targetEmail = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-    let dbDisplayName = targetEmail || '';
+    /**
+     * 🎯 [1. จัดการกรณีหน้าว่าง]
+     * หากไม่มีการระบุ viewingUser (เช่น Supervisor เพิ่งลอกอิน)
+     */
+    if (!S.viewingUser) {
+        S.records = [];
+        const countDisplay = document.getElementById('record-count');
+        if (countDisplay) countDisplay.textContent = `0 รายการ`;
+        renderTable();
+        if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+        return;
+    }
+
+    const targetEmail = S.viewingUser.toLowerCase().trim();
+    let dbDisplayName = targetEmail;
     for (const [fullName, email] of Object.entries(STAFF_EMAIL_MAP)) {
-        if (email.toLowerCase() === (targetEmail || '').toLowerCase()) {
+        if (email.toLowerCase() === targetEmail) {
             dbDisplayName = fullName;
             break;
         }
     }
 
-    const isPrivileged = S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer' || S.viewingUser === 'all' || !targetEmail;
-
     let fetchSuccess = false;
 
     if (navigator.onLine) {
         try {
-            // STEP 1: ดึงรอบแรกเพื่อเอา "จำนวนทั้งหมด (Count)"
-            let query = sb.from('records').select('*', { count: 'exact' });
+            const filterString = `inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`;
 
-            if (!isPrivileged && targetEmail && dbDisplayName) {
-                query = query.or(`inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`);
+            // 1. นับจำนวนทั้งหมดก่อน
+            const { count, error: countErr } = await sb
+                .from('records')
+                .select('*', { count: 'exact', head: true })
+                .or(filterString);
+
+            if (countErr) throw countErr;
+
+            const totalInDB = count || 0;
+            const BATCH_SIZE = 1000;
+            const promises = [];
+
+            /**
+             * 🎯 [2. ระบบ Parallel Fetching]
+             * แทนที่จะวนลูปทีละรอบแล้วรอ (await ใน loop) 
+             * เราจะสร้าง "รายการคำสั่งดึงข้อมูล" ไว้ล่วงหน้าแล้วยิงออกไปพร้อมกัน
+             */
+            for (let i = 0; i < totalInDB; i += BATCH_SIZE) {
+                const request = sb
+                    .from('records')
+                    .select('*')
+                    .or(filterString)
+                    .order('created_at', { ascending: false })
+                    .range(i, i + BATCH_SIZE - 1);
+                
+                promises.push(request);
+                
+                // ความปลอดภัย: ป้องกันการดึงมากเกินไปจนเบราว์เซอร์รับไม่ไหว (จำกัดที่ 10,000 รายการ)
+                if (promises.length >= 10) break; 
             }
 
-            const { data: firstBatch, count, error } = await query
-                .range(0, 999) // ดึง 1,000 รายการแรก
-                .order('created_at', { ascending: false });
+            // ยิงคำสั่งทั้งหมดออกไปพร้อมกัน (เร็วกว่าเดิมหลายเท่า)
+            const results = await Promise.all(promises);
+            
+            let allFetchedRecords = [];
+            results.forEach(res => {
+                if (res.data) allFetchedRecords = allFetchedRecords.concat(res.data);
+            });
 
-            if (error) throw error;
-
-            let allRecords = firstBatch || [];
-            const total = count || 0;
-
-            // ถ้ากรณีค้นหาด้วยชื่อผู้ตรวจแล้วไม่เจอ แต่ในฐานข้อมูลมีข้อมูล ให้ดึงข้อมูลทั้งหมดมาแสดง
-            if (allRecords.length === 0 && !isPrivileged) {
-                const fallbackRes = await sb.from('records')
-                    .select('*', { count: 'exact' })
-                    .range(0, 999)
-                    .order('created_at', { ascending: false });
-                if (fallbackRes.data && fallbackRes.data.length > 0) {
-                    allRecords = fallbackRes.data;
-                }
-            }
-
-            // STEP 2: ถ้ามีข้อมูลมากกว่า 1,000 ให้ดึงส่วนที่เหลือพร้อมกันทีเดียว (Parallel)
-            if (total > 1000) {
-                const promises = [];
-                for (let i = 1000; i < total; i += 1000) {
-                    const to = Math.min(i + 999, total - 1);
-                    let subQuery = sb.from('records').select('*');
-                    if (!isPrivileged && targetEmail && dbDisplayName) {
-                        subQuery = subQuery.or(`inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`);
-                    }
-                    promises.push(
-                        subQuery.range(i, to).order('created_at', { ascending: false })
-                    );
-                }
-
-                const results = await Promise.all(promises);
-                results.forEach(res => {
-                    if (res.data) allRecords = allRecords.concat(res.data);
-                });
-            }
-
-            // STEP 3: บันทึกข้อมูลและแสดงผล
-            S.records = allRecords.map(normalizeRecord);
-            S.totalDatabaseCount = S.records.length; 
+            // [3. บันทึกและอัปเดต UI]
+            S.records = allFetchedRecords.map(normalizeRecord);
             fetchSuccess = true;
 
-            // บันทึกลงแคช IndexedDB และ LocalStorage สำหรับใช้งานตอนออฟไลน์/ติดโควต้า
+            const countDisplay = document.getElementById('record-count');
+            if (countDisplay) {
+                countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
+            }
+
+            // Sync แคช
             try {
-                if (typeof SQEIndexedDBManager !== 'undefined' && typeof SQEIndexedDBManager.saveTableCache === 'function') {
-                    SQEIndexedDBManager.saveTableCache('claim_records', S.records);
+                if (typeof SQEIndexedDBManager !== 'undefined') {
+                    SQEIndexedDBManager.saveTableCache(`claim_records_${targetEmail}`, S.records);
                 }
-                const lightweight = S.records.slice(0, 300).map(r => ({ ...r, imageUrl: (r.imageUrl && r.imageUrl.length < 500) ? r.imageUrl : '' }));
-                safeLocalStorageSet(`carrier_records_cache_${targetEmail || 'all'}`, JSON.stringify(lightweight));
-                safeLocalStorageSet('carrier_records_cache_last', JSON.stringify(lightweight));
+                safeLocalStorageSet(`carrier_records_cache_${targetEmail}`, JSON.stringify(S.records.slice(0, 500)));
             } catch(ce) {}
 
-            renderTable();
-            rebuildSmartMemory(S.records);
-            updateAIBrain(S.records);
-
-            if (typeof refreshClaimDashboard === 'function') {
-                refreshClaimDashboard();
-            }
-
-        } catch (e) {
-            console.warn('[loadRecords Fallback triggered due to fetch/quota limit]:', e?.message || e);
-        }
-    }
-
-    // STEP 4: Fallback หาก Fetch ไม่สำเร็จ (เช่น ติดโควต้า exceed_egress_quota หรือไม่มีเน็ต)
-    if (!fetchSuccess) {
-        let restoredRecords = [];
-        try {
-            if (typeof SQEIndexedDBManager !== 'undefined' && typeof SQEIndexedDBManager.getTableCache === 'function') {
-                const idbData = await SQEIndexedDBManager.getTableCache('claim_records');
-                if (Array.isArray(idbData) && idbData.length > 0) {
-                    restoredRecords = idbData;
-                }
-            }
-        } catch(idbErr) {}
-
-        if (restoredRecords.length === 0) {
-            try {
-                const cached = localStorage.getItem(`carrier_records_cache_${targetEmail || 'all'}`) || localStorage.getItem('carrier_records_cache_last');
-                if (cached) {
-                    const parsed = JSON.parse(cached);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        restoredRecords = parsed;
-                    }
-                }
-            } catch(lsErr) {}
-        }
-
-        if (restoredRecords.length > 0) {
-            S.records = restoredRecords.map(normalizeRecord);
-            S.totalDatabaseCount = S.records.length;
-            renderTable();
-            rebuildSmartMemory(S.records);
-            updateAIBrain(S.records);
-            if (typeof refreshClaimDashboard === 'function') {
-                refreshClaimDashboard();
-            }
-            console.log(`[loadRecords] Restored ${S.records.length} records from local cache.`);
-        } else if (S.records && S.records.length > 0) {
+            // วาดหน้าจอ
             renderTable();
             rebuildSmartMemory(S.records);
             updateAIBrain(S.records);
             if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+
+        } catch (e) {
+            console.error('[loadRecords Error]', e.message);
+            // ถ้าเกิด Error ให้พยายามโหลดจาก Cache
+            fetchSuccess = false;
+        }
+    }
+
+    /**
+     * 📶 [4. Fallback สำหรับโหมดออฟไลน์หรือเมื่อ Fetch พลาด]
+     */
+    if (!fetchSuccess) {
+        try {
+            const cached = localStorage.getItem(`carrier_records_cache_${targetEmail}`);
+            if (cached) {
+                S.records = JSON.parse(cached).map(normalizeRecord);
+                const countDisplay = document.getElementById('record-count');
+                if (countDisplay) countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
+                renderTable();
+                rebuildSmartMemory(S.records);
+                updateAIBrain(S.records);
+                if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+            }
+        } catch(lsErr) {
+            console.warn("Offline load failed", lsErr);
         }
     }
 }
@@ -19413,13 +19396,14 @@ function triggerGlobalRefresh() {
     if (!titleEl) return;
 
     const title = titleEl.textContent.trim().toUpperCase();
+    
+    // 🎯 1. อัปเดต Sidebar ทันที (ลบ targetUser ออก เพื่อให้แสดงชื่อคนลอกอินจริงเสมอ)
+    updateSidebarUserUI();
+
+    // ระบุพนักงานเป้าหมายสำหรับใช้ในโมดูลเนื้อหา
     const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-    if (!targetUser) return;
 
-    // 1. อัปเดตข้อมูลพนักงานใน Sidebar (รันทันทีไม่ต้องรอ Frame)
-    updateSidebarUserUI(targetUser);
-
-    // 2. ใช้ requestAnimationFrame เพื่อให้ Browser วาดหน้าจอได้ลื่นไหล (ลดอาการ UI Block)
+    // 2. ใช้ requestAnimationFrame เพื่อความลื่นไหล
     requestAnimationFrame(() => {
         console.log(`[System] UI Update: ${title}`);
 
@@ -19433,57 +19417,83 @@ function triggerGlobalRefresh() {
         const isOT          = title.includes('OT')        || title.includes('ล่วงเวลา');
         const isSpecial     = title.includes('SPECIAL')   || title.includes('ภารกิจ');
 
-        if (isDashboard && isClaimWord) {
-            refreshClaimDashboard(); 
-        } 
-        else if (isClaimWord && !isDashboard) {
-            renderTable(); 
-        }
-        else if (isExec) {
-            initExecDashboard();
-        }
-        else if (isAttendance) {
-            renderAttRecords(); // เปลี่ยนจาก initAttDashboard ที่มี fetch อยู่ข้างใน
-            renderDailySubmissionMatrix();
-            updateAttKPI();
-        }
-        else if (isSupport) {
-            WapSupportLogs.init(targetUser);
-        }
-        else if (is5S) {
-            Wap5SExcellence.renderAll(); // เปลี่ยนจาก fetchRecords -> renderAll
-        }
-        else if (isSkill) {
-            WapSkillMatrix.renderAll(); // เปลี่ยนจาก init -> renderAll
-        }
-        else if (isOT) {
-            WapOTManagement.updateUI(); // เปลี่ยนจาก fetchRecords -> updateUI
-        }
-        else if (isSpecial) {
-            WapSpecialJobs.applyDateFilter(); // เปลี่ยนจาก init -> applyDateFilter (ซึ่งมี renderTable/Charts)
+        // 🎯 กรณีที่มีการเลือกพนักงานแล้ว (หรือเป็นพนักงานลอกอินเอง)
+        if (targetUser) {
+            if (isDashboard && isClaimWord) {
+                refreshClaimDashboard(); 
+            } 
+            else if (isClaimWord && !isDashboard) {
+                renderTable(); 
+            }
+            else if (isExec) {
+                initExecDashboard();
+            }
+            else if (isAttendance) {
+                renderAttRecords();
+                renderDailySubmissionMatrix();
+                updateAttKPI();
+            }
+            else if (isSupport) {
+                WapSupportLogs.init(targetUser);
+            }
+            else if (is5S) {
+                Wap5SExcellence.renderAll();
+            }
+            else if (isSkill) {
+                WapSkillMatrix.renderAll();
+            }
+            else if (isOT) {
+                WapOTManagement.updateUI();
+            }
+            else if (isSpecial) {
+                WapSpecialJobs.applyDateFilter();
+            }
+        } else {
+            // 🎯 กรณีไม่มี targetUser (เช่น Supervisor เพิ่งลอกอินและยังไม่ได้เลือกใคร)
+            // สั่ง Render หน้าว่างเปล่าเพื่อให้ UI แสดงผลตาม Logic ที่เราตั้งไว้ใน renderTable
+            if (isClaimWord) renderTable();
+            if (isDashboard) refreshClaimDashboard();
         }
     });
 }
 
-// แยก UI Sidebar ออกมาเพื่อความสะอาด
-function updateSidebarUserUI(targetUser) {
-    const displayName = targetUser.split('@')[0].replace(/\./g, ' ').toUpperCase();
-    if ($id('user-display-name')) {
-        if (S.userRole === 'supervisor' && S.viewingUser !== S.currentUser) {
-            $id('user-display-name').innerHTML = `${displayName} <span class="text-[8px] text-rose-500 font-black tracking-tighter">(VIEWING)</span>`;
-        } else {
-            $id('user-display-name').textContent = displayName;
+// แก้ไข: ล็อคข้อมูล Sidebar ให้เป็นของคนลอกอินปัจจุบันเสมอ
+function updateSidebarUserUI() {
+    // 🎯 ใช้ข้อมูลจาก S.currentUser (คนลอกอิน) เท่านั้น ไม่ใช้พารามิเตอร์ที่ส่งมา
+    const email = S.currentUser;
+    const namePart = email.split('@')[0] || 'USER';
+    const displayName = namePart.replace(/\./g, ' ').toUpperCase();
+    const initial = displayName.charAt(0);
+
+    // 1. อัปเดตชื่อผู้ใช้งาน (ล็อคชื่อตัวเอง ไม่เปลี่ยนตามฟิลเตอร์)
+    const nameEl = $id('user-display-name');
+    if (nameEl) {
+        nameEl.textContent = displayName; 
+        // ตัด Logic เงื่อนไข (VIEWING) ออกทั้งหมด เพื่อให้ชื่อคงที่
+    }
+
+    // 2. อัปเดตอีเมลแสดงผล
+    const emailEl = $id('user-display-email');
+    if (emailEl) {
+        emailEl.textContent = email;
+    }
+
+    // 3. อัปเดตตัวอักษรหรือรูป Avatar
+    const avatarEl = $id('user-avatar');
+    if (avatarEl) {
+        // อัปเดตตัวอักษรย่อเฉพาะกรณีที่ไม่มีรูปภาพ (img) อยู่ข้างใน
+        if (!avatarEl.querySelector('img')) {
+            avatarEl.textContent = initial;
         }
     }
-    if ($id('user-display-email')) $id('user-display-email').textContent = targetUser;
-    if ($id('user-avatar')) $id('user-avatar').textContent = displayName.charAt(0);
 
-    // อัปเดตการแสดงผลปุ่ม Admin User Control
+    // 4. อัปเดตการแสดงผลปุ่ม Admin User Control (อิงตามสิทธิ์คนลอกอินจริง)
     const adminFooterBtn = document.getElementById('admin-footer-access');
     if (adminFooterBtn) {
         const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
             ? hasAdminAccessPermission(S.currentUser, S.userRole) 
             : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
+        
         if (isAllowedAdmin) {
             adminFooterBtn.classList.remove('hidden');
         } else {
