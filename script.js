@@ -4024,12 +4024,60 @@ const STAFF_TEAMS = [
             "Mr.Witsarut S.",
             "Mr.Chiraphat K.",
             "Ms.Naruemon C.",
-            "Mr.Jumnong T."
+            "Mr.Jumnong T.",
+            "Mr.Suphap M."
         ]
     }
 ];
 
 const STAFF_LIST = STAFF_TEAMS.reduce((acc, t) => acc.concat(t.members), []);
+
+// --- 📋 MASTER AUTHORITATIVE STAFF USERS LIST (32 MEMBERS) ---
+const MASTER_STAFF_USERS = [
+    // Mold (7)
+    { name: "Mr.Eakkachai B.", email: "eakkachai.butnet@carrier.com", role: "iqc", department: "Mold", key: "1234" },
+    { name: "Mr.Ubonsak J.", email: "ubonsak.j@carrier.com", role: "iqc", department: "Mold", key: "1234" },
+    { name: "Mr.Somchai R.", email: "somchai.rukkachat@carrier.com", role: "iqc", department: "Mold", key: "1234" },
+    { name: "Mr.Natthawut C.", email: "natthawut.chaising@carrier.com", role: "admin", department: "Mold", key: "271166" },
+    { name: "Mr.Thawutchai T.", email: "tawatchai.tathong@carrier.com", role: "iqc", department: "Mold", key: "1234" },
+    { name: "Mr.Pongpan P.", email: "pongpan.panna@carrier.com", role: "supervisor", department: "Mold", key: "-" },
+    { name: "Ms.Nipawan J.", email: "nipawan.janpong@carrier.com", role: "manager", department: "Mold", key: "-" },
+
+    // Printing (3)
+    { name: "Ms.Siriwan S.", email: "siriwan.sonkaew@carrier.com", role: "iqc", department: "Printing", key: "1234" },
+    { name: "Ms.Supaporn S.", email: "supaporn.sata@carrier.com", role: "iqc", department: "Printing", key: "1234" },
+    { name: "Mr.Kaptan Y.", email: "KAPTAN.YOOUSUK@carrier.com", role: "iqc", department: "Printing", key: "1234" },
+
+    // Steel (2)
+    { name: "Mr.Aphinan P.", email: "aphinan.phookrongnak@carrier.com", role: "iqc", department: "Steel", key: "1234" },
+    { name: "Mr.Satthra O.", email: "Satthra.Onsawarng@carrier.com", role: "iqc", department: "Steel", key: "1234" },
+
+    // Piping and Mat (3)
+    { name: "Mr.Anuchit A.", email: "anuchit.arnoon@carrier.com", role: "iqc", department: "Piping and Mat", key: "1234" },
+    { name: "Mr.Eueangkoon S.", email: "eueangkoon.seesanit@carrier.com", role: "sqe_support", department: "Piping and Mat", key: "1234" },
+    { name: "Mr.Meechai T.", email: "meechai.thawornpong@carrier.com", role: "engineer", department: "Piping and Mat", key: "-" },
+
+    // Electronic (7)
+    { name: "Mr.Puriwat S.", email: "puriwat.sangjan@carrier.com", role: "iqc", department: "Electronic", key: "1234" },
+    { name: "Mr.Theerapol W.", email: "theerapol.wanna@carrier.com", role: "iqc", department: "Electronic", key: "1234" },
+    { name: "Mr.Pratheep N.", email: "pratheep.ngoenon@carrier.com", role: "iqc", department: "Electronic", key: "1234" },
+    { name: "Mr.Kraiwit P.", email: "kraiwit.priawkudro@carrier.com", role: "iqc", department: "Electronic", key: "1234" },
+    { name: "Mr.Sornchai W.", email: "sornchai.wongjanta@carrier.com", role: "sqe_support", department: "Electronic", key: "1234" },
+    { name: "Ms.Panida B.", email: "panida.boonchamoi@carrier.com", role: "iqc", department: "Electronic", key: "-" },
+    { name: "Mr.Pakon M.", email: "pakon.muanglen@carrier.com", role: "iqc", department: "Electronic", key: "-" },
+
+    // Approved / Leadership (10)
+    { name: "Mr.Watcharin Y.", email: "watcharin.yawanopart@carrier.com", role: "manager", department: "Approved", key: "-" },
+    { name: "Ms.Songporn C.", email: "songporn.chaisim@carrier.com", role: "engineer", department: "Approved", key: "-" },
+    { name: "Ms.Siriporn P.", email: "Siriporn.Prasongsuk@carrier.com", role: "supervisor", department: "Approved", key: "-" },
+    { name: "Mr.Ekkalak L.", email: "ekkalak.laksanasamrith@carrier.com", role: "manager", department: "Approved", key: "-" },
+    { name: "Mr.Komson N.", email: "komson.namwicha@carrier.com", role: "supervisor", department: "Approved", key: "-" },
+    { name: "Mr.Witsarut S.", email: "witsarut.singholsai@carrier.com", role: "engineer", department: "Approved", key: "-" },
+    { name: "Mr.Chiraphat K.", email: "Chiraphat.Khanthong@carrier.com", role: "supervisor", department: "Approved", key: "-" },
+    { name: "Ms.Naruemon C.", email: "naruemon.champa@carrier.com", role: "engineer", department: "Approved", key: "-" },
+    { name: "Mr.Jumnong T.", email: "jumnong.thongsom@carrier.com", role: "supervisor", department: "Approved", key: "-" },
+    { name: "Mr.Suphap M.", email: "suphap.m@carrier.com", role: "supervisor", department: "Approved", key: "Carrier4564" }
+];
 
 const STAFF_EMAIL_MAP = {
     // Mold
@@ -4147,53 +4195,6 @@ const STAFF_EMAIL_MAP = {
     "Ekaraj I.": "ekaraj.inpara@carrier.com"
 };
 
-// ตารางระดับสิทธิ์ดึงตามภาพ Agent Identity และ Clearance Role
-const USER_LEVEL_MAP = {
-    // --- 1. SQE Support ---
-    "eueangkoon.seesanit@carrier.com": "1. SQE Support",
-    "sornchai.wongjanta@carrier.com": "1. SQE Support",
-
-    // --- 2. IQC ---
-    "anuchit.arnoon@carrier.com": "2. IQC",
-    "aphinan.phookrongnak@carrier.com": "2. IQC",
-    "eakkachai.butnet@carrier.com": "2. IQC",
-    "KAPTAN.YOOUSUK@carrier.com": "2. IQC",
-    "kraiwit.priawkudro@carrier.com": "2. IQC",
-    "pakon.muanglen@carrier.com": "2. IQC",
-    "panida.boonchamoi@carrier.com": "2. IQC",
-    "pratheep.ngoenon@carrier.com": "2. IQC",
-    "puriwat.sangjan@carrier.com": "2. IQC",
-    "Satthra.Onsawarng@carrier.com": "2. IQC",
-    "siriwan.sonkaew@carrier.com": "2. IQC",
-    "somchai.rukkachat@carrier.com": "2. IQC",
-    "supaporn.sata@carrier.com": "2. IQC",
-    "tawatchai.tathong@carrier.com": "2. IQC",
-    "theerapol.wanna@carrier.com": "2. IQC",
-    "ubonsak.j@carrier.com": "2. IQC",
-
-    // --- 3. EN / Engineer ---
-    "meechai.thawornpong@carrier.com": "3. EN / Engineer",
-    "naruemon.champa@carrier.com": "3. EN / Engineer",
-    "songporn.chaisim@carrier.com": "3. EN / Engineer",
-    "witsarut.singholsai@carrier.com": "3. EN / Engineer",
-
-    // --- 4. Supervisor ---
-    "Chiraphat.Khanthong@carrier.com": "4. Supervisor",
-    "jumnong.thongsom@carrier.com": "4. Supervisor",
-    "komson.namwicha@carrier.com": "4. Supervisor",
-    "pongpan.panna@carrier.com": "4. Supervisor",
-    "Siriporn.Prasongsuk@carrier.com": "4. Supervisor",
-    "suphap.m@carrier.com": "4. Supervisor",
-
-    // --- 5. Manager ---
-    "ekkalak.laksanasamrith@carrier.com": "5. Manager",
-    "nipawan.janpong@carrier.com": "5. Manager",
-    "watcharin.yawanopart@carrier.com": "5. Manager",
-
-    // --- 6. Admin ---
-    "natthawut.chaising@carrier.com": "6. Admin"
-};
-
 // --- 🔒 MASTER SECURITY KEY MAP (BACKUP AUTH) ---
 const INTERNAL_AUTH_DB = {
     "natthawut.chaising@carrier.com": "271166",
@@ -4215,8 +4216,6 @@ const INTERNAL_AUTH_DB = {
     "ubonsak.j@carrier.com": "1234",
     "suphap.m@carrier.com": "Carrier4564"
 };
-window.USER_LEVEL_MAP = USER_LEVEL_MAP;
-
 /**
  * 🧠 ระบบจัดการดรอปดาวน์สำหรับพนักงาน (SQE SUPPORT)
  */
@@ -4247,10 +4246,9 @@ function getEmployeeData() {
     });
     return list;
 }
-window.getEmployeeData = getEmployeeData;
 
 // 2. ฟังก์ชันวาดรายการ (Render) ลงในดรอปดาวน์
-function renderEmployeeLoginDropdown(query = '') {
+window.renderEmployeeLoginDropdown = function(query = '') {
     const dropdown = document.getElementById('login-employee-dropdown');
     if (!dropdown) return;
 
@@ -4259,7 +4257,7 @@ function renderEmployeeLoginDropdown(query = '') {
     const q = String(query || '').trim().toLowerCase();
 
     // เช็คว่าตอนนี้ผู้ใช้กดอยู่ที่แท็บไหน
-    const isSupervisorTab = (typeof S !== 'undefined' && S && S.loginRole === 'supervisor');
+    const isSupervisorTab = (S.loginRole === 'supervisor');
 
     const filtered = allStaff.filter(item => {
         const role = item.role.toLowerCase();
@@ -4324,32 +4322,74 @@ function renderEmployeeLoginDropdown(query = '') {
     });
 
     dropdown.innerHTML = html;
-}
-window.renderEmployeeLoginDropdown = renderEmployeeLoginDropdown;
+};
 
 // 3. ฟังก์ชันเมื่อพิมพ์ในช่อง Input
-function handleEmployeeInput(val) {
-    renderEmployeeLoginDropdown(val);
-}
-window.handleEmployeeInput = handleEmployeeInput;
+window.handleEmployeeInput = function(val) {
+    window.renderEmployeeLoginDropdown(val);
+};
 
 // 4. ฟังก์ชันเปิด/ปิด เมื่อกดปุ่ม Chevron หรือคลิกช่อง
-function toggleEmployeeLoginDropdown(e) {
+window.toggleEmployeeLoginDropdown = function(e) {
     if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     const dropdown = document.getElementById('login-employee-dropdown');
     if (!dropdown) return;
 
     if (dropdown.classList.contains('hidden')) {
         const input = document.getElementById('login-email');
-        renderEmployeeLoginDropdown(input ? input.value : '');
+        window.renderEmployeeLoginDropdown(input ? input.value : '');
     } else {
         dropdown.classList.add('hidden');
     }
-}
-window.toggleEmployeeLoginDropdown = toggleEmployeeLoginDropdown;
+};
+// ตารางระดับสิทธิ์ดึงตามภาพ Agent Identity และ Clearance Role
+const USER_LEVEL_MAP = {
+    // --- 1. SQE Support ---
+    "eueangkoon.seesanit@carrier.com": "1. SQE Support",
+    "sornchai.wongjanta@carrier.com": "1. SQE Support",
 
+    // --- 2. IQC ---
+    "anuchit.arnoon@carrier.com": "2. IQC",
+    "aphinan.phookrongnak@carrier.com": "2. IQC",
+    "eakkachai.butnet@carrier.com": "2. IQC",
+    "KAPTAN.YOOUSUK@carrier.com": "2. IQC",
+    "kraiwit.priawkudro@carrier.com": "2. IQC",
+    "pakon.muanglen@carrier.com": "2. IQC",
+    "panida.boonchamoi@carrier.com": "2. IQC",
+    "pratheep.ngoenon@carrier.com": "2. IQC",
+    "puriwat.sangjan@carrier.com": "2. IQC",
+    "Satthra.Onsawarng@carrier.com": "2. IQC",
+    "siriwan.sonkaew@carrier.com": "2. IQC",
+    "somchai.rukkachat@carrier.com": "2. IQC",
+    "supaporn.sata@carrier.com": "2. IQC",
+    "tawatchai.tathong@carrier.com": "2. IQC",
+    "theerapol.wanna@carrier.com": "2. IQC",
+    "ubonsak.j@carrier.com": "2. IQC",
+
+    // --- 3. EN / Engineer ---
+    "meechai.thawornpong@carrier.com": "3. EN / Engineer",
+    "naruemon.champa@carrier.com": "3. EN / Engineer",
+    "songporn.chaisim@carrier.com": "3. EN / Engineer",
+    "witsarut.singholsai@carrier.com": "3. EN / Engineer",
+
+    // --- 4. Supervisor ---
+    "Chiraphat.Khanthong@carrier.com": "4. Supervisor",
+    "jumnong.thongsom@carrier.com": "4. Supervisor",
+    "komson.namwicha@carrier.com": "4. Supervisor",
+    "pongpan.panna@carrier.com": "4. Supervisor",
+    "Siriporn.Prasongsuk@carrier.com": "4. Supervisor",
+    "suphap.m@carrier.com": "4. Supervisor",
+
+    // --- 5. Manager ---
+    "ekkalak.laksanasamrith@carrier.com": "5. Manager",
+    "nipawan.janpong@carrier.com": "5. Manager",
+    "watcharin.yawanopart@carrier.com": "5. Manager",
+
+    // --- 6. Admin ---
+    "natthawut.chaising@carrier.com": "6. Admin"
+};
 // 5. ฟังก์ชันเมื่อเลือกรายชื่อ
-function selectEmployeeLoginOption(email, name) {
+window.selectEmployeeLoginOption = function(email, name) {
     const emailInput = document.getElementById('login-email');
     const dropdown = document.getElementById('login-employee-dropdown');
     const passInput = document.getElementById('login-pass');
@@ -4357,15 +4397,13 @@ function selectEmployeeLoginOption(email, name) {
     if (emailInput) {
         emailInput.value = email; // ใส่ค่าอีเมลที่เลือก
         emailInput.classList.add('valid');
-        emailInput.classList.remove('invalid');
     }
 
     if (dropdown) dropdown.classList.add('hidden'); // ปิดดรอปดาวน์
     if (passInput) setTimeout(() => passInput.focus(), 50); // ไปช่องรหัสผ่าน
 
     if (typeof toast === 'function') toast(`👤 เลือกพนักงาน: ${name}`, "success");
-}
-window.selectEmployeeLoginOption = selectEmployeeLoginOption;
+};
 
 // 6. 🛡️ คลิกข้างนอกให้ปิด (Global Click)
 document.addEventListener('mousedown', (e) => {
@@ -4701,6 +4739,40 @@ function getStaffSignatureImage(name) {
     const firstName = lower.split(' ')[0] || 'default';
     return resolveSignatureAssetUrl(`./signatures/${firstName}_sig.png`);
 }
+
+function generateSignatureSvgDataUrl(name) {
+    if (!name) return "";
+    const clean = typeof cleanSignatureName === 'function' ? cleanSignatureName(name) : String(name).trim();
+    const displayName = clean || String(name).trim();
+    
+    // Hash name to create consistent aesthetic flourish and angle
+    let hash = 0;
+    for (let i = 0; i < displayName.length; i++) {
+        hash = ((hash << 5) - hash) + displayName.charCodeAt(i);
+        hash |= 0;
+    }
+    const absHash = Math.abs(hash);
+    const slant = (absHash % 7) - 3; // -3deg to +3deg
+    const fontFamilies = [
+        "'Caveat', 'Segoe Print', 'Brush Script MT', cursive",
+        "'Segoe Print', 'Caveat', 'Comic Sans MS', cursive",
+        "'Brush Script MT', 'Caveat', 'Segoe Script', cursive",
+        "'Dancing Script', 'Segoe Print', 'Caveat', cursive",
+        "'Great Vibes', 'Brush Script MT', cursive"
+    ];
+    const chosenFont = fontFamilies[absHash % fontFamilies.length];
+    const color = "#1e40af"; // Signature Blue Ink
+    
+    // Dynamic authentic vector signature with flourish
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 52" width="170" height="52">
+        <text x="8" y="32" font-family="${chosenFont}" font-size="22" font-weight="700" font-style="italic" fill="${color}" transform="rotate(${slant} 85 26)">${displayName}</text>
+        <path d="M 6 ${38 + (absHash % 3)} Q ${40 + (absHash % 20)} ${34 + (absHash % 5)}, ${100 + (absHash % 20)} ${37 + (absHash % 4)} T 162 ${35 + (absHash % 4)}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
+    </svg>`;
+    
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+window.generateSignatureSvgDataUrl = generateSignatureSvgDataUrl;
 window.getStaffSignatureImage = getStaffSignatureImage;
 window.SIG_LIBRARY = SIG_LIBRARY;
 
@@ -5342,14 +5414,7 @@ document.addEventListener('contextmenu', e => e.preventDefault());
 const $id = id => document.getElementById(id);
 
 function hasWriteAccess() {
-    // ถ้าเป็น Master Admin ให้ผ่านตลอด
-    if (S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com') return true;
-
-    // ถ้าเข้าสู่ระบบในโหมด SQE Support หรือบทบาทไม่ใช่ supervisor ให้มีสิทธิ์แก้ไข/จัดการงานของตนเอง
-    if (S.userRole !== 'supervisor') return true;
-
-    toast('⚠️ โหมดหัวหน้างาน: อ่านข้อมูลได้อย่างเดียวไม่สามารถแก้ไขได้ ยกเว้นงานของตนเอง', 'error'); 
-    return false;
+    return true;
 }
 
 function generateUUID() {
@@ -5449,31 +5514,62 @@ window.fetchDbUsersForDirectory = async function() {
     try {
         const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
         if (!sb) return;
+
+        // 1. ดึงข้อมูลจากตาราง 'profiles' (เปลี่ยนจาก users เดิม)
+        // ดึงคอลัมน์ที่มีอยู่จริงในฐานข้อมูลคุณ: email, display_name, role, status
         const { data, error } = await sb
-            .from('users')
-            .select('email, display_name, role, status, department')
+            .from('profiles') 
+            .select('email, display_name, role, status') 
             .order('email', { ascending: true });
             
-        if (!error && Array.isArray(data) && data.length > 0) {
+        if (error) {
+            console.error('Supabase Fetch Error:', error.message);
+            return;
+        }
+
+        if (Array.isArray(data) && data.length > 0) {
+            // 2. ล้างข้อมูลเก่าใน Memory Map และเติมข้อมูลใหม่จาก DB 32 คน
             window._dbUsersRoleMap.clear();
             data.forEach(u => {
                 if (u && u.email) {
                     const em = u.email.toLowerCase().trim();
                     window._dbUsersRoleMap.set(em, {
                         email: u.email,
-                        display_name: u.display_name || '',
+                        display_name: u.display_name || u.email.split('@')[0].toUpperCase(),
                         role: u.role || 'staff',
-                        status: u.status || 'active',
-                        department: u.department || ''
+                        status: u.status || 'active'
                     });
                 }
             });
-            console.log(`[Users DB] Synced ${data.length} users with real roles from DB.`);
+            
+            console.log(`[Profiles DB] Success: Synced ${data.length} users to memory.`);
+
+            // 3. 🎯 จุดสำคัญที่สุด: สั่งให้ UI วาดรายการในดรอปดาวน์ใหม่ทันที
+            // เพื่อให้รายชื่อ 32 คนไปปรากฏในช่อง "Select Operator / Staff"
+            if (typeof window.loadStaffList === 'function') {
+                window.loadStaffList();
+            }
+            
+            // ถ้าดรอปดาวน์เปิดอยู่ ให้ Render ใหม่ด้วย
+            if (typeof window.renderStaffCustomDropdown === 'function') {
+                window.renderStaffCustomDropdown('');
+            }
+        } else {
+            console.log('No data found in profiles table');
         }
     } catch (e) {
         console.warn('fetchDbUsersForDirectory error:', e);
     }
 };
+
+// สั่งรันครั้งแรกทันทีที่โหลดสคริปต์ (รอ 500ms ให้ Client พร้อม)
+if (typeof setTimeout === 'function') {
+    setTimeout(() => {
+        if (typeof window.fetchDbUsersForDirectory === 'function') {
+            window.fetchDbUsersForDirectory();
+        }
+    }, 500);
+}
 
 // Initial sync
 if (typeof setTimeout === 'function') {
@@ -5568,7 +5664,8 @@ window.getEngineeringAndApprovalDirectory = function() {
         { name: "Ms.Songporn C.", email: "songporn.chaisim@carrier.com", role: "ENGINEER", cat: "5. สายการอนุมัติเอกสาร (Engineer & Approver)" },
         { name: "Mr.Witsarut S.", email: "witsarut.singholsai@carrier.com", role: "SUPERVISOR", cat: "5. สายการอนุมัติเอกสาร (Supervisor & Approver)" },
         { name: "Mr.Chiraphat K.", email: "Chiraphat.Khanthong@carrier.com", role: "SUPERVISOR", cat: "5. สายการอนุมัติเอกสาร (Supervisor & Approver)" },
-        { name: "Ms.Naruemon C.", email: "naruemon.champa@carrier.com", role: "ENGINEER", cat: "5. สายการอนุมัติเอกสาร (Engineer & Approver)" }
+        { name: "Ms.Naruemon C.", email: "naruemon.champa@carrier.com", role: "ENGINEER", cat: "5. สายการอนุมัติเอกสาร (Engineer & Approver)" },
+        { name: "Mr.Suphap M.", email: "suphap.m@carrier.com", role: "SUPERVISOR", cat: "5. สายการอนุมัติเอกสาร (Supervisor & Approver)" }
     ];
     baseApprovalMatrix.forEach(item => addEntry(item.name, item.email, item.role, item.cat));
 
@@ -5831,30 +5928,53 @@ function switchLoginTab(role) {
     S.loginRole = isSupport ? 'sqe_support' : 'supervisor';
     const tabSupport = $id('tab-support');
     const tabSupervisor = $id('tab-supervisor');
-    const emailGroup = $id('email-input-group');
+    const wrap = $id('employee-select-wrap');
     const passField = $id('password-field');
-    const quickSelectWrap = $id('supervisor-quick-select-wrap');
     const btnText = $id('login-btn-text');
+    const badge = $id('login-role-badge') || document.querySelector('#employee-select-wrap span.bg-blue-950\\/70, #employee-select-wrap span.bg-orange-950\\/70');
+    const label = $id('login-role-label') || document.querySelector('#employee-select-wrap span.text-blue-300, #employee-select-wrap span.text-orange-300');
+    const emailInput = $id('login-email');
 
     if (tabSupport) tabSupport.classList.toggle('active', isSupport);
     if (tabSupervisor) tabSupervisor.classList.toggle('active', !isSupport);
     
-    // โหมด SQE Support: แสดง Access Email และ Security Key ปกติ, ซ่อน Approver Select
-    // โหมด SUPERVISOR: ซ่อน Access Email และ Security Key, แสดงเฉพาะ Approver/Engineer Select ช่องเดียว
-    if (emailGroup) {
-        emailGroup.style.display = isSupport ? 'block' : 'none';
-        emailGroup.classList.toggle('hidden', !isSupport);
+    // อัปเดต Badge และ Label ให้ตรงตามแท็บที่เลือก
+    if (badge) {
+        badge.textContent = isSupport ? '👤 SQE SUPPORT' : '👤 SQE SUPPORT';
+        badge.className = isSupport 
+            ? 'text-[8.5px] font-black text-blue-400 uppercase tracking-wider bg-blue-950/70 px-2 py-0.5 rounded border border-blue-500/40 whitespace-nowrap shrink-0'
+            : 'text-[8.5px] font-black text-blue-400 uppercase tracking-wider bg-blue-950/70 px-2 py-0.5 rounded border border-blue-500/40 whitespace-nowrap shrink-0';
     }
+    if (label) {
+        label.textContent = 'SELECT OPERATOR / STAFF';
+        label.className = 'text-[9px] font-black uppercase tracking-wider text-blue-300';
+    }
+    if (emailInput) {
+        emailInput.placeholder = '🔍 ค้นหาชื่อพนักงาน หรือทีมที่สังกัด...';
+    }
+
     if (passField) {
-        passField.style.display = isSupport ? 'block' : 'none';
-        passField.classList.toggle('hidden', !isSupport);
+        // SQE Support require password field, Supervisor login hides password field immediately
+        if (isSupport) {
+            passField.style.display = 'block';
+            passField.classList.remove('hidden');
+        } else {
+            passField.style.display = 'none';
+            passField.classList.add('hidden');
+            const passInput = $id('login-pass');
+            if (passInput) passInput.value = '';
+        }
     }
-    if (quickSelectWrap) {
-        quickSelectWrap.style.display = !isSupport ? 'block' : 'none';
-        quickSelectWrap.classList.toggle('hidden', isSupport);
+
+    if (btnText) {
+        btnText.textContent = !isSupport ? 'INITIALIZE SUPERVISOR SESSION' : 'INITIALIZE SESSION';
     }
-    if (btnText) btnText.textContent = !isSupport ? 'INITIALIZE SUPERVISOR SESSION' : 'INITIALIZE SESSION';
     $id('login-error')?.classList.add('hidden');
+
+    const dropdown = $id('login-employee-dropdown');
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+        window.renderEmployeeLoginDropdown(emailInput ? emailInput.value : '');
+    }
 
     if (!isSupport && typeof window.fetchDbUsersForDirectory === 'function') {
         window.fetchDbUsersForDirectory();
@@ -5865,6 +5985,804 @@ function togglePassVis() {
     const inp = $id('login-pass');
     inp.type = inp.type === 'password' ? 'text' : 'password';
 }
+
+/* ============================================================
+   🌌 ANIMATED CYBER CONSTELLATION BACKGROUND
+   ============================================================ */
+function initLoginConstellationParticles() {
+    const canvas = document.getElementById('login-particles-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let width = (canvas.width = window.innerWidth || document.documentElement.clientWidth || 1200);
+    let height = (canvas.height = window.innerHeight || document.documentElement.clientHeight || 800);
+
+    const onResize = () => {
+        if (!canvas) return;
+        width = canvas.width = window.innerWidth || document.documentElement.clientWidth || 1200;
+        height = canvas.height = window.innerHeight || document.documentElement.clientHeight || 800;
+    };
+    window.addEventListener('resize', onResize);
+
+    const mouse = { x: null, y: null, radius: 150 };
+    window.addEventListener('mousemove', (e) => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+    });
+    window.addEventListener('mouseleave', () => {
+        mouse.x = null;
+        mouse.y = null;
+    });
+
+    const particles = [];
+    const count = Math.min(Math.floor((width * height) / 12000), 95);
+
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            vx: (Math.random() - 0.5) * 0.55,
+            vy: (Math.random() - 0.5) * 0.55,
+            radius: Math.random() * 2.2 + 1.2,
+            color: Math.random() > 0.6 ? '#38bdf8' : (Math.random() > 0.3 ? '#60a5fa' : '#a5f3fc'),
+            alpha: Math.random() * 0.6 + 0.4,
+            pulseSpeed: Math.random() * 0.03 + 0.015,
+            pulseVal: Math.random() * Math.PI * 2
+        });
+    }
+
+    // Shooting stars
+    const shootingStars = [];
+    function createShootingStar() {
+        if (shootingStars.length < 2 && Math.random() < 0.03) {
+            shootingStars.push({
+                x: Math.random() * width * 0.8,
+                y: Math.random() * height * 0.4,
+                len: Math.random() * 80 + 50,
+                speed: Math.random() * 6 + 4,
+                angle: Math.PI / 4 + (Math.random() - 0.5) * 0.2,
+                opacity: 1
+            });
+        }
+    }
+
+    let animFrameId = null;
+
+    function render() {
+        const loginView = document.getElementById('login-view');
+        if (loginView && (loginView.classList.contains('hidden-view') || loginView.style.display === 'none')) {
+            animFrameId = requestAnimationFrame(render);
+            return;
+        }
+
+        ctx.clearRect(0, 0, width, height);
+
+        // Update & Render Shooting Stars
+        createShootingStar();
+        for (let s = shootingStars.length - 1; s >= 0; s--) {
+            const star = shootingStars[s];
+            star.x += Math.cos(star.angle) * star.speed;
+            star.y += Math.sin(star.angle) * star.speed;
+            star.opacity -= 0.015;
+
+            if (star.opacity <= 0 || star.x > width || star.y > height) {
+                shootingStars.splice(s, 1);
+                continue;
+            }
+
+            const tailX = star.x - Math.cos(star.angle) * star.len;
+            const tailY = star.y - Math.sin(star.angle) * star.len;
+
+            const grad = ctx.createLinearGradient(star.x, star.y, tailX, tailY);
+            grad.addColorStop(0, `rgba(255, 255, 255, ${star.opacity})`);
+            grad.addColorStop(0.3, `rgba(56, 189, 248, ${star.opacity * 0.7})`);
+            grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+
+            ctx.beginPath();
+            ctx.moveTo(star.x, star.y);
+            ctx.lineTo(tailX, tailY);
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+
+        // Render Particles
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+
+            if (p.x < 0) p.x = width;
+            else if (p.x > width) p.x = 0;
+            if (p.y < 0) p.y = height;
+            else if (p.y > height) p.y = 0;
+
+            p.pulseVal += p.pulseSpeed;
+            const currentAlpha = p.alpha * (0.65 + 0.35 * Math.sin(p.pulseVal));
+
+            // Mouse interaction
+            if (mouse.x !== null && mouse.y !== null) {
+                const mdx = p.x - mouse.x;
+                const mdy = p.y - mouse.y;
+                const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
+                if (mdist < mouse.radius) {
+                    const force = (1 - mdist / mouse.radius) * 0.6;
+                    p.x += (mdx / mdist) * force * 1.5;
+                    p.y += (mdy / mdist) * force * 1.5;
+
+                    // Draw line to mouse
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(mouse.x, mouse.y);
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.globalAlpha = (1 - mdist / mouse.radius) * 0.35;
+                    ctx.lineWidth = 0.9;
+                    ctx.stroke();
+                }
+            }
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = currentAlpha;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = p.color;
+            ctx.fill();
+
+            for (let j = i + 1; j < particles.length; j++) {
+                const p2 = particles[j];
+                const dx = p.x - p2.x;
+                const dy = p.y - p2.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 135) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.globalAlpha = (1 - dist / 135) * 0.22;
+                    ctx.lineWidth = 0.85;
+                    ctx.shadowBlur = 0;
+                    ctx.stroke();
+                }
+            }
+        }
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        animFrameId = requestAnimationFrame(render);
+    }
+
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+    render();
+}
+
+window.initLoginConstellationParticles = initLoginConstellationParticles;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLoginConstellationParticles);
+} else {
+    initLoginConstellationParticles();
+}
+
+/* ============================================================
+   ✏️ QC EVIDENCE IMAGE ANNOTATOR & MARKUP SYSTEM (100% MATCH)
+   ============================================================ */
+window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
+    if (!imageUrl) return;
+
+    const existing = document.getElementById('evidence-annotator-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'evidence-annotator-modal';
+    overlay.className = 'annotator-modal-overlay';
+    
+    overlay.innerHTML = `
+        <div class="annotator-container">
+            <!-- Header Bar (White Background with Title, Subtitle, Close and Save buttons) -->
+            <div class="annotator-header">
+                <div class="annotator-header-left">
+                    <span class="annotator-header-icon">✏️</span>
+                    <div class="annotator-header-text">
+                        <div class="annotator-title">
+                            Evidence Defect Annotator (ใส่สัญลักษณ์ & ข้อความชี้จุดบกพร่อง)
+                        </div>
+                        <div class="annotator-subtitle">
+                            ลากวาดลูกศร, วงกลม, กรอบสี่เหลี่ยม, เส้นตรง, ปากกา, พิมพ์ข้อความ พร้อมระบบ Pan & Zoom ส่องตรวจความละเอียดสูง
+                        </div>
+                    </div>
+                </div>
+                <div class="annotator-header-actions">
+                    <button type="button" id="annotator-close-btn" class="annotator-header-btn btn-close-modal" title="ปิดหน้าต่าง">
+                        ✕ ปิด
+                    </button>
+                    <button type="button" id="annotator-save-btn" class="annotator-header-btn btn-save-modal" title="บันทึกลงเอกสาร">
+                        <span style="font-size:14px;">💾</span> บันทึกลงเอกสาร
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Floating Control Bar -->
+            <div class="annotator-floating-toolbar-wrap">
+                <div class="annotator-floating-toolbar">
+                    <!-- Tool Selection Group -->
+                    <div class="annotator-pill-group tool-selection-group">
+                        <button type="button" class="annotator-pill-btn active" data-tool="arrow" title="วาดลูกศร (Arrow)">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" data-tool="circle" title="วาดวงกลม / วงรี (Circle / Oval)">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"></circle></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" data-tool="rect" title="วาดกรอบสี่เหลี่ยม (Rectangle)">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" data-tool="line" title="วาดเส้นตรง (Straight Line)">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"></line></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" data-tool="pen" title="ปากกาวาดอิสระ (Freehand Pen)">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" data-tool="text" title="พิมพ์ข้อความชี้จุด (Text / Label)">
+                            <span style="font-size:12px; font-weight:900; font-family:sans-serif;">abc</span>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" data-tool="crop" title="ตัดเฉพาะส่วน (Crop)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" data-tool="pan" title="เลื่อนภาพ (Hand / Pan Tool)">
+                            <span style="font-size:13px;">✋</span>
+                        </button>
+                    </div>
+
+                    <!-- History Group -->
+                    <div class="annotator-pill-group">
+                        <button type="button" class="annotator-pill-btn" id="annotator-undo-btn" title="ย้อนกลับ (Undo)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" id="annotator-redo-btn" title="ทำซ้ำ (Redo)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" id="annotator-flip-btn" title="กลับด้านภาพ (Flip Horizontal)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+                        </button>
+                    </div>
+
+                    <!-- Color Picker Group -->
+                    <div class="annotator-pill-group color-picker-group" style="position:relative;">
+                        <button type="button" class="annotator-pill-btn" id="annotator-color-trigger" style="display:inline-flex; align-items:center; gap:5px; font-weight:800; font-size:11.5px; color:#334155; padding:4px 10px;" title="เลือกสีลายเส้นและข้อความ">
+                            <span id="current-color-dot" style="width:11px; height:11px; border-radius:50%; background:#ef4444; display:inline-block; border:1px solid rgba(0,0,0,0.15);"></span>
+                            <span style="font-size:13px;">🎨</span> สี
+                        </button>
+                        <input type="color" id="native-color-picker" value="#ef4444" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;" />
+                        <div id="annotator-color-palette" class="annotator-color-popover" style="display:none;">
+                            <div class="color-swatch active" data-color="#ef4444" style="background:#ef4444;" title="แดง"></div>
+                            <div class="color-swatch" data-color="#f97316" style="background:#f97316;" title="ส้ม"></div>
+                            <div class="color-swatch" data-color="#eab308" style="background:#eab308;" title="เหลือง"></div>
+                            <div class="color-swatch" data-color="#22c55e" style="background:#22c55e;" title="เขียว"></div>
+                            <div class="color-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="ฟ้า"></div>
+                            <div class="color-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="น้ำเงิน"></div>
+                            <div class="color-swatch" data-color="#a855f7" style="background:#a855f7;" title="ม่วง"></div>
+                            <div class="color-swatch" data-color="#ffffff" style="background:#ffffff; border:1px solid #cbd5e1;" title="ขาว"></div>
+                            <div class="color-swatch" data-color="#000000" style="background:#000000;" title="ดำ"></div>
+                        </div>
+                    </div>
+
+                    <!-- Stroke Width Group -->
+                    <div class="annotator-pill-group stroke-size-group">
+                        <button type="button" class="annotator-pill-btn" data-size="2" title="ขนาดเส้น 2px">2px</button>
+                        <button type="button" class="annotator-pill-btn active" data-size="4" title="ขนาดเส้น 4px">4px</button>
+                        <button type="button" class="annotator-pill-btn" data-size="7" title="ขนาดเส้น 7px">7px</button>
+                    </div>
+
+                    <!-- Zoom Controls Group -->
+                    <div class="annotator-pill-group zoom-control-group">
+                        <button type="button" class="annotator-pill-btn" id="annotator-zoom-out-btn" title="ซูมออก (−)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        </button>
+                        <span id="annotator-zoom-label" class="annotator-zoom-display" title="ระดับการซูมปัจจุบัน">100%</span>
+                        <button type="button" class="annotator-pill-btn" id="annotator-zoom-in-btn" title="ซูมเข้า (+)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" id="annotator-zoom-fit-btn" title="ปรับขนาดพอดีหน้าจอ (Fit Screen)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                        </button>
+                    </div>
+
+                    <!-- Rotate & Action Group -->
+                    <div class="annotator-pill-group action-tools-group">
+                        <button type="button" class="annotator-pill-btn" id="annotator-rotate-left-btn" title="หมุนทวนเข็มนาฬิกา 90°">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" id="annotator-rotate-right-btn" title="หมุนตามเข็มนาฬิกา 90°">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn btn-clear-canvas" id="annotator-clear-btn" title="ล้างการวาดทั้งหมด">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Canvas Viewport with Pan & Zoom -->
+            <div class="annotator-canvas-viewport" id="annotator-viewport">
+                <div class="annotator-stage" id="annotator-stage">
+                    <canvas id="annotator-canvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Bottom Floating Help Bar -->
+            <div class="annotator-bottom-help">
+                <div class="help-pill">
+                    <span style="font-size:13px;">💡</span> หมุนล้อเมาส์เพื่อซูมเข้า-ออก | กด Spacebar ค้างไว้หรือเลือก ✋ เพื่อลากเลื่อนภาพ (Pan)
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const canvas = overlay.querySelector('#annotator-canvas');
+    const ctx = canvas.getContext('2d');
+    const viewport = overlay.querySelector('#annotator-viewport');
+    const stage = overlay.querySelector('#annotator-stage');
+    const zoomLabel = overlay.querySelector('#annotator-zoom-label');
+    const colorDot = overlay.querySelector('#current-color-dot');
+    const colorPopover = overlay.querySelector('#annotator-color-palette');
+    const colorTrigger = overlay.querySelector('#annotator-color-trigger');
+    const nativeColorPicker = overlay.querySelector('#native-color-picker');
+
+    let currentTool = 'arrow'; // 'arrow' | 'circle' | 'rect' | 'line' | 'pen' | 'text' | 'crop' | 'pan'
+    let currentColor = '#ef4444';
+    let currentLineWidth = 4;
+    let isDrawing = false;
+    let isPanning = false;
+    let spacePressed = false;
+    let startX = 0;
+    let startY = 0;
+    let panStartX = 0;
+    let panStartY = 0;
+    let currentZoom = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let rotationAngle = 0;
+
+    let history = []; // Canvas snapshot states
+    let redoStack = [];
+
+    const baseImage = new Image();
+    baseImage.crossOrigin = 'anonymous';
+
+    function updateTransform() {
+        if (!stage) return;
+        stage.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+        if (zoomLabel) {
+            zoomLabel.textContent = `${Math.round(currentZoom * 100)}%`;
+        }
+    }
+
+    function fitToScreen() {
+        if (!canvas.width || !canvas.height || !viewport) return;
+        const pad = 60;
+        const availW = Math.max(200, viewport.clientWidth - pad);
+        const availH = Math.max(200, viewport.clientHeight - pad);
+        const scaleX = availW / canvas.width;
+        const scaleY = availH / canvas.height;
+        currentZoom = Math.min(1.5, Math.max(0.2, Math.min(scaleX, scaleY)));
+        panX = 0;
+        panY = 0;
+        updateTransform();
+    }
+
+    function saveHistory() {
+        if (history.length > 30) history.shift();
+        history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        redoStack = [];
+    }
+
+    baseImage.onload = () => {
+        canvas.width = baseImage.naturalWidth || baseImage.width || 1200;
+        canvas.height = baseImage.naturalHeight || baseImage.height || 800;
+        ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
+        saveHistory();
+        setTimeout(fitToScreen, 50);
+    };
+    baseImage.src = imageUrl;
+
+    // Tool switching
+    overlay.querySelectorAll('[data-tool]').forEach(btn => {
+        btn.onclick = () => {
+            overlay.querySelectorAll('[data-tool]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentTool = btn.getAttribute('data-tool');
+            if (currentTool === 'pan') {
+                viewport.style.cursor = 'grab';
+            } else {
+                viewport.style.cursor = 'crosshair';
+            }
+        };
+    });
+
+    // Stroke width
+    overlay.querySelectorAll('[data-size]').forEach(btn => {
+        btn.onclick = () => {
+            overlay.querySelectorAll('[data-size]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentLineWidth = parseInt(btn.getAttribute('data-size'), 10) || 4;
+        };
+    });
+
+    // Color picker
+    if (colorTrigger && colorPopover) {
+        colorTrigger.onclick = (e) => {
+            e.stopPropagation();
+            colorPopover.style.display = colorPopover.style.display === 'flex' ? 'none' : 'flex';
+        };
+
+        colorPopover.querySelectorAll('.color-swatch').forEach(sw => {
+            sw.onclick = (e) => {
+                e.stopPropagation();
+                colorPopover.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                sw.classList.add('active');
+                currentColor = sw.getAttribute('data-color');
+                if (colorDot) colorDot.style.background = currentColor;
+                colorPopover.style.display = 'none';
+            };
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!colorPopover.contains(e.target) && e.target !== colorTrigger) {
+                colorPopover.style.display = 'none';
+            }
+        });
+    }
+
+    // Zoom Controls
+    const zoomInBtn = overlay.querySelector('#annotator-zoom-in-btn');
+    const zoomOutBtn = overlay.querySelector('#annotator-zoom-out-btn');
+    const zoomFitBtn = overlay.querySelector('#annotator-zoom-fit-btn');
+
+    if (zoomInBtn) {
+        zoomInBtn.onclick = () => {
+            currentZoom = Math.min(4.0, currentZoom + 0.15);
+            updateTransform();
+        };
+    }
+    if (zoomOutBtn) {
+        zoomOutBtn.onclick = () => {
+            currentZoom = Math.max(0.15, currentZoom - 0.15);
+            updateTransform();
+        };
+    }
+    if (zoomFitBtn) {
+        zoomFitBtn.onclick = () => {
+            fitToScreen();
+        };
+    }
+
+    // Wheel Zoom
+    viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
+        const newZoom = Math.min(4.0, Math.max(0.15, currentZoom * zoomFactor));
+        currentZoom = newZoom;
+        updateTransform();
+    }, { passive: false });
+
+    // Rotate Actions
+    async function rotateCanvas(angleDeg) {
+        const offCanvas = document.createElement('canvas');
+        const offCtx = offCanvas.getContext('2d');
+        const is90or270 = Math.abs(angleDeg % 180) === 90;
+        offCanvas.width = is90or270 ? canvas.height : canvas.width;
+        offCanvas.height = is90or270 ? canvas.width : canvas.height;
+
+        offCtx.translate(offCanvas.width / 2, offCanvas.height / 2);
+        offCtx.rotate((angleDeg * Math.PI) / 180);
+        offCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+
+        canvas.width = offCanvas.width;
+        canvas.height = offCanvas.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(offCanvas, 0, 0);
+
+        saveHistory();
+        fitToScreen();
+    }
+
+    const rotLeftBtn = overlay.querySelector('#annotator-rotate-left-btn');
+    const rotRightBtn = overlay.querySelector('#annotator-rotate-right-btn');
+    if (rotLeftBtn) rotLeftBtn.onclick = () => rotateCanvas(-90);
+    if (rotRightBtn) rotRightBtn.onclick = () => rotateCanvas(90);
+
+    // Flip horizontal
+    const flipBtn = overlay.querySelector('#annotator-flip-btn');
+    if (flipBtn) {
+        flipBtn.onclick = () => {
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d');
+            offCanvas.width = canvas.width;
+            offCanvas.height = canvas.height;
+            offCtx.translate(canvas.width, 0);
+            offCtx.scale(-1, 1);
+            offCtx.drawImage(canvas, 0, 0);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(offCanvas, 0, 0);
+            saveHistory();
+        };
+    }
+
+    // Undo / Redo
+    const undoBtn = overlay.querySelector('#annotator-undo-btn');
+    const redoBtn = overlay.querySelector('#annotator-redo-btn');
+
+    if (undoBtn) {
+        undoBtn.onclick = () => {
+            if (history.length > 1) {
+                const popped = history.pop();
+                redoStack.push(popped);
+                const prevState = history[history.length - 1];
+                canvas.width = prevState.width;
+                canvas.height = prevState.height;
+                ctx.putImageData(prevState, 0, 0);
+            }
+        };
+    }
+
+    if (redoBtn) {
+        redoBtn.onclick = () => {
+            if (redoStack.length > 0) {
+                const nextState = redoStack.pop();
+                history.push(nextState);
+                canvas.width = nextState.width;
+                canvas.height = nextState.height;
+                ctx.putImageData(nextState, 0, 0);
+            }
+        };
+    }
+
+    // Clear
+    const clearBtn = overlay.querySelector('#annotator-clear-btn');
+    if (clearBtn) {
+        clearBtn.onclick = () => {
+            if (history.length > 0) {
+                const initial = history[0];
+                canvas.width = initial.width;
+                canvas.height = initial.height;
+                ctx.putImageData(initial, 0, 0);
+                history = [initial];
+                redoStack = [];
+                if (typeof toast === 'function') toast('🗑️ ล้างการวาดทั้งหมดเรียบร้อยแล้ว', 'info');
+            }
+        };
+    }
+
+    // Spacebar Pan Key Listener
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !spacePressed && e.target.tagName !== 'INPUT') {
+            spacePressed = true;
+            viewport.style.cursor = 'grab';
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+            spacePressed = false;
+            if (currentTool !== 'pan') {
+                viewport.style.cursor = 'crosshair';
+            }
+        }
+    });
+
+    function getCanvasCoordinates(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
+    }
+
+    function drawArrow(targetCtx, fromx, fromy, tox, toy, headlen, color, width) {
+        const angle = Math.atan2(toy - fromy, tox - fromx);
+        targetCtx.beginPath();
+        targetCtx.moveTo(fromx, fromy);
+        targetCtx.lineTo(tox, toy);
+        targetCtx.strokeStyle = color;
+        targetCtx.lineWidth = width;
+        targetCtx.lineCap = 'round';
+        targetCtx.lineJoin = 'round';
+        targetCtx.stroke();
+
+        targetCtx.beginPath();
+        targetCtx.moveTo(tox, toy);
+        targetCtx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+        targetCtx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+        targetCtx.closePath();
+        targetCtx.fillStyle = color;
+        targetCtx.fill();
+    }
+
+    function drawCircle(targetCtx, x1, y1, x2, y2, color, width) {
+        const centerX = (x1 + x2) / 2;
+        const centerY = (y1 + y2) / 2;
+        const radiusX = Math.abs(x2 - x1) / 2;
+        const radiusY = Math.abs(y2 - y1) / 2;
+
+        targetCtx.beginPath();
+        targetCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+        targetCtx.strokeStyle = color;
+        targetCtx.lineWidth = width;
+        targetCtx.stroke();
+    }
+
+    function drawRect(targetCtx, x1, y1, x2, y2, color, width) {
+        const w = x2 - x1;
+        const h = y2 - y1;
+        targetCtx.beginPath();
+        targetCtx.strokeStyle = color;
+        targetCtx.lineWidth = width;
+        targetCtx.strokeRect(x1, y1, w, h);
+    }
+
+    function drawLine(targetCtx, x1, y1, x2, y2, color, width) {
+        targetCtx.beginPath();
+        targetCtx.moveTo(x1, y1);
+        targetCtx.lineTo(x2, y2);
+        targetCtx.strokeStyle = color;
+        targetCtx.lineWidth = width;
+        targetCtx.lineCap = 'round';
+        targetCtx.stroke();
+    }
+
+    // Text tool input creation
+    function promptAddText(coords) {
+        const textStr = prompt('✏️ กรอกข้อความที่ต้องการใส่บนภาพ (Defect Note):', 'จุดบกพร่อง');
+        if (!textStr || !textStr.trim()) return;
+
+        const fontSize = Math.max(16, currentLineWidth * 6);
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        const textMetrics = ctx.measureText(textStr);
+        const padding = 8;
+        const boxWidth = textMetrics.width + (padding * 2);
+        const boxHeight = fontSize + (padding * 2);
+
+        // Draw pill label background
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.strokeStyle = currentColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(coords.x, coords.y - boxHeight, boxWidth, boxHeight, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw text
+        ctx.fillStyle = currentColor === '#ffffff' ? '#ffffff' : '#ffffff';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(textStr, coords.x + padding, coords.y - (boxHeight / 2));
+
+        saveHistory();
+    }
+
+    // Mouse & Touch events
+    function handlePointerDown(e) {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        // Check if middle click or spacebar or pan tool
+        if (e.button === 1 || e.button === 2 || spacePressed || currentTool === 'pan') {
+            isPanning = true;
+            panStartX = clientX - panX;
+            panStartY = clientY - panY;
+            viewport.style.cursor = 'grabbing';
+            e.preventDefault();
+            return;
+        }
+
+        if (e.button !== 0 && !e.touches) return;
+
+        const coords = getCanvasCoordinates(clientX, clientY);
+        startX = coords.x;
+        startY = coords.y;
+
+        if (currentTool === 'text') {
+            promptAddText(coords);
+            return;
+        }
+
+        isDrawing = true;
+
+        if (currentTool === 'pen') {
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = currentLineWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+        }
+    }
+
+    function handlePointerMove(e) {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        if (isPanning) {
+            panX = clientX - panStartX;
+            panY = clientY - panStartY;
+            updateTransform();
+            return;
+        }
+
+        if (!isDrawing) return;
+
+        const coords = getCanvasCoordinates(clientX, clientY);
+
+        if (currentTool === 'pen') {
+            ctx.lineTo(coords.x, coords.y);
+            ctx.stroke();
+        } else {
+            // Restore snapshot to preview shape
+            const lastState = history[history.length - 1];
+            if (lastState) ctx.putImageData(lastState, 0, 0);
+
+            if (currentTool === 'arrow') {
+                drawArrow(ctx, startX, startY, coords.x, coords.y, currentLineWidth * 4.5, currentColor, currentLineWidth);
+            } else if (currentTool === 'circle') {
+                drawCircle(ctx, startX, startY, coords.x, coords.y, currentColor, currentLineWidth);
+            } else if (currentTool === 'rect') {
+                drawRect(ctx, startX, startY, coords.x, coords.y, currentColor, currentLineWidth);
+            } else if (currentTool === 'line') {
+                drawLine(ctx, startX, startY, coords.x, coords.y, currentColor, currentLineWidth);
+            }
+        }
+    }
+
+    function handlePointerUp(e) {
+        if (isPanning) {
+            isPanning = false;
+            viewport.style.cursor = (spacePressed || currentTool === 'pan') ? 'grab' : 'crosshair';
+        }
+        if (!isDrawing) return;
+        isDrawing = false;
+        saveHistory();
+    }
+
+    viewport.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+
+    viewport.addEventListener('touchstart', handlePointerDown, { passive: false });
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
+    window.addEventListener('touchend', handlePointerUp);
+
+    viewport.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Close
+    overlay.querySelector('#annotator-close-btn').onclick = () => {
+        window.removeEventListener('mousemove', handlePointerMove);
+        window.removeEventListener('mouseup', handlePointerUp);
+        window.removeEventListener('touchmove', handlePointerMove);
+        window.removeEventListener('touchend', handlePointerUp);
+        overlay.remove();
+    };
+
+    // Save
+    overlay.querySelector('#annotator-save-btn').onclick = () => {
+        const annotatedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        if (typeof onSave === 'function') {
+            onSave(annotatedDataUrl);
+        }
+        window.removeEventListener('mousemove', handlePointerMove);
+        window.removeEventListener('mouseup', handlePointerUp);
+        window.removeEventListener('touchmove', handlePointerMove);
+        window.removeEventListener('touchend', handlePointerUp);
+        overlay.remove();
+        if (typeof toast === 'function') {
+            toast('💾 บันทึกรูปภาพหลักฐานและมาร์กจุดบกพร่องลงเอกสารเรียบร้อย', 'success');
+        }
+    };
+};
 
 /* ============================================================
    INTEGRATED LOGIN SYSTEM (V5.6 - FIXED & UNIFIED)
@@ -6815,6 +7733,9 @@ function handleLogout() {
     if (loginView) {
         loginView.classList.remove('hidden-view');
         loginView.style.display = 'flex';
+        if (typeof initLoginConstellationParticles === 'function') {
+            initLoginConstellationParticles();
+        }
     }
 
     // แจ้งเตือนผู้ใช้
@@ -6857,9 +7778,9 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         showBtn.classList.remove('hidden');
         gsap.set(showBtn, { x: 0, opacity: 1 });
     }
-// --- [ส่วนที่แก้ไข]: ตรวจสอบสิทธิ์ Master Admin ---
+
+    // ตรวจสอบประเภทการ Login
     const isSupervisorSession = (S.loginRole === 'supervisor');
-    const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
 
     if (isSupervisorSession) { 
         // ==========================================
@@ -6867,57 +7788,48 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         // ==========================================
         S.userRole = 'supervisor';
 
-        // ✅ แสดงช่องเลือกรายชื่อพนักงานเสมอ (เพื่อให้ Admin เลือกบันทึกงานแทนคนอื่นได้)
+        // ✅ แสดงช่องเลือกรายชื่อพนักงาน (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.remove('hidden');
-            staffWrap.classList.add('flex');
+            staffWrap.classList.add('flex'); // ใช้ flex เพื่อให้ตำแหน่งสวยงามตามดีไซน์
         }
 
         await loadStaffList(); 
 
-        // 🎯 [เงื่อนไขพิเศษสำหรับ Master Admin]
-        if (isMasterAdmin) {
-            // แอดมิน: ให้แสดงปุ่มเปิดฟอร์ม และเปิดให้พิมพ์ได้เหมือน IQC
-            if (showBtn) showBtn.style.display = 'flex';
-            const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
-            if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
+        // จัดการ UI เพิ่มเติมสำหรับ Supervisor
+        if (showBtn) showBtn.style.display = 'none'; 
+        const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
+        if (internalCloseBtn) internalCloseBtn.style.display = 'none';
 
-            const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
-            formInputs.forEach(el => {
-                el.disabled = false;
-                el.style.opacity = '1';
-                el.style.cursor = 'default';
-            });
-            console.log("Master Admin: Write Access Granted in Supervisor Mode");
-        } else {
-            // หัวหน้างานทั่วไป: ปิดการใช้งานฟอร์ม (Read-only)
-            if (showBtn) showBtn.style.display = 'none'; 
-            const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
-            if (internalCloseBtn) internalCloseBtn.style.display = 'none';
-
-            const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
-            formInputs.forEach(el => {
-                el.disabled = true;
-                el.style.opacity = '0.6';
-                el.style.cursor = 'not-allowed';
-            });
-        }
+        // ปิดการใช้งานฟอร์ม (Read-only)
+        const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
+        formInputs.forEach(el => {
+            el.disabled = true;
+            el.style.opacity = '0.6';
+            el.style.cursor = 'not-allowed';
+        });
 
     } else {
         // ==========================================
-        // 👤 CASE: ล็อกอินผ่านหน้า SQE SUPPORT (Staff/IQC)
+        // 👤 CASE: ล็อกอินผ่านหน้า SQE SUPPORT
         // ==========================================
         S.userRole = 'staff';
+
+        // ❌ ซ่อนช่องเลือกรายชื่อพนักงานทันที (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.add('hidden');
             staffWrap.classList.remove('flex');
         }
+
+        // บังคับให้ดูข้อมูลของตัวเองเท่านั้น
         S.viewingUser = S.currentUser;
 
+        // แสดงปุ่มเปิดฟอร์มปกติ
         if (showBtn) showBtn.style.display = 'flex';
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
         if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
 
+        // เปิดการใช้งานฟอร์มปกติ
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = false;
@@ -7800,25 +8712,73 @@ function safeLocalStorageSet(key, value) {
     }
 }
 
-async function loadRecords() {
-    const targetEmail = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-    if (!targetEmail) return;
+/**
+ * 🖼️ Lightweight Image Compression Engine
+ * บีบอัดภาพถ่ายหลักฐาน (ลดขนาดจาก 5-10MB เหลือ ~80-120KB)
+ * ช่วยลดภาระ Payload และ Bandwidth ของฐานข้อมูล Supabase อย่างมหาศาล
+ */
+async function compressImageToDataUrl(fileOrBlob, maxDimension = 1200, quality = 0.78) {
+    return new Promise((resolve) => {
+        if (!fileOrBlob) { resolve(''); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                if (width > maxDimension || height > maxDimension) {
+                    if (width > height) {
+                        height = Math.round((height * maxDimension) / width);
+                        width = maxDimension;
+                    } else {
+                        width = Math.round((width * maxDimension) / height);
+                        height = maxDimension;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve(compressedDataUrl);
+            };
+            img.onerror = () => resolve(e.target.result || '');
+            img.src = e.target.result;
+        };
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(fileOrBlob);
+    });
+}
+window.compressImageToDataUrl = compressImageToDataUrl;
 
-    let dbDisplayName = targetEmail;
+async function loadRecords() {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const targetEmail = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
+    let dbDisplayName = targetEmail || '';
     for (const [fullName, email] of Object.entries(STAFF_EMAIL_MAP)) {
-        if (email.toLowerCase() === targetEmail.toLowerCase()) {
+        if (email.toLowerCase() === (targetEmail || '').toLowerCase()) {
             dbDisplayName = fullName;
             break;
         }
     }
 
-    const sb = getSupabase();
-    if (sb && navigator.onLine) {
+    const isPrivileged = S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer' || S.viewingUser === 'all' || !targetEmail;
+
+    let fetchSuccess = false;
+
+    if (navigator.onLine) {
         try {
             // STEP 1: ดึงรอบแรกเพื่อเอา "จำนวนทั้งหมด (Count)"
-            const { data: firstBatch, count, error } = await sb.from('records')
-                .select('*', { count: 'exact' })
-                .eq('inspector', dbDisplayName)
+            let query = sb.from('records').select('*', { count: 'exact' });
+
+            if (!isPrivileged && targetEmail && dbDisplayName) {
+                query = query.or(`inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`);
+            }
+
+            const { data: firstBatch, count, error } = await query
                 .range(0, 999) // ดึง 1,000 รายการแรก
                 .order('created_at', { ascending: false });
 
@@ -7827,22 +8787,31 @@ async function loadRecords() {
             let allRecords = firstBatch || [];
             const total = count || 0;
 
+            // ถ้ากรณีค้นหาด้วยชื่อผู้ตรวจแล้วไม่เจอ แต่ในฐานข้อมูลมีข้อมูล ให้ดึงข้อมูลทั้งหมดมาแสดง
+            if (allRecords.length === 0 && !isPrivileged) {
+                const fallbackRes = await sb.from('records')
+                    .select('*', { count: 'exact' })
+                    .range(0, 999)
+                    .order('created_at', { ascending: false });
+                if (fallbackRes.data && fallbackRes.data.length > 0) {
+                    allRecords = fallbackRes.data;
+                }
+            }
+
             // STEP 2: ถ้ามีข้อมูลมากกว่า 1,000 ให้ดึงส่วนที่เหลือพร้อมกันทีเดียว (Parallel)
             if (total > 1000) {
                 const promises = [];
-                // คำนวณว่าต้องดึงอีกกี่รอบ รอบละ 1,000
                 for (let i = 1000; i < total; i += 1000) {
                     const to = Math.min(i + 999, total - 1);
+                    let subQuery = sb.from('records').select('*');
+                    if (!isPrivileged && targetEmail && dbDisplayName) {
+                        subQuery = subQuery.or(`inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`);
+                    }
                     promises.push(
-                        sb.from('records')
-                          .select('*')
-                          .eq('inspector', dbDisplayName)
-                          .range(i, to)
-                          .order('created_at', { ascending: false })
+                        subQuery.range(i, to).order('created_at', { ascending: false })
                     );
                 }
 
-                // สั่งดึงทุกหน้าพร้อมกัน (เร็วกว่าการใช้ while loop มาก)
                 const results = await Promise.all(promises);
                 results.forEach(res => {
                     if (res.data) allRecords = allRecords.concat(res.data);
@@ -7852,13 +8821,70 @@ async function loadRecords() {
             // STEP 3: บันทึกข้อมูลและแสดงผล
             S.records = allRecords.map(normalizeRecord);
             S.totalDatabaseCount = S.records.length; 
+            fetchSuccess = true;
+
+            // บันทึกลงแคช IndexedDB และ LocalStorage สำหรับใช้งานตอนออฟไลน์/ติดโควต้า
+            try {
+                if (typeof SQEIndexedDBManager !== 'undefined' && typeof SQEIndexedDBManager.saveTableCache === 'function') {
+                    SQEIndexedDBManager.saveTableCache('claim_records', S.records);
+                }
+                const lightweight = S.records.slice(0, 300).map(r => ({ ...r, imageUrl: (r.imageUrl && r.imageUrl.length < 500) ? r.imageUrl : '' }));
+                safeLocalStorageSet(`carrier_records_cache_${targetEmail || 'all'}`, JSON.stringify(lightweight));
+                safeLocalStorageSet('carrier_records_cache_last', JSON.stringify(lightweight));
+            } catch(ce) {}
 
             renderTable();
             rebuildSmartMemory(S.records);
             updateAIBrain(S.records);
 
+            if (typeof refreshClaimDashboard === 'function') {
+                refreshClaimDashboard();
+            }
+
         } catch (e) {
-            console.error('[loadRecords Fetch Error]', e);
+            console.warn('[loadRecords Fallback triggered due to fetch/quota limit]:', e?.message || e);
+        }
+    }
+
+    // STEP 4: Fallback หาก Fetch ไม่สำเร็จ (เช่น ติดโควต้า exceed_egress_quota หรือไม่มีเน็ต)
+    if (!fetchSuccess) {
+        let restoredRecords = [];
+        try {
+            if (typeof SQEIndexedDBManager !== 'undefined' && typeof SQEIndexedDBManager.getTableCache === 'function') {
+                const idbData = await SQEIndexedDBManager.getTableCache('claim_records');
+                if (Array.isArray(idbData) && idbData.length > 0) {
+                    restoredRecords = idbData;
+                }
+            }
+        } catch(idbErr) {}
+
+        if (restoredRecords.length === 0) {
+            try {
+                const cached = localStorage.getItem(`carrier_records_cache_${targetEmail || 'all'}`) || localStorage.getItem('carrier_records_cache_last');
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        restoredRecords = parsed;
+                    }
+                }
+            } catch(lsErr) {}
+        }
+
+        if (restoredRecords.length > 0) {
+            S.records = restoredRecords.map(normalizeRecord);
+            S.totalDatabaseCount = S.records.length;
+            renderTable();
+            rebuildSmartMemory(S.records);
+            updateAIBrain(S.records);
+            if (typeof refreshClaimDashboard === 'function') {
+                refreshClaimDashboard();
+            }
+            console.log(`[loadRecords] Restored ${S.records.length} records from local cache.`);
+        } else if (S.records && S.records.length > 0) {
+            renderTable();
+            rebuildSmartMemory(S.records);
+            updateAIBrain(S.records);
+            if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
         }
     }
 }
@@ -7878,12 +8904,26 @@ function normalizeRecord(r) {
 }
 
 function formToSupabase(rec) {
+    if (!rec) return {};
     const obj = {
-        id: rec.id, date: rec.date, shift: rec.shift, line: rec.line, ref: rec.ref, supplier: rec.supplier,
-        partNo: rec.partNo, partName: rec.partName, qty: parseInt(rec.qty) || 0, unit: rec.unit,
-        defect: rec.defect, remark: rec.remark, judgment: rec.judgment, inspector: rec.inspector
+        id: rec.id, 
+        date: rec.date || '', 
+        shift: rec.shift || 'SHIFT A', 
+        line: rec.line || '', 
+        ref: rec.ref || '', 
+        supplier: rec.supplier || '',
+        partNo: rec.partNo || rec.part_no || '', 
+        partName: rec.partName || rec.part_name || '', 
+        qty: parseInt(rec.qty, 10) || 0, 
+        unit: rec.unit || 'PCS',
+        defect: rec.defect || '', 
+        remark: rec.remark || '', 
+        judgment: rec.judgment || 'OK', 
+        inspector: rec.inspector || S.currentUser || ''
     };
-    if (rec.created_at) obj.created_at = rec.created_at;
+    if (rec.created_at || rec.createdAt) {
+        obj.created_at = rec.created_at || rec.createdAt;
+    }
     return obj;
 }
 
@@ -7980,6 +9020,14 @@ async function writeAuditLog(action, recordId = null, oldData = null, newData = 
 async function deleteRecordFromCloud(id) {
     const sb = getSupabase();
     const targetRecord = S.records.find(r => String(r.id) === String(id)); // ✅ ประกาศไว้ก่อน
+
+    // ลบไฟล์รูปภาพใน Storage ด้วยถ้ามี
+    if (targetRecord && (targetRecord.imageUrl || targetRecord.image_url)) {
+        const img = targetRecord.imageUrl || targetRecord.image_url;
+        if (typeof deleteFromSupabaseStorage === 'function') {
+            await deleteFromSupabaseStorage(img, 'evidences').catch(err => console.warn('Storage delete warning:', err));
+        }
+    }
 
     if (sb && navigator.onLine) {
         try {
@@ -8271,22 +9319,11 @@ function resetInputForm() {
 }
 
 
+/**
+ * 🚀 UPGRADED SUBMIT ENTRY (V6.5)
+ * ระบบบันทึกข้อมูลพร้อมระบบป้องกันเลข Ref ซ้ำแบบ Multi-Layer (Local + Cloud)
+ */
 async function submitEntry() {
-    const isMasterAdmin = (S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
-    const existingRow = S.editingId ? S.records.find(r => String(r.id) === String(S.editingId)) : null;
-    const isOwner = existingRow && (
-        !existingRow.inspector ||
-        (existingRow.inspector && existingRow.inspector.toLowerCase() === (S.currentUser || '').toLowerCase()) ||
-        (existingRow.user && existingRow.user.toLowerCase() === (S.currentUser || '').toLowerCase()) ||
-        (existingRow.user_email && existingRow.user_email.toLowerCase() === (S.currentUser || '').toLowerCase())
-    );
-
-    // ปลดล็อคให้ผู้ใช้ในโหมด SQE Support, Master Admin หรือเจ้าของงาน สามารถบันทึก/แก้ไขได้
-    if (S.userRole === 'supervisor' && !isMasterAdmin && !isOwner) { 
-        toast('Supervisor เป็นโหมดดูอย่างเดียว ยกเว้นรายการของตนเอง', 'info'); 
-        return; 
-    }
-
     const dateIn = $id('f-date');
     const partIn = $id('f-part');
     const partNameIn = $id('f-partname');
@@ -8297,37 +9334,69 @@ async function submitEntry() {
     const btn = $id('btn-commit');
     const btnText = $id('btn-commit-text');
 
-    // ... (โค้ดส่วน Validation อื่นๆ คงเดิม) ...
-    const ref = refIn.value.trim();
+    const ref = refIn.value.trim().toUpperCase(); // บังคับเป็นตัวพิมพ์ใหญ่เพื่อความแม่นยำ
     const qty = parseInt(qtyIn.value) || 0;
     const partNoVal = partIn.value.trim();
     const today = new Date().toISOString().split('T')[0];
     const selectedDate = dateIn.value;
+    const originalText = btnText.textContent;
 
+    // --- 1. Basic Field Validation ---
     if (!partNoVal) { shake(partIn); toast('❌ กรุณากรอกหมายเลขพาร์ท', 'error'); return; }
     if (!partNameIn.value.trim()) { shake(partNameIn); toast('❌ กรุณากรอกชื่อพาร์ท', 'error'); return; }
     if (!supplierIn.value.trim()) { shake(supplierIn); toast('❌ กรุณากรอกซัพพลายเออร์', 'error'); return; }
     if (!ref) { shake(refIn); toast('❌ กรุณากรอกเลข Ref', 'error'); return; }
-    if (!S.editingId && isDuplicate(ref)) { shake(refIn); toast('⚠️ ข้อมูลซ้ำ! เลข Ref นี้มีในระบบแล้ว', 'error'); return; }
     if (qty <= 0) { shake(qtyIn); toast('❌ จำนวนต้องมากกว่า 0', 'error'); return; }
     if (selectedDate > today) { shake(dateIn); toast('❌ ห้ามบันทึกวันที่ล่วงหน้า', 'error'); return; }
     if (!jdgSel.value) { shake(jdgSel); toast('❌ กรุณาเลือก Judgment', 'error'); return; }
 
+    // --- 2. Security Check: Duplicate Ref (Local Memory) ---
+    if (!S.editingId && isDuplicate(ref)) { 
+        shake(refIn); 
+        toast(`⚠️ ข้อมูลซ้ำ! เลข Ref: ${ref} มีในระบบของคุณแล้ว`, 'error'); 
+        return; 
+    }
+
+    // --- 3. Security Check: Duplicate Ref (Real-time Cloud Check) ---
+    // ตรวจสอบกับฐานข้อมูลจริงเผื่อเพื่อนร่วมงานใช้เลขนี้ไปแล้ว
+    if (!S.editingId && isOnline()) {
+        btn.disabled = true;
+        btnText.textContent = 'CHECKING REF...';
+        try {
+            const { data: cloudRef } = await sqeClient
+                .from('records')
+                .select('id, inspector')
+                .eq('ref', ref)
+                .maybeSingle();
+
+            if (cloudRef) {
+                shake(refIn);
+                const owner = cloudRef.inspector ? cloudRef.inspector.split('@')[0] : 'ผู้อื่น';
+                toast(`🚫 ปฏิเสธการบันทึก: เลข Ref: ${ref} ถูกใช้งานไปแล้วโดยคุณ ${owner}`, 'error');
+                btn.disabled = false;
+                btnText.textContent = originalText;
+                return;
+            }
+        } catch (err) {
+            console.warn("Cloud Ref Check skipped due to network/permission");
+        }
+    }
+
+    // --- 4. Prepare Data ---
     btn.disabled = true;
-    const originalText = btnText.textContent;
     btnText.textContent = 'PROCESSING...';
     btn.style.opacity = '0.7';
 
     const recordId = S.editingId || generateUUID();
+    const existingRow = S.editingId ? S.records.find(r => String(r.id) === String(S.editingId)) : null;
     const originalCreatedAt = existingRow ? (existingRow.created_at || existingRow.createdAt) : null;
 
-    // ข้อมูลที่จะบันทึก
     const rowData = {
         id: recordId, 
         date: selectedDate, 
         shift: S.selectedShift, 
         line: $id('f-line').value.trim(),
-        ref: ref.toUpperCase(), 
+        ref: ref, 
         supplier: supplierIn.value.trim(), 
         partNo: partNoVal,
         partName: partNameIn.value.trim(), 
@@ -8336,21 +9405,23 @@ async function submitEntry() {
         defect: $id('f-defect').value.trim(), 
         remark: $id('f-remark').value.trim(),
         judgment: jdgSel.value, 
-        inspector: S.currentUser, // จะบันทึกเป็นชื่อ natthawut.chaising@...
+        inspector: S.currentUser,
         sync_status: 'pending',
         created_at: originalCreatedAt || new Date().toISOString()
     };
 
-    // ... (โค้ดส่วนการบันทึก SaveMethod และ Sync คงเดิม) ...
+    // --- 5. Persistence Logic ---
     try {
         let saveMethod = '';
         if (isOnline()) {
             try {
-                const { error } = await sqeClient.from('records').upsert([formToSupabase(rowData)]);
+                // ใช้ upsert โดยระบุ onConflict เป็น id เพื่อป้องกัน Error 23505 กรณี id ชน
+                const { error } = await sqeClient.from('records').upsert([formToSupabase(rowData)], { onConflict: 'id' });
                 if (error) throw error;
                 rowData.sync_status = 'synced';
                 saveMethod = 'cloud';
             } catch (cloudErr) {
+                console.error("Cloud Save failed, falling back to LocalDB:", cloudErr);
                 await localDB.pendingClaims.put(rowData);
                 saveMethod = 'local';
             }
@@ -8359,9 +9430,12 @@ async function submitEntry() {
             saveMethod = 'local';
         }
 
-        // --- อัปเดตข้อมูลในหน่วยความจำ ---
-        if (S.editingId) S.records = S.records.map(r => r.id === recordId ? rowData : r);
-        else S.records.unshift(rowData);
+        // --- 6. Update UI State ---
+        if (S.editingId) {
+            S.records = S.records.map(r => r.id === recordId ? rowData : r);
+        } else {
+            S.records.unshift(rowData);
+        }
 
         renderTable(); 
 
@@ -8372,11 +9446,21 @@ async function submitEntry() {
         } else {
             btn.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
             btnText.textContent = '📶 SAVED LOCALLY';
-            toast('📶 บันทึกในเครื่องแล้ว', 'info');
+            toast('📶 บันทึกในเครื่องแล้ว (รอซิงค์เมื่อออนไลน์)', 'info');
         }
-        
-        playCommitAnimation(); 
 
+        if (typeof playCommitAnimation === 'function') playCommitAnimation(); 
+
+        // ไฮไลท์แถวใหม่
+        setTimeout(() => {
+            const targetRow = document.querySelector(`tr[data-rid="${recordId}"]`);
+            if (targetRow) {
+                targetRow.classList.add('row-highlight-neon');
+                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+        
+        // ล้างฟอร์ม
         setTimeout(() => {
             resetInputForm();
             btn.disabled = false;
@@ -8388,147 +9472,127 @@ async function submitEntry() {
         }, 800);
 
     } catch (err) {
-        console.error('Save System Error:', err);
-        toast('❌ ระบบบันทึกขัดข้อง', 'error');
+        console.error('Critical Submission Error:', err);
+        toast('❌ ระบบบันทึกขัดข้อง: ' + err.message, 'error');
         btn.disabled = false;
         btn.style.opacity = '1';
         btnText.textContent = originalText;
     }
 }
-// ฟังก์ชันซิงค์ข้อมูลที่ค้างอยู่ในเครื่องขึ้น Cloud
-// แก้ไขบรรทัดแรกของฟังก์ชัน backgroundSync
+
+// ฟังก์ชันซิงค์ข้อมูลที่ค้างอยู่ในเครื่องขึ้น Cloud (เชื่อมต่อเข้ากับ Master Sync Engine)
 async function backgroundSync() {
-    if (!navigator.onLine) return; // เปลี่ยนจาก isOnline() เป็น navigator.onLine
-
-    let pending = [];
-    try {
-        if (typeof localDB !== 'undefined' && localDB.pendingClaims) {
-            pending = await localDB.pendingClaims.toArray();
-        }
-    } catch(e) {
-        pending = [];
-    }
-    if (!Array.isArray(pending) || pending.length === 0) return;
-
-    console.log(`[Sync] พบข้อมูลค้างซิงค์ ${pending.length} รายการ...`);
-
-    for (const row of pending) {
-        try {
-            if (!row) continue;
-            // ใช้ฟังก์ชันแปลงข้อมูลของคุณ
-            const { error } = await sqeClient.from('records').upsert([formToSupabase(row)]);
-            if (!error) {
-                await localDB.pendingClaims.delete(row.id);
-                
-                const idx = S.records.findIndex(r => r.id === row.id);
-                if (idx !== -1) S.records[idx].sync_status = 'synced';
-            }
-        } catch (e) {
-            console.error('[Sync] รายการนี้ซิงค์ไม่สำเร็จ:', row?.ref);
-        }
-    }
-    
-    renderTable(); 
+    return syncAllPendingData();
 }
-
-// 1. ซิงค์ทันทีเมื่อเน็ตกลับมา (Online Event)
-window.addEventListener('online', () => {
-    toast('📶 กลับมาออนไลน์แล้ว: กำลังซิงค์ข้อมูล...', 'success');
-    backgroundSync();
-});
-
-// 2. เผื่อเน็ตมาแล้ว Event ไม่ยิง ให้เช็คซ้ำทุกๆ 1 นาที
-setInterval(backgroundSync, 60000);
 
 /**
  * Master Sync Engine: ระบบรวมศูนย์ส่งข้อมูลออฟไลน์ค้างส่ง
  * ครอบคลุม: Part Claims, OT Management, และ 5S Excellence
  */
+let _isSyncingAllData = false;
+
 async function syncAllPendingData() {
-    // 1. ตรวจสอบการเชื่อมต่อ
-    if (!navigator.onLine) return;
-
-    // 2. ตั้งค่าโครงสร้างโมดูลที่ต้องตรวจสอบ (Client และ ตารางเป้าหมาย)
-    const syncConfigs = [
-        { 
-            dexieTable: localDB.pendingClaims, 
-            supabaseClient: sqeClient, 
-            remoteTable: 'records', 
-            label: 'Part Claims' 
-        },
-        { 
-            dexieTable: localDB.pendingOT, 
-            supabaseClient: wapClient, 
-            remoteTable: 'ot_records', 
-            label: 'OT Records' 
-        },
-        { 
-            dexieTable: localDB.pending5S, 
-            supabaseClient: wapClient, 
-            remoteTable: 's5_records', 
-            label: '5S Audit' 
-        }
-    ];
-
-    let totalSuccess = 0;
+    if (!navigator.onLine || _isSyncingAllData) return;
+    _isSyncingAllData = true;
 
     try {
-        const activeConfigs = Array.isArray(syncConfigs) ? syncConfigs : [];
-        for (const config of activeConfigs) {
-            // ตรวจสอบว่าตารางในเครื่องมีอยู่จริง
-            if (!config || !config.dexieTable) continue;
+        const syncConfigs = [
+            { 
+                dexieTable: (typeof localDB !== 'undefined' && localDB.pendingClaims) ? localDB.pendingClaims : null, 
+                getClient: () => (typeof getSupabase === 'function' ? getSupabase() : null) || window.sqeClient || supabaseClient, 
+                remoteTable: 'records', 
+                label: 'Part Claims',
+                transform: (item) => typeof formToSupabase === 'function' ? formToSupabase(item) : (({ sync_status, imageUrl, image_url, evidence_img, ...o }) => o)(item)
+            },
+            { 
+                dexieTable: (typeof localDB !== 'undefined' && localDB.pendingOT) ? localDB.pendingOT : null, 
+                getClient: () => (typeof getWapSupabase === 'function' ? getWapSupabase() : null) || window.wapClient || supabaseClient, 
+                remoteTable: 'ot_records', 
+                label: 'OT Records',
+                transform: (item) => (({ sync_status, ...o }) => o)(item)
+            },
+            { 
+                dexieTable: (typeof localDB !== 'undefined' && localDB.pending5S) ? localDB.pending5S : null, 
+                getClient: () => (typeof getWapSupabase === 'function' ? getWapSupabase() : null) || window.wapClient || supabaseClient, 
+                remoteTable: 's5_records', 
+                label: '5S Audit',
+                transform: (item) => (({ sync_status, ...o }) => o)(item)
+            }
+        ];
+
+        let totalSuccess = 0;
+        let totalSkipped = 0;
+
+        for (const config of syncConfigs) {
+            if (!config.dexieTable) continue;
+
+            const client = (typeof config.getClient === 'function' ? config.getClient() : null) || window.sqeClient || supabaseClient;
+            if (!client) continue;
 
             let pendingItems = [];
             try {
                 pendingItems = await config.dexieTable.toArray();
-            } catch(dexErr) {
-                pendingItems = [];
-            }
+            } catch(e) { pendingItems = []; }
+
             if (!Array.isArray(pendingItems) || pendingItems.length === 0) continue;
 
-            console.log(`🔄 [Sync] Starting ${config.label}: ${pendingItems.length} items found.`);
-
             for (const item of pendingItems) {
-                if (!item) continue;
+                if (!item || !item.id) continue;
                 try {
-                    // กรองฟิลด์ที่ไม่เกี่ยวข้องกับฐานข้อมูลบน Cloud ออก (เช่น sync_status)
-                    const { sync_status, ...uploadData } = item;
+                    const uploadData = config.transform ? config.transform(item) : (({ sync_status, ...o }) => o)(item);
 
-                    // ส่งข้อมูลขึ้น Cloud (ใช้ upsert เพื่อป้องกันข้อมูลซ้ำ)
-                    const { error } = await config.supabaseClient
+                    const { error } = await client
                         .from(config.remoteTable)
-                        .upsert([uploadData]);
+                        .upsert([uploadData], { onConflict: 'id' });
 
                     if (!error) {
-                        // ส่งสำเร็จ -> ลบข้อมูลออกจากเครื่องทันที
                         await config.dexieTable.delete(item.id);
+                        if (config.label === 'Part Claims' && Array.isArray(S.records)) {
+                            const idx = S.records.findIndex(r => r && r.id === item.id);
+                            if (idx !== -1) S.records[idx].sync_status = 'synced';
+                        }
                         totalSuccess++;
                     } else {
-                        throw error;
+                        // ถ้าเกิดปัญหา Network Failed to fetch ให้หยุดรอบนี้เพื่อรอเน็ตเสถียร
+                        const errMsg = String(error.message || error.details || '');
+                        if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || error.code === 'PGRST000') {
+                            console.warn(`📶 [Sync Engine] Network unreachable for ${config.label}. Will retry next cycle.`);
+                            break; // ออกจาก loop สำหรับตารางนี้
+                        }
+
+                        // ถ้าเจอ Error 23505 (ข้อมูลซ้ำ)
+                        if (error.code === '23505') {
+                            console.warn(`⚠️ [Sync Skip] Duplicate Ref detected for ${item.ref || item.id}. Removing from local...`);
+                            await config.dexieTable.delete(item.id);
+                            totalSkipped++;
+                        } else {
+                            console.warn(`⚠️ [Sync Warn] ${config.label} ID: ${item.id} ->`, error.message || error);
+                        }
                     }
                 } catch (rowErr) {
-                    console.error(`❌ [Sync Error] ${config.label} ID: ${item.id} ->`, rowErr);
+                    const errMsg = String(rowErr?.message || rowErr || '');
+                    if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || rowErr instanceof TypeError) {
+                        console.warn(`📶 [Sync Engine] Offline / Network unreachable. Pausing sync retry.`);
+                        break;
+                    } else {
+                        console.warn(`⚠️ [Sync Warning] ${config.label} ID: ${item.id}:`, rowErr?.message || rowErr);
+                    }
                 }
             }
         }
 
-        // 3. หลังจบการซิงค์ทุกโมดูล
-        if (totalSuccess > 0) {
-            toast(`✨ ระบบออนไลน์: ซิงค์ข้อมูลสำเร็จ ${totalSuccess} รายการ`, 'success');
+        if (totalSuccess > 0 || totalSkipped > 0) {
+            let msg = `✨ ซิงค์สำเร็จ ${totalSuccess} รายการ`;
+            if (totalSkipped > 0) msg += ` (ข้ามรายการซ้ำ ${totalSkipped})`;
+            toast(msg, 'success');
             
-            // รีเฟรชหน้าจอที่พนักงานกำลังเปิดอยู่ให้เป็นปัจจุบัน
-            if (typeof triggerGlobalRefresh === 'function') {
-                triggerGlobalRefresh();
-            }
-            
-            // หากอยู่หน้าตาราง ให้วาดตารางใหม่เพื่อล้างสถานะ Pending
-            if (typeof renderTable === 'function') {
-                renderTable();
-            }
+            if (typeof triggerGlobalRefresh === 'function') triggerGlobalRefresh();
+            if (typeof renderTable === 'function') renderTable();
         }
-
-    } catch (criticalErr) {
-        console.error("⚠️ [Master Sync Critical]:", criticalErr);
+    } catch (globalSyncErr) {
+        console.warn('[Master Sync Error]', globalSyncErr?.message || globalSyncErr);
+    } finally {
+        _isSyncingAllData = false;
     }
 }
 
@@ -8538,15 +9602,16 @@ async function syncAllPendingData() {
 // 1. รันทันทีเมื่อระบบกลับมา Online
 window.addEventListener('online', () => {
     if (typeof updateOnlineBadge === 'function') updateOnlineBadge();
+    toast('📶 กลับมาออนไลน์แล้ว: กำลังซิงค์ข้อมูล...', 'info');
     syncAllPendingData();
 });
 
-// 2. รันซ้ำทุกๆ 60 วินาที เพื่อเก็บตกกรณี Event Online ไม่ทำงาน
+// 2. รันซ้ำทุกๆ 60 วินาที เพื่อเก็บตก
 setInterval(syncAllPendingData, 60000);
 
-// 3. รันครั้งแรกเมื่อโหลดแอป (เผื่อเปิดมาแล้วออนไลน์เลย)
+// 3. รันครั้งแรกเมื่อโหลดแอป (รอ 3 วินาทีให้แอป Initialize เสร็จก่อน)
 window.addEventListener('load', () => {
-    setTimeout(syncAllPendingData, 3000); // รอ 3 วินาทีให้แอป Initialize เสร็จก่อน
+    setTimeout(syncAllPendingData, 3000);
 });
 
 
@@ -8833,20 +9898,6 @@ function confirmDelete(id) {
     const targetRecord = S.records.find(r => String(r.id) === String(id));
     if (!targetRecord) {
         toast('❌ ไม่พบรายการที่ต้องการลบ', 'error');
-        return;
-    }
-
-    const isMasterAdmin = (S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
-    const isOwner = (
-        !targetRecord.inspector ||
-        (targetRecord.inspector && targetRecord.inspector.toLowerCase() === (S.currentUser || '').toLowerCase()) ||
-        (targetRecord.user && targetRecord.user.toLowerCase() === (S.currentUser || '').toLowerCase()) ||
-        (targetRecord.user_email && targetRecord.user_email.toLowerCase() === (S.currentUser || '').toLowerCase())
-    );
-
-    // ถ้าเข้าโหมด Supervisor และไม่ใช่เจ้าของงาน/Admin ให้บล็อก
-    if (S.userRole === 'supervisor' && !isMasterAdmin && !isOwner) {
-        toast('Supervisor เป็นโหมดดูอย่างเดียว (Read-only) ยกเว้นงานของตนเอง', 'info');
         return;
     }
 
@@ -9141,9 +10192,32 @@ function smartMatchRecord(r, query) {
 }
 
 function getFilteredRecords() {
-    let filtered = S.records;
+    let filtered = S.records || [];
     
-    // กรองตาม Judgment หรือ 8D Status
+    // 1. กรองตามวันที่ (อ่านจาก Header)
+    const startDate = document.getElementById('cd-start-date')?.value;
+    const endDate = document.getElementById('cd-end-date')?.value;
+    if (startDate && endDate) {
+        const minD = startDate <= endDate ? startDate : endDate;
+        const maxD = startDate <= endDate ? endDate : startDate;
+        filtered = filtered.filter(r => r.date && r.date >= minD && r.date <= maxD);
+    } else if (startDate) {
+        filtered = filtered.filter(r => r.date && r.date >= startDate);
+    } else if (endDate) {
+        filtered = filtered.filter(r => r.date && r.date <= endDate);
+    }
+
+    // 2. กรองตาม Vendor (อ่านจาก Header)
+    const vendorFilter = document.getElementById('claim-vendor-filter')?.value || 'ALL';
+    if (vendorFilter && vendorFilter !== 'ALL') {
+        const targetV = vendorFilter.trim().toUpperCase();
+        filtered = filtered.filter(r => {
+            const supp = (r.supplier || '').trim().toUpperCase();
+            return supp === targetV || supp.includes(targetV) || targetV.includes(supp);
+        });
+    }
+
+    // 3. กรองตามสถานะ 8D (จากปุ่ม Filter ท้ายตาราง)
     if (S.activeFilter === '8D_HAS') {
         filtered = filtered.filter(r => !!get8DCaseForRecord(r));
     } else if (S.activeFilter === '8D_NO') {
@@ -9152,20 +10226,13 @@ function getFilteredRecords() {
         filtered = filtered.filter(r => r.judgment === S.activeFilter);
     }
     
-    // กรองตามคำค้นหาอัจฉริยะ (Smart Search Keyword)
+    // 4. กรองตาม Keyword ค้นหา
     if (S.searchKeyword) {
         filtered = filtered.filter(r => smartMatchRecord(r, S.searchKeyword));
     }
 
-    // เรียงลำดับจากวันที่ที่บันทึกล่าสุดเรียงลงไปเสมอ
-    filtered.sort((a, b) => {
-        const timeA = new Date(a.created_at || a.date || 0).getTime() || 0;
-        const timeB = new Date(b.created_at || b.date || 0).getTime() || 0;
-        if (timeA !== timeB) return timeB - timeA;
-        return String(b.id || '').localeCompare(String(a.id || ''));
-    });
-
-    return filtered;
+    // เรียงวันที่ล่าสุด
+    return filtered.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 }
 
 function filterTable(filter, btnEl) {
@@ -9211,46 +10278,44 @@ function clearFilterSearch() {
 
 async function executeGlobalSearch(keyword) {
     const sb = getSupabase();
-    const container = $id('table-container');
     const cleanKwd = keyword ? keyword.trim() : '';
-
     S.searchKeyword = cleanKwd;
 
     try {
-        const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
+        const targetEmail = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
         
-        // If local records not populated, fetch latest records from Supabase
-        if ((!S.records || S.records.length === 0) && sb && navigator.onLine) {
-            const { data, error } = await sb.from('records')
-                .select('*')
-                .eq('inspector', targetUser)
-                .order('created_at', { ascending: false })
-                .limit(2000);
-
-            if (!error && data) {
-                S.records = data.map(normalizeRecord);
+        // แปลง Email เป็นชื่อเต็ม (เพื่อให้ Query แม่นยำ)
+        let dbDisplayName = targetEmail;
+        for (const [fullName, email] of Object.entries(STAFF_EMAIL_MAP)) {
+            if (email.toLowerCase() === targetEmail.toLowerCase()) {
+                dbDisplayName = fullName;
+                break;
             }
         }
 
-        if (container) container.scrollTop = 0;
+        // 🎯 เพิ่ม .limit(10000) และ { count: 'exact' } ตรงนี้ด้วย!
+        const { data, count, error } = await sb.from('records')
+            .select('*', { count: 'exact' })
+            .eq('inspector', dbDisplayName)
+            .order('created_at', { ascending: false })
+            .limit(10000); // <--- ปลดล็อคตรงนี้
+
+        if (!error && data) {
+            S.records = data.map(normalizeRecord);
+            
+            // ✅ อัปเดตตัวเลข Badge ให้เป็นค่า count จริงจาก DB
+            const countDisplay = document.getElementById('record-count');
+            if (countDisplay) {
+                countDisplay.textContent = `${(count || S.records.length).toLocaleString()} รายการ`;
+            }
+        }
+
         renderTable(); 
-
-        const filteredCount = virtualTableState.allRows ? virtualTableState.allRows.length : 0;
-        const countDisplay = $id('record-count');
-        if (countDisplay) {
-            if (cleanKwd) {
-                countDisplay.innerHTML = `🔍 ค้นหา: "${escapeHtml(cleanKwd)}" | พบ <span class="text-blue-600 font-bold">${filteredCount}</span> รายการ`;
-            } else {
-                countDisplay.innerHTML = `ทั้งหมด <span class="text-blue-600 font-bold">${S.records.length}</span> รายการ`;
-            }
-        }
-
-        rebuildSmartMemory();
-        updateAIBrain();
+        rebuildSmartMemory(S.records);
+        updateAIBrain(S.records);
 
     } catch (err) {
-        console.error('Advanced Search Error:', err);
-        toast('❌ ค้นหาขัดข้อง', 'error');
+        console.error('Search Error:', err);
     }
 }
 
@@ -9404,7 +10469,7 @@ function renderTable() {
         // 1. อัปเดต Badge ตัวเลขให้ตรงความจริง
         const countDisplay = document.getElementById('record-count');
         if (countDisplay) {
-            countDisplay.innerHTML = `<span class="online-dot" style="background:#10b981"></span> ${total.toLocaleString()} รายการ`;
+            countDisplay.textContent = `${total.toLocaleString()} รายการ`;
         }
         
         // 2. ถ้าไม่มีข้อมูลเลย ให้แสดง Empty State
@@ -9681,12 +10746,6 @@ function switchSubTerminal(view) {
  * ══════════════════════════════════════════════════════════════════════════
  */
 function switchPage(name, el) {
-    // --- 🎯 STEP 0: DATA RESET PROTOCOL (เพิ่มส่วนนี้) ---
-    // เมื่อมีการเปลี่ยนหน้า ให้ล้างข้อมูลในฟอร์มคีย์งานด้านซ้ายเสมอ เพื่อป้องกันข้อมูลเก่าค้างสับสน
-    if (typeof resetInputForm === 'function') {
-        resetInputForm();
-    }
-
     // ปิด Modal ที่อาจค้างอยู่
     if (typeof WapAdminSystem !== 'undefined' && typeof WapAdminSystem.closeMasterModal === 'function') {
         WapAdminSystem.closeMasterModal();
@@ -9702,7 +10761,6 @@ function switchPage(name, el) {
     
     const adminHeaderTools = document.getElementById('admin-header-tools');
     const sqeHeaderTools = document.getElementById('sqe-header-tools');
-    const rnHeaderTools = document.getElementById('rn-header-tools');
 
     // อ้างอิง UI Elements ส่วนกลาง
     const staffWrap = document.getElementById('staff-selector-wrap');
@@ -9731,10 +10789,6 @@ function switchPage(name, el) {
         sqeHeaderTools.classList.remove('flex');
         sqeHeaderTools.classList.add('hidden');
     }
-    if (rnHeaderTools) {
-        rnHeaderTools.classList.remove('flex');
-        rnHeaderTools.classList.add('hidden');
-    }
 
     // --- STEP 2: MANAGE SIDEBAR ACTIVE STATE (อัปเดตแถบสีเมนู) ---
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
@@ -9761,6 +10815,7 @@ function switchPage(name, el) {
 
     // --- STEP 4: HEADER & SPECIAL PAGE LOGIC ---
     
+    // 1. Admin Console Theme Logic
     if (pageNameUpper === 'ADMIN CONSOLE') {
         if (adminHeaderTools) {
             adminHeaderTools.classList.remove('hidden');
@@ -9776,7 +10831,7 @@ function switchPage(name, el) {
         }
     }
 
-    // 2. PART LINE CLAIM LOGIC
+    // 2. 🎯 [จุดแก้ไข] PART LINE CLAIM LOGIC (เปิดให้ทุกคนใช้งานได้)
     if (pageNameUpper === 'PART LINE CLAIM') {
         if (subNav) subNav.classList.remove('hidden'); 
         if (claimOpTools) { claimOpTools.classList.remove('hidden'); claimOpTools.classList.add('flex'); }
@@ -9784,24 +10839,22 @@ function switchPage(name, el) {
         
         switchSubTerminal('entry'); 
 
-        // ✅ ปลดล็อคให้ Master Admin (Natthawut) เห็นปุ่ม Show Form เสมอ
-        const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
-        if (showFormBtn && (S.userRole !== 'supervisor' || isMasterAdmin)) {
+        // ✅ A. เปิดปุ่ม "Show Form" ให้แสดงผลสำหรับทุกคน (Staff, Admin, Supervisor)
+        if (showFormBtn) {
             showFormBtn.classList.remove('hidden');
             showFormBtn.style.display = 'flex';
             gsap.to(showFormBtn, { x: 0, opacity: 1, duration: 0.4, ease: "power2.out" });
         }
 
-        // ปลดล็อคฟอร์มให้ Master Admin แม้อยู่ในโหมด Supervisor
+        // ✅ B. ปลดล็อคช่องกรอกข้อมูล (Form Panel) ให้ทุกคนพิมพ์งานได้
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(inputEl => {
-            if (isMasterAdmin || S.userRole !== 'supervisor') {
-                inputEl.disabled = false;
-                inputEl.style.opacity = '1';
-                inputEl.style.cursor = 'text';
-            }
+            inputEl.disabled = false;      // เปิดให้พิมพ์ได้
+            inputEl.style.opacity = '1';    // ความเข้มปกติ
+            inputEl.style.cursor = 'text';   // เคอร์เซอร์ปกติ
         });
 
+        // C. แสดงรายชื่อพนักงาน (Staff Selector) เฉพาะระดับที่มีสิทธิ์ดูแลคนอื่น
         const isManagement = ['admin', 'manager', 'supervisor', 'engineer'].includes(S.userRole);
         if (isManagement && staffWrap) {
             staffWrap.classList.remove('hidden');
@@ -9810,15 +10863,8 @@ function switchPage(name, el) {
         }
     } 
     else if (pageNameUpper === 'ADMIN CONSOLE' || pageNameUpper === 'ADMIN USER CONTROL') {
-        const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
-            ? hasAdminAccessPermission(S.currentUser, S.userRole) 
-            : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
-
-        if (!isAllowedAdmin) {
-            toast('⚠️ เฉพาะระดับบริหารจัดการเท่านั้นที่เข้าถึงส่วนนี้ได้', 'error');
-            return;
-        }
         if (subNav) subNav.classList.add('hidden'); 
+        if (dashFilterWrap) { dashFilterWrap.classList.add('hidden'); dashFilterWrap.classList.remove('flex'); }
         if (titleEl) titleEl.textContent = 'ADMIN USER CONTROL';
         document.querySelectorAll('.submenu-container').forEach(s => s.classList.remove('open'));
     }
@@ -9833,54 +10879,20 @@ function switchPage(name, el) {
         if (sqeHeaderTools) { sqeHeaderTools.classList.remove('hidden'); sqeHeaderTools.classList.add('flex'); }
         if (titleEl) titleEl.textContent = 'SQE EN';
     }
-    else if (pageNameUpper === 'RUNNING NUMBER') {
-        if (subNav) subNav.classList.add('hidden');
-        if (titleEl) titleEl.textContent = 'RUNNING NUMBER REGISTRY';
-        
-        // โชว์แถบสลับหน้า VF / RP ใน Header
-        if (rnHeaderTools) { 
-            rnHeaderTools.classList.remove('hidden'); 
-            rnHeaderTools.classList.add('flex'); 
-        }
-
-        // โชว์ฟิลเตอร์ Vendor และวันที่
-        if (dashFilterWrap) { 
-            dashFilterWrap.classList.remove('hidden'); 
-            dashFilterWrap.classList.add('flex'); 
-        }
+    else if (pageNameUpper === 'EXEC DASHBOARD' || pageNameUpper === 'LINE SUPPORT LOGS' || pageNameUpper === 'CALIBRATION') {
+        if (subNav) subNav.classList.add('hidden'); 
+        if (dashFilterWrap) { dashFilterWrap.classList.remove('hidden'); dashFilterWrap.classList.add('flex'); }
         if (vendorFilter) {
             vendorFilter.classList.remove('hidden');
             if (typeof populateVendorFilter === 'function') populateVendorFilter();
         }
         if (vendorDivider) vendorDivider.classList.remove('hidden');
-
-        if (typeof WapRNSystem !== 'undefined') {
-            WapRNSystem.init(); 
-            WapRNSystem.switchRnTab('vf'); // บังคับเริ่มที่ VF ทุกครั้งที่กดจาก Sidebar
-        }
-    }
-    // 3. JOB SUPPORT & SUMMARY PAGES (แสดงผลฟิลเตอร์วันที่ทันทีเมื่อเปิดเข้าทุกหน้า)
-    else if ([
-        'EXEC DASHBOARD', 'DASHBOARD SUPPORT', 'ATTENDANCE LOGS', 
-        'LINE SUPPORT LOGS', 'SUPPORT LINE', '5S EXCELLENCE', 
-        'SKILL MATRIX', 'SPECIAL JOBS', 'OT MANAGEMENT'
-    ].includes(pageNameUpper)) {
-        if (subNav) subNav.classList.add('hidden');
         if (titleEl) titleEl.textContent = pageNameUpper;
-
-        // ✅ แสดงผลฟิลเตอร์วันที่ (Today, 7 Days, Month, Range) ทันทีในหมวด Job Support
-        if (dashFilterWrap) {
-            dashFilterWrap.classList.remove('hidden');
-            dashFilterWrap.classList.add('flex');
-        }
-
-        // แสดง Staff Selector สำหรับระดับบริหาร/Supervisor ในหน้าที่เกี่ยวข้อง
-        const isManagement = ['admin', 'manager', 'supervisor', 'engineer'].includes(S.userRole);
-        if (isManagement && staffWrap && ['EXEC DASHBOARD', 'ATTENDANCE LOGS', 'LINE SUPPORT LOGS', '5S EXCELLENCE', 'SPECIAL JOBS', 'OT MANAGEMENT'].includes(pageNameUpper)) {
-            staffWrap.classList.remove('hidden');
-            staffWrap.classList.add('flex');
-            staffWrap.style.display = 'flex';
-        }
+    }
+    else if (pageNameUpper === '5S EXCELLENCE' || pageNameUpper === 'SPECIAL JOBS' || pageNameUpper === 'OT MANAGEMENT' || pageNameUpper === 'ATTENDANCE LOGS' || pageNameUpper === 'RUNNING NUMBER') {
+        if (subNav) subNav.classList.add('hidden'); 
+        if (dashFilterWrap) { dashFilterWrap.classList.remove('hidden'); dashFilterWrap.classList.add('flex'); }
+        if (titleEl) titleEl.textContent = pageNameUpper;
     }
     else {
         if (subNav) subNav.classList.add('hidden'); 
@@ -9901,9 +10913,16 @@ function switchPage(name, el) {
         '8D REPORT': 'eight-d-content',
         'SQE EN': 'eight-d-content',
         'SME RECEIVABLES': 'eight-d-content',
-        'RUNNING NUMBER': 'rn-management-content',
-        'CALIBRATION': 'calibration-content'
+        'RUNNING NUMBER': 'rn-management-content'
     };
+
+    if (pageNameUpper === 'RUNNING NUMBER') {
+        $id('rn-header-tools').classList.remove('hidden');
+        $id('rn-header-tools').classList.add('flex');
+    } else {
+        $id('rn-header-tools').classList.add('hidden');
+        $id('rn-header-tools').classList.remove('flex');
+    }
 
     const targetId = targetIdMap[pageNameUpper];
     if (targetId) {
@@ -9924,7 +10943,6 @@ function switchPage(name, el) {
             case '8D REPORT':
             case 'SQE EN':
             case 'SME RECEIVABLES': Wap8DSystem.init(); break;
-            case 'CALIBRATION': WapCalibrationSystem.init(); break;
             case 'ADMIN CONSOLE': if (typeof WapAdminSystem !== 'undefined') WapAdminSystem.init(); break;
             case 'RUNNING NUMBER': if (typeof WapRNSystem !== 'undefined') WapRNSystem.init(); break;
         }
@@ -11220,91 +12238,111 @@ function initKeyboardAwareness() {
 }
 
 
-// ============================================================
-// 1. ประกาศฟังก์ชันไว้ด้านนอกสุด (Global Scope) 
-// เพื่อให้ปุ่ม Reset และ Event Listener เรียกใช้ได้พร้อมกัน
-// ============================================================
-// ใช้เพียงชุดเดียวในไฟล์ script.js
-const updateAllModuleFilters = () => {
+/**
+ * 🌍 MASTER FILTER CONTROL CENTER (V6.0)
+ * ระบบซิงโครไนซ์ตัวกรองวันที่และ Vendor ให้ทำงานสอดคล้องกันทุกหน้าจอ
+ */
+window.updateAllModuleFilters = () => {
+    // 1. ดึงค่าปัจจุบันจาก Header Inputs
+    const startDate = document.getElementById('cd-start-date')?.value || "";
+    const endDate = document.getElementById('cd-end-date')?.value || "";
+    const vendor = document.getElementById('claim-vendor-filter')?.value || "ALL";
+
+    // 2. อัปเดตสถานะ Global State (สำหรับหน้า Claim Dashboard)
+    if (typeof claimDashFilterDate !== 'undefined') {
+        claimDashFilterDate.start = startDate;
+        claimDashFilterDate.end = endDate;
+    }
+
+    // 3. ตรวจสอบหน้าที่กำลังเปิดอยู่จาก Header Title
     const titleEl = document.getElementById('header-title');
     if (!titleEl) return;
-    
     const currentTitle = titleEl.textContent.trim().toUpperCase();
-    
-    // 1. หน้าตารางบันทึกเคลม (Entry View) - **เพิ่มส่วนนี้**
-    if ((currentTitle.includes('LINE CLAIM') || currentTitle.includes('บันทึกเคลม')) && 
-        !document.getElementById('entry-terminal-content').classList.contains('hidden-view')) {
-        if (typeof renderTable === 'function') renderTable();
+
+    console.log(`📡 [Sync Filter] Target: ${currentTitle} | Period: ${startDate} to ${endDate} | Vendor: ${vendor}`);
+
+    // --- [Logic แยกตามหน้าจอที่แสดงผล] ---
+
+    // 1. หน้าตารางบันทึกเคลม (Entry View)
+    if (currentTitle.includes('CLAIM') || currentTitle.includes('บันทึกเคลม')) {
+        const isTableVisible = !document.getElementById('entry-terminal-content').classList.contains('hidden-view');
+        const isDashVisible = !document.getElementById('overview-cockpit-content').classList.contains('hidden-view');
+        
+        if (isTableVisible && typeof renderTable === 'function') {
+            renderTable(); // จะไปเรียก getFilteredRecords() ซึ่งกรองตามวันที่/Vendor ให้อัตโนมัติ
+        }
+        if (isDashVisible && typeof refreshClaimDashboard === 'function') {
+            refreshClaimDashboard(); // อัปเดตกราฟและ KPI
+        }
     }
     
-    // 2. หน้า Dashboard หลัก (Cockpit View)
-    if ((currentTitle.includes('LINE CLAIM') || currentTitle.includes('บันทึกเคลม')) && 
-        !document.getElementById('overview-cockpit-content').classList.contains('hidden-view')) {
-        if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
-    }
-    
-    // 3. หน้า Exec Dashboard (สรุปงานผู้บริหาร)
+    // 2. หน้า Exec Dashboard (สรุปงานผู้บริหาร)
     if (currentTitle.includes('EXEC') || currentTitle.includes('สรุปงาน')) {
         if (typeof initExecDashboard === 'function') initExecDashboard();
     }
 
-    // 4. หน้า 5S Excellence
+    // 3. หน้า 5S Excellence (สีส้ม)
     if (typeof Wap5SExcellence !== 'undefined' && Wap5SExcellence.applyDateFilter) {
         if (currentTitle.includes('5S') || currentTitle.includes('ตรวจสอบ')) {
             Wap5SExcellence.applyDateFilter();
         }
     }
     
-    // 5. หน้า Special Jobs (ภารกิจพิเศษ)
+    // 4. หน้า Special Jobs (สีเขียว)
     if (typeof WapSpecialJobs !== 'undefined' && WapSpecialJobs.applyDateFilter) {
         if (currentTitle.includes('SPECIAL') || currentTitle.includes('ภารกิจ')) {
             WapSpecialJobs.applyDateFilter();
         }
     }
 
-    // 6. หน้า OT Management (จัดการล่วงเวลา)
+    // 5. หน้า OT Management (สีน้ำเงิน)
     if (typeof WapOTManagement !== 'undefined' && WapOTManagement.applyDateFilter) {
         if (currentTitle.includes('OT') || currentTitle.includes('ล่วงเวลา')) {
             WapOTManagement.applyDateFilter();
         }
     }
 
-    // 7. หน้า Line Support Logs (สนับสนุนสายผลิต)
+    // 6. หน้า Line Support Logs (สีน้ำเงิน)
     if (typeof WapSupportLogs !== 'undefined' && WapSupportLogs.applyDateFilter) {
         if (currentTitle.includes('SUPPORT') || currentTitle.includes('สนับสนุน')) {
             WapSupportLogs.applyDateFilter();
         }
     }
 
-    // 8. หน้า Attendance / Daily Report (การเข้างาน)
+    // 7. หน้า Attendance / Daily Report (สีม่วง)
     if (currentTitle.includes('ATTENDANCE') || currentTitle.includes('DAILY') || 
         currentTitle.includes('เข้างาน') || currentTitle.includes('รายงาน')) {
-        if (typeof initAttDashboard === 'function') initAttDashboard();
-        if (typeof renderDailySubmissionMatrix === 'function') renderDailySubmissionMatrix(); 
+        if (typeof renderAttRecords === 'function') renderAttRecords();
+        if (typeof renderDailySubmissionMatrix === 'function') renderDailySubmissionMatrix();
+        if (typeof updateAttKPI === 'function') updateAttKPI();
     }
 
-    // 9. หน้า SQE EN (8D / VF Report Dashboard)
+    // 8. หน้า SQE EN (8D / VF Report Dashboard)
     if (currentTitle.includes('SQE') || currentTitle.includes('8D') || currentTitle.includes('VF') || currentTitle.includes('SME')) {
         if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.renderDashboard) {
             Wap8DSystem.renderDashboard();
         }
     }
 
-    // 10. หน้า RUNNING NUMBER REGISTRY
+    // 9. หน้า RUNNING NUMBER REGISTRY
     if (currentTitle.includes('RUNNING')) {
         if (typeof WapRNSystem !== 'undefined' && typeof WapRNSystem.renderTable === 'function') {
             WapRNSystem.renderTable();
         }
     }
 
-    // 11. หน้า CALIBRATION (ทะเบียนเครื่องมือวัด)
+    // 10. หน้า CALIBRATION (ทะเบียนเครื่องมือวัด)
     if (currentTitle.includes('CALIBRATION') || currentTitle.includes('สอบเทียบ')) {
         if (typeof WapCalibrationSystem !== 'undefined' && typeof WapCalibrationSystem.render === 'function') {
             WapCalibrationSystem.render();
         }
     }
 
-    console.log(`✨ [Master Filter] Applied to: ${currentTitle}`);
+    // --- กิมมิก: สั่น Badge จำนวนรายการเบาๆ เพื่อบอกว่าข้อมูลเปลี่ยนแล้ว ---
+    const badge = document.getElementById('record-count');
+    if (badge && window.gsap) {
+        gsap.fromTo(badge, { scale: 1.2 }, { scale: 1, duration: 0.3 });
+    }
 };
 
 function renderDailySubmissionMatrix() {
@@ -11981,132 +13019,248 @@ function refreshDashboard() {
 function renderDashboardCharts(yieldRate, filtered) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    // 1. กำหนดปีปัจจุบันและเดือนปัจจุบัน
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonthIdx = now.getMonth(); // 0 = Jan, 7 = Aug
+    const currentMonthIdx = now.getMonth(); // 0 = Jan ... 7 = Aug
 
-    const dataSet = {
-        OK: new Array(12).fill(0),
-        SF: new Array(12).fill(0),
-        CTC: new Array(12).fill(0),
-        VENDOR: new Array(12).fill(0)
+    // ตรวจสอบช่วงปีจากตัวกรอง หรือค้นหาปีล่าสุดที่มีข้อมูลในระบบ (ห้ามนำข้อมูลหลายปีมารวมกัน)
+    const filterStart = document.getElementById('cd-start-date')?.value;
+    let targetYear = null;
+    if (filterStart) {
+        const parsedY = new Date(filterStart).getFullYear();
+        if (!isNaN(parsedY) && parsedY > 2000) targetYear = parsedY;
+    }
+    
+    if (!targetYear) {
+        const availableRecords = (filtered && filtered.length) ? filtered : (S.records || []);
+        const validYears = availableRecords
+            .map(r => r.date ? new Date(r.date).getFullYear() : null)
+            .filter(y => y && !isNaN(y) && y > 2000);
+        targetYear = validYears.length ? Math.max(...validYears) : currentYear;
+    }
+
+    // กำหนดค่าเริ่มต้น:
+    // - ถ้าเป็นปีปัจจุบัน (currentYear): เดือนที่ยังมาไม่ถึง (index > currentMonthIdx) ให้เป็น null เพื่อให้ ApexCharts ตัดเส้นกราฟหยุดที่เดือนปัจจุบัน (ไม่วาดลากยาวมั่ว)
+    // - เดือนที่ผ่านมาแล้ว (index <= currentMonthIdx) ให้เริ่มต้นที่ 0
+    // - ถ้าเป็นปีในอดีต (targetYear < currentYear): ทั้ง 12 เดือนเริ่มต้นที่ 0
+    // - ถ้าเป็นปีในอนาคต (targetYear > currentYear): ทั้ง 12 เดือนเป็น null
+    const isCurrentYear = (targetYear === currentYear);
+    const isPastYear = (targetYear < currentYear);
+
+    const initMonthlyArray = () => {
+        return months.map((_, idx) => {
+            if (isPastYear) return 0;
+            if (isCurrentYear) return idx <= currentMonthIdx ? 0 : null;
+            return null;
+        });
     };
 
-    // 2. กรองเฉพาะข้อมูลของ "ปีปัจจุบัน" เท่านั้น
-    filtered.forEach(r => {
+    const dataSet = {
+        OK: initMonthlyArray(),
+        SF: initMonthlyArray(),
+        CTC: initMonthlyArray(),
+        VENDOR: initMonthlyArray()
+    };
+
+    const monthDetails = Array.from({ length: 12 }, () => ({
+        claimsCount: 0,
+        lots: new Set(),
+        totalQty: 0,
+        defects: {},
+        suppliers: {},
+        parts: {}
+    }));
+
+    // รวมข้อมูลแยกรายเดือนเฉพาะปี targetYear เท่านั้น (ห้ามนำปีอื่นมารวมเด็ดขาด)
+    (filtered || []).forEach(r => {
         if (!r.date) return;
         const d = new Date(r.date);
+        if (isNaN(d.getTime())) return;
         
-        // เช็คว่าต้องเป็นปีปัจจุบันเท่านั้น
-        if (d.getFullYear() === currentYear) {
-            const mIdx = d.getMonth();
+        const recYear = d.getFullYear();
+        // เงื่อนไขเข้มงวด: ต้องเป็นปีเป้าหมายเท่านั้น
+        if (recYear !== targetYear) return;
+
+        const mIdx = d.getMonth();
+        if (mIdx >= 0 && mIdx <= 11) {
+            // ถ้าเป็นปีปัจจุบันและเดือนเกินเดือนปัจจุบัน ไม่นับ
+            if (isCurrentYear && mIdx > currentMonthIdx) return;
+
             const qty = parseFloat(r.qty) || 0;
             const j = (r.judgment || '').toUpperCase().trim();
 
-            if (mIdx >= 0 && mIdx <= 11) {
-                if (j === 'CAN USE' || j === 'OK') dataSet.OK[mIdx] += qty;
-                else if (j === 'SF') dataSet.SF[mIdx] += qty;
-                else if (j === 'CTC') dataSet.CTC[mIdx] += qty;
-                else if (j.includes('VENDOR')) dataSet.VENDOR[mIdx] += qty;
+            if (dataSet.OK[mIdx] === null) dataSet.OK[mIdx] = 0;
+            if (dataSet.SF[mIdx] === null) dataSet.SF[mIdx] = 0;
+            if (dataSet.CTC[mIdx] === null) dataSet.CTC[mIdx] = 0;
+            if (dataSet.VENDOR[mIdx] === null) dataSet.VENDOR[mIdx] = 0;
+
+            if (j === 'CAN USE' || j === 'OK') dataSet.OK[mIdx] += qty;
+            else if (j === 'SF') dataSet.SF[mIdx] += qty;
+            else if (j === 'CTC') dataSet.CTC[mIdx] += qty;
+            else if (j.includes('VENDOR')) dataSet.VENDOR[mIdx] += qty;
+            else dataSet.OK[mIdx] += qty;
+
+            monthDetails[mIdx].claimsCount += 1;
+            if (r.ref) monthDetails[mIdx].lots.add(r.ref);
+            monthDetails[mIdx].totalQty += qty;
+
+            if (r.defect) {
+                const df = r.defect.trim();
+                monthDetails[mIdx].defects[df] = (monthDetails[mIdx].defects[df] || 0) + qty;
+            }
+            if (r.supplier) {
+                const sp = r.supplier.trim();
+                monthDetails[mIdx].suppliers[sp] = (monthDetails[mIdx].suppliers[sp] || 0) + qty;
+            }
+            if (r.partNo || r.partName) {
+                const pt = (r.partNo || r.partName).trim();
+                monthDetails[mIdx].parts[pt] = (monthDetails[mIdx].parts[pt] || 0) + qty;
             }
         }
     });
 
-    // 3. 🛡️ จุดสำคัญ: ล้างข้อมูลเดือนที่ยังมาไม่ถึงให้เป็น null เพื่อให้เส้นกราฟ "ตัดจบ"
-    // ถ้าเราอยู่ในเดือน 8 (Aug) เดือน 9-12 จะไม่แสดงเส้นวิ่งไปที่เลข 0
-    for (let i = 0; i < 12; i++) {
-        if (i > currentMonthIdx) {
-            dataSet.OK[i] = null;
-            dataSet.SF[i] = null;
-            dataSet.CTC[i] = null;
-            dataSet.VENDOR[i] = null;
-        }
+    // คำนวณสถิติภาพรวมเฉพาะเดือนที่ผ่านมาแล้ว
+    const maxEvalMonth = isCurrentYear ? currentMonthIdx : (isPastYear ? 11 : -1);
+    const validTotals = [];
+    let totalPcsVal = 0;
+
+    for (let i = 0; i <= maxEvalMonth; i++) {
+        const mOk = dataSet.OK[i] || 0;
+        const mSf = dataSet.SF[i] || 0;
+        const mCtc = dataSet.CTC[i] || 0;
+        const mVen = dataSet.VENDOR[i] || 0;
+        const mTotal = mOk + mSf + mCtc + mVen;
+        totalPcsVal += mTotal;
+        if (mTotal > 0) validTotals.push(mTotal);
     }
 
-    // 4. คำนวณสถิติเฉพาะเดือนที่มีข้อมูลจริง (Jan - ปัจจุบัน)
-    const monthlyTotals = months.map((_, i) => {
-        if (i > currentMonthIdx) return null;
-        return (dataSet.OK[i] || 0) + (dataSet.SF[i] || 0) + (dataSet.CTC[i] || 0) + (dataSet.VENDOR[i] || 0);
-    });
-
-    const validTotals = monthlyTotals.filter(v => v !== null);
-    const totalPcsVal = validTotals.reduce((a, b) => a + b, 0);
     const maxVal = validTotals.length ? Math.max(...validTotals) : 0;
     const minVal = validTotals.length ? Math.min(...validTotals) : 0;
     const avgVal = validTotals.length ? Math.round(totalPcsVal / validTotals.length) : 0;
 
-    // อัปเดตตัวเลขบน UI
+    // อัปเดตตัวเลขบน UI (แก้ไขไม่ให้มีข้อความซ้ำ เช่น Max: Max: )
     animateValue('trend-total-pcs', 0, totalPcsVal, 1000, 0, "", "PCS ");
-    animateValue('trend-max', 0, maxVal, 1000, 0, "", "Max: ");
-    animateValue('trend-min', 0, minVal, 1000, 0, "", "Min: ");
-    animateValue('trend-avg', 0, avgVal, 1000, 0, "", "Avg: ");
+    animateValue('trend-max', 0, maxVal, 1000, 0, "", "");
+    animateValue('trend-min', 0, minVal, 1000, 0, "", "");
+    animateValue('trend-avg', 0, avgVal, 1000, 0, "", "");
 
-    // 5. วาดกราฟ
+    // วาดกราฟ Monthly Production Trends พร้อม Custom Tooltip Gimmick
     const trendChartEl = document.getElementById("trend-chart");
     if (trendChartEl) {
         if (charts.trend) charts.trend.destroy();
         
-        // ... โค้ดส่วนคำนวณด้านบนเหมือนเดิม ...
+        charts.trend = new ApexCharts(trendChartEl, {
+            series: [
+                { name: 'OK', data: dataSet.OK },
+                { name: 'SF', data: dataSet.SF },
+                { name: 'CTC', data: dataSet.CTC },
+                { name: 'VENDOR', data: dataSet.VENDOR }
+            ],
+            chart: {
+                type: 'area',
+                height: '100%',
+                toolbar: { show: false },
+                animations: { enabled: true, easing: 'easeinout', speed: 600 }
+            },
+            dataLabels: {
+                enabled: false 
+            },
+            markers: {
+                size: 4,
+                strokeColors: '#fff',
+                strokeWidth: 2,
+                hover: {
+                    size: 6
+                }
+            },
+            tooltip: {
+                enabled: true,
+                shared: false,
+                intersect: false,
+                custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                    const mName = months[dataPointIndex];
+                    const ok = dataSet.OK[dataPointIndex] || 0;
+                    const sf = dataSet.SF[dataPointIndex] || 0;
+                    const ctc = dataSet.CTC[dataPointIndex] || 0;
+                    const vendor = dataSet.VENDOR[dataPointIndex] || 0;
+                    const totalM = ok + sf + ctc + vendor;
+                    const details = monthDetails[dataPointIndex];
+                    const claims = details.claimsCount;
+                    const lots = details.lots.size;
 
-charts.trend = new ApexCharts(trendChartEl, {
-    series: [
-        { name: 'OK', data: dataSet.OK },
-        { name: 'SF', data: dataSet.SF },
-        { name: 'CTC', data: dataSet.CTC },
-        { name: 'VENDOR', data: dataSet.VENDOR }
-    ],
-    chart: {
-        type: 'area',
-        height: '100%',
-        toolbar: { show: false },
-        animations: { enabled: true }
-    },
-    // 1. ❌ ปิดกล่องตัวเลขบนกราฟ
-    dataLabels: {
-        enabled: false 
-    },
-    // 2. 🟢 เพิ่มจุด (Markers) บนเส้นกราฟ
-    markers: {
-        size: 4,               // ขนาดของจุด
-        strokeColors: '#fff',  // ขอบสีขาวรอบจุด
-        strokeWidth: 2,
-        hover: {
-            size: 6            // ขนาดจุดเมื่อเอาเมาส์ไปชี้
-        }
-    },
-    // 3. 🎯 ตั้งค่าให้แสดงผลเมื่อเมาส์ชี้ (Tooltip)
-    tooltip: {
-        enabled: true,
-        shared: true,          // แสดงข้อมูลทุกเส้นพร้อมกันเมื่อชี้ที่เดือนนั้น
-        intersect: false,
-        theme: 'dark',
-        y: {
-            formatter: function (val) {
-                return val !== null ? val.toLocaleString() + " PCS" : null;
-            }
-        }
-    },
-    // ... ส่วนการตั้งค่าอื่นๆ (colors, stroke, xaxis, yaxis) คงเดิม ...
-    colors: ['#10b981', '#f97316', '#2563eb', '#ef4444'],
-    stroke: { curve: 'smooth', width: 3 },
-    fill: {
-        type: 'gradient',
-        gradient: { opacityFrom: 0.4, opacityTo: 0.05 }
-    },
-    xaxis: {
-        categories: months,
-        labels: { style: { colors: '#94a3b8', fontSize: '10px' } }
-    },
-    yaxis: {
-        labels: {
-            style: { colors: '#94a3b8', fontSize: '10px' },
-            formatter: val => val ? val.toLocaleString() : 0
-        }
-    },
-    grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
-    legend: { show: false }
-});
+                    const topDefectEntry = Object.entries(details.defects).sort((a, b) => b[1] - a[1])[0];
+                    const topDefectStr = topDefectEntry ? `${topDefectEntry[0]} (${topDefectEntry[1].toLocaleString()})` : '-';
+
+                    const topSupplierEntry = Object.entries(details.suppliers).sort((a, b) => b[1] - a[1])[0];
+                    const topSupplierStr = topSupplierEntry ? `${topSupplierEntry[0]} (${topSupplierEntry[1].toLocaleString()})` : '-';
+
+                    return `
+                    <div style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.6); font-family: inherit; min-width: 240px; color: #fff;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 7px; margin-bottom: 9px;">
+                            <div style="font-weight: 900; font-size: 13px; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+                                <span>📅</span> <span>${mName} ${targetYear}</span>
+                            </div>
+                            <div style="font-size: 10px; font-weight: 800; background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(56,189,248,0.3);">
+                                ${totalM.toLocaleString()} PCS
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 9px;">
+                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #10b981;">
+                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">OK / CAN USE</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #34d399;">${ok.toLocaleString()}</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #f97316;">
+                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">SPECIAL FOCUS</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #fb923c;">${sf.toLocaleString()}</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #3b82f6;">
+                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">CTC (CHARGE)</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #60a5fa;">${ctc.toLocaleString()}</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #ef4444;">
+                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">VENDOR FAULT</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #f87171;">${vendor.toLocaleString()}</div>
+                            </div>
+                        </div>
+
+                        <div style="border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 7px; font-size: 9.5px; line-height: 1.45; color: #cbd5e1;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                <span style="color: #94a3b8;">Total Records / Lots:</span>
+                                <span style="font-weight: 800; color: #fff;">${claims} Recs / ${lots} Lots</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                <span style="color: #94a3b8;">Top Defect:</span>
+                                <span style="font-weight: 700; color: #fde047; text-align: right; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topDefectStr}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #94a3b8;">Top Supplier:</span>
+                                <span style="font-weight: 700; color: #a78bfa; text-align: right; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topSupplierStr}</span>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }
+            },
+            colors: ['#10b981', '#f97316', '#2563eb', '#ef4444'],
+            stroke: { curve: 'smooth', width: 3 },
+            fill: {
+                type: 'gradient',
+                gradient: { opacityFrom: 0.4, opacityTo: 0.05 }
+            },
+            xaxis: {
+                categories: months,
+                labels: { style: { colors: '#94a3b8', fontSize: '10px' } }
+            },
+            yaxis: {
+                labels: {
+                    style: { colors: '#94a3b8', fontSize: '10px' },
+                    formatter: val => val ? val.toLocaleString() : 0
+                }
+            },
+            grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+            legend: { show: false }
+        });
         charts.trend.render();
     }
 }
@@ -12764,7 +13918,46 @@ function renderExecTrends(actData, s5Data) {
             markers: { radius: 12 },
             labels: { colors: '#64748b' }
         },
-        tooltip: { theme: 'dark', shared: true, intersect: false }
+        tooltip: {
+            enabled: true,
+            shared: false,
+            intersect: false,
+            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                const mName = months[dataPointIndex];
+                const s5 = s5CalculatedData[dataPointIndex] || 0;
+                const supp = supportData[dataPointIndex] || 0;
+                const sj = specialJobsData[dataPointIndex] || 0;
+                const totalAct = s5 + supp + sj;
+
+                return `
+                <div style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 12px; padding: 12px 14px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.6); font-family: inherit; min-width: 220px; color: #fff;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 7px; margin-bottom: 9px;">
+                        <div style="font-weight: 900; font-size: 13px; color: #c084fc; display: flex; align-items: center; gap: 6px;">
+                            <span>📊</span> <span>${mName} ${targetYear}</span>
+                        </div>
+                        <div style="font-size: 10px; font-weight: 800; background: rgba(168, 85, 247, 0.2); color: #c084fc; padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(168, 85, 247, 0.3);">
+                            ${totalAct} Total Activities
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.06); padding: 5px 8px; border-radius: 6px; border-left: 3px solid #a855f7;">
+                            <span style="font-size: 10px; color: #d8b4fe; font-weight: 700;">5S Findings</span>
+                            <span style="font-size: 11px; font-weight: 800; color: #fff;">${s5.toLocaleString()}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.06); padding: 5px 8px; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                            <span style="font-size: 10px; color: #93c5fd; font-weight: 700;">Support Line</span>
+                            <span style="font-size: 11px; font-weight: 800; color: #fff;">${supp.toLocaleString()}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.06); padding: 5px 8px; border-radius: 6px; border-left: 3px solid #10b981;">
+                            <span style="font-size: 10px; color: #6ee7b7; font-weight: 700;">Special Missions</span>
+                            <span style="font-size: 11px; font-weight: 800; color: #fff;">${sj.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }
+        }
     });
     execCharts.trend.render();
 }
@@ -12991,8 +14184,19 @@ async function fetchAttendanceRecords() {
     const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
     if (!targetUser) return [];
     
-    // หากออฟไลน์ ให้ใช้ข้อมูลเดิมใน State
-    if (!navigator.onLine) return S.attLeaveRecords;
+    // หากออฟไลน์ ให้ใช้ข้อมูลเดิมใน State หรือ Cache
+    if (!navigator.onLine) {
+        try {
+            const cached = localStorage.getItem(`att_leave_cache_${targetUser}`) || localStorage.getItem('att_leave_cache_last');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    S.attLeaveRecords = parsed;
+                }
+            }
+        } catch(e){}
+        return S.attLeaveRecords;
+    }
 
     try {
         const { data, error } = await wapClient
@@ -13003,14 +14207,30 @@ async function fetchAttendanceRecords() {
 
         if (error) throw error;
         
-        // อัปเดตข้อมูลลงใน Global State แทนตัวแปรกระจัดกระจาย
+        // อัปเดตข้อมูลลงใน Global State และสำรองลง Cache
         S.attLeaveRecords = data || [];
+        try {
+            safeLocalStorageSet(`att_leave_cache_${targetUser}`, JSON.stringify(S.attLeaveRecords));
+            safeLocalStorageSet('att_leave_cache_last', JSON.stringify(S.attLeaveRecords));
+            if (window.SQEIndexedDBManager && typeof SQEIndexedDBManager.saveTableCache === 'function') {
+                SQEIndexedDBManager.saveTableCache(`attendance_${targetUser}`, S.attLeaveRecords);
+            }
+        } catch(ce){}
         return S.attLeaveRecords;
 
     } catch (e) {
-        console.error('Fetch attendance error:', e);
-        attToast('โหลดข้อมูลการลาไม่สำเร็จ', 'error');
-        return S.attLeaveRecords;
+        console.warn('[Attendance Fetch fallback to cache]:', e?.message || e);
+        try {
+            const cached = localStorage.getItem(`att_leave_cache_${targetUser}`) || localStorage.getItem('att_leave_cache_last');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    S.attLeaveRecords = parsed;
+                    return S.attLeaveRecords;
+                }
+            }
+        } catch(err){}
+        return S.attLeaveRecords || [];
     }
 }
 
@@ -13156,12 +14376,6 @@ async function deleteAttRecord(id) {
     // - หรือเป็น Master Admin (Natthawut)
     const isOwner = (target.user_id === S.currentUser);
     const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
-
-    // บล็อกการลบเฉพาะกรณีที่เป็นคนอื่น และอยู่ในโหมด Supervisor
-    if (!isOwner && !isMasterAdmin && S.userRole === 'supervisor') { 
-        attToast('⚠️ เฉพาะเจ้าของบันทึกหรือ Admin เท่านั้นที่ลบรายการนี้ได้', 'error'); 
-        return; 
-    }
 
     // 3. แสดงหน้าต่างยืนยันการลบแบบ Custom (เหมือนหน้าอื่นๆ)
     showCustomConfirmDialog({
@@ -13667,30 +14881,6 @@ const calcNG = () => {
         ngInput.style.color = '';
         ngInput.style.fontWeight = 'normal';
     }
-
-    // อัปเดตข้อความในช่อง Note/Remark อัตโนมัติตามแบบฟอร์มมาตรฐาน
-    const remarkArea = document.querySelector('#support-form-modal textarea[name="remark"]');
-    if (remarkArea) {
-        const curVal = remarkArea.value;
-        const lotVal = (lotInput.value !== '' && lotInput.value !== null) ? lotInput.value : '0';
-        const ngVal = (ngInput.value !== '' && ngInput.value !== null) ? ngInput.value : '0';
-
-        // ตรวจสอบว่าช่อง Remark ว่างเปล่า หรือยังคงรูปแบบฟอร์มมาตรฐาน Temporary action
-        const isStandardPattern = !curVal.trim() || /Temporary action[\s\S]*SQE Support production line total\s*=\s*.*?Pcs\.\s*Found NG\s*=\s*.*?Pcs\./i.test(curVal);
-
-        if (isStandardPattern) {
-            // สกัดข้อมูลส่วน IQC re check หากผู้ใช้มีการกรอกตัวเลขไว้ ให้คงค่าเดิมไว้
-            let iqcLine = 'IQC re check part in CTC stock total =  Pcs. Found NG =  Pcs.';
-            const iqcMatch = curVal.match(/IQC re check part in CTC stock total\s*=\s*([^\n\r]*)/i);
-            if (iqcMatch) {
-                iqcLine = `IQC re check part in CTC stock total = ${iqcMatch[1].trim()}`;
-            }
-
-            remarkArea.value = `Temporary action\nSQE Support production line total = ${lotVal} Pcs. Found NG = ${ngVal} Pcs.\n${iqcLine}`;
-            remarkArea.style.height = 'auto';
-            remarkArea.style.height = (Math.max(75, remarkArea.scrollHeight)) + 'px';
-        }
-    }
 };
 
 const WapSupportLogs = (function () {
@@ -13804,7 +14994,7 @@ const WapSupportLogs = (function () {
 
             applyDateFilter();
         } catch (e) {
-            console.error('[WapSupport] Fetch error:', e);
+            console.warn('[WapSupport] Fetch fallback to cache:', e?.message || e);
             if (myToken === _fetchToken && _alive) {
                 let restored = false;
                 try {
@@ -13815,7 +15005,6 @@ const WapSupportLogs = (function () {
                         if (Array.isArray(parsed) && parsed.length > 0) {
                             _records = parsed.map(_fromDb);
                             restored = true;
-                            toast('📦 โหลดรายงานผลิตจากหน่วยความจำสำรองในเครื่องเรียบร้อย', 'info');
                         }
                     }
                 } catch (err) {
@@ -13828,7 +15017,6 @@ const WapSupportLogs = (function () {
                         if (Array.isArray(idbData) && idbData.length > 0) {
                             _records = idbData.map(_fromDb);
                             restored = true;
-                            toast('📦 โหลดรายงานผลิตจากหน่วยความจำสำรอง IndexedDB เรียบร้อย', 'info');
                         }
                     } catch (idbErr) {
                         console.warn('[IDB Cache Restore Error]', idbErr.message);
@@ -13839,7 +15027,6 @@ const WapSupportLogs = (function () {
                     if (Array.isArray(S.wapData?.achievements) && S.wapData.achievements.length > 0) {
                         _records = S.wapData.achievements.map(_fromDb);
                     } else {
-                        toast('⚠️ โหลดข้อมูล Support ไม่สำเร็จ: ' + (e.message || ''), 'error');
                         _records = [];
                     }
                 }
@@ -13850,48 +15037,109 @@ const WapSupportLogs = (function () {
         }
     }
 
-    function applyDateFilter() {
-        if (!_alive) {
-            const targetUser = (S.userRole === 'supervisor') ? S.viewingUser : S.currentUser;
-            init(targetUser);
-            return;
-        }
-        const start = document.getElementById('cd-start-date')?.value;
-        const end = document.getElementById('cd-end-date')?.value;
-        let temp = Array.isArray(_records) ? [..._records] : [];
-
-        if (start && end) {
-            temp = temp.filter(r => r.eventDate && r.eventDate >= start && r.eventDate <= end);
-        }
-        if (_filter && _filter !== 'ALL') {
-            temp = temp.filter(r => r.report === _filter);
-        }
-        if (_search && _search.trim() !== "") {
-            const kw = _search.toLowerCase().trim();
-            const cleanKw = kw.replace(/[^a-z0-9ก-๙]/gi, '');
-            temp = temp.filter(r => {
-                const problemText = (r.problem || "").toLowerCase();
-                const partText = (r.part || "").toLowerCase();
-                const lotText = (r.lot || "").toLowerCase();
-                const remarkText = (r.remark || "").toLowerCase();
-                const directMatch = problemText.includes(kw) || partText.includes(kw) || lotText.includes(kw) || remarkText.includes(kw);
-                const fuzzyMatch = problemText.replace(/[^a-z0-9ก-๙]/gi, '').includes(cleanKw) ||
-                                   partText.replace(/[^a-z0-9ก-๙]/gi, '').includes(cleanKw);
-                return directMatch || (cleanKw.length > 3 && fuzzyMatch);
-            });
-        }
-        // เรียงข้อมูลตามวันที่บันทึกล่าสุดลงไปเสมอ - ปลอดภัยบน Safari / iOS
-        temp.sort((a, b) => {
-            const timeA = _safeTime(a.createdAt || a.eventDate);
-            const timeB = _safeTime(b.createdAt || b.eventDate);
-            if (timeA !== timeB) return timeB - timeA;
-            return String(b.id || '').localeCompare(String(a.id || ''));
-        });
-
-        _filtered = temp;
-        _lastVsState = null;
-        _render();
+    /**
+ * 🛠️ UPGRADED: SUPPORT LOGS DATE & VENDOR FILTER (V6.0)
+ * เชื่อมโยงตัวกรองเข้ากับ Header ส่วนกลาง และรองรับการกรองตามซัพพลายเออร์
+ */
+function applyDateFilter() {
+    // 1. ตรวจสอบสถานะ Module หากยังไม่ได้โหลดข้อมูลให้ Initialize ใหม่
+    if (!_alive) {
+        const targetUser = (S.userRole === 'supervisor') ? S.viewingUser : S.currentUser;
+        init(targetUser);
+        return;
     }
+
+    // 2. ดึงค่าตัวกรองจาก Header ส่วนกลาง (cd-start-date, cd-end-date, claim-vendor-filter)
+    const start = document.getElementById('cd-start-date')?.value || '';
+    const end = document.getElementById('cd-end-date')?.value || '';
+    const globalVendor = document.getElementById('claim-vendor-filter')?.value || 'ALL';
+
+    let temp = Array.isArray(_records) ? [..._records] : [];
+
+    // Helper: ถอดรหัสและแปลงวันที่ให้อยู่ในรูป YYYY-MM-DD สม่ำเสมอ
+    function _normDate(val) {
+        if (!val) return '';
+        const str = String(val).trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 10);
+        if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}/.test(str)) {
+            const p = str.split(/[\/\-\.]/);
+            return `${p[2]}-${String(p[1]).padStart(2, '0')}-${String(p[0]).padStart(2, '0')}`;
+        }
+        const d = new Date(str);
+        return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
+    }
+
+    // 3. กรองตามช่วงวันที่ (Header Filter) - ตรงตามฐานข้อมูลเท่านั้น
+    if (start && end) {
+        const minD = start <= end ? start : end;
+        const maxD = start <= end ? end : start;
+        temp = temp.filter(r => {
+            const rDate = _normDate(r.eventDate || r.event_date || r.date || r.createdAt || r.created_at);
+            return rDate && rDate >= minD && rDate <= maxD;
+        });
+    } else if (start) {
+        temp = temp.filter(r => {
+            const rDate = _normDate(r.eventDate || r.event_date || r.date || r.createdAt || r.created_at);
+            return rDate && rDate >= start;
+        });
+    } else if (end) {
+        temp = temp.filter(r => {
+            const rDate = _normDate(r.eventDate || r.event_date || r.date || r.createdAt || r.created_at);
+            return rDate && rDate <= end;
+        });
+    }
+
+    // 4. กรองตามซัพพลายเออร์ (Global Vendor Filter)
+    // ระบบจะตรวจสอบทั้งในฟิลด์ supplier ตรงๆ และค้นหาชื่อในประโยคปัญหา (Problem Statement)
+    if (globalVendor !== 'ALL') {
+        const vKwd = globalVendor.trim().toUpperCase();
+        temp = temp.filter(r => {
+            const sName = (r.supplier || "").toUpperCase();
+            const pText = (r.problem || "").toUpperCase();
+            return sName.includes(vKwd) || pText.includes(vKwd);
+        });
+    }
+
+    // 5. กรองตามประเภทรายงาน (Support Side Pills: VF, RP, RECORDS)
+    if (_filter && _filter !== 'ALL') {
+        temp = temp.filter(r => r.report === _filter);
+    }
+
+    // 6. กรองตามคำค้นหาอัจฉริยะ (Local Search Input)
+    if (_search && _search.trim() !== "") {
+        const kw = _search.toLowerCase().trim();
+        const cleanKw = kw.replace(/[^a-z0-9ก-๙]/gi, '');
+        temp = temp.filter(r => {
+            const problemText = (r.problem || "").toLowerCase();
+            const partText = (r.part || "").toLowerCase();
+            const lotText = (r.lot || "").toLowerCase();
+            const remarkText = (r.remark || "").toLowerCase();
+            
+            const directMatch = problemText.includes(kw) || partText.includes(kw) || 
+                               lotText.includes(kw) || remarkText.includes(kw);
+                               
+            const fuzzyMatch = problemText.replace(/[^a-z0-9ก-๙]/gi, '').includes(cleanKw) ||
+                               partText.replace(/[^a-z0-9ก-๙]/gi, '').includes(cleanKw);
+                               
+            return directMatch || (cleanKw.length > 3 && fuzzyMatch);
+        });
+    }
+
+    // 7. ระบบจัดเรียงลำดับ (ล่าสุดอยู่บนสุด - iOS/Safari Supported)
+    temp.sort((a, b) => {
+        const timeA = _safeTime(a.createdAt || a.eventDate);
+        const timeB = _safeTime(b.createdAt || b.eventDate);
+        if (timeA !== timeB) return timeB - timeA;
+        return String(b.id || '').localeCompare(String(a.id || ''));
+    });
+
+    // 8. อัปเดตข้อมูลที่จะวาดและสั่ง Render ตารางใหม่
+    _filtered = temp;
+    _lastVsState = null; // บังคับให้ Virtual Scroller รีเฟรชตำแหน่ง
+    _render();
+
+    console.log(`📋 [Support Filtered] Result: ${temp.length} cases.`);
+}
 
     function _render(fromScroll = false) {
         try {
@@ -14065,6 +15313,7 @@ const WapSupportLogs = (function () {
                 partNo: (rec.partNo || rec.part_no || rec.drawing_no || '').trim(),
                 supplier: (rec.supplier || '').trim(),
                 defect: (rec.defect || rec.defect_detail || '').trim(),
+                category: (rec.part || rec.part_group || rec.category || '').trim(),
                 dateStr: _formatProblemDateStr(rec.eventDate || rec.event_date || rec.createdAt || rec.created_at),
                 isRP: false
             };
@@ -14086,12 +15335,12 @@ const WapSupportLogs = (function () {
             const repType = (rec.report || rec.report_type || '').toString().toUpperCase();
             res.isRP = (/^IQC/i.test(clean) || repType.includes('RP') || repType.includes('IQC'));
 
-            if (res.isRP) {
+            if (res.isRP && !res.user) {
                 res.user = "IQC incoming inspection";
             }
 
             // 1. ตรวจหาวันที่ "On <date> ..."
-            const onDateMatch = clean.match(/^On\s+(\d{1,2}\s+[A-Za-z]{3}(?:'\d{2}|\s+\d{2,4})?)\b/i);
+            const onDateMatch = clean.match(/^On\s+(\d{1,2}\s+[A-Za-z]{3}(?:'\d{2}|\s+\d{2,4})?|\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})\b/i);
             if (onDateMatch && onDateMatch[1]) {
                 res.dateStr = onDateMatch[1].trim();
             }
@@ -14107,6 +15356,7 @@ const WapSupportLogs = (function () {
                     const parts = clean.split(/about/i);
                     mainContent = parts.slice(1).join('about').trim();
                 }
+                if (!res.user) res.user = "IQC incoming inspection";
             } else if (/record\s*:/i.test(clean)) {
                 // e.g. "On 25 Aug'26 V1 record: BELL-MOUNT / 1140009601 PARADISE PLASTIC CO., LTD. found defect Part deform"
                 const recordParts = clean.split(/record\s*:/i);
@@ -14118,8 +15368,7 @@ const WapSupportLogs = (function () {
                     rawUser = rawUser.replace(onDateMatch[1], '').trim();
                 }
                 rawUser = rawUser.replace(/\b\d{1,2}\s+[A-Za-z']+\d{2}\b/gi, '').replace(/\b[A-Za-z']+\d{2}\b/gi, '').trim();
-                if (rawUser && (!res.user || res.user === 'IQC incoming inspection')) res.user = rawUser;
-                else if (rawUser) res.user = rawUser;
+                if (rawUser) res.user = rawUser;
             } else if (/inform(?:\s+quality\s+problem)?\s+about/i.test(clean)) {
                 const parts = clean.split(/inform(?:\s+quality\s+problem)?\s+about/i);
                 const prefix = parts[0].trim();
@@ -14130,8 +15379,7 @@ const WapSupportLogs = (function () {
                     rawUser = rawUser.replace(onDateMatch[1], '').trim();
                 }
                 rawUser = rawUser.replace(/\b\d{1,2}\s+[A-Za-z']+\d{2}\b/gi, '').replace(/\b[A-Za-z']+\d{2}\b/gi, '').trim();
-                if (rawUser && (!res.user || res.user === 'IQC incoming inspection')) res.user = rawUser;
-                else if (rawUser) res.user = rawUser;
+                if (rawUser) res.user = rawUser;
             } else if (/about/i.test(clean)) {
                 const parts = clean.split(/about/i);
                 const prefix = parts[0].trim();
@@ -14141,8 +15389,7 @@ const WapSupportLogs = (function () {
                     rawUser = rawUser.replace(onDateMatch[1], '').trim();
                 }
                 rawUser = rawUser.replace(/\b\d{1,2}\s+[A-Za-z']+\d{2}\b/gi, '').replace(/\b[A-Za-z']+\d{2}\b/gi, '').trim();
-                if (rawUser && (!res.user || res.user === 'IQC incoming inspection')) res.user = rawUser;
-                else if (rawUser) res.user = rawUser;
+                if (rawUser) res.user = rawUser;
             }
 
             // 3. แยก Defect ออกจาก mainContent
@@ -14157,6 +15404,10 @@ const WapSupportLogs = (function () {
                 const defSplit = mainContent.split(/defect\s*:/i);
                 partInfoStr = defSplit[0].trim();
                 defectStr = defSplit.slice(1).join('defect:').trim();
+            } else if (/defect\s*-\s*/i.test(mainContent)) {
+                const defSplit = mainContent.split(/defect\s*-\s*/i);
+                partInfoStr = defSplit[0].trim();
+                defectStr = defSplit.slice(1).join('defect - ').trim();
             }
 
             if (defectStr) {
@@ -14298,22 +15549,41 @@ const WapSupportLogs = (function () {
             Object.keys(defectDict).forEach(k => allDefects.add(k.toUpperCase()));
         }
 
-        // Parse initial problem fields for this record
-        let parsedDateStr = _formatProblemDateStr(r.eventDate);
+        // Parse initial problem fields for this record (ดึงวันที่จากแถวตารางมาใส่เสมอ)
+        function _toIsoDateStr(val) {
+            if (!val) return '';
+            const str = String(val).trim();
+            if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 10);
+            if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}/.test(str)) {
+                const p = str.split(/[\/\-\.]/);
+                return `${p[2]}-${String(p[1]).padStart(2, '0')}-${String(p[0]).padStart(2, '0')}`;
+            }
+            const d = new Date(str);
+            return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
+        }
+
+        const headerFilterStart = document.getElementById('cd-start-date')?.value;
+        const initialFormDate = _toIsoDateStr(r.eventDate || r.event_date || r.date || r.createdAt || r.created_at) ||
+                               _toIsoDateStr(headerFilterStart) ||
+                               new Date().toISOString().split('T')[0];
+
+        let parsedDateStr = _formatProblemDateStr(initialFormDate);
         let parsedUser = "";
         let parsedPart = "";
         let parsedPartNo = "";
         let parsedSupplier = "";
         let parsedDefect = "";
+        let parsedCategory = r.part || r.part_group || r.category || "";
 
         if (isEdit) {
             const parsed = parseProblemDetails(r.problem, r);
-            parsedDateStr = parsed.dateStr || parsedDateStr;
+            parsedDateStr = parsed.dateStr || _formatProblemDateStr(initialFormDate);
             parsedUser = parsed.user || r.user || r.informer || r.area || r.dept || r.line || r._user || "";
             parsedPart = parsed.partName || r.partName || r.part_name || r.report_data?.vf_data?.part_name || "";
             parsedPartNo = parsed.partNo || r.partNo || r.part_no || r.drawing_no || r.report_data?.vf_data?.drawing_no || "";
             parsedSupplier = parsed.supplier || r.supplier || r.report_data?.vf_data?.vendor || "";
             parsedDefect = parsed.defect || r.defect || r.defect_detail || r.report_data?.vf_data?.defect || "";
+            parsedCategory = parsed.category || parsedCategory;
 
             // 4. 🏭 ผู้จำหน่าย (Supplier) ให้แสดงผลตามข้อมูล 🔢 รหัสพาร์ท (Part No.) * ที่เคยมี
             if (!parsedSupplier && parsedPartNo) {
@@ -14339,20 +15609,20 @@ const WapSupportLogs = (function () {
                 const matchedPack = partMapByName[parsedPart.toLowerCase()];
                 if (matchedPack && matchedPack.partNo) parsedPartNo = matchedPack.partNo;
             }
+            if (!parsedCategory && parsedPartNo) {
+                const matchedPack = partMapByNo[parsedPartNo.toLowerCase()];
+                if (matchedPack && matchedPack.partGroup) parsedCategory = matchedPack.partGroup;
+            }
+            if (!parsedCategory && parsedPart) {
+                const matchedPack = partMapByName[parsedPart.toLowerCase()];
+                if (matchedPack && matchedPack.partGroup) parsedCategory = matchedPack.partGroup;
+            }
         }
 
         const partnoDatalistOptions = Array.from(allPartNos).sort().map(p => `<option value="${_esc(p)}">`).join('');
         const partnameDatalistOptions = Array.from(allPartNames).sort().map(p => `<option value="${_esc(p)}">`).join('');
         const supplierDatalistOptions = Array.from(allSuppliers).sort().map(s => `<option value="${_esc(s)}">`).join('');
         const defectDatalistOptions = Array.from(allDefects).sort().map(d => `<option value="${_esc(d)}">`).join('');
-
-        // เตรียมข้อมูล Note/Remark เริ่มต้นตามฟอร์มมาตรฐาน
-        let initialRemark = r.remark || '';
-        if (!initialRemark) {
-            const initLot = (r.lot !== undefined && r.lot !== null && r.lot !== '') ? r.lot : ((r.qty !== undefined && r.qty !== null && r.qty !== '') ? r.qty : '0');
-            const initNG = (r.ng !== undefined && r.ng !== null && r.ng !== '') ? r.ng : '0';
-            initialRemark = `Temporary action\nSQE Support production line total = ${initLot} Pcs. Found NG = ${initNG} Pcs.\nIQC re check part in CTC stock total =  Pcs. Found NG =  Pcs.`;
-        }
 
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
@@ -14451,7 +15721,7 @@ const WapSupportLogs = (function () {
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📦 หมวดหมู่พาร์ท</label>
                                 <div style="position:relative;">
                                     <input type="text" id="f-sup-part-cat" name="part" 
-                                           value="${r.part || ''}" 
+                                           value="${parsedCategory || ''}" 
                                            placeholder="พิมพ์/เลือกหมวดหมู่..." 
                                            class="form-input" 
                                            style="width:100%; height:32px; font-size:11px; font-weight:600;" 
@@ -14508,11 +15778,14 @@ const WapSupportLogs = (function () {
                             ⚙️ 2. วันที่ การแก้ไข & จำนวนชิ้นงาน
                         </label>
 
-                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-                            <div>
-                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📅 วันที่รายงาน</label>
-                                <input type="date" id="f-sup-date" name="date" value="${r.eventDate || new Date().toISOString().split('T')[0]}" class="form-input" style="width:100%; height:32px; font-size:11px;" required title="Date" aria-label="Date">
-                            </div>
+<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+    <div>
+        <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📅 วันที่รายงาน</label>
+        <input type="date" id="f-sup-date" name="date" 
+            value="${initialFormDate}" 
+            class="form-input" style="width:100%; height:32px; font-size:11px;" required title="Date" aria-label="Date">
+    </div>
+ 
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔧 การแก้ไข (ACTION)</label>
                                 <div style="position:relative;">
@@ -14650,14 +15923,12 @@ const WapSupportLogs = (function () {
                         </div>
 
                         <!-- Mode Switcher Tabs (แบบที่ 1 / แบบที่ 2) -->
-                        <div class="evidence-mode-switcher-container">
+                        <div style="display:flex; background:#e2e8f0; border-radius:10px; padding:3px; gap:4px;">
                             <button type="button" id="btn-evidence-mode-single" class="evidence-mode-tab-btn active">
-                                <span class="evidence-tab-icon">🖼️</span>
-                                <span class="evidence-tab-label">แบบที่ 1: แนบภาพสำเร็จรูป (1 ไฟล์)</span>
+                                <span>🖼️ แบบที่ 1: แนบภาพสำเร็จรูป (1 ไฟล์)</span>
                             </button>
                             <button type="button" id="btn-evidence-mode-multi" class="evidence-mode-tab-btn">
-                                <span class="evidence-tab-icon">🧩</span>
-                                <span class="evidence-tab-label">แบบที่ 2: แนบภาพแยก (3 - 5 รูป รวมภาพอัตโนมัติ)</span>
+                                <span>🧩 แบบที่ 2: แนบภาพแยก (3 - 5 รูป รวมภาพอัตโนมัติ)</span>
                             </button>
                         </div>
 
@@ -14668,19 +15939,11 @@ const WapSupportLogs = (function () {
                                 <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; position:relative; z-index:3;">
                                     ${r.imageUrl ? `
                                         <div class="evidence-single-preview-wrap">
-                                            <div style="width:100%; display:flex; justify-content:center; align-items:center; overflow:hidden;">
-                                                <img src="${r.imageUrl}" style="max-height:105px; max-width:100%; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.12); display:block; object-fit:contain;" alt="Evidence Single" />
-                                            </div>
+                                            <img src="${r.imageUrl}" style="max-height:95px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" alt="Evidence Single" />
                                             <div class="evidence-single-actions">
-                                                <button type="button" class="evidence-preview-btn btn-rotate-single" title="หมุนรูปภาพ 90°">
-                                                    <span>↻</span> หมุน
-                                                </button>
-                                                <button type="button" class="evidence-preview-btn btn-zoom-single" title="ขยายดูภาพใหญ่">
-                                                    <span>🔍</span> ขยาย
-                                                </button>
-                                                <button type="button" class="evidence-preview-btn btn-del btn-del-single" title="ลบรูปภาพนี้">
-                                                    <span>🗑️</span> ลบ
-                                                </button>
+                                                <button type="button" class="evidence-preview-btn btn-rotate-single" title="หมุนรูปภาพ 90°">↻ หมุน</button>
+                                                <button type="button" class="evidence-preview-btn btn-zoom-single" title="ขยายดูภาพใหญ่">🔍 ขยาย</button>
+                                                <button type="button" class="evidence-preview-btn btn-del btn-del-single" title="ลบรูปภาพ">✖ ลบ</button>
                                             </div>
                                         </div>
                                     ` : `
@@ -14702,10 +15965,11 @@ const WapSupportLogs = (function () {
                                 <span id="evidence-multi-count-badge" style="font-size:9.5px; font-weight:800; background:#d97706; color:#fff; padding:2px 8px; border-radius:6px;">(อัปโหลดแล้ว 0/5 รูป)</span>
                             </div>
 
-                            <!-- Grid แสดงรูปภาพ 3-5 รูป และปุ่มเพิ่ม -->
+                            <!-- Thumbnails Grid -->
                             <div id="evidence-multi-grid" class="evidence-multi-grid">
-                                <!-- Dynamic thumbnails & Add Slot -->
+                                <!-- Rendered dynamically by JS -->
                             </div>
+
                             <input type="file" id="img-multi-input" accept="image/*" multiple style="display:none;" title="Multi Img Input">
 
                             <!-- Stitched Banner Preview Container -->
@@ -14732,21 +15996,18 @@ const WapSupportLogs = (function () {
                     </div>
 
                     <!-- ==========================================================
-                         หมวดหมู่ 4: หมายเหตุ (Note / Remark - Auto Expand Textarea)
+                         หมวดหมู่ 4: หมายเหตุ (Remark - Auto Expand Textarea)
                          ========================================================== -->
                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
-                                💬 4. หมายเหตุเพิ่มเติม (Note / Remark)
-                            </label>
-                            <span style="font-size:9.5px; font-weight:700; color:#64748b;">(สามารถแก้ไขข้อความได้อิสระ)</span>
-                        </div>
+                        <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
+                            💬 4. หมายเหตุเพิ่มเติม (Remark)
+                        </label>
                         <textarea name="remark" class="form-input" 
-                                  style="width:100%; min-height:75px; max-height:180px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.5; outline:none; resize:vertical; overflow-y:auto; font-family:inherit;" 
-                                  placeholder="Temporary action..." 
-                                  title="Note / Remark" 
-                                  aria-label="Note / Remark"
-                                  oninput="this.style.height='75px'; this.style.height=(this.scrollHeight)+'px';">${_esc(initialRemark)}</textarea>
+                                  style="width:100%; min-height:38px; max-height:140px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.4; outline:none; resize:none; overflow-y:auto;" 
+                                  placeholder="พิมพ์รายละเอียดหรือหมายเหตุเพิ่มเติม (กล่องย่อ-ขยายความสูงอัตโนมัติตามข้อความ)..." 
+                                  title="Remark" 
+                                  aria-label="Remark"
+                                  oninput="this.style.height='38px'; this.style.height=(this.scrollHeight)+'px';">${_esc(r.remark || '')}</textarea>
                     </div>
 
                     <!-- ปุ่มดำเนินการ -->
@@ -14930,7 +16191,7 @@ const WapSupportLogs = (function () {
 
         // --- แก้ไขฟังก์ชัน syncProblemSentence ให้ตรวจจับการเปลี่ยนประเภทรายงานแบบ Real-Time ---
         function syncProblemSentence() {
-            const dateInputVal = modal.querySelector('#f-sup-date')?.value || r.eventDate;
+            const dateInputVal = modal.querySelector('#f-sup-date')?.value || initialFormDate || r.eventDate;
             const dateStr = _formatProblemDateStr(dateInputVal);
             const userInpEl = modal.querySelector('#prob-user');
             let userVal = (userInpEl?.value || '').trim();
@@ -15063,14 +16324,7 @@ const WapSupportLogs = (function () {
         // --- Logic: 3. รูปภาพหลักฐาน (Evidence Upload 2-Mode System) ---
         let currentEvidenceMode = 'single'; // 'single' หรือ 'multi'
         let singleImage = r.imageUrl || null;
-        let singleImageOriginal = r.imageUrl || null;
-        let singleImageAnnotated = null;
-        let singleImageShowAnnot = true;
-
         let multiImages = [];
-        let multiImagesOriginal = [];
-        let multiImagesAnnotated = [];
-        let multiImagesShowAnnot = [];
         let stitchedMultiImage = null;
         let currentImage = r.imageUrl || null;
         modal._currentImage = currentImage;
@@ -15092,1201 +16346,68 @@ const WapSupportLogs = (function () {
         const btnZoomComposite = modal.querySelector('#btn-zoom-composite');
         const btnDownloadComposite = modal.querySelector('#btn-download-composite');
 
-        // 🎨 MASTER EVIDENCE PHOTO ANNOTATION LAYER (HTML5 Canvas Defect Marker with Pan & Zoom)
-        function openEvidenceAnnotator(initialDataUrl, onSaveCallback) {
-            if (!initialDataUrl) {
-                toast('⚠️ ไม่พบรูปภาพที่ต้องการใส่สัญลักษณ์/ข้อความ', 'warning');
-                return;
-            }
-
-            const overlay = document.createElement('div');
-            overlay.className = 'evidence-annotator-overlay';
-
-            overlay.innerHTML = `
-                <div class="evidence-annotator-modal">
-                    <div class="evidence-annotator-header">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <span style="font-size:18px;">✏️</span>
-                            <div>
-                                <h3 style="font-size:14px; font-weight:900; margin:0; color:#0f172a;" class="dark:text-white">Evidence Defect Annotator (ใส่สัญลักษณ์ & ข้อความชี้จุดบกพร่อง)</h3>
-                                <p style="font-size:11px; margin:0; color:#64748b;" class="dark:text-slate-400">ลากวาดลูกศร, วงกลม, กรอบสี่เหลี่ยม, เส้นตรง, ปากกา, พิมพ์ข้อความ พร้อมระบบ Pan & Zoom ส่องตรวจความละเอียดสูง</p>
-                            </div>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <button type="button" class="annot-btn" id="btn-annot-cancel" style="background:#f1f5f9; color:#475569; padding:0 12px; height:30px;" title="ยกเลิกการแก้ไขและปิดหน้าต่าง">✕ ปิด</button>
-                            <button type="button" class="annot-btn" id="btn-annot-save" style="background:#16a34a; color:#ffffff; font-weight:900; padding:0 14px; height:30px; box-shadow:0 2px 4px rgba(22,163,74,0.3);" title="บันทึกรูปภาพที่แก้ไขลงเอกสารหลักฐาน">💾 บันทึกลงเอกสาร</button>
-                        </div>
-                    </div>
-
-                    <div class="evidence-annotator-toolbar">
-                        <!-- 1. Drawing, Text, Crop & Pan Tools -->
-                        <div class="annot-tool-group" title="เครื่องมือวาดและชี้จุดเสีย">
-                            <button type="button" class="annot-btn active" data-tool="arrow" title="➔ ลูกศรชี้จุดบกพร่อง (Arrow)"><span>➔</span></button>
-                            <button type="button" class="annot-btn" data-tool="circle" title="⭕ วงกลมล้อมจุดบกพร่อง (Circle)"><span>⭕</span></button>
-                            <button type="button" class="annot-btn" data-tool="rect" title="🔲 กรอบสี่เหลี่ยมชี้จุดเสีย (Rectangle)"><span>🔲</span></button>
-                            <button type="button" class="annot-btn" data-tool="line" title="📏 เส้นตรงชี้แนวระนาบ (Line)"><span>📏</span></button>
-                            <button type="button" class="annot-btn" data-tool="pen" title="🖊️ ปากกาวาดอิสระ (Pen)"><span>🖊️</span></button>
-                            <button type="button" class="annot-btn" data-tool="text" title="🔤 พิมพ์ข้อความชี้จุดเสีย (Text)"><span>🔤</span></button>
-                            <button type="button" class="annot-btn" data-tool="crop" title="✂️ ครอบตัดรูปภาพ (Crop)"><span>✂️</span></button>
-                            <button type="button" class="annot-btn" data-tool="pan" title="✋ เลื่อนดูภาพ (Pan)"><span>✋</span></button>
-                        </div>
-
-                        <!-- 2. Rotate & Flip Tools -->
-                        <div class="annot-tool-group" title="หมุนและพลิกรูปภาพ">
-                            <button type="button" class="annot-btn" id="btn-annot-rotate-left" title="↺ หมุนทวนเข็ม 90° (Rotate Left -90°)">
-                                <span>↺</span>
-                            </button>
-                            <button type="button" class="annot-btn" id="btn-annot-rotate-right" title="↻ หมุนตามเข็ม 90° (Rotate Right +90°)">
-                                <span>↻</span>
-                            </button>
-                            <button type="button" class="annot-btn" id="btn-annot-flip-h" title="⇄ พลิกรูปภาพแนวนอน (Flip Horizontal)">
-                                <span>⇄</span>
-                            </button>
-                        </div>
-
-                        <!-- 3. Color Picker Button in Toolbar -->
-                        <div class="annot-tool-group annot-color-group" title="เลือกสีสัญลักษณ์">
-                            <button type="button" class="annot-btn" id="btn-annot-color-toggle" title="🎨 คลิกเพื่อเปิด/ปิด แถบเลือกสีสัญลักษณ์ (Color Palette)">
-                                <span id="annot-current-color-dot" style="display:inline-block; width:11px; height:11px; border-radius:50%; background:#ef4444; border:1.5px solid #ffffff; box-shadow:0 0 0 1px #94a3b8; vertical-align:middle; margin-right:3px;"></span>
-                                <span>🎨 สี</span>
-                            </button>
-                        </div>
-
-                        <!-- 4. Stroke Size Presets -->
-                        <div class="annot-tool-group" title="ขนาดความหนาเส้น">
-                            <button type="button" class="annot-btn" data-size="2" title="ขนาดเส้นบาง 2px (Thin)">2px</button>
-                            <button type="button" class="annot-btn active" data-size="4" title="ขนาดเส้นมาตรฐาน 4px (Normal)">4px</button>
-                            <button type="button" class="annot-btn" data-size="7" title="ขนาดเส้นหนา 7px (Bold)">7px</button>
-                        </div>
-
-                        <!-- 5. Zoom & View Controls -->
-                        <div class="annot-tool-group annot-zoom-group" title="มุมมองและระดับการซูม">
-                            <button type="button" class="annot-btn" id="btn-annot-zoom-out" title="➖ ซูมออก (-25%)"><span>➖</span></button>
-                            <span class="annot-zoom-badge" id="annot-zoom-level-label" title="ระดับการซูมปัจจุบัน">100%</span>
-                            <button type="button" class="annot-btn" id="btn-annot-zoom-in" title="➕ ซูมเข้า (+25%)"><span>➕</span></button>
-                            <button type="button" class="annot-btn" id="btn-annot-zoom-fit" title="⛶ ปรับขนาดพอดีหน้าจอ (Fit Screen)"><span>⛶</span></button>
-                        </div>
-
-                        <!-- 6. History & Clear Actions -->
-                        <div class="annot-tool-group" style="margin-left:auto;" title="คำสั่งจัดการภาพ">
-                            <button type="button" class="annot-btn" id="btn-annot-undo" title="↩️ ย้อนกลับคำสั่งล่าสุด (Undo - Ctrl+Z)">
-                                <span>↩️</span>
-                            </button>
-                            <button type="button" class="annot-btn" id="btn-annot-redo" title="↪️ ทำซ้ำคำสั่งที่ยกเลิก (Redo - Ctrl+Y)">
-                                <span>↪️</span>
-                            </button>
-                            <button type="button" class="annot-btn" id="btn-annot-clear" title="🗑️ ล้างสัญลักษณ์ทั้งหมด (Clear All)" style="color:#dc2626;">
-                                <span>🗑️</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- 🎨 Dedicated Color Selection Bar (แถบการเลือกสีสัญลักษณ์) -->
-                    <div class="evidence-annotator-colorbar" id="annot-color-bar" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:6px 12px; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:12px;" class="dark:bg-slate-900 dark:border-slate-700">
-                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <span style="font-weight:800; font-size:11px; color:#334155; display:inline-flex; align-items:center; gap:4px;" class="dark:text-slate-200">
-                                <span>🎨</span>
-                                <span>แถบเลือกสี (Color Palette):</span>
-                            </span>
-                            <div style="display:inline-flex; align-items:center; gap:5px; background:#ffffff; padding:3px 8px; border-radius:9999px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.05);" class="dark:bg-slate-800 dark:border-slate-600">
-                                <div class="annot-color-dot active" data-color="#ef4444" style="background:#ef4444; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🔴 สีแดง (Defect Red - #ef4444)"></div>
-                                <div class="annot-color-dot" data-color="#f97316" style="background:#f97316; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🟠 สีส้ม (Alert Orange - #f97316)"></div>
-                                <div class="annot-color-dot" data-color="#eab308" style="background:#eab308; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🟡 สีเหลือง (Warning Yellow - #eab308)"></div>
-                                <div class="annot-color-dot" data-color="#22c55e" style="background:#22c55e; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🟢 สีเขียว (Pass Green - #22c55e)"></div>
-                                <div class="annot-color-dot" data-color="#06b6d4" style="background:#06b6d4; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🩵 สีฟ้า (Sky Cyan - #06b6d4)"></div>
-                                <div class="annot-color-dot" data-color="#3b82f6" style="background:#3b82f6; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🔵 สีน้ำเงิน (Carrier Blue - #3b82f6)"></div>
-                                <div class="annot-color-dot" data-color="#a855f7" style="background:#a855f7; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🟣 สีม่วง (Purple - #a855f7)"></div>
-                                <div class="annot-color-dot" data-color="#ec4899" style="background:#ec4899; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="🌸 สีชมพู (Pink - #ec4899)"></div>
-                                <div class="annot-color-dot" data-color="#ffffff" style="background:#ffffff; border:1px solid #94a3b8; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="⚪ สีขาว (White - #ffffff)"></div>
-                                <div class="annot-color-dot" data-color="#000000" style="background:#000000; width:17px; height:17px; border-radius:50%; cursor:pointer; box-shadow:0 0 0 1px #cbd5e1;" title="⚫ สีดำ (Black - #000000)"></div>
-                            </div>
-
-                            <label class="annot-btn" id="annot-custom-color-btn" style="position:relative; display:inline-flex; align-items:center; gap:5px; padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer; background:#ffffff; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden;" title="🌈 เลือกสีกำหนดเอง (Custom Color Wheel)">
-                                <span id="annot-custom-wheel-icon" style="width:13px; height:13px; border-radius:50%; background:conic-gradient(red, yellow, lime, aqua, blue, magenta, red); display:inline-block; border:1px solid rgba(0,0,0,0.15);"></span>
-                                <span>กำหนดเอง</span>
-                                <span id="annot-custom-color-hex" style="font-family:monospace; font-size:10px; color:#475569; font-weight:800;">#ef4444</span>
-                                <input type="color" id="annot-custom-color" value="#ef4444" style="opacity:0; width:100%; height:100%; position:absolute; inset:0; cursor:pointer; padding:0; border:none;">
-                            </label>
-                        </div>
-
-                        <div style="display:flex; align-items:center; gap:6px;">
-                            <button type="button" id="btn-annot-color-close" class="annot-btn" style="padding:2px 8px; font-size:10.5px; font-weight:700; color:#64748b; background:#e2e8f0; border-radius:5px;" title="ซ่อนแถบเลือกสี">✕ ซ่อนแถบสี</button>
-                        </div>
-                    </div>
-
-                    <div class="evidence-annotator-body" id="annot-stage-container">
-                        <div class="annot-canvas-stage-wrapper" id="annot-canvas-wrapper">
-                            <canvas class="annot-canvas-stage" id="annot-canvas"></canvas>
-                        </div>
-                        <div class="annot-stage-hint">💡 หมุนล้อเมาส์เพื่อซูมเข้า-ออก | กด Spacebar ค้างไว้หรือเลือก ✋ เพื่อลากเลื่อนภาพ (Pan)</div>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(overlay);
-
-            const canvas = overlay.querySelector('#annot-canvas');
-            const ctx = canvas.getContext('2d');
-            const canvasWrapper = overlay.querySelector('#annot-canvas-wrapper');
-            const stageContainer = overlay.querySelector('#annot-stage-container');
-
-            let baseImg = new Image();
-            baseImg.crossOrigin = 'anonymous';
-
-            let currentTool = 'arrow';
-            let currentColor = '#ef4444';
-            let currentLineWidth = 5;
-
-            // Pan & Zoom State
-            let zoomLevel = 1.0;
-            let panX = 0;
-            let panY = 0;
-            let isPanning = false;
-            let panStartX = 0;
-            let panStartY = 0;
-            let isSpacePressed = false;
-            let touchStartDistance = null;
-            let touchStartZoom = 1.0;
-
-            let isDrawing = false;
-            let startX = 0;
-            let startY = 0;
-            let freehandPoints = [];
-
-            // Crop Tool State
-            let cropRect = null; // { x, y, w, h }
-            let isCropping = false;
-
-            // History & Redo Stacks
-            let historyStack = [];
-            let redoStack = [];
-
-            function updateTransform() {
-                canvasWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
-                const pct = Math.round(zoomLevel * 100) + '%';
-                const zoomLabel = overlay.querySelector('#annot-zoom-level-label');
-                if (zoomLabel) zoomLabel.textContent = pct;
-                updateCursor();
-            }
-
-            function applyZoom(newZoom, originClientX, originClientY) {
-                newZoom = Math.max(0.25, Math.min(6.0, newZoom));
-                if (Math.abs(newZoom - zoomLevel) < 0.001) return;
-
-                if (originClientX !== undefined && originClientY !== undefined) {
-                    const stageRect = stageContainer.getBoundingClientRect();
-                    const originX = originClientX - (stageRect.left + stageRect.width / 2) - panX;
-                    const originY = originClientY - (stageRect.top + stageRect.height / 2) - panY;
-                    const factor = newZoom / zoomLevel;
-                    panX -= originX * (factor - 1);
-                    panY -= originY * (factor - 1);
-                }
-                zoomLevel = newZoom;
-                updateTransform();
-            }
-
-            function resetZoom() {
-                if (!canvas || !stageContainer) return;
-                const stageRect = stageContainer.getBoundingClientRect();
-                const paddingH = 32; 
-                const paddingV = 24;
-                const availW = Math.max(100, stageRect.width - paddingH);
-                const availH = Math.max(100, stageRect.height - paddingV);
-                const scaleW = availW / canvas.width;
-                const scaleH = availH / canvas.height;
-                
-                // สำหรับภาพรวมหลักฐานที่มีสัดส่วนแนวนอนกว้าง ปรับอัตราการซูมเริ่มต้นให้ภาพมีความสูงพอดีกับพื้นที่พื้นหลังด้านบน-ล่าง
-                const imgAspect = canvas.width / Math.max(1, canvas.height);
-                let fitScale = Math.min(scaleW, scaleH, 1.0);
-                if (imgAspect >= 2.0 && scaleH * 0.75 > scaleW) {
-                    fitScale = Math.min(scaleW * 1.35, scaleH * 0.92);
-                }
-
-                zoomLevel = Math.max(0.25, fitScale);
-                panX = 0;
-                panY = 0;
-                updateTransform();
-            }
-
-            function updateCursor() {
-                if (isPanning) {
-                    stageContainer.style.cursor = 'grabbing';
-                    canvas.style.cursor = 'grabbing';
-                } else if (isSpacePressed || currentTool === 'pan') {
-                    stageContainer.style.cursor = 'grab';
-                    canvas.style.cursor = 'grab';
-                } else if (currentTool === 'crop') {
-                    stageContainer.style.cursor = 'default';
-                    canvas.style.cursor = 'crosshair';
-                } else if (currentTool === 'text') {
-                    stageContainer.style.cursor = 'default';
-                    canvas.style.cursor = 'text';
-                } else {
-                    stageContainer.style.cursor = 'default';
-                    canvas.style.cursor = 'crosshair';
-                }
-            }
-
-            function saveHistory() {
-                if (canvas.width > 0 && canvas.height > 0) {
-                    historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-                    if (historyStack.length > 30) historyStack.shift();
-                    redoStack = []; // Reset redo on new action
-                }
-            }
-
-            function redrawBase() {
-                if (!baseImg.complete) return;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(baseImg, 0, 0, canvas.width, canvas.height);
-            }
-
-            baseImg.onload = () => {
-                const nw = baseImg.naturalWidth || 1024;
-                const nh = baseImg.naturalHeight || 768;
-                canvas.width = nw;
-                canvas.height = nh;
-                redrawBase();
-                saveHistory(); // Snapshot state 0
-                resetZoom();
-            };
-            baseImg.src = initialDataUrl;
-
-            // Coordinate conversion from viewport/client mouse coords to canvas pixels
-            function getCanvasCoordinates(e) {
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                return {
-                    x: (clientX - rect.left) * scaleX,
-                    y: (clientY - rect.top) * scaleY
-                };
-            }
-
-            // Draw Arrow with clean arrowhead
-            function drawArrow(context, fromX, fromY, toX, toY, color, width) {
-                const headLen = Math.max(16, width * 3.5);
-                const angle = Math.atan2(toY - fromY, toX - fromX);
-
-                context.save();
-                context.strokeStyle = color;
-                context.fillStyle = color;
-                context.lineWidth = width;
-                context.lineCap = 'round';
-                context.lineJoin = 'round';
-
-                // Main arrow shaft
-                context.beginPath();
-                context.moveTo(fromX, fromY);
-                context.lineTo(toX, toY);
-                context.stroke();
-
-                // Arrow head filled triangle
-                context.beginPath();
-                context.moveTo(toX, toY);
-                context.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
-                context.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
-                context.closePath();
-                context.fill();
-
-                context.restore();
-            }
-
-            // Draw Circle / Ellipse
-            function drawCircle(context, fromX, fromY, toX, toY, color, width) {
-                context.save();
-                context.strokeStyle = color;
-                context.lineWidth = width;
-                context.lineCap = 'round';
-
-                const rx = Math.abs(toX - fromX) / 2;
-                const ry = Math.abs(toY - fromY) / 2;
-                const cx = Math.min(fromX, toX) + rx;
-                const cy = Math.min(fromY, toY) + ry;
-
-                context.beginPath();
-                context.ellipse(cx, cy, Math.max(1, rx), Math.max(1, ry), 0, 0, 2 * Math.PI);
-                context.stroke();
-                context.restore();
-            }
-
-            // Draw Rectangle
-            function drawRect(context, fromX, fromY, toX, toY, color, width) {
-                context.save();
-                context.strokeStyle = color;
-                context.lineWidth = width;
-                context.lineCap = 'round';
-                context.lineJoin = 'round';
-
-                const x = Math.min(fromX, toX);
-                const y = Math.min(fromY, toY);
-                const w = Math.abs(toX - fromX);
-                const h = Math.abs(toY - fromY);
-
-                context.beginPath();
-                context.rect(x, y, w, h);
-                context.stroke();
-                context.restore();
-            }
-
-            // Draw Straight Line (เส้นตรงชี้แนวระนาบ)
-            function drawLine(context, fromX, fromY, toX, toY, color, width) {
-                context.save();
-                context.strokeStyle = color;
-                context.lineWidth = width;
-                context.lineCap = 'round';
-                context.lineJoin = 'round';
-                context.beginPath();
-                context.moveTo(fromX, fromY);
-                context.lineTo(toX, toY);
-                context.stroke();
-                context.restore();
-            }
-
-            // Draw Text Callout directly onto canvas
-            function drawTextCallout(context, text, x, y, color, baseSize) {
-                if (!text || !text.trim()) return;
-                context.save();
-
-                const fontSize = Math.max(18, Math.round(canvas.width * 0.024));
-                context.font = `bold ${fontSize}px sans-serif, "Noto Sans Thai"`;
-                context.textBaseline = 'top';
-
-                const lines = text.split('\n');
-                const padding = fontSize * 0.45;
-                let maxLineWidth = 0;
-                lines.forEach(l => {
-                    const metrics = context.measureText(l);
-                    if (metrics.width > maxLineWidth) maxLineWidth = metrics.width;
-                });
-
-                const boxW = maxLineWidth + padding * 2;
-                const boxH = (lines.length * fontSize * 1.3) + padding * 1.5;
-
-                // Semi-transparent dark background badge with vibrant outline
-                context.fillStyle = 'rgba(15, 23, 42, 0.88)';
-                context.strokeStyle = color;
-                context.lineWidth = 2.5;
-
-                context.beginPath();
-                if (typeof context.roundRect === 'function') {
-                    context.roundRect(x, y, boxW, boxH, 8);
-                } else {
-                    context.rect(x, y, boxW, boxH);
-                }
-                context.fill();
-                context.stroke();
-
-                // Text Content
-                context.fillStyle = '#ffffff';
-                lines.forEach((l, idx) => {
-                    context.fillText(l, x + padding, y + padding + (idx * fontSize * 1.3));
-                });
-
-                context.restore();
-            }
-
-            // --- Mouse / Touch Drawing & Pan Handlers ---
-            function onPointerDown(e) {
-                // Multi-touch pinch detection
-                if (e.touches && e.touches.length === 2) {
-                    isDrawing = false;
-                    isPanning = false;
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    touchStartDistance = Math.sqrt(dx * dx + dy * dy);
-                    touchStartZoom = zoomLevel;
-                    return;
-                }
-
-                const isMiddleBtn = e.button === 1;
-                if (currentTool === 'pan' || isSpacePressed || isMiddleBtn) {
-                    isPanning = true;
-                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                    panStartX = clientX - panX;
-                    panStartY = clientY - panY;
-                    updateCursor();
-                    return;
-                }
-
-                if (currentTool === 'text') {
-                    handleTextPrompt(e);
-                    return;
-                }
-
-                isDrawing = true;
-                const pos = getCanvasCoordinates(e);
-                startX = pos.x;
-                startY = pos.y;
-                freehandPoints = [pos];
-            }
-
-            function onPointerMove(e) {
-                // Multi-touch pinch-to-zoom
-                if (e.touches && e.touches.length === 2 && touchStartDistance) {
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    const currentDist = Math.sqrt(dx * dx + dy * dy);
-                    const scaleFactor = currentDist / touchStartDistance;
-                    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                    applyZoom(touchStartZoom * scaleFactor, midX, midY);
-                    return;
-                }
-
-                if (isPanning) {
-                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                    panX = clientX - panStartX;
-                    panY = clientY - panStartY;
-                    updateTransform();
-                    return;
-                }
-
-                if (!isDrawing) return;
-                const pos = getCanvasCoordinates(e);
-
-                // Restore last committed state to show live rubber-band preview
-                if (historyStack.length > 0) {
-                    ctx.putImageData(historyStack[historyStack.length - 1], 0, 0);
-                }
-
-                if (currentTool === 'crop') {
-                    // Draw dimming mask outside crop rectangle
-                    const x = Math.min(startX, pos.x);
-                    const y = Math.min(startY, pos.y);
-                    const w = Math.abs(pos.x - startX);
-                    const h = Math.abs(pos.y - startY);
-                    cropRect = { x, y, w, h };
-
-                    ctx.save();
-                    // Dim surrounding area
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    // Clear the crop selection area
-                    if (w > 0 && h > 0) {
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.rect(x, y, w, h);
-                        ctx.clip();
-                        if (historyStack.length > 0) {
-                            ctx.putImageData(historyStack[historyStack.length - 1], 0, 0);
-                        }
-                        ctx.restore();
-
-                        // Crop border line & grid (rule of thirds)
-                        ctx.strokeStyle = '#38bdf8';
-                        ctx.lineWidth = Math.max(2, Math.round(canvas.width * 0.002));
-                        ctx.setLineDash([6, 4]);
-                        ctx.strokeRect(x, y, w, h);
-
-                        // Rule of thirds lines
-                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-                        ctx.lineWidth = 1;
-                        ctx.setLineDash([3, 3]);
-                        ctx.beginPath();
-                        ctx.moveTo(x + w / 3, y);
-                        ctx.lineTo(x + w / 3, y + h);
-                        ctx.moveTo(x + (2 * w) / 3, y);
-                        ctx.lineTo(x + (2 * w) / 3, y + h);
-                        ctx.moveTo(x, y + h / 3);
-                        ctx.lineTo(x + w, y + h / 3);
-                        ctx.moveTo(x, y + (2 * h) / 3);
-                        ctx.lineTo(x + w, y + (2 * h) / 3);
-                        ctx.stroke();
-                    }
-                    ctx.restore();
-                } else if (currentTool === 'arrow') {
-                    drawArrow(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
-                } else if (currentTool === 'circle') {
-                    drawCircle(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
-                } else if (currentTool === 'rect') {
-                    drawRect(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
-                } else if (currentTool === 'line') {
-                    drawLine(ctx, startX, startY, pos.x, pos.y, currentColor, currentLineWidth);
-                } else if (currentTool === 'pen') {
-                    freehandPoints.push(pos);
-                    ctx.save();
-                    ctx.strokeStyle = currentColor;
-                    ctx.lineWidth = currentLineWidth;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    ctx.beginPath();
-                    ctx.moveTo(freehandPoints[0].x, freehandPoints[0].y);
-                    for (let i = 1; i < freehandPoints.length; i++) {
-                        ctx.lineTo(freehandPoints[i].x, freehandPoints[i].y);
-                    }
-                    ctx.stroke();
-                    ctx.restore();
-                }
-            }
-
-            function removeCropActions() {
-                const oldActions = canvasWrapper.querySelector('.annot-crop-actions');
-                if (oldActions) oldActions.remove();
-                cropRect = null;
-                isCropping = false;
-            }
-
-            function showCropActions(cx, cy, cw, ch) {
-                removeCropActions();
-                isCropping = true;
-
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = rect.width / canvas.width;
-                const scaleY = rect.height / canvas.height;
-
-                const actionsWrap = document.createElement('div');
-                actionsWrap.className = 'annot-crop-actions';
-                
-                // Position popup directly beneath the crop rect or inside it
-                const posX = (cx + cw / 2) * scaleX;
-                const posY = Math.min(rect.height - 40, (cy + ch) * scaleY + 10);
-                actionsWrap.style.left = `${posX}px`;
-                actionsWrap.style.top = `${posY}px`;
-
-                actionsWrap.innerHTML = `
-                    <button type="button" class="annot-crop-confirm-btn" id="btn-confirm-crop">
-                        <span>✂️</span> ยืนยันการครอบ (${Math.round(cw)}×${Math.round(ch)}px)
-                    </button>
-                    <button type="button" class="annot-crop-cancel-btn" id="btn-cancel-crop">
-                        ยกเลิก
-                    </button>
-                `;
-
-                canvasWrapper.appendChild(actionsWrap);
-
-                const btnConfirm = actionsWrap.querySelector('#btn-confirm-crop');
-                const btnCancel = actionsWrap.querySelector('#btn-cancel-crop');
-
-                btnConfirm.onclick = (ev) => {
-                    ev.stopPropagation();
-                    executeCrop(cx, cy, cw, ch);
-                };
-
-                btnCancel.onclick = (ev) => {
-                    ev.stopPropagation();
-                    cancelCropSelection();
-                };
-            }
-
-            function cancelCropSelection() {
-                removeCropActions();
-                if (historyStack.length > 0) {
-                    ctx.putImageData(historyStack[historyStack.length - 1], 0, 0);
-                }
-            }
-
-            function executeCrop(cx, cy, cw, ch) {
-                if (cw < 10 || ch < 10) {
-                    toast('⚠️ กรุณาลากครอบพื้นที่ขนาดใหญ่กว่านี้', 'warning');
-                    cancelCropSelection();
-                    return;
-                }
-
-                // Get cropped pixel data from latest committed state
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = cw;
-                tempCanvas.height = ch;
-                const tempCtx = tempCanvas.getContext('2d');
-
-                // Draw the cropped region from current canvas
-                if (historyStack.length > 0) {
-                    ctx.putImageData(historyStack[historyStack.length - 1], 0, 0);
-                }
-                tempCtx.drawImage(canvas, cx, cy, cw, ch, 0, 0, cw, ch);
-
-                // Update canvas to new cropped dimension
-                canvas.width = cw;
-                canvas.height = ch;
-                ctx.drawImage(tempCanvas, 0, 0);
-
-                removeCropActions();
-                saveHistory();
-                resetZoom();
-                toast(`✂️ ครอบตัดภาพสำเร็จ (${Math.round(cw)}×${Math.round(ch)}px)`, 'success');
-
-                // Switch back to Arrow tool for convenient next action
-                const arrowBtn = overlay.querySelector('.annot-btn[data-tool="arrow"]');
-                if (arrowBtn) arrowBtn.click();
-            }
-
-            function onPointerUp(e) {
-                if (touchStartDistance && (!e.touches || e.touches.length < 2)) {
-                    touchStartDistance = null;
-                }
-                if (isPanning) {
-                    isPanning = false;
-                    updateCursor();
-                    return;
-                }
-                if (!isDrawing) return;
-                isDrawing = false;
-
-                if (currentTool === 'crop') {
-                    if (cropRect && cropRect.w > 15 && cropRect.h > 15) {
-                        showCropActions(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
-                    } else {
-                        cancelCropSelection();
-                    }
-                    return;
-                }
-
-                saveHistory();
-            }
-
-            // Create editable interactive floating text input box on canvas
-            function handleTextPrompt(e) {
-                const pos = getCanvasCoordinates(e);
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = rect.width / canvas.width;
-                const scaleY = rect.height / canvas.height;
-
-                // Existing text inputs removal
-                const oldInput = canvasWrapper.querySelector('.annot-text-input-overlay');
-                if (oldInput) oldInput.remove();
-
-                const input = document.createElement('textarea');
-                input.className = 'annot-text-input-overlay';
-                input.rows = 2;
-                input.placeholder = 'พิมพ์ข้อความชี้จุดเสีย... (กด Shift+Enter ขึ้นบรรทัดใหม่, คลิกข้างนอกเพื่อวาง)';
-                input.style.left = `${(pos.x * scaleX)}px`;
-                input.style.top = `${(pos.y * scaleY)}px`;
-                input.style.borderColor = currentColor;
-
-                canvasWrapper.appendChild(input);
-                setTimeout(() => input.focus(), 50);
-
-                const commitText = () => {
-                    const val = input.value.trim();
-                    if (val) {
-                        drawTextCallout(ctx, val, pos.x, pos.y, currentColor, currentLineWidth);
-                        saveHistory();
-                    }
-                    input.remove();
-                };
-
-                input.onblur = commitText;
-                input.onkeydown = (ev) => {
-                    if (ev.key === 'Enter' && !ev.shiftKey) {
-                        ev.preventDefault();
-                        commitText();
-                    } else if (ev.key === 'Escape') {
-                        input.remove();
-                    }
-                };
-            }
-
-            // Pointer event listeners on canvas and stage
-            canvas.addEventListener('mousedown', onPointerDown);
-            stageContainer.addEventListener('mousedown', (e) => {
-                if (e.target === stageContainer || currentTool === 'pan' || isSpacePressed || e.button === 1) {
-                    onPointerDown(e);
-                }
-            });
-            window.addEventListener('mousemove', onPointerMove);
-            window.addEventListener('mouseup', onPointerUp);
-
-            canvas.addEventListener('touchstart', onPointerDown, { passive: false });
-            stageContainer.addEventListener('touchstart', onPointerDown, { passive: false });
-            window.addEventListener('touchmove', onPointerMove, { passive: false });
-            window.addEventListener('touchend', onPointerUp, { passive: false });
-
-            // Wheel event on stage container for smooth mouse wheel zoom
-            const onWheelZoom = (e) => {
-                e.preventDefault();
-                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-                applyZoom(zoomLevel * zoomFactor, e.clientX, e.clientY);
-            };
-            stageContainer.addEventListener('wheel', onWheelZoom, { passive: false });
-
-            // Zoom Toolbar Buttons
-            const btnZoomIn = overlay.querySelector('#btn-annot-zoom-in');
-            const btnZoomOut = overlay.querySelector('#btn-annot-zoom-out');
-            const btnZoomFit = overlay.querySelector('#btn-annot-zoom-fit');
-            const btnFloatZoomIn = overlay.querySelector('#btn-float-zoom-in');
-            const btnFloatZoomOut = overlay.querySelector('#btn-float-zoom-out');
-            const btnFloatZoomFit = overlay.querySelector('#btn-float-zoom-fit');
-
-            if (btnZoomIn) btnZoomIn.onclick = () => applyZoom(zoomLevel * 1.25);
-            if (btnZoomOut) btnZoomOut.onclick = () => applyZoom(zoomLevel / 1.25);
-            if (btnZoomFit) btnZoomFit.onclick = resetZoom;
-
-            // 🎨 Color Bar Toggle & Logic (แถบเลือกสีสัญลักษณ์)
-            const colorToggleBtn = overlay.querySelector('#btn-annot-color-toggle');
-            const colorBar = overlay.querySelector('#annot-color-bar');
-            const colorCloseBtn = overlay.querySelector('#btn-annot-color-close');
-            const currentColorDot = overlay.querySelector('#annot-current-color-dot');
-            const customColorHex = overlay.querySelector('#annot-custom-color-hex');
-            const customColorInput = overlay.querySelector('#annot-custom-color');
-
-            function showColorBar() {
-                if (colorBar) {
-                    colorBar.style.display = 'flex';
-                }
-                if (colorToggleBtn) {
-                    colorToggleBtn.classList.add('active');
-                }
-            }
-
-            function hideColorBar() {
-                if (colorBar) {
-                    colorBar.style.display = 'none';
-                }
-                if (colorToggleBtn) {
-                    colorToggleBtn.classList.remove('active');
-                }
-            }
-
-            function toggleColorBar(e) {
-                if (e) e.stopPropagation();
-                if (!colorBar) return;
-                const isShown = colorBar.style.display === 'flex' || colorBar.style.display === 'inline-flex';
-                if (isShown) {
-                    hideColorBar();
-                } else {
-                    showColorBar();
-                }
-            }
-
-            if (colorToggleBtn) {
-                colorToggleBtn.onclick = toggleColorBar;
-            }
-            if (colorCloseBtn) {
-                colorCloseBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    hideColorBar();
-                };
-            }
-
-            function selectColor(colorHex, sourceDotElement) {
-                currentColor = colorHex;
-                if (currentColorDot) {
-                    currentColorDot.style.background = currentColor;
-                }
-                if (customColorHex) {
-                    customColorHex.textContent = currentColor;
-                }
-                if (customColorInput && currentColor.length === 7) {
-                    customColorInput.value = currentColor;
-                }
-                overlay.querySelectorAll('.annot-color-dot').forEach(d => d.classList.remove('active'));
-                if (sourceDotElement) {
-                    sourceDotElement.classList.add('active');
-                }
-            }
-
-            // Tool Switching Buttons
-            overlay.querySelectorAll('.annot-btn[data-tool]').forEach(btn => {
-                btn.onclick = () => {
-                    overlay.querySelectorAll('.annot-btn[data-tool]').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentTool = btn.dataset.tool;
-                    if (currentTool !== 'crop') {
-                        cancelCropSelection();
-                    }
-                    updateCursor();
-                };
-            });
-
-            // Preset Color Dots in Color Bar
-            overlay.querySelectorAll('.annot-color-dot[data-color]').forEach(dot => {
-                dot.onclick = (e) => {
-                    e.stopPropagation();
-                    selectColor(dot.dataset.color, dot);
-                };
-            });
-
-            // Custom Color Picker
-            if (customColorInput) {
-                customColorInput.oninput = (e) => {
-                    selectColor(e.target.value, null);
-                };
-                customColorInput.onchange = (e) => {
-                    selectColor(e.target.value, null);
-                };
-            }
-
-            // Line Width Selection
-            overlay.querySelectorAll('.annot-btn[data-size]').forEach(btn => {
-                btn.onclick = () => {
-                    overlay.querySelectorAll('.annot-btn[data-size]').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentLineWidth = parseInt(btn.dataset.size, 10) || 4;
-                };
-            });
-
-            // 🔄 ฟังก์ชันหมุนรูปภาพบน Canvas 90 องศา (Rotate Canvas with all drawn annotations)
-            function rotateCanvas(degrees = 90) {
-                if (typeof cancelCropSelection === 'function') cancelCropSelection();
-
-                // สร้าง Canvas สำรองเพื่อคัดลอกภาพและสัญลักษณ์ที่วาดไว้ทั้งหมด
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = canvas.width;
-                tempCanvas.height = canvas.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(canvas, 0, 0);
-
-                const rad = (degrees * Math.PI) / 180;
-                const isSwap = (Math.abs(degrees) % 180 !== 0);
-                const newW = isSwap ? canvas.height : canvas.width;
-                const newH = isSwap ? canvas.width : canvas.height;
-
-                canvas.width = newW;
-                canvas.height = newH;
-
-                ctx.clearRect(0, 0, newW, newH);
-                ctx.save();
-                ctx.translate(newW / 2, newH / 2);
-                ctx.rotate(rad);
-                ctx.drawImage(tempCanvas, -tempCanvas.width / 2, -tempCanvas.height / 2);
-                ctx.restore();
-
-                // ปรับปรุง baseImg ให้เป็นภาพที่หมุนแล้ว
-                const rotatedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                baseImg = new Image();
-                baseImg.crossOrigin = 'anonymous';
-                baseImg.src = rotatedDataUrl;
-
-                saveHistory();
-                resetZoom();
-                toast(`↻ หมุนรูปภาพ ${degrees > 0 ? '+' : ''}${degrees}° เรียบร้อยแล้ว`, 'info');
-            }
-
-            // ⇄ ฟังก์ชันพลิกรูปภาพแนวนอน (Flip Horizontal)
-            function flipCanvasHorizontal() {
-                if (typeof cancelCropSelection === 'function') cancelCropSelection();
-
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = canvas.width;
-                tempCanvas.height = canvas.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(canvas, 0, 0);
-
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.save();
-                ctx.translate(canvas.width, 0);
-                ctx.scale(-1, 1);
-                ctx.drawImage(tempCanvas, 0, 0);
-                ctx.restore();
-
-                const flippedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                baseImg = new Image();
-                baseImg.crossOrigin = 'anonymous';
-                baseImg.src = flippedDataUrl;
-
-                saveHistory();
-                toast('⇄ พลิกรูปภาพแนวนอนเรียบร้อยแล้ว', 'info');
-            }
-
-            const btnRotLeft = overlay.querySelector('#btn-annot-rotate-left');
-            const btnRotRight = overlay.querySelector('#btn-annot-rotate-right');
-            const btnFlipH = overlay.querySelector('#btn-annot-flip-h');
-            if (btnRotLeft) btnRotLeft.onclick = () => rotateCanvas(-90);
-            if (btnRotRight) btnRotRight.onclick = () => rotateCanvas(90);
-            if (btnFlipH) btnFlipH.onclick = () => flipCanvasHorizontal();
-
-            // Undo Button (Ctrl+Z)
-            const undoBtn = overlay.querySelector('#btn-annot-undo');
-            const handleUndo = () => {
-                if (historyStack.length > 1) {
-                    const popped = historyStack.pop(); // Remove current
-                    redoStack.push(popped);
-                    const prev = historyStack[historyStack.length - 1];
-                    if (canvas.width !== prev.width || canvas.height !== prev.height) {
-                        canvas.width = prev.width;
-                        canvas.height = prev.height;
-                        resetZoom();
-                    }
-                    ctx.putImageData(prev, 0, 0);
-                    toast('↩️ ย้อนกลับคำสั่งล่าสุด', 'info');
-                } else if (historyStack.length === 1) {
-                    redrawBase();
-                    toast('↩️ คืนค่าภาพต้นฉบับ', 'info');
-                }
-            };
-            if (undoBtn) undoBtn.onclick = handleUndo;
-
-            // Redo Button (Ctrl+Y / Ctrl+Shift+Z)
-            const redoBtn = overlay.querySelector('#btn-annot-redo');
-            const handleRedo = () => {
-                if (redoStack.length > 0) {
-                    const nextState = redoStack.pop();
-                    historyStack.push(nextState);
-                    if (canvas.width !== nextState.width || canvas.height !== nextState.height) {
-                        canvas.width = nextState.width;
-                        canvas.height = nextState.height;
-                        resetZoom();
-                    }
-                    ctx.putImageData(nextState, 0, 0);
-                    toast('↪️ ทำซ้ำคำสั่งที่ยกเลิก', 'info');
-                }
-            };
-            if (redoBtn) redoBtn.onclick = handleRedo;
-
-            // Keyboard Shortcuts
-            const handleKeydown = (e) => {
-                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-                if (e.code === 'Space' && !isSpacePressed) {
-                    e.preventDefault();
-                    isSpacePressed = true;
-                    updateCursor();
-                } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-                    e.preventDefault();
-                    if (e.shiftKey) {
-                        handleRedo();
-                    } else {
-                        handleUndo();
-                    }
-                } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-                    e.preventDefault();
-                    handleRedo();
-                } else if (e.key === 'Escape') {
-                    if (colorBar && colorBar.style.display !== 'none') {
-                        hideColorBar();
-                    } else {
-                        closeAnnotator();
-                    }
-                } else if (e.key === '+' || e.key === '=') {
-                    applyZoom(zoomLevel * 1.25);
-                } else if (e.key === '-' || e.key === '_') {
-                    applyZoom(zoomLevel / 1.25);
-                } else if (e.key === '0') {
-                    resetZoom();
-                }
-            };
-
-            const handleKeyup = (e) => {
-                if (e.code === 'Space') {
-                    isSpacePressed = false;
-                    if (isPanning && currentTool !== 'pan') {
-                        isPanning = false;
-                    }
-                    updateCursor();
-                }
-            };
-
-            window.addEventListener('keydown', handleKeydown);
-            window.addEventListener('keyup', handleKeyup);
-
-            // Clear Button
-            const clearBtn = overlay.querySelector('#btn-annot-clear');
-            if (clearBtn) {
-                clearBtn.onclick = () => {
-                    redrawBase();
-                    historyStack = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
-                    redoStack = [];
-                    toast('🗑️ ล้างสัญลักษณ์ทั้งหมดบนภาพแล้ว', 'info');
-                };
-            }
-
-            // Close / Cancel
-            function closeAnnotator() {
-                window.removeEventListener('mousemove', onPointerMove);
-                window.removeEventListener('mouseup', onPointerUp);
-                window.removeEventListener('touchmove', onPointerMove);
-                window.removeEventListener('touchend', onPointerUp);
-                window.removeEventListener('keydown', handleKeydown);
-                window.removeEventListener('keyup', handleKeyup);
-                stageContainer.removeEventListener('wheel', onWheelZoom);
-                overlay.remove();
-            }
-
-            const cancelBtn = overlay.querySelector('#btn-annot-cancel');
-            if (cancelBtn) cancelBtn.onclick = closeAnnotator;
-
-            // Save & Commit Button
-            const saveBtn = overlay.querySelector('#btn-annot-save');
-            if (saveBtn) {
-                saveBtn.onclick = async () => {
-                    saveBtn.disabled = true;
-                    saveBtn.textContent = '⏳ กำลังประมวลผล...';
-                    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                    const finalDataUrl = await compressAndOptimizeImage(rawDataUrl, 1400, 480 * 1024);
-                    if (typeof onSaveCallback === 'function') {
-                        onSaveCallback(finalDataUrl || rawDataUrl);
-                    }
-                    closeAnnotator();
-                    toast('✨ บันทึกสัญลักษณ์ข้อความลงบนรูปภาพหลักฐานเรียบร้อยแล้ว', 'success');
-                };
-            }
-        }
-        window.openEvidenceAnnotator = openEvidenceAnnotator;
-
-        // ⚡ ฟังก์ชันลดขนาดและบีบอัดรูปภาพให้เบา ไม่กินเน็ต คมชัดเทียบเท่าไฟล์ที่ผ่านโปรแกรม Paint (จำกัดขนาดรวมไม่เกิน 500KB)
-        function compressAndOptimizeImage(source, maxDimension = 1400, maxSizeBytes = 480 * 1024) {
-            if (!source) return Promise.resolve(null);
-            return new Promise(async (resolve) => {
-                let dataUrl = '';
-                if (typeof source === 'string') {
-                    dataUrl = source;
-                } else if (source instanceof Blob || source instanceof File) {
-                    dataUrl = await new Promise((res) => {
-                        const reader = new FileReader();
-                        reader.onload = (e) => res(e.target.result);
-                        reader.onerror = () => res(null);
-                        reader.readAsDataURL(source);
-                    });
-                }
-                if (!dataUrl) {
-                    resolve(null);
-                    return;
-                }
-
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    let nw = img.naturalWidth || img.width || 800;
-                    let nh = img.naturalHeight || img.height || 600;
-
-                    // ปรับสัดส่วนขนาดภาพให้กะทัดรัด (Downscale ถ้าขนาดภาพใหญ่เกิน maxDimension)
-                    if (nw > maxDimension || nh > maxDimension) {
-                        if (nw >= nh) {
-                            nh = Math.round((nh * maxDimension) / nw);
-                            nw = maxDimension;
-                        } else {
-                            nw = Math.round((nw * maxDimension) / nh);
-                            nh = maxDimension;
-                        }
-                    }
-
-                    const canvas = document.createElement('canvas');
-                    canvas.width = nw;
-                    canvas.height = nh;
-                    const ctx = canvas.getContext('2d');
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.imageSmoothingQuality = 'high';
-                    ctx.drawImage(img, 0, 0, nw, nh);
-
-                    // คำนวณขนาด byte คร่าวๆ จาก base64 string
-                    const getByteSize = (str) => {
-                        const base64Str = str.split(',')[1] || str;
-                        return Math.round((base64Str.length * 3) / 4);
-                    };
-
-                    // บีบอัดแบบ Adaptive คุณภาพสูง โดยควบคุมให้ขนาดไม่เกิน maxSizeBytes (~480KB)
-                    let quality = 0.88;
-                    let result = canvas.toDataURL('image/jpeg', quality);
-
-                    while (getByteSize(result) > maxSizeBytes && quality > 0.40) {
-                        quality -= 0.08;
-                        result = canvas.toDataURL('image/jpeg', quality);
-                    }
-
-                    // ถ้ารูปภาพยังมีขนาดเกิน ให้ย่อ Canvas ลงอีกเล็กน้อย
-                    if (getByteSize(result) > maxSizeBytes) {
-                        const scaledCanvas = document.createElement('canvas');
-                        scaledCanvas.width = Math.round(nw * 0.75);
-                        scaledCanvas.height = Math.round(nh * 0.75);
-                        const sCtx = scaledCanvas.getContext('2d');
-                        sCtx.imageSmoothingEnabled = true;
-                        sCtx.imageSmoothingQuality = 'high';
-                        sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
-                        result = scaledCanvas.toDataURL('image/jpeg', 0.75);
-                    }
-
-                    resolve(result);
-                };
-                img.onerror = () => resolve(dataUrl);
-                img.src = dataUrl;
-            });
-        }
-
-        // 🔄 ฟังก์ชันหมุนรูปภาพ 90 องศาตามเข็มนาฬิกา (Canvas 90° Clockwise Rotation พร้อมปรับขนาดให้กะทัดรัด)
+        // 🔄 ฟังก์ชันหมุนรูปภาพ 90 องศาตามเข็มนาฬิกา (Canvas 90° Clockwise Rotation)
         function rotateImageDataUrl(dataUrl) {
             if (!dataUrl) return Promise.resolve(dataUrl);
             return new Promise((resolve) => {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
-                img.onload = async () => {
+                img.onload = () => {
                     const canvas = document.createElement('canvas');
                     const nw = img.naturalWidth || img.width || 800;
                     const nh = img.naturalHeight || img.height || 600;
                     canvas.width = nh;
                     canvas.height = nw;
                     const ctx = canvas.getContext('2d');
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.imageSmoothingQuality = 'high';
                     ctx.translate(canvas.width / 2, canvas.height / 2);
                     ctx.rotate(90 * Math.PI / 180);
                     ctx.drawImage(img, -nw / 2, -nh / 2);
-                    const rotated = canvas.toDataURL('image/jpeg', 0.92);
-                    const compressed = await compressAndOptimizeImage(rotated, 1400, 480 * 1024);
-                    resolve(compressed || rotated);
+                    resolve(canvas.toDataURL('image/jpeg', 0.95));
                 };
                 img.onerror = () => resolve(dataUrl);
                 img.src = dataUrl;
             });
         }
 
-        // 🖼️ ฟังก์ชันเรนเดอร์ Thumbnail Preview ของ Mode 1 (พร้อมปุ่ม สลับดูต้นฉบับ/สัญลักษณ์, หมุน, ขยาย, ใส่สัญลักษณ์, ลบ)
+        // 🖼️ ฟังก์ชันเรนเดอร์ Thumbnail Preview ของ Mode 1 (พร้อมปุ่ม ทำเครื่องหมาย/วาด, หมุน, ขยาย, ลบ)
         function renderSinglePreview() {
             if (!imgPreviewArea) return;
-            const rawImg = singleImageOriginal || singleImage;
-            const annotImg = singleImageAnnotated;
-            const hasAnnot = Boolean(annotImg && annotImg !== rawImg);
-            const isAnnotShowing = hasAnnot ? Boolean(singleImageShowAnnot !== false) : false;
-            const displayImg = (isAnnotShowing && annotImg) ? annotImg : rawImg;
-            singleImage = displayImg;
-            if (currentEvidenceMode === 'single') {
-                currentImage = singleImage;
-                modal._currentImage = currentImage;
-            }
-
-            if (displayImg) {
+            if (singleImage) {
                 imgPreviewArea.innerHTML = `
-                    <div class="evidence-single-preview-wrap">
-                        <div style="width:100%; display:flex; justify-content:center; align-items:center; overflow:hidden;">
-                            <img src="${displayImg}" style="max-height:105px; max-width:100%; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.12); display:block; object-fit:contain;" alt="Evidence Single" />
-                        </div>
-                        <div class="evidence-single-actions">
-                            ${hasAnnot ? `
-                                <button type="button" class="evidence-preview-btn btn-toggle-annot btn-toggle-annot-single ${isAnnotShowing ? 'active' : ''}" title="${isAnnotShowing ? 'คลิกเพื่อดูรูปต้นฉบับ (ซ่อนสัญลักษณ์)' : 'คลิกเพื่อดูรูปพร้อมสัญลักษณ์ (แสดงสัญลักษณ์)'}">
-                                    <span>${isAnnotShowing ? '👁️' : '👁️‍🗨️'}</span> ${isAnnotShowing ? 'ดูต้นฉบับ' : 'ดูสัญลักษณ์'}
-                                </button>
-                            ` : ''}
-                            <button type="button" class="evidence-preview-btn btn-annotate btn-annotate-single" title="ใส่สัญลักษณ์/ข้อความชี้จุดเสีย">
-                                <span>✏️</span> ทำเครื่องหมาย/วาด
+                    <div class="evidence-single-preview-wrap" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+                        <img src="${singleImage}" style="max-height:160px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); display:block; object-fit:contain; cursor:zoom-in;" alt="Evidence Single" />
+                        <div class="evidence-toolbar" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:8px; padding:6px 10px; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; flex-wrap:wrap;">
+                            <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fff7ed; border:1px solid #fed7aa; color:#c2410c; cursor:pointer;" title="ทำเครื่องหมายหรือวาดบนรูปภาพ">
+                                <span style="font-size:12px;">✏️</span> ทำเครื่องหมาย/วาด
                             </button>
-                            <button type="button" class="evidence-preview-btn btn-rotate-single" title="หมุนรูปภาพ 90°">
-                                <span>↻</span> หมุน
+                            <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; cursor:pointer;" title="หมุนรูปภาพ 90°">
+                                <span style="font-size:12px;">🔄</span> หมุน
                             </button>
-                            <button type="button" class="evidence-preview-btn btn-zoom-single" title="ขยายดูภาพใหญ่">
-                                <span>🔍</span> ขยาย
+                            <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; cursor:pointer;" title="ขยายดูภาพใหญ่">
+                                <span style="font-size:12px;">🔍</span> ขยาย
                             </button>
-                            <button type="button" class="evidence-preview-btn btn-del btn-del-single" title="ลบรูปภาพนี้">
-                                <span>🗑️</span> ลบ
+                            <button type="button" class="evidence-tool-btn btn-delete btn-del-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; cursor:pointer;" title="ลบรูปภาพ">
+                                <span style="font-size:12px;">🗑️</span> ลบ
                             </button>
                         </div>
                     </div>
                 `;
 
-                // ผูก Event ปุ่มต่างๆ ใน Mode 1
-                const btnToggleAnnot = imgPreviewArea.querySelector('.btn-toggle-annot-single');
-                if (btnToggleAnnot) {
-                    btnToggleAnnot.onclick = (e) => {
+                const imgEl = imgPreviewArea.querySelector('img');
+                if (imgEl) {
+                    imgEl.onclick = (e) => {
                         e.stopPropagation();
-                        singleImageShowAnnot = !singleImageShowAnnot;
-                        renderSinglePreview();
-                        saveDraftData();
-                        updateSupportFormValidation();
-                        toast(singleImageShowAnnot ? '👁️ แสดงสัญลักษณ์ชี้จุดเสียบนรูปภาพ' : '🖼️ ซ่อนสัญลักษณ์และแสดงรูปต้นฉบับ (บันทึกสัญลักษณ์เดิมไว้)', 'info');
+                        _openLightbox(singleImage);
                     };
                 }
 
-                const btnAnnot = imgPreviewArea.querySelector('.btn-annotate-single');
-                if (btnAnnot) {
-                    btnAnnot.onclick = (e) => {
+                // ผูก Event ปุ่ม 1: วาด/ทำเครื่องหมาย
+                const btnAnnotate = imgPreviewArea.querySelector('.btn-annotate-single');
+                if (btnAnnotate) {
+                    btnAnnotate.onclick = (e) => {
                         e.stopPropagation();
-                        const imgToAnnotate = singleImageAnnotated || singleImageOriginal || singleImage;
-                        openEvidenceAnnotator(imgToAnnotate, (annotatedDataUrl) => {
-                            if (!singleImageOriginal) singleImageOriginal = singleImage;
-                            singleImageAnnotated = annotatedDataUrl;
-                            singleImageShowAnnot = true;
-                            singleImage = annotatedDataUrl;
+                        window.openEvidenceImageAnnotator(singleImage, (annotatedImage) => {
+                            singleImage = annotatedImage;
                             if (currentEvidenceMode === 'single') {
                                 currentImage = singleImage;
                                 modal._currentImage = currentImage;
@@ -16298,19 +16419,15 @@ const WapSupportLogs = (function () {
                     };
                 }
 
+                // ผูก Event ปุ่ม 2: หมุนรูปภาพ 90 องศา
                 const btnRot = imgPreviewArea.querySelector('.btn-rotate-single');
                 if (btnRot) {
                     btnRot.onclick = async (e) => {
                         e.stopPropagation();
                         btnRot.disabled = true;
-                        btnRot.textContent = '⏳';
-                        if (singleImageOriginal) {
-                            singleImageOriginal = await rotateImageDataUrl(singleImageOriginal);
-                        }
-                        if (singleImageAnnotated) {
-                            singleImageAnnotated = await rotateImageDataUrl(singleImageAnnotated);
-                        }
-                        singleImage = (singleImageShowAnnot && singleImageAnnotated) ? singleImageAnnotated : singleImageOriginal;
+                        btnRot.textContent = '⏳ หมุน...';
+                        const rotated = await rotateImageDataUrl(singleImage);
+                        singleImage = rotated;
                         if (currentEvidenceMode === 'single') {
                             currentImage = singleImage;
                             modal._currentImage = currentImage;
@@ -16322,6 +16439,7 @@ const WapSupportLogs = (function () {
                     };
                 }
 
+                // ผูก Event ปุ่ม 3: ขยายดูภาพ
                 const btnZoom = imgPreviewArea.querySelector('.btn-zoom-single');
                 if (btnZoom) {
                     btnZoom.onclick = (e) => {
@@ -16330,14 +16448,12 @@ const WapSupportLogs = (function () {
                     };
                 }
 
+                // ผูก Event ปุ่ม 4: ลบรูปภาพ
                 const btnDel = imgPreviewArea.querySelector('.btn-del-single');
                 if (btnDel) {
                     btnDel.onclick = (e) => {
                         e.stopPropagation();
                         singleImage = null;
-                        singleImageOriginal = null;
-                        singleImageAnnotated = null;
-                        singleImageShowAnnot = true;
                         if (currentEvidenceMode === 'single') {
                             currentImage = null;
                             modal._currentImage = null;
@@ -16387,7 +16503,7 @@ const WapSupportLogs = (function () {
         if (btnModeSingle) btnModeSingle.onclick = () => switchEvidenceMode('single');
         if (btnModeMulti) btnModeMulti.onclick = () => switchEvidenceMode('multi');
 
-        // 🧩 ฟังก์ชันสร้าง Canvas รวมภาพ 3 - 5 รูปเป็นผืนเดียว (Proportional Width, 0 Top/Bottom Space, ไม่กินขอบ ขนาดรวมไม่เกิน 500KB)
+        // 🧩 ฟังก์ชันสร้าง Canvas รวมภาพ 3 - 5 รูปเป็นผืนเดียว (Proportional Width, 0 Top/Bottom Space, 0 Cropping / ไม่กินขอบ)
         async function buildMultiCollageCanvas(imgList) {
             if (!imgList || imgList.length < 3 || imgList.length > 5) return null;
 
@@ -16408,18 +16524,16 @@ const WapSupportLogs = (function () {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            // 🎯 กำหนดความสูงมาตรฐาน 960px เพื่อให้ภาพหลักฐานรวมทั้ง 3-5 รูปมีความสูงที่สมดุล สวยงาม คมชัดสูง และไม่แบนเรียบเกินไป
-            const targetHeight = 960;
-            const spacing = 4;
+            // 🎯 ล็อกความสูงมาตรฐานคงที่ (1080px Full HD Standard) เท่ากันเสมอทุกครั้งที่บันทึก และคำนวณความกว้างตามสัดส่วนจริงของแต่ละรูปภาพ (No Cropping / คมชัดเต็มภาพ ไม่มีพื้นที่ว่างบนล่าง)
+            const targetHeight = 1080;
+            const spacing = 3;
             const padding = 0;
 
             const slotWidths = validImages.map(img => {
                 const nw = img.naturalWidth || 800;
                 const nh = img.naturalHeight || 600;
-                const rawAspect = nw / nh;
-                // ปรับสัดส่วนช่องภาพให้สมดุล (ระหว่าง 0.85 ถึง 1.30) เพื่อไม่ให้ภาพแนวนอนกว้างเกินไปจนดึงความสูงของแถบรวมให้เตี้ยลง
-                const balancedAspect = Math.min(1.30, Math.max(0.85, rawAspect));
-                return Math.max(120, Math.round(targetHeight * balancedAspect));
+                const aspect = nw / nh;
+                return Math.max(100, Math.round(targetHeight * aspect));
             });
 
             const totalWidth = slotWidths.reduce((sum, w) => sum + w, 0) + (spacing * (num - 1)) + (padding * 2);
@@ -16435,7 +16549,7 @@ const WapSupportLogs = (function () {
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-            // วาดแต่ละภาพเต็มความสูงและจัดกึ่งกลางสวยงาม คมชัด 100%
+            // วาดแต่ละภาพตามความกว้างสัดส่วนจริง ไม่ตัดขอบ เต็มความสูงพอดี 100% ไม่มีพื้นที่ว่าง
             let currentX = padding;
             validImages.forEach((img, idx) => {
                 const w = slotWidths[idx];
@@ -16443,156 +16557,52 @@ const WapSupportLogs = (function () {
                 const x = currentX;
                 const y = padding;
 
-                const nw = img.naturalWidth || 800;
-                const nh = img.naturalHeight || 600;
-                const imgAspect = nw / nh;
-                const slotAspect = w / h;
-
-                let sx = 0, sy = 0, sw = nw, sh = nh;
-                if (imgAspect > slotAspect) {
-                    sw = nh * slotAspect;
-                    sx = (nw - sw) / 2;
-                } else if (imgAspect < slotAspect) {
-                    sh = nw / slotAspect;
-                    sy = (nh - sh) / 2;
-                }
-
                 ctx.save();
-                ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+                // วาดภาพเต็มความละเอียดและสัดส่วนจริง 100%
+                ctx.drawImage(img, x, y, w, h);
                 ctx.restore();
 
                 currentX += w + spacing;
             });
 
-            const getByteSize = (str) => {
-                const base64Str = str.split(',')[1] || str;
-                return Math.round((base64Str.length * 3) / 4);
-            };
-
-            let quality = 0.88;
-            let collageDataUrl = canvas.toDataURL('image/jpeg', quality);
-
-            while (getByteSize(collageDataUrl) > 480 * 1024 && quality > 0.40) {
-                quality -= 0.08;
-                collageDataUrl = canvas.toDataURL('image/jpeg', quality);
-            }
-
-            if (getByteSize(collageDataUrl) > 500 * 1024) {
-                const scaledCanvas = document.createElement('canvas');
-                scaledCanvas.width = Math.round(totalWidth * 0.75);
-                scaledCanvas.height = Math.round(totalHeight * 0.75);
-                const sCtx = scaledCanvas.getContext('2d');
-                sCtx.imageSmoothingEnabled = true;
-                sCtx.imageSmoothingQuality = 'high';
-                sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
-                collageDataUrl = scaledCanvas.toDataURL('image/jpeg', 0.75);
-            }
-
-            return collageDataUrl;
+            return canvas.toDataURL('image/jpeg', 0.98);
         }
 
-        // 🧩 ฟังก์ชันเรนเดอร์ Thumbnails ใน Mode 2 (แถบเครื่องมือด้านบนแบบ Flex ไม่ซ้อนทับกัน)
+        // 🧩 ฟังก์ชันเรนเดอร์ Thumbnails ใน Mode 2 (พร้อมปุ่ม [x] ลบ และ [↻] หมุน)
         const renderMultiGrid = () => {
             if (!multiGrid) return;
             multiGrid.innerHTML = '';
 
             multiImages.forEach((imgData, idx) => {
-                const rawImg = multiImagesOriginal[idx] || imgData;
-                const annotImg = multiImagesAnnotated[idx] || null;
-                const hasAnnot = Boolean(annotImg && annotImg !== rawImg);
-                const isAnnotShowing = hasAnnot ? Boolean(multiImagesShowAnnot[idx] !== false) : false;
-                const displayImg = (isAnnotShowing && annotImg) ? annotImg : rawImg;
-                multiImages[idx] = displayImg;
-
                 const card = document.createElement('div');
                 card.className = 'evidence-thumb-card';
                 card.innerHTML = `
-                    <div class="evidence-thumb-img-wrap">
-                        <img src="${displayImg}" alt="Evidence ${idx + 1}" />
-                    </div>
-                    <div class="evidence-thumb-top-bar">
-                        <span class="evidence-thumb-tag">#${idx + 1}</span>
-                        <div class="evidence-thumb-actions">
-                            ${hasAnnot ? `
-                                <button type="button" class="evidence-thumb-action-btn btn-annot-toggle ${isAnnotShowing ? 'is-defect' : 'is-raw'}" title="${isAnnotShowing ? '👁️ กำลังแสดงสัญลักษณ์ (คลิกสลับดูรูปต้นฉบับ)' : '👁️‍🗨️ กำลังแสดงต้นฉบับ (คลิกแสดงสัญลักษณ์)'}" data-toggle-idx="${idx}">
-                                    <span>${isAnnotShowing ? '👁️' : '👁️‍🗨️'}</span>
-                                </button>
-                            ` : ''}
-                            <button type="button" class="evidence-thumb-action-btn btn-annot" title="วาด/ชี้จุดบกพร่องรูปนี้" data-annot-idx="${idx}">✏️</button>
-                            <button type="button" class="evidence-thumb-action-btn btn-rot" title="หมุนรูปภาพ 90°" data-rot-idx="${idx}">↻</button>
-                            <button type="button" class="evidence-thumb-action-btn btn-del" title="ลบรูปนี้" data-del-idx="${idx}">✖</button>
-                        </div>
-                    </div>
-                    <div class="evidence-thumb-bottom-bar">
-                        <span class="evidence-thumb-status ${hasAnnot ? (isAnnotShowing ? 'status-defect' : 'status-raw') : ''}">
-                            ${hasAnnot ? (isAnnotShowing ? '✏️ Defect' : '📷 Raw') : `รูปที่ ${idx + 1}`}
-                        </span>
-                    </div>
+                    <img src="${imgData}" alt="Evidence ${idx + 1}" />
+                    <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูปภาพ 90°" data-rot-idx="${idx}">↻</button>
+                    <button type="button" class="evidence-thumb-delete-btn" title="ลบรูปนี้" data-del-idx="${idx}">✖</button>
+                    <span class="evidence-thumb-badge">รูปที่ ${idx + 1}</span>
                 `;
 
-                // ปุ่มสลับดูต้นฉบับ / สัญลักษณ์ (Toggle Raw vs Annotation)
-                const toggleBtn = card.querySelector('.btn-annot-toggle');
-                if (toggleBtn) {
-                    toggleBtn.onclick = async (e) => {
-                        e.stopPropagation();
-                        multiImagesShowAnnot[idx] = !multiImagesShowAnnot[idx];
-                        multiImages[idx] = (multiImagesShowAnnot[idx] && multiImagesAnnotated[idx]) ? multiImagesAnnotated[idx] : (multiImagesOriginal[idx] || multiImages[idx]);
-                        await handleMultiImagesChange();
-                        if (multiImagesShowAnnot[idx]) {
-                            toast(`👁️ แสดงสัญลักษณ์รูปที่ ${idx + 1}`, 'info');
-                        } else {
-                            toast(`🖼️ แสดงรูปต้นฉบับรูปที่ ${idx + 1} (บันทึกสัญลักษณ์เดิมไว้)`, 'info');
-                        }
-                    };
-                }
-
-                // ปุ่มวาด/ชี้จุดบกพร่อง (Annotate)
-                const annotBtn = card.querySelector('.btn-annot');
-                if (annotBtn) {
-                    annotBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const imgToAnnotate = multiImagesAnnotated[idx] || multiImagesOriginal[idx] || multiImages[idx];
-                        openEvidenceAnnotator(imgToAnnotate, async (annotatedDataUrl) => {
-                            if (!multiImagesOriginal[idx]) {
-                                multiImagesOriginal[idx] = multiImages[idx];
-                            }
-                            multiImagesAnnotated[idx] = annotatedDataUrl;
-                            multiImagesShowAnnot[idx] = true;
-                            multiImages[idx] = annotatedDataUrl;
-                            await handleMultiImagesChange();
-                            toast(`✨ อัปเดตสัญลักษณ์บนรูปที่ ${idx + 1} เรียบร้อย (กดปุ่มสลับดูรูปต้นฉบับได้ตลอดเวลา)`, 'success');
-                        });
-                    };
-                }
-
                 // ปุ่มหมุนรูป 90°
-                const rotBtn = card.querySelector('.btn-rot');
+                const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
                 if (rotBtn) {
                     rotBtn.onclick = async (e) => {
                         e.stopPropagation();
                         rotBtn.style.pointerEvents = 'none';
                         rotBtn.textContent = '⏳';
-                        if (multiImagesOriginal[idx]) {
-                            multiImagesOriginal[idx] = await rotateImageDataUrl(multiImagesOriginal[idx]);
-                        }
-                        if (multiImagesAnnotated[idx]) {
-                            multiImagesAnnotated[idx] = await rotateImageDataUrl(multiImagesAnnotated[idx]);
-                        }
-                        multiImages[idx] = (multiImagesShowAnnot[idx] && multiImagesAnnotated[idx]) ? multiImagesAnnotated[idx] : (multiImagesOriginal[idx] || multiImages[idx]);
+                        const rotated = await rotateImageDataUrl(multiImages[idx]);
+                        multiImages[idx] = rotated;
                         await handleMultiImagesChange();
                         toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
                     };
                 }
 
                 // ปุ่มลบรูป
-                const delBtn = card.querySelector('.btn-del');
+                const delBtn = card.querySelector('.evidence-thumb-delete-btn');
                 if (delBtn) {
                     delBtn.onclick = async (e) => {
                         e.stopPropagation();
                         multiImages.splice(idx, 1);
-                        multiImagesOriginal.splice(idx, 1);
-                        multiImagesAnnotated.splice(idx, 1);
-                        multiImagesShowAnnot.splice(idx, 1);
                         await handleMultiImagesChange();
                         toast(`🗑️ ลบรูปภาพที่ ${idx + 1} เรียบร้อย`, 'info');
                     };
@@ -16605,15 +16615,12 @@ const WapSupportLogs = (function () {
             if (multiImages.length < 5) {
                 const addSlot = document.createElement('div');
                 addSlot.className = 'evidence-add-slot';
-                addSlot.title = 'คลิกเพื่อเลือกรูปภาพหลักฐาน (รองรับการเลือกพร้อมกันหลายรูป หรือกดเพิ่มทีละรูป)';
                 addSlot.innerHTML = `
-                    <div style="width:36px; height:36px; border-radius:50%; background:#eff6ff; display:flex; align-items:center; justify-content:center; color:#2563eb; margin-bottom:2px; box-shadow:0 1px 3px rgba(37,99,235,0.15);">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                            <path d="M12 4v16m8-8H4"/>
-                        </svg>
-                    </div>
-                    <span style="font-size:11px; font-weight:800; color:#1e40af;">+ เพิ่มรูปภาพ</span>
-                    <span style="font-size:9.5px; font-weight:600; color:#64748b;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
+                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-bottom:2px;">
+                        <path d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span style="font-size:10px; font-weight:800;">+ เพิ่มรูปภาพ</span>
+                    <span style="font-size:8.5px; opacity:0.8;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
                 `;
                 addSlot.onclick = () => {
                     if (imgMultiInput) {
@@ -16697,16 +16704,100 @@ const WapSupportLogs = (function () {
                             modal._currentImage = currentImage;
                         }
                         if (stitchedBox) {
-                            stitchedBox.innerHTML = `<img src="${collage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:6px; display:block; cursor:zoom-in;" alt="Composite Evidence" />`;
+                            stitchedBox.innerHTML = `
+                                <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
+                                    <img src="${collage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:6px; display:block; cursor:zoom-in;" alt="Composite Evidence" />
+                                    <div class="evidence-toolbar" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:8px; padding:6px 10px; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; flex-wrap:wrap;">
+                                        <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fff7ed; border:1px solid #fed7aa; color:#c2410c; cursor:pointer;" title="ทำเครื่องหมายหรือวาดบนภาพหลักฐานรวม">
+                                            <span style="font-size:12px;">✏️</span> ทำเครื่องหมาย/วาด
+                                        </button>
+                                        <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; cursor:pointer;" title="หมุนภาพรวม 90°">
+                                            <span style="font-size:12px;">🔄</span> หมุน
+                                        </button>
+                                        <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; cursor:pointer;" title="ขยายดูภาพใหญ่">
+                                            <span style="font-size:12px;">🔍</span> ขยาย
+                                        </button>
+                                        <button type="button" class="evidence-tool-btn btn-delete btn-del-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; cursor:pointer;" title="ลบภาพหลักฐานทั้งหมดในโหมดนี้">
+                                            <span style="font-size:12px;">🗑️</span> ลบ
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+
                             const imgEl = stitchedBox.querySelector('img');
                             if (imgEl) {
-                                imgEl.onclick = () => _openLightbox(collage);
+                                imgEl.onclick = () => _openLightbox(stitchedMultiImage);
+                            }
+
+                            // 1. วาด/ทำเครื่องหมาย บนภาพหลักฐานรวม
+                            const btnAnnotateM = stitchedBox.querySelector('.btn-annotate-multi');
+                            if (btnAnnotateM) {
+                                btnAnnotateM.onclick = (e) => {
+                                    e.stopPropagation();
+                                    window.openEvidenceImageAnnotator(stitchedMultiImage, (annotatedImage) => {
+                                        stitchedMultiImage = annotatedImage;
+                                        if (currentEvidenceMode === 'multi') {
+                                            currentImage = stitchedMultiImage;
+                                            modal._currentImage = currentImage;
+                                        }
+                                        if (imgEl) imgEl.src = stitchedMultiImage;
+                                        saveDraftData();
+                                        updateSupportFormValidation();
+                                    });
+                                };
+                            }
+
+                            // 2. หมุนภาพหลักฐานรวม
+                            const btnRotateM = stitchedBox.querySelector('.btn-rotate-multi');
+                            if (btnRotateM) {
+                                btnRotateM.onclick = async (e) => {
+                                    e.stopPropagation();
+                                    btnRotateM.disabled = true;
+                                    btnRotateM.textContent = '⏳ หมุน...';
+                                    const rotated = await rotateImageDataUrl(stitchedMultiImage);
+                                    stitchedMultiImage = rotated;
+                                    if (currentEvidenceMode === 'multi') {
+                                        currentImage = stitchedMultiImage;
+                                        modal._currentImage = currentImage;
+                                    }
+                                    if (imgEl) imgEl.src = stitchedMultiImage;
+                                    btnRotateM.disabled = false;
+                                    btnRotateM.innerHTML = '<span style="font-size:12px;">🔄</span> หมุน';
+                                    saveDraftData();
+                                    updateSupportFormValidation();
+                                    toast('🔄 หมุนภาพหลักฐานรวม 90° เรียบร้อยแล้ว', 'info');
+                                };
+                            }
+
+                            // 3. ขยายภาพหลักฐานรวม
+                            const btnZoomM = stitchedBox.querySelector('.btn-zoom-multi');
+                            if (btnZoomM) {
+                                btnZoomM.onclick = (e) => {
+                                    e.stopPropagation();
+                                    _openLightbox(stitchedMultiImage);
+                                };
+                            }
+
+                            // 4. ลบภาพหลักฐานรวม
+                            const btnDelM = stitchedBox.querySelector('.btn-del-multi');
+                            if (btnDelM) {
+                                btnDelM.onclick = (e) => {
+                                    e.stopPropagation();
+                                    multiImages = [];
+                                    stitchedMultiImage = null;
+                                    if (currentEvidenceMode === 'multi') {
+                                        currentImage = null;
+                                        modal._currentImage = null;
+                                    }
+                                    handleMultiImagesChange();
+                                    toast('🗑️ ลบภาพหลักฐานในโหมดรวมภาพทั้งหมดแล้ว', 'info');
+                                };
                             }
                         }
                         if (compositeActions) {
                             compositeActions.style.display = 'flex';
                         }
-                        toast(`✨ รวมภาพหลักฐาน ${multiImages.length} รูปเรียบร้อยแล้ว (ขนาดไฟล์ < 500KB)`, 'success');
+                        toast(`✨ รวมภาพหลักฐาน ${multiImages.length} รูปเรียบร้อยแล้ว`, 'success');
                     }
                 } catch(e) {
                     console.error('Collage error:', e);
@@ -16747,13 +16838,12 @@ const WapSupportLogs = (function () {
 
                 const filesToAdd = files.slice(0, availableSlots);
                 for (let file of filesToAdd) {
-                    const optimizedUrl = await compressAndOptimizeImage(file, 1200, 400 * 1024);
-                    if (optimizedUrl) {
-                        multiImagesOriginal.push(optimizedUrl);
-                        multiImagesAnnotated.push(null);
-                        multiImagesShowAnnot.push(true);
-                        multiImages.push(optimizedUrl);
-                    }
+                    const dataUrl = await new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onload = ev => resolve(ev.target.result);
+                        reader.readAsDataURL(file);
+                    });
+                    if (dataUrl) multiImages.push(dataUrl);
                 }
 
                 if (multiImages.length < 3) {
@@ -16765,22 +16855,21 @@ const WapSupportLogs = (function () {
         }
 
         // จัดการอัปโหลดรูปภาพใน Mode 1 (Single)
-        async function handleSingleImageFile(file) {
-            if (!file || (!file.type?.startsWith('image/') && !(file instanceof Blob))) return;
-            const optimizedUrl = await compressAndOptimizeImage(file, 1400, 480 * 1024);
-            if (!optimizedUrl) return;
-            singleImageOriginal = optimizedUrl;
-            singleImageAnnotated = null;
-            singleImageShowAnnot = true;
-            singleImage = optimizedUrl;
-            if (currentEvidenceMode === 'single') {
-                currentImage = singleImage;
-                modal._currentImage = currentImage;
-            }
-            renderSinglePreview();
-            saveDraftData();
-            updateSupportFormValidation();
-            toast('📸 อัปโหลดและปรับขนาดภาพหลักฐานเรียบร้อย (ขนาดไฟล์ < 500KB)', 'success');
+        function handleSingleImageFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                singleImage = ev.target.result;
+                if (currentEvidenceMode === 'single') {
+                    currentImage = singleImage;
+                    modal._currentImage = currentImage;
+                }
+                renderSinglePreview();
+                saveDraftData();
+                updateSupportFormValidation();
+                toast('📸 อัปโหลดรูปภาพหลักฐานเรียบร้อย', 'success');
+            };
+            reader.readAsDataURL(file);
         }
 
         if (imgInput) {
@@ -16815,7 +16904,7 @@ const WapSupportLogs = (function () {
         renderSinglePreview();
 
         // Allow pasting image from Clipboard (Ctrl+V) into modal
-        const handlePasteImage = async (e) => {
+        const handlePasteImage = (e) => {
             if (!document.body.contains(modal)) {
                 window.removeEventListener('paste', handlePasteImage);
                 return;
@@ -16827,22 +16916,20 @@ const WapSupportLogs = (function () {
                     if (item && item.type && item.type.indexOf('image') === 0) {
                         const blob = item.getAsFile();
                         if (currentEvidenceMode === 'single') {
-                            await handleSingleImageFile(blob);
-                            if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานและปรับขนาดเรียบร้อย', 'success');
+                            handleSingleImageFile(blob);
+                            if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ', 'success');
                         } else {
                             if (multiImages.length >= 5) {
                                 toast('⚠️ แนบรูปภาพครบ 5 รูปแล้ว', 'warning');
                                 return;
                             }
-                            const optimizedUrl = await compressAndOptimizeImage(blob, 1200, 400 * 1024);
-                            if (optimizedUrl) {
-                                multiImagesOriginal.push(optimizedUrl);
-                                multiImagesAnnotated.push(null);
-                                multiImagesShowAnnot.push(true);
-                                multiImages.push(optimizedUrl);
+                            const reader = new FileReader();
+                            reader.onload = async (ev) => {
+                                multiImages.push(ev.target.result);
                                 if (typeof toast === 'function') toast(`📸 วางรูปภาพจาก Clipboard (รูปที่ ${multiImages.length})`, 'success');
                                 await handleMultiImagesChange();
-                            }
+                            };
+                            reader.readAsDataURL(blob);
                         }
                         break;
                     }
@@ -16945,13 +17032,7 @@ const WapSupportLogs = (function () {
                     is8d: d8Check ? d8Check.checked : false,
                     evidenceMode: currentEvidenceMode,
                     singleImage: singleImage || null,
-                    singleImageOriginal: singleImageOriginal || null,
-                    singleImageAnnotated: singleImageAnnotated || null,
-                    singleImageShowAnnot: singleImageShowAnnot,
                     multiImages: multiImages || [],
-                    multiImagesOriginal: multiImagesOriginal || [],
-                    multiImagesAnnotated: multiImagesAnnotated || [],
-                    multiImagesShowAnnot: multiImagesShowAnnot || [],
                     stitchedMultiImage: stitchedMultiImage || null,
                     image: currentImage || null,
                     savedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -16975,7 +17056,10 @@ const WapSupportLogs = (function () {
                 if (d.supplier !== undefined && modal.querySelector('#prob-supplier')) modal.querySelector('#prob-supplier').value = d.supplier;
                 if (d.defect !== undefined && modal.querySelector('#prob-defect')) modal.querySelector('#prob-defect').value = d.defect;
                 if (d.category !== undefined && modal.querySelector('#f-sup-part-cat')) modal.querySelector('#f-sup-part-cat').value = d.category;
-                if (d.eventDate !== undefined && modal.querySelector('#f-sup-date')) modal.querySelector('#f-sup-date').value = d.eventDate;
+                if (d.eventDate !== undefined && modal.querySelector('#f-sup-date')) {
+    // ตัดเอาเฉพาะ 10 ตัวแรก (YYYY-MM-DD) เพื่อให้ input date ยอมรับค่า
+    modal.querySelector('#f-sup-date').value = d.eventDate.substring(0, 10);
+}
                 if (d.action !== undefined && modal.querySelector('#f-sup-action')) modal.querySelector('#f-sup-action').value = d.action;
                 if (d.report !== undefined && modal.querySelector('#f-sup-report')) modal.querySelector('#f-sup-report').value = d.report;
                 if (d.po_no !== undefined && modal.querySelector('#f-sup-po')) modal.querySelector('#f-sup-po').value = d.po_no;
@@ -16999,9 +17083,6 @@ const WapSupportLogs = (function () {
                 if (d.evidenceMode === 'multi') {
                     currentEvidenceMode = 'multi';
                     multiImages = Array.isArray(d.multiImages) ? d.multiImages : [];
-                    multiImagesOriginal = Array.isArray(d.multiImagesOriginal) ? d.multiImagesOriginal : [...multiImages];
-                    multiImagesAnnotated = Array.isArray(d.multiImagesAnnotated) ? d.multiImagesAnnotated : multiImages.map(() => null);
-                    multiImagesShowAnnot = Array.isArray(d.multiImagesShowAnnot) ? d.multiImagesShowAnnot : multiImages.map(() => true);
                     stitchedMultiImage = d.stitchedMultiImage || null;
                     currentImage = stitchedMultiImage;
                     modal._currentImage = currentImage;
@@ -17018,9 +17099,6 @@ const WapSupportLogs = (function () {
                 } else {
                     currentEvidenceMode = 'single';
                     singleImage = d.singleImage || d.image || null;
-                    singleImageOriginal = d.singleImageOriginal || singleImage;
-                    singleImageAnnotated = d.singleImageAnnotated || null;
-                    singleImageShowAnnot = d.singleImageShowAnnot !== undefined ? d.singleImageShowAnnot : true;
                     currentImage = singleImage;
                     modal._currentImage = currentImage;
                     switchEvidenceMode('single');
@@ -17242,13 +17320,14 @@ const WapSupportLogs = (function () {
         updateSupportFormValidation();
 
         // --- Save Support Form ---
+        // --- 🚀 ชุดสมบูรณ์: บันทึกข้อมูลพร้อมอัปโหลดรูปภาพขึ้น Storage (User-Specific Folder) ---
         formEl.onsubmit = async (e) => {
             e.preventDefault();
             if (submitBtn.disabled) return;
             
             saveDraftData();
 
-            // 0. ตรวจสอบข้อมูลช่องที่จำเป็น (Validation check & highlight missing fields)
+            // 1. ตรวจสอบข้อมูลช่องที่จำเป็น (Validation)
             const requiredFields = [
                 { id: 'prob-partno', name: 'รหัสพาร์ท (Part No.)' },
                 { id: 'prob-part', name: 'ชื่อพาร์ท (Part Name)' },
@@ -17272,11 +17351,11 @@ const WapSupportLogs = (function () {
             if (missingFields.length > 0) {
                 const firstMissingEl = modal.querySelector('#' + missingFields[0].id);
                 if (firstMissingEl) firstMissingEl.focus();
-                toast(`⚠️ กรุณากรอกข้อมูลในช่องที่ไฮไลต์ให้ครบถ้วน: ${missingFields.map(m => m.name).join(', ')}`, 'error');
+                toast(`⚠️ กรุณากรอกข้อมูลให้ครบถ้วน: ${missingFields.map(m => m.name).join(', ')}`, 'error');
                 return;
             }
 
-            // ตรวจสอบรูปภาพหลักฐาน (บังคับแนบรูปภาพหลักฐานก่อนบันทึก)
+            // 2. ตรวจสอบรูปภาพหลักฐาน (บังคับแนบรูปภาพ)
             if (currentEvidenceMode === 'multi') {
                 if (multiImages.length < 3 || multiImages.length > 5) {
                     const secCont = modal.querySelector('#evidence-section-container');
@@ -17285,7 +17364,7 @@ const WapSupportLogs = (function () {
                         secCont.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         if (typeof shake === 'function') shake(secCont);
                     }
-                    toast(`⚠️ แบบที่ 2 (แนบภาพแยก) ต้องแนบรูปภาพระหว่าง 3 ถึง 5 รูป (ปัจจุบันเลือกไว้ ${multiImages.length} รูป)`, 'error');
+                    toast(`⚠️ แบบที่ 2 (แนบภาพแยก) ต้องแนบรูปภาพระหว่าง 3 ถึง 5 รูป`, 'error');
                     return;
                 }
             }
@@ -17298,69 +17377,82 @@ const WapSupportLogs = (function () {
                     secCont.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     if (typeof shake === 'function') shake(secCont);
                 }
-                toast('⚠️ กรุณาแนบรูปภาพหลักฐานก่อนทำการบันทึกรายงาน', 'error');
+                toast('⚠️ กรุณาแนบรูปภาพหลักฐานก่อนทำการบันทึก', 'error');
                 return;
             }
 
+            // 3. ตรวจสอบสถานะออนไลน์
             if (!navigator.onLine) {
-                toast('📶 ขณะนี้คุณอยู่ออฟไลน์: ระบบได้บันทึกข้อมูลแบบร่างลง LocalStorage เรียบร้อยแล้ว', 'info');
+                toast('📶 ออฟไลน์: บันทึกแบบร่างลงเครื่องแล้ว', 'info');
                 return;
             }
 
-            const fd = new FormData(e.target);
-            const isSyncActive = syncCheck.checked;
-            const is8DActive = d8Check.checked;
-            const commanderName = commanderInput.value.trim() || 'SQE EN';
-
+            // --- ⚡ เริ่มขั้นตอนการส่งข้อมูลขึ้น Cloud ---
             submitBtn.disabled = true;
-            submitBtn.textContent = 'กำลังประมวลผล...';
-
-            // Ensure problem string is set
-            syncProblemSentence();
-
-            const existingRec = _editingId ? _records.find(x => String(x.id) === String(_editingId)) : null;
-            const originalCreatedAt = existingRec ? (existingRec.createdAt || existingRec.created_at) : null;
-
-            let repVal = (fd.get('report') || 'VF').toString().trim();
-            if (repVal.toUpperCase().includes('RP')) repVal = 'RP';
-            else if (repVal.toUpperCase().includes('RECORD')) repVal = 'RECORDS';
-            else if (repVal.toUpperCase().includes('VF')) repVal = 'VF';
-
-            const suppVal = (fd.get('supplier') || (modal.querySelector('#prob-supplier')?.value) || '').trim();
-            const partNoVal = (modal.querySelector('#prob-partno')?.value || '').trim();
-            const poVal = (fd.get('po_no') || modal.querySelector('#f-sup-po')?.value || '').trim();
-            const invVal = (fd.get('inv_no') || modal.querySelector('#f-sup-inv')?.value || '').trim();
-            const rawRemark = fd.get('remark') || '';
-
-            // บันทึก PO และ INV ลงใน remark metadata เพื่อไม่ให้เกิดข้อผิดพลาดคอลัมน์ใน Supabase support_records
-            let finalRemark = rawRemark;
-            if (poVal || invVal) {
-                const metaTag = `[PO:${poVal || ''}|INV:${invVal || ''}]`;
-                finalRemark = (metaTag + (rawRemark ? ' ' + rawRemark : '')).trim();
-            }
-
-            const payload = {
-                id: _editingId || 'SUP-' + Date.now(),
-                user_id: S.currentUser,
-                problem: fd.get('problem') || '',
-                action: fd.get('action') || 'Rework',
-                part: fd.get('part') || '',
-                lot: Number(fd.get('lot')) || 0,
-                ok_qty: Number(fd.get('ok')) || 0,
-                ng_qty: Number(fd.get('ng')) || 0,
-                report_type: repVal,
-                remark: finalRemark,
-                event_date: fd.get('date'),
-                image_url: currentImage,
-                created_at: originalCreatedAt || new Date().toISOString()
-            };
+            submitBtn.innerHTML = `<span class="animate-spin">🌀</span> UPLOADING...`;
 
             try {
-                // STEP 1: บันทึกลงตาราง Support (WAP DB)
+                // [STEP 1]: อัปโหลดรูปภาพขึ้น Supabase Storage (ถ้าเป็น Base64/ไฟล์ใหม่)
+                let finalImageUrl = currentImage;
+                if (currentImage && currentImage.startsWith('data:')) {
+                    toast("📸 กำลังส่งไฟล์ภาพขึ้น Cloud Storage...", "info");
+                    // เรียกใช้ฟังก์ชันอัปโหลด (แบ่งโฟลเดอร์ตามชื่อผู้ใช้/ปี-เดือน)
+                    finalImageUrl = await uploadToSupabaseStorage(currentImage, 'evidences');
+                }
+
+                // [STEP 2]: เตรียมข้อมูล Payload
+                const fd = new FormData(e.target);
+                const isSyncActive = syncCheck.checked;
+                const is8DActive = d8Check.checked;
+                const commanderName = commanderInput.value.trim() || 'SQE EN';
+
+                syncProblemSentence(); // มั่นใจว่าประโยคปัญหาถูกสร้างสมบูรณ์
+
+                const existingRec = _editingId ? _records.find(x => String(x.id) === String(_editingId)) : null;
+                const originalCreatedAt = existingRec ? (existingRec.createdAt || existingRec.created_at) : null;
+
+                let repVal = (fd.get('report') || 'VF').toString().trim();
+                if (repVal.toUpperCase().includes('RP')) repVal = 'RP';
+                else if (repVal.toUpperCase().includes('RECORD')) repVal = 'RECORDS';
+                else if (repVal.toUpperCase().includes('VF')) repVal = 'VF';
+
+                // จัดการ PO/INV Metadata
+                const poVal = (fd.get('po_no') || modal.querySelector('#f-sup-po')?.value || '').trim();
+                const invVal = (fd.get('inv_no') || modal.querySelector('#f-sup-inv')?.value || '').trim();
+                const rawRemark = fd.get('remark') || '';
+                let finalRemark = rawRemark;
+                if (poVal || invVal) {
+                    finalRemark = `[PO:${poVal}|INV:${invVal}] ${rawRemark}`.trim();
+                }
+
+                const payload = {
+                    id: _editingId || 'SUP-' + Date.now(),
+                    user_id: S.currentUser,
+                    problem: fd.get('problem') || '',
+                    action: fd.get('action') || 'Rework',
+                    part: fd.get('part') || '',
+                    lot: Number(fd.get('lot')) || 0,
+                    ok_qty: Number(fd.get('ok')) || 0,
+                    ng_qty: Number(fd.get('ng')) || 0,
+                    report_type: repVal,
+                    remark: finalRemark,
+                    event_date: fd.get('date'),
+                    image_url: finalImageUrl, // ✅ ใช้ URL จาก Storage แทน Base64
+                    created_at: originalCreatedAt || new Date().toISOString()
+                };
+
+                // [STEP 3]: บันทึกลงตาราง Support (WAP DB)
                 const { error: errorSup } = await wapClient.from('support_records').upsert([payload]);
                 if (errorSup) throw errorSup;
 
-                // STEP 2: บันทึกลงตาราง Special Jobs (ถ้าเลือก)
+                // ลบรูปภาพเก่าใน Storage หากมีการแก้ไขหรือเปลี่ยนรูปใหม่
+                if (existingRec && existingRec.imageUrl && existingRec.imageUrl !== finalImageUrl) {
+                    if (typeof deleteFromSupabaseStorage === 'function') {
+                        deleteFromSupabaseStorage(existingRec.imageUrl, 'evidences').catch(err => console.warn('Old image delete warning:', err));
+                    }
+                }
+
+                // [STEP 4]: บันทึกลงตารางภารกิจพิเศษ (ถ้าเลือก)
                 if (isSyncActive) {
                     await wapClient.from('special_jobs').insert([{
                         id: 'SJ-SYNC-' + Date.now(),
@@ -17373,31 +17465,21 @@ const WapSupportLogs = (function () {
                     }]);
                 }
 
-                // STEP 3: ✅ สร้างเคส 8D อัตโนมัติ (SQE DB)
+                // [STEP 5]: สร้างเคส 8D อัตโนมัติ (SQE DB)
                 if (is8DActive) {
                     await Wap8DSystem.createNewCase({
                         ...payload,
-                        supplier: suppVal,
-                        part_no: partNoVal,
-                        partNo: partNoVal,
-                        po_no: poVal,
-                        inv_no: invVal
+                        supplier: (modal.querySelector('#prob-supplier')?.value || '').trim(),
+                        part_no: (modal.querySelector('#prob-partno')?.value || '').trim()
                     });
                 }
 
-                // ล้างแบบร่าง ล้างฟอร์ม และล้างเอฟเฟกต์ไฮไลต์
+                // [STEP 6]: ล้างข้อมูลและปิด Modal
                 localStorage.removeItem(DRAFT_KEY);
                 formEl.reset();
-                modal.querySelectorAll('.field-glow-unfilled, .field-glow-filled, .valid, .invalid').forEach(el => {
-                    el.classList.remove('field-glow-unfilled', 'field-glow-filled', 'valid', 'invalid');
-                });
-
-                window.removeEventListener('online', handleOnlineOfflineState);
-                window.removeEventListener('offline', handleOnlineOfflineState);
-
-                toast('✨ บันทึกข้อมูลและวิเคราะห์ผลสำเร็จ', 'success');
+                toast('✨ บันทึกข้อมูลและอัปโหลดรูปภาพสำเร็จ', 'success');
                 modal.remove();
-                await _fetch();
+                await _fetch(); // รีเฟรชตารางหน้าจอ
 
             } catch (err) {
                 console.error('[System Error]:', err);
@@ -17443,64 +17525,6 @@ function _openViewModal(id) {
 
     // --- 2. Smart Logic จัดการข้อความจริงจากฐานข้อมูล ---
     let displaySentence = (item.problem || "").trim();
-
-    // Format Note / Remark Section
-    let remarkHtml = '';
-    const rawRemark = (item.remark || '').trim();
-
-    if (!rawRemark || rawRemark === 'ไม่มีหมายเหตุเพิ่มเติม') {
-        remarkHtml = `
-            <div style="font-size:11.5px; font-weight:600; color:${theme.remarkText}; line-height:1.5; text-align:left; margin:0; padding:0;">
-                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px; margin-right:6px; display:inline;">NOTE:</span>
-                <span style="opacity:0.8;">ไม่มีหมายเหตุเพิ่มเติม</span>
-            </div>
-        `;
-    } else {
-        const isTempAction = /^Temporary\s*action/i.test(rawRemark) || /SQE\s*Support\s*production\s*line\s*total/i.test(rawRemark);
-        
-        if (isTempAction) {
-            let contentText = rawRemark.replace(/^Temporary\s*action[:\s-]*/i, '').trim();
-            const lines = contentText.split('\n').map(l => l.trim()).filter(Boolean);
-            
-            const formattedLines = lines.map(line => {
-                if (/SQE\s*Support\s*production\s*line\s*total/i.test(line)) {
-                    const m = line.match(/SQE\s*Support\s*production\s*line\s*total\s*=\s*(.*?)\s*Pcs\.\s*Found\s*NG\s*=\s*(.*?)\s*Pcs\./i);
-                    if (m) {
-                        const totalVal = m[1].trim();
-                        const ngVal = m[2].trim();
-                        return `<div>SQE Support production line total = <span style="font-weight:800; color:${isDark ? '#fff' : '#0f172a'};">${totalVal || ''}</span> Pcs. Found NG = <span style="font-weight:800; color:#ef4444;">${ngVal || '0'}</span> Pcs.</div>`;
-                    }
-                } else if (/IQC\s*re\s*check\s*part\s*in\s*CTC\s*stock/i.test(line)) {
-                    const m = line.match(/IQC\s*re\s*check\s*part\s*in\s*CTC\s*stock\s*total\s*=\s*(.*?)\s*Pcs\.\s*Found\s*NG\s*=\s*(.*?)\s*Pcs\./i);
-                    if (m) {
-                        const totalVal = m[1].trim();
-                        const ngVal = m[2].trim();
-                        return `<div>IQC re check part in CTC stock total = <span style="font-weight:800; color:${isDark ? '#fff' : '#0f172a'};">${totalVal}</span> Pcs. Found NG = <span style="font-weight:800; color:${ngVal && ngVal !== '0' ? '#ef4444' : (isDark ? '#fff' : '#0f172a')};">${ngVal}</span> Pcs.</div>`;
-                    }
-                }
-                return `<div>${escapeHtml(line)}</div>`;
-            }).join('');
-
-            remarkHtml = `
-                <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-                    <div style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
-                        <span>NOTE:</span>
-                        <span style="color:${theme.remarkText}; font-weight:800; font-size:11px; text-transform:none;">Temporary action</span>
-                    </div>
-                    <div style="padding-left:18px; display:flex; flex-direction:column; gap:3px; font-size:11.5px; font-weight:600; color:${theme.remarkText}; line-height:1.5; text-align:left;">
-                        ${formattedLines}
-                    </div>
-                </div>
-            `;
-        } else {
-            // ข้อความทั่วไป (เช่น Rework support...): แสดงต่อท้าย NOTE: บนบรรทัดเดียวกันทันที (Inline flow)
-            remarkHtml = `
-                <div style="font-size:11.5px; font-weight:600; color:${theme.remarkText}; line-height:1.5; text-align:left; word-break:break-word; white-space:pre-wrap; margin:0; padding:0;">
-                    <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:10px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px; margin-right:6px; display:inline;">NOTE:</span>${escapeHtml(rawRemark)}
-                </div>
-            `;
-        }
-    }
 
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -17572,25 +17596,28 @@ function _openViewModal(id) {
                 </div>
             </div>
 
-            <!-- Image Section (Snug edge-to-edge, zero top/bottom empty space) -->
-            <div style="width:100%; background:transparent; border:1px solid ${theme.imgBorder}; border-radius:8px; display:block; padding:0; overflow:hidden; margin-bottom:10px; box-shadow:0 4px 14px rgba(0,0,0,0.18);">
+            <!-- Image Section (Edge-to-edge snugly without top/bottom empty space) -->
+            <div style="width:100%; background:${isDark ? '#020617' : '#0f172a'}; border:1px solid ${theme.imgBorder}; border-radius:8px; display:flex; justify-content:center; align-items:center; padding:0; overflow:hidden; margin-bottom:10px;">
                 ${item.imageUrl 
                     ? `
-                    <div style="width:100%; display:block; padding:0; margin:0; line-height:0; overflow:hidden;">
+                    <div style="width:100%; display:flex; justify-content:center; align-items:center; overflow:hidden;">
                         <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
                             onerror="handleImgError(this)"
                             onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
                             data-img-url="${escapeHtml(item.imageUrl)}"
-                            style="width:100%; height:auto; max-height:85vh; display:block; object-fit:contain; cursor:zoom-in; image-rendering:-webkit-optimize-contrast; transition:transform 0.2s ease; margin:0 auto;" 
+                            style="width:100%; height:auto; max-height:960px; object-fit:contain; cursor:zoom-in; display:block; image-rendering:-webkit-optimize-contrast;" 
                             alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">
                     </div>` 
-                    : `<div style="padding:24px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>`
+                    : `<div style="padding:30px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>`
                 }
             </div>
 
             <!-- Remark Section -->
-            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:8px; padding:10px 16px; margin-bottom:10px; font-family:'Inter', 'Kanit', sans-serif;">
-                ${remarkHtml}
+            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:6px; padding:10px 15px; display:flex; align-items:center; gap:10px;">
+                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:9px; font-weight:950; text-transform:uppercase; flex-shrink:0;">Note:</span>
+                <p style="color:${theme.remarkText}; font-size:12px; font-weight:600; margin:0; line-height:1.2;">
+                    ${item.remark || 'ไม่มีหมายเหตุเพิ่มเติม'}
+                </p>
             </div>
 
             <!-- Footer -->
@@ -17613,18 +17640,9 @@ function _openViewModal(id) {
 
         // 2. ตรวจสอบสิทธิ์ (Ownership Logic)
         // - เป็นเจ้าของงาน (user_id ในฐานข้อมูลตรงกับอีเมลที่ล็อกอินปัจจุบัน)
-        // - หรือเข้าใช้งานในโหมด SQE Support
         // - หรือเป็น Master Admin (Natthawut)
-        const myEmail = (S.currentUser || '').toLowerCase();
-        const targetUser = (target._user || target.user_id || '').toLowerCase();
-        const isOwner = !targetUser || (targetUser === myEmail) || (S.userRole !== 'supervisor');
-        const isMasterAdmin = (myEmail === 'natthawut.chaising@carrier.com');
-
-        // บล็อกการลบเฉพาะกรณีที่เป็นคนอื่น (ไม่ใช่เจ้าของ) และไม่ใช่ Admin และอยู่ในโหมด Supervisor
-        if (!isOwner && !isMasterAdmin && S.userRole === 'supervisor') { 
-            toast('⚠️ เฉพาะเจ้าของบันทึกหรือ Admin เท่านั้นที่ลบรายการนี้ได้', 'error'); 
-            return; 
-        }
+        const isOwner = (target._user === S.currentUser);
+        const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
 
         // 3. แสดงหน้าต่างยืนยันการลบ
         showCustomConfirmDialog({
@@ -17646,11 +17664,17 @@ function _openViewModal(id) {
 
     async function _doDelete(id) {
         try {
+            const target = _records.find(r => String(r.id) === String(id));
+            if (target && target.imageUrl) {
+                if (typeof deleteFromSupabaseStorage === 'function') {
+                    await deleteFromSupabaseStorage(target.imageUrl, 'evidences').catch(err => console.warn('Support storage image delete warning:', err));
+                }
+            }
             _records = _records.filter(r => String(r.id) !== String(id));
             applyDateFilter();
             const { error } = await wapClient.from(TABLE).delete().eq('id', id);
             if (error) throw error;
-            toast('ลบสำเร็จ', 'success');
+            toast('🗑️ ลบข้อมูลและไฟล์ภาพในฐานข้อมูลเรียบร้อยแล้ว', 'success');
             await _fetch();
         } catch (e) {
             console.error('[WapSupport] Delete error:', e);
@@ -18168,7 +18192,7 @@ const Wap5SExcellence = (function() {
             return;
         }
 
-        const isReadOnly = (S.userRole === 'supervisor');
+        const isReadOnly = false;
 
         tbody.innerHTML = displayRecords.map(r => {
             const isCurrentEditing = (_editingId === r.id);
@@ -18608,7 +18632,6 @@ const WapSkillMatrix = (function() {
     }
 
     async function submit() {
-        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
         const nameInput = $id('sm-f-name');
         const valInput = $id('sm-f-value');
         if (!nameInput || !valInput) return;
@@ -18618,7 +18641,7 @@ const WapSkillMatrix = (function() {
         if(!name || val === "") { toast("⚠️ กรุณากรอกชื่อทักษะและระดับความสามารถ (0-100)", "error"); return; }
         
         const numVal = Math.min(100, Math.max(0, parseInt(val) || 0));
-        const targetUser = S.currentUser;
+        const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
         
         const payload = {
             user_id: targetUser,
@@ -18654,8 +18677,6 @@ const WapSkillMatrix = (function() {
     }
 
     function editSkill(skillName, currentVal) {
-        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        
         const nameInput = $id('sm-f-name');
         const valInput = $id('sm-f-value');
         if (nameInput) nameInput.value = skillName;
@@ -18669,8 +18690,6 @@ const WapSkillMatrix = (function() {
     }
 
     async function remove(skillName) {
-        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        
         const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
         const targetSkill = _records ? _records.find(r => r.skill_name === skillName) : null;
 
@@ -18707,7 +18726,6 @@ const WapSkillMatrix = (function() {
     }
 
     async function clearAll() {
-        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
         if (!_records || _records.length === 0) { toast('ไม่มีทักษะให้ล้าง', 'info'); return; }
         
         const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
@@ -20224,8 +20242,6 @@ function updateTarget(val) {
 }
 
 async function remove(id) {
-        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        
         const target = _allRecords ? _allRecords.find(r => String(r.id) === String(id)) : null;
 
         showCustomConfirmDialog({
@@ -20629,8 +20645,6 @@ function renderTable() {
 
     // 8. ฟังก์ชันลบข้อมูล
     async function remove(id) {
-        if (S.userRole === 'supervisor') { toast('โหมดอ่านอย่างเดียว', 'info'); return; }
-        
         const target = _allRecords ? _allRecords.find(r => String(r.id) === String(id)) : null;
 
         showCustomConfirmDialog({
@@ -20695,74 +20709,124 @@ function validateOtTime(inputEl) {
     return ok;
 }
 
-// ✅ ลบทิ้งทั้งหมดของโค้ด global ด้านบน แล้วแทนที่ด้วย
-document.addEventListener('DOMContentLoaded', () => {
-    const targetInput = $id('ot-target-input');
-    if (targetInput) {
-        targetInput.addEventListener('input', (e) => WapOTManagement.updateTarget(e.target.value));
-    }
-});
-
-// --- [แยกส่วน] ตัวแปรจัดการวันที่หน้า DASHBOARD LINE CLAIM ---
+// --- 📅 ระบบ Preset Filter ควบคุมปุ่มวันที่ (TODAY, 7 DAYS, MONTH) ---
+let _isPresetTriggered = false;
 let claimDashFilterDate = { start: '', end: '' };
 
-function onClaimDashDateChange() {
-    const startVal = document.getElementById('cd-start-date').value;
-    const endVal = document.getElementById('cd-end-date').value;
+/**
+ * ฟังก์ชันไฮไลต์สีปุ่ม Preset ให้คงอยู่ (Active State Retention)
+ * รองรับทั้ง Light และ Dark mode
+ */
+function updatePresetButtonUI(activeType) {
+    const presetMap = {
+        'today': 'cd-preset-today',
+        '7days': 'cd-preset-7days',
+        '7d': 'cd-preset-7days',
+        'week': 'cd-preset-7days',
+        'month': 'cd-preset-month'
+    };
+    
+    const activeKey = (activeType || '').toLowerCase();
+    const activeId = activeKey ? presetMap[activeKey] : null;
 
-    if (startVal && endVal) {
+    const allPresetIds = ['cd-preset-today', 'cd-preset-7days', 'cd-preset-month'];
+    allPresetIds.forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        
+        if (id === activeId) {
+            btn.classList.remove('bg-white', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-200', 'border-slate-200/80', 'dark:border-slate-600');
+            btn.classList.add('bg-blue-600', 'dark:bg-blue-600', 'text-white', 'dark:text-white', 'border-blue-600', 'dark:border-blue-600', 'shadow-md', 'ring-2', 'ring-blue-400/40');
+        } else {
+            btn.classList.remove('bg-blue-600', 'dark:bg-blue-600', 'text-white', 'dark:text-white', 'border-blue-600', 'dark:border-blue-600', 'shadow-md', 'ring-2', 'ring-blue-400/40');
+            btn.classList.add('bg-white', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-200', 'border-slate-200/80', 'dark:border-slate-600');
+        }
+    });
+}
+window.updatePresetButtonUI = updatePresetButtonUI;
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ผูก Event ให้กับปฏิทิน Header และ Vendor Filter
+    const headerStart = document.getElementById('cd-start-date');
+    const headerEnd = document.getElementById('cd-end-date');
+    const vendorSelect = document.getElementById('claim-vendor-filter');
+
+    if (headerStart) headerStart.addEventListener('change', () => { onClaimDashDateChange(); });
+    if (headerEnd) headerEnd.addEventListener('change', () => { onClaimDashDateChange(); });
+    if (vendorSelect) vendorSelect.addEventListener('change', () => { if (typeof updateAllModuleFilters === 'function') updateAllModuleFilters(); });
+});
+
+function onClaimDashDateChange() {
+    if (_isPresetTriggered) return; // ถ้าเป็นการกดมาจาก Preset ไม่ต้องล้างสี
+
+    const startVal = document.getElementById('cd-start-date')?.value || '';
+    const endVal = document.getElementById('cd-end-date')?.value || '';
+
+    if (typeof claimDashFilterDate !== 'undefined') {
         claimDashFilterDate.start = startVal;
         claimDashFilterDate.end = endVal;
+    }
 
-        // ล้างสีปุ่ม Preset เพราะเป็นการเลือกเอง (Custom)
-        document.querySelectorAll('#claim-dash-filter-wrap button').forEach(b => {
-            b.classList.remove('bg-blue-600', 'text-white');
-            b.classList.add('bg-white', 'text-slate-500');
-        });
+    // เมื่อผู้ใช้เลือกวันที่เองทางปฏิทิน ให้เคลียร์สถานะสีปุ่ม Preset
+    updatePresetButtonUI('');
 
-        updateAllModuleFilters(); 
+    if (typeof updateAllModuleFilters === 'function') {
+        updateAllModuleFilters();
     }
 }
+window.onClaimDashDateChange = onClaimDashDateChange;
 
+/**
+ * 📅 ฟังก์ชันเมื่อกดเลือก Preset (TODAY, 7 DAYS, MONTH)
+ * ไฮไลต์ปุ่มค้างไว้ และกวาดค้นหาข้อมูลตามช่วงวันที่ในทุกโมดูล
+ */
 function applyClaimDashPreset(type) {
+    _isPresetTriggered = true; // ล็อคไว้ไม่ให้ Event ปฏิทินไปล้างสีปุ่ม
+    
     const now = new Date();
     let start = new Date();
     let end = new Date();
 
-    // 1. จัดการสีปุ่ม (UI Feedback)
-    document.querySelectorAll('#claim-dash-filter-wrap button').forEach(b => {
-        b.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
-        b.classList.add('bg-white', 'text-slate-500');
-    });
-    const activeBtn = document.getElementById(`cd-preset-${type}`);
-    if (activeBtn) {
-        activeBtn.classList.replace('bg-white', 'bg-blue-600');
-        activeBtn.classList.replace('text-slate-500', 'text-white');
-    }
-
-    // 2. คำนวณช่วงวันที่
+    // 1. คำนวณช่วงวันที่
     if (type === 'today') {
         start = now;
-    } else if (type === '7days') {
-        start.setDate(now.getDate() - 6);
+    } else if (type === '7days' || type === '7d' || type === 'week') {
+        type = '7days';
+        start.setDate(now.getDate() - 6); // ย้อนหลัง 7 วันรวมวันนี้
     } else if (type === 'month') {
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        start = new Date(now.getFullYear(), now.getMonth(), 1); // วันแรกของเดือน
     }
 
-    // 3. หยอดค่าลงในช่อง Input ปฏิทิน
     const startIso = start.toISOString().split('T')[0];
     const endIso = end.toISOString().split('T')[0];
     
-    document.getElementById('cd-start-date').value = startIso;
-    document.getElementById('cd-end-date').value = endIso;
+    // 2. หยอดค่าลงในช่อง Input ปฏิทิน
+    const startInput = document.getElementById('cd-start-date');
+    const endInput = document.getElementById('cd-end-date');
+    if (startInput) startInput.value = startIso;
+    if (endInput) endInput.value = endIso;
 
-    // 4. บันทึกลงตัวแปร Global และสั่งอัปเดตทุกหน้า
-    claimDashFilterDate.start = startIso;
-    claimDashFilterDate.end = endIso;
+    // 3. กำหนดตัวแปร Global
+    if (typeof claimDashFilterDate !== 'undefined') {
+        claimDashFilterDate.start = startIso;
+        claimDashFilterDate.end = endIso;
+    }
+
+    // 4. ✨ ไฮไลต์สีปุ่มที่กดให้ค้างไว้ทันที (Active State Retention)
+    updatePresetButtonUI(type);
+
+    // 5. สั่งกวาดหาข้อมูลและอัปเดตทุกหน้าจอ
+    if (typeof updateAllModuleFilters === 'function') {
+        updateAllModuleFilters();
+    }
     
-    toast(`📅 แสดงข้อมูล: ${type.toUpperCase()}`, 'info');
-    updateAllModuleFilters(); 
+    toast(`📅 กรองข้อมูลตามช่วง: ${type.toUpperCase()}`, 'info');
+
+    setTimeout(() => {
+        _isPresetTriggered = false; // ปลดล็อคสถานะ
+    }, 150);
 }
+window.applyClaimDashPreset = applyClaimDashPreset;
 
 function clearAllPageFilters(silent = false) {
     // 1. ล้างตัวแปรวันที่
@@ -20773,15 +20837,11 @@ function clearAllPageFilters(silent = false) {
     if (startDateEl) startDateEl.value = '';
     const endDateEl = document.getElementById('cd-end-date');
     if (endDateEl) endDateEl.value = '';
-    
     const vendorSelect = document.getElementById('claim-vendor-filter');
     if (vendorSelect) vendorSelect.value = 'ALL';
 
     // 3. คืนค่าสีปุ่ม Preset (Today / 7 Days / Month)
-    document.querySelectorAll('#claim-dash-filter-wrap button').forEach(b => {
-        b.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
-        b.classList.add('bg-white', 'text-slate-500');
-    });
+    updatePresetButtonUI('');
 
     // 4. ล้างคำค้นหาในช่องค้นหาต่างๆ
     const filterSearchEl = document.getElementById('filter-search');
@@ -20925,7 +20985,6 @@ function exportToCSV() {
 
 // --- Import ข้อมูลจาก JSON ---
 function triggerImport() {
-    if (S.userRole === 'supervisor') return toast("Supervisor ไม่สามารถนำเข้าข้อมูลได้", "error");
     const inp = $id('import-hidden-input');
     if (inp && typeof inp.click === 'function') {
         inp.click();
@@ -20936,7 +20995,6 @@ function triggerImport() {
 
 // --- ล้างข้อมูลทั้งหมด ---
 async function confirmClearAll() {
-    if (S.userRole === 'supervisor') return toast("Supervisor ไม่มีสิทธิ์ลบข้อมูล", "error");
     if (!S.records || S.records.length === 0) return toast("ไม่มีข้อมูลให้ลบ", "info");
 
     showCustomConfirmDialog({
@@ -20969,6 +21027,107 @@ async function confirmClearAll() {
     });
 }
 
+async function uploadToSupabaseStorage(fileOrBase64, bucketName = 'evidences') {
+    if (!fileOrBase64) return null;
+
+    try {
+        let imageData = fileOrBase64;
+
+        // 1. ตรวจสอบว่าถ้าเป็น Base64 ให้ทำการบีบอัดก่อน (Compression Pass)
+        if (typeof imageData === 'string' && imageData.startsWith('data:image')) {
+            // แปลง Base64 เป็น Blob เพื่อเข้ากระบวนการบีบอัดที่มีอยู่แล้ว
+            const response = await fetch(imageData);
+            const blob = await response.blob();
+            // เรียกใช้ฟังก์ชันบีบอัด (กำหนดขนาดสูงสุด 1200px คุณภาพ 0.7 เพื่อให้ไฟล์เล็กกว่า 500KB)
+            imageData = await compressImageToDataUrl(blob, 1200, 0.7);
+        }
+
+        // 2. แยกชื่อผู้ใช้และโฟลเดอร์วันที่
+        const userFolder = S.currentUser ? S.currentUser.split('@')[0] : 'anonymous';
+        const now = new Date();
+        const monthFolder = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const timestamp = Date.now();
+        
+        let fileBlob, fileName;
+
+        // 3. เตรียม Blob สำหรับ Upload
+        if (typeof imageData === 'string' && imageData.startsWith('data:')) {
+            const parts = imageData.split(',');
+            const mime = parts[0].match(/:(.*?);/)[1];
+            const bstr = atob(parts[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) u8arr[n] = bstr.charCodeAt(n);
+            fileBlob = new Blob([u8arr], { type: mime });
+            const extension = mime.split('/')[1] || 'jpg';
+            fileName = `img_${timestamp}.${extension}`;
+        } else {
+            fileBlob = imageData;
+            fileName = `${timestamp}_${imageData.name.replace(/\s+/g, '_')}`;
+        }
+
+        // 4. ตรวจสอบขนาดไฟล์ครั้งสุดท้าย (ถ้าเกิน 1MB ให้เตือนหรือบีบเพิ่ม)
+        if (fileBlob.size > 1024 * 1024) {
+            console.warn(`⚠️ Large file detected: ${(fileBlob.size / 1024 / 1024).toFixed(2)} MB`);
+        }
+
+        const filePath = `${userFolder}/${monthFolder}/${fileName}`;
+
+        // 5. ส่งขึ้น Supabase
+        const { data, error } = await sqeClient.storage
+            .from(bucketName)
+            .upload(filePath, fileBlob, {
+                cacheControl: '3600',
+                upsert: true
+            });
+
+        if (error) throw error;
+
+        const { data: urlData } = sqeClient.storage
+            .from(bucketName)
+            .getPublicUrl(filePath);
+
+        return urlData.publicUrl;
+
+    } catch (err) {
+        console.error("❌ Storage Upload Error:", err.message);
+        // หากส่งไม่สำเร็จ ให้ส่งค่าเดิมกลับไป (Base64) เพื่อให้ระบบทำงานต่อได้แต่อาจจะโหลดช้าในอนาคต
+        return fileOrBase64; 
+    }
+}
+
+async function deleteFromSupabaseStorage(fileUrlOrPath, bucketName = 'evidences') {
+    if (!fileUrlOrPath || typeof fileUrlOrPath !== 'string') return;
+    if (fileUrlOrPath.startsWith('data:') || fileUrlOrPath.startsWith('blob:')) return;
+
+    try {
+        let filePath = fileUrlOrPath;
+        const marker = `/storage/v1/object/public/${bucketName}/`;
+        if (filePath.includes(marker)) {
+            filePath = filePath.substring(filePath.indexOf(marker) + marker.length);
+        } else if (filePath.includes(`/${bucketName}/`)) {
+            filePath = filePath.substring(filePath.indexOf(`/${bucketName}/`) + bucketName.length + 2);
+        }
+
+        filePath = filePath.split('?')[0].split('#')[0];
+        filePath = decodeURIComponent(filePath);
+
+        if (!filePath) return;
+
+        const sb = typeof sqeClient !== 'undefined' ? sqeClient : (typeof wapClient !== 'undefined' ? wapClient : (typeof getSupabase === 'function' ? getSupabase() : null));
+        if (sb && sb.storage) {
+            const { data, error } = await sb.storage.from(bucketName).remove([filePath]);
+            if (error) {
+                console.warn(`[Supabase Storage Delete Warning]:`, error.message);
+            } else {
+                console.log(`[Supabase Storage] Deleted file: ${filePath}`);
+            }
+        }
+    } catch (err) {
+        console.warn(`[Supabase Storage Delete Error]:`, err.message || err);
+    }
+}
+window.deleteFromSupabaseStorage = deleteFromSupabaseStorage;
 /**
  * ═══════════════════════════════════════════════════════
  *  AI SMART IMPORT ENGINE V6.0 (ULTIMATE PRECISION)
@@ -22666,23 +22825,31 @@ function formatRuleForSupabase(item, idx = 0) {
             const clients = getAdminClients();
             const sb = getPrimaryAdminClient();
 
-            if (_currentTab === 'users') {
-                let users = [];
-                for (const client of clients) {
-                    try {
-                        const { data, error } = await client.from('users').select('*').order('email');
-                        if (!error && data && data.length > 0) {
-                            users = data;
-                            break;
-                        }
-                    } catch (_) {}
-                }
+            // --- ค้นหาส่วนนี้ใน WapAdminSystem.loadData ---
+if (_currentTab === 'users') {
+    let users = [];
+    for (const client of clients) {
+        try {
+            // แก้ตรงนี้: เปลี่ยนจาก 'users' เป็น 'profiles'
+            const { data, error } = await client.from('profiles').select('*').order('email'); 
+            if (!error && data && data.length > 0) {
+                users = data;
+                break;
+            }
+        } catch (_) {}
+    }
+    // ... (โค้ดส่วนอื่นคงเดิม)
 
-                // ดึงรายชื่อและอีเมลทั้งหมดจาก 4. Engineering & Reports และ 5. Approval Matrix
+                // ดึงรายชื่อและอีเมลทั้งหมดจาก MASTER_STAFF_USERS, Engineering & Reports และ Approval Matrix
                 const engAndApprList = (typeof window.getEngineeringAndApprovalDirectory === 'function')
                     ? window.getEngineeringAndApprovalDirectory()
                     : [];
                 
+                const allStaffList = [
+                    ...(typeof MASTER_STAFF_USERS !== 'undefined' ? MASTER_STAFF_USERS : []),
+                    ...engAndApprList
+                ];
+
                 const userMap = new Map();
                 (users || []).forEach(u => {
                     if (u.email) {
@@ -22698,17 +22865,20 @@ function formatRuleForSupabase(item, idx = 0) {
                 const missingToSync = [];
                 const nowIso = new Date().toISOString();
 
-                engAndApprList.forEach(item => {
+                allStaffList.forEach(item => {
+                    if (!item.email || !item.email.includes('@')) return;
                     const emKey = item.email.toLowerCase().trim();
                     if (!userMap.has(emKey)) {
                         const rawRole = (item.role || '').toLowerCase();
                         let defaultRole = 'supervisor';
-                        if (rawRole.includes('iqc')) defaultRole = 'iqc';
-                        else if (rawRole.includes('sqe') || rawRole.includes('engineer')) defaultRole = 'engineer';
+                        if (rawRole.includes('admin')) defaultRole = 'admin';
                         else if (rawRole.includes('manager')) defaultRole = 'manager';
+                        else if (rawRole.includes('iqc')) defaultRole = 'iqc';
+                        else if (rawRole.includes('support')) defaultRole = 'sqe_support';
+                        else if (rawRole.includes('sqe') || rawRole.includes('engineer')) defaultRole = 'engineer';
 
                         const officialName = resolveOfficialDisplayName(item.email, item.name);
-                        const defaultPassword = 'Carrier' + Math.floor(1000 + Math.random() * 9000);
+                        const defaultPassword = item.key && item.key !== '-' ? item.key : ('Carrier' + Math.floor(1000 + Math.random() * 9000));
                         const newStaffUser = {
                             id: 'usr_' + emKey.replace(/[^a-z0-9]/g, '_'),
                             email: item.email,
@@ -26315,37 +26485,24 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         list = window.WapAdminSystem.getEmailRules();
     } 
     
-    if ((!list || !list.length) && window._data && Array.isArray(window._data.system) && window._data.system.length > 0) {
-        list = window._data.system;
-    }
-
-    if ((!list || !list.length) && window.VF_RP_MASTER_DATA && window.VF_RP_MASTER_DATA.length > 0) {
+    if ((!list || !list.length) && window.VF_RP_MASTER_DATA) {
         list = window.VF_RP_MASTER_DATA;
     }
 
     // 2. Fallback: ค้นหาจาก LocalStorage (กรณีเปิดไฟล์ตรงๆ หรือออฟไลน์)
     if (!list || !list.length) {
         try {
-            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_config', 'vf_rp_master_cache', 'carrier_latest_app_state_backup'];
+            // สแกนหาจากทุก Key ที่เป็นไปได้ที่ระบบอาจจะบันทึกไว้
+            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_cache', 'carrier_latest_app_state_backup'];
             for (const key of backupKeys) {
                 const cached = localStorage.getItem(key);
                 if (cached) {
                     const parsed = JSON.parse(cached);
-                    let actualData = null;
-                    if (parsed && typeof parsed === 'object') {
-                        if (Array.isArray(parsed)) {
-                            actualData = parsed;
-                        } else if (parsed.app_state) {
-                            actualData = parsed.app_state.vf_rp_email_rules || parsed.app_state.system || parsed.app_state.email_rules || null;
-                        } else if (parsed.data && Array.isArray(parsed.data)) {
-                            actualData = parsed.data;
-                        } else if (parsed.vf_rp_email_rules && Array.isArray(parsed.vf_rp_email_rules)) {
-                            actualData = parsed.vf_rp_email_rules;
-                        }
-                    }
+                    // รองรับทั้งแบบ Array ตรงๆ และแบบ Snapshot Object
+                    const actualData = parsed.app_state ? (parsed.app_state.eight_d_cases || []) : parsed;
                     if (Array.isArray(actualData) && actualData.length > 0) {
                         list = actualData;
-                        window.VF_RP_MASTER_DATA = list;
+                        window.VF_RP_MASTER_DATA = list; // กู้คืนกลับเข้า Memory
                         break;
                     }
                 }
@@ -26355,6 +26512,7 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         }
     }
     
+    // หากยังไม่พบฐานข้อมูลเลย ให้คืนค่า null
     if (!list || !list.length) {
         return null;
     }
@@ -26363,37 +26521,63 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
     const deepClean = (val) => {
         if (!val || val === '-' || val === '--') return "";
         return String(val).trim().toLowerCase()
-            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V_ หรือ V- นำหน้า
-            .replace(/^v(?=[a-z0-9])/i, '') // ตัด V นำหน้า เช่น VMCP -> MCP, V1005 -> 1005
-            .replace(/\b(co\.,\s*ltd|co\.,ltd|co\s+ltd|ltd|company\s+limited|inc|corp|corporation|จำกัด|บริษัท)\b/gi, '') 
-            .replace(/[^a-z0-9ก-๙]/gi, '') // ลบสัญลักษณ์พิเศษทั้งหมด
+            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V. นำหน้า
+            .replace(/\b(co\.,\s*ltd|co\.,ltd|co\s+ltd|ltd|company\s+limited|inc|corp|corporation|จำกัด|บริษัท|vendor)\b/gi, '') 
+            .replace(/[-_>]/g, ' ')
+            .replace(/[^a-z0-9ก-๙\s]/gi, '') // ลบสัญลักษณ์พิเศษทั้งหมด
+            .replace(/\s+/g, ' ')
             .trim();
     };
 
-    const targetName = deepClean(supplierName);
-    const targetCode = deepClean(vendorCode);
-    const targetInit = deepClean(initials);
+    let sName = (supplierName || "").toString().trim();
+    let vCode = (vendorCode || "").toString().trim();
+    let sInit = (initials || "").toString().trim();
 
+    // ขจัดคำต่อท้าย เช่น "--> VENDOR" หรือ "TO:"
+    if (sName) {
+        sName = sName.replace(/-->\s*vendor/gi, '').replace(/\bvendor\b/gi, '').replace(/^to:\s*/i, '').trim();
+    }
+
+    // ตรวจสอบกับ VENDOR_MASTER เผื่อแปลชื่อเป็นรหัส หรือแปลรหัสเป็นชื่อ
+    if (typeof VENDOR_MASTER === 'object' && VENDOR_MASTER !== null) {
+        if (vCode && !sName && VENDOR_MASTER[vCode]) {
+            sName = VENDOR_MASTER[vCode];
+        }
+        if (sName && !vCode) {
+            const foundEntry = Object.entries(VENDOR_MASTER).find(([k, v]) => 
+                v.toLowerCase().includes(sName.toLowerCase()) || sName.toLowerCase().includes(v.toLowerCase())
+            );
+            if (foundEntry) vCode = foundEntry[0];
+        }
+    }
+
+    const targetName = deepClean(sName);
+    const targetCode = deepClean(vCode);
+    const targetInit = deepClean(sInit);
+
+    // ป้องกันการค้นหาด้วยค่าว่าง
     if (!targetName && !targetCode && !targetInit) return null;
 
     // 4. เริ่มการค้นหาแบบลำดับความสำคัญ (Matching Logic)
     return list.find(r => {
         const dbName = deepClean(r.supplier_name || r.supplier || '');
         const dbCode = deepClean(r.vendor_code || r.supplier_code || '');
-        const dbInit = deepClean(r.initials_name || r.initials || '');
+        const dbInit = deepClean(r.initials_name || '');
+        const dbTo = deepClean(r.to_vf_rp_report || '');
+        const dbDear = deepClean(r.dear_vendor || '');
 
         // กฎที่ 1: รหัส Vendor ตรงกัน (แม่นยำที่สุด)
-        if (targetCode && dbCode && dbCode === targetCode) return true;
+        if (targetCode && dbCode && (dbCode === targetCode || dbCode.includes(targetCode) || targetCode.includes(dbCode))) return true;
 
         // กฎที่ 2: ตัวย่อ (Initials) ตรงกัน
-        if (targetInit && dbInit && dbInit === targetInit) return true;
+        if (targetInit && dbInit && (dbInit === targetInit || dbInit.includes(targetInit))) return true;
 
-        // กฎที่ 3: ชื่อบริษัทตรงกันเป๊ะ หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา
+        // กฎที่ 3: ชื่อบริษัทตรงกันเป๊ะ หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา หรือเทียบจากชื่อผู้ติดต่อ
         if (targetName) {
-            if (dbName && dbName === targetName) return true;
-            if (dbInit && dbInit === targetName) return true;
-            // กฎที่ 4: ค้นหาแบบบางส่วน (Fuzzy)
-            if (dbName && (dbName.includes(targetName) || targetName.includes(dbName))) return true;
+            if (dbName && (dbName === targetName || dbName.includes(targetName) || targetName.includes(dbName))) return true;
+            if (dbInit && (dbInit === targetName || targetName.includes(dbInit))) return true;
+            if (dbTo && (dbTo.includes(targetName) || targetName.includes(dbTo))) return true;
+            if (dbDear && (dbDear.includes(targetName) || targetName.includes(dbDear))) return true;
         }
 
         return false;
@@ -26402,7 +26586,7 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
 
 // --- แก้ไขฟังก์ชันซิงค์ข้อมูลเมื่อมีการแก้ไข VENDOR บนหน้าเอกสาร (Document Sync Engine) ---
 window.onVfDocVendorChange = function(el) {
-    const rawVal = (el ? (el.innerText || el.value || '') : '').trim();
+    const rawVal = (el ? el.innerText : '').trim();
     if (!rawVal) return;
 
     // 1. ค้นหา Matrix จากชื่อซัพพลายเออร์ที่เพิ่งพิมพ์ลงไป
@@ -26411,6 +26595,7 @@ window.onVfDocVendorChange = function(el) {
         : null;
 
     // 2. อัปเดตข้อมูลเข้าสู่สถานะตัวแปรปัจจุบัน (Internal State Update)
+    // จุดนี้สำคัญมาก! เพราะหน้าส่งเมล์จะดึงข้อมูลจาก currentCase ไปใช้
     const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
         ? Wap8DSystem.getCurrentCase()
         : null;
@@ -26418,23 +26603,17 @@ window.onVfDocVendorChange = function(el) {
         if (!curCase.report_data.vf_data) curCase.report_data.vf_data = {};
         const vf = curCase.report_data.vf_data;
 
+        // บันทึกชื่อซัพพลายเออร์ที่แก้ไขลงในหน่วยความจำ
         vf.vendor = rawVal; 
 
         if (matrix) {
+            // ถ้าเจอใน Matrix ให้หยอดค่าที่เกี่ยวข้องลงใน Data Object ทันที
             vf.vendor_code = matrix.vendor_code || vf.vendor_code;
             vf.part_group = matrix.parts_group || vf.part_group;
-            vf.inform_email_to = matrix.inform_email_to || matrix.recipient_to;
-            vf.team_member_email = matrix.team_member_email;
             
-            const isRP = (curCase.report_data?.source_report_type || curCase.report_type || '').toString().toUpperCase().includes('RP');
-            if (!vf.confirm_sig_active) {
-                const confName = isRP ? (matrix.confirm_rp_name || matrix.confirm_rp) : (matrix.confirm_vf_name || matrix.confirm_vf);
-                if (confName && confName !== '-') vf.confirm_by = confName;
-            }
-            if (!vf.approved_sig_active) {
-                const apprName = isRP ? (matrix.approve_rp_name || matrix.approve_rp) : (matrix.approve_vf_name || matrix.approve_vf);
-                if (apprName && apprName !== '-') vf.approved_by = apprName;
-            }
+            // หยอดอีเมลที่แมปมาจาก Matrix เข้าไปเก็บไว้ใน Case เพื่อให้ปุ่มส่งเมล์มองเห็น
+            vf.inform_email_to = matrix.inform_email_to || matrix.recipient_to;
+            vf.team_member_email = matrix.team_member_email; // 3.3 ที่คุณต้องการ
         }
     }
 
@@ -26444,26 +26623,37 @@ window.onVfDocVendorChange = function(el) {
         const ccEl = document.getElementById('vf-doc-cc-display');
         const vCodeEl = document.getElementById('vf-doc-vendor-code');
         const partGrpEl = document.getElementById('vf-doc-part-group');
-        const confInput = document.getElementById('prob-confirm-by');
-        const apprInput = document.getElementById('prob-approved-by');
 
+        // แสดงผลหัวกระดาษ (To/CC/Code/Group)
         if (toEl && matrix.to_vf_rp_report && matrix.to_vf_rp_report !== '-') toEl.innerText = matrix.to_vf_rp_report;
         if (ccEl && matrix.cc_vf_rp_report && matrix.cc_vf_rp_report !== '-') ccEl.innerText = matrix.cc_vf_rp_report;
         if (vCodeEl && matrix.vendor_code && matrix.vendor_code !== '-') vCodeEl.innerText = matrix.vendor_code;
         if (partGrpEl && matrix.parts_group && matrix.parts_group !== '-') partGrpEl.innerText = matrix.parts_group;
 
-        const isRP = (_currentCase?.report_data?.source_report_type || _currentCase?.report_type || '').toString().toUpperCase().includes('RP');
-        const vf = _currentCase?.report_data?.vf_data || {};
-        if (confInput && !vf.confirm_sig_active) {
-            const defaultConf = isRP ? (matrix.confirm_rp_name || matrix.confirm_rp) : (matrix.confirm_vf_name || matrix.confirm_vf);
-            if (defaultConf && defaultConf !== '-') confInput.value = defaultConf;
-        }
-        if (apprInput && !vf.approved_sig_active) {
-            const defaultAppr = isRP ? (matrix.approve_rp_name || matrix.approve_rp) : (matrix.approve_vf_name || matrix.approve_vf);
-            if (defaultAppr && defaultAppr !== '-') apprInput.value = defaultAppr;
+        // อัปเดตชื่อหัวหน้างานและผู้อนุมัติ (CONFIRM BY & APPROVED BY) ตาม Vendor Matrix
+        const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
+        const isRP = reportType.includes('RP');
+        const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
+        const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
+
+        if (curCase?.report_data?.vf_data) {
+            const vf = curCase.report_data.vf_data;
+            if (!vf.confirm_sig_active && mConfirm) {
+                vf.confirm_by = mConfirm;
+                const cInput = document.getElementById('prob-confirm-by');
+                if (cInput) cInput.value = mConfirm;
+            }
+            if (!vf.approved_sig_active && mApprove) {
+                vf.approved_by = mApprove;
+                const aInput = document.getElementById('prob-approved-by');
+                if (aInput) aInput.value = mApprove;
+            }
         }
 
-        toast(`🔗 เชื่อมโยงข้อมูล Matrix ของ ${rawVal} สำเร็จ`, "success");
+        toast(`🔗 เชื่อมโยงข้อมูล ${rawVal} สำเร็จ (พร้อมส่งอีเมล)`, "success");
+    } else {
+        // กรณีพิมพ์ชื่อแล้วหาใน Matrix ไม่เจอ
+        console.warn(`[Matrix] Supplier "${rawVal}" not found in master database.`);
     }
 
     // 4. บันทึกความคืบหน้าลง Cloud ทันที (Auto-Save)
@@ -26473,7 +26663,7 @@ window.onVfDocVendorChange = function(el) {
 };
 
 window.onVfDocVendorCodeChange = function(el) {
-    const rawCode = (el ? (el.innerText || el.value || '') : '').trim();
+    const rawCode = (el ? el.innerText : '').trim();
     if (!rawCode) return;
     const matrix = (typeof window.getVFRPMatrixForSupplier === 'function')
         ? window.getVFRPMatrixForSupplier('', rawCode, '')
@@ -26483,23 +26673,30 @@ window.onVfDocVendorCodeChange = function(el) {
         const ccEl = document.getElementById('vf-doc-cc-display');
         const vEl = document.getElementById('vf-doc-vendor');
         const partGrpEl = document.getElementById('vf-doc-part-group');
-        const confInput = document.getElementById('prob-confirm-by');
-        const apprInput = document.getElementById('prob-approved-by');
-
         if (toEl && matrix.to_vf_rp_report && matrix.to_vf_rp_report !== '-') toEl.innerText = matrix.to_vf_rp_report;
         if (ccEl && matrix.cc_vf_rp_report && matrix.cc_vf_rp_report !== '-') ccEl.innerText = matrix.cc_vf_rp_report;
         if (vEl && matrix.supplier) vEl.innerText = matrix.supplier.toUpperCase();
         if (partGrpEl && matrix.parts_group && matrix.parts_group !== '-') partGrpEl.innerText = matrix.parts_group;
 
-        const isRP = (_currentCase?.report_data?.source_report_type || _currentCase?.report_type || '').toString().toUpperCase().includes('RP');
-        const vf = _currentCase?.report_data?.vf_data || {};
-        if (confInput && !vf.confirm_sig_active) {
-            const defaultConf = isRP ? (matrix.confirm_rp_name || matrix.confirm_rp) : (matrix.confirm_vf_name || matrix.confirm_vf);
-            if (defaultConf && defaultConf !== '-') confInput.value = defaultConf;
-        }
-        if (apprInput && !vf.approved_sig_active) {
-            const defaultAppr = isRP ? (matrix.approve_rp_name || matrix.approve_rp) : (matrix.approve_vf_name || matrix.approve_vf);
-            if (defaultAppr && defaultAppr !== '-') apprInput.value = defaultAppr;
+        const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
+            ? Wap8DSystem.getCurrentCase()
+            : null;
+        if (curCase?.report_data?.vf_data) {
+            const vf = curCase.report_data.vf_data;
+            const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
+            const isRP = reportType.includes('RP');
+            const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
+            const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
+            if (!vf.confirm_sig_active && mConfirm) {
+                vf.confirm_by = mConfirm;
+                const cInput = document.getElementById('prob-confirm-by');
+                if (cInput) cInput.value = mConfirm;
+            }
+            if (!vf.approved_sig_active && mApprove) {
+                vf.approved_by = mApprove;
+                const aInput = document.getElementById('prob-approved-by');
+                if (aInput) aInput.value = mApprove;
+            }
         }
 
         if (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.saveCurrentProgress === 'function') {
@@ -27462,42 +27659,6 @@ let currentModalACIndex = -1;
 let tempAvatarBase64 = null; // ตัวแปรพักรูปภาพ
 
 /**
- * 🧹 ปิดดรอปดาวน์ Modal Autocomplete ทั้งหมดทันที
- */
-function closeAllModalAC() {
-    document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
-        if (dd.style.display !== 'none') {
-            dd.style.display = 'none';
-        }
-    });
-    currentOpenModalDropdown = null;
-    currentModalACIndex = -1;
-}
-window.closeAllModalAC = closeAllModalAC;
-
-// ⚡ ตรวจจับการคลิกพื้นที่ว่างหรือภายนอก เพื่อปิดดรอปดาวน์ทันที (Instant Outside Click Dismissal)
-if (typeof document !== 'undefined') {
-    document.addEventListener('pointerdown', (e) => {
-        // หากคลิกภายในตัว dropdown ไม่ต้องปิด (อนุญาตให้เลือกหรือ scroll)
-        if (e.target.closest('.modal-ac-dropdown')) return;
-
-        // หากคลิกที่ช่อง input ที่กำลังเปิด dropdown อยู่ ไม่ต้องปิด
-        const activeInput = e.target.closest('input') || e.target.closest('textarea');
-        if (activeInput && activeInput === currentOpenModalDropdown) return;
-
-        // คลิกพื้นที่ว่าง พื้นหลัง หรือปุ่มอื่นๆ -> ปิด dropdown ทันที
-        closeAllModalAC();
-    }, { passive: true });
-
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('.modal-ac-dropdown')) return;
-        const activeInput = e.target.closest('input') || e.target.closest('textarea');
-        if (activeInput && activeInput === currentOpenModalDropdown) return;
-        closeAllModalAC();
-    });
-}
-
-/**
  * 🧠 MASTER MODAL AUTO-COMPLETE ENGINE (Strict Matrix Integration)
  * อัปเดต: ดึงหมวดหมู่พาร์ทจาก Proficiency Breakdown (Skill Matrix)
  */
@@ -27531,7 +27692,7 @@ function renderModalAC(type, inputEl) {
     const query = inputEl.value.trim().toLowerCase();
     let htmlContent = '';
 
-// ============================================================
+    // ============================================================
     // ✍️ กรณีการลงนาม (Sign-off): ISSUE BY | CONFIRM BY | APPROVED BY
     // ============================================================
     if (type === 'staff') {
@@ -27546,156 +27707,224 @@ function renderModalAC(type, inputEl) {
         const docTypeLabel = (document.getElementById('vf-doc-type-label')?.innerText || '').toUpperCase();
         const isRP = reportType.includes('RP') || docTypeLabel.includes('RP');
 
-        // 2. ดึงข้อมูล Vendor จากหน้าเอกสารเพื่อไปค้นหาในฐานข้อมูล Matrix (32 Fields)
-        const vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() || vfData.vendor || "";
-        const vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() || vfData.vendor_code || "";
-        const matrix = (typeof window.getVFRPMatrixForSupplier === 'function') 
-            ? window.getVFRPMatrixForSupplier(vendorName, vendorCode, '') 
-            : null;
+        // 2. ดึงข้อมูล Vendor จากหน้าเอกสารและ Case เพื่อไปค้นหาในฐานข้อมูล Matrix
+        const vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() 
+            || vfData.vendor 
+            || curCase?.supplier 
+            || curCase?.vendor 
+            || curCase?.report_data?.supplier 
+            || "";
+        const vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() 
+            || vfData.vendor_code 
+            || curCase?.vendor_code 
+            || curCase?.supplier_code 
+            || "";
+        const docToDisplay = document.getElementById('vf-doc-to-display')?.innerText?.trim() || vfData.to || "";
 
-        // 3. Helper: ฟังก์ชันวาดรายการพนักงาน (Standard UI)
+        let matrix = null;
+        if (typeof window.getVFRPMatrixForSupplier === 'function') {
+            matrix = window.getVFRPMatrixForSupplier(vendorName, vendorCode, '')
+                  || window.getVFRPMatrixForSupplier(curCase?.supplier || '', curCase?.vendor_code || '', '')
+                  || window.getVFRPMatrixForSupplier(docToDisplay, '', '');
+        }
+
+        // 3. Helper: รวบรวมรายชื่อพนักงานและบทบาทจากระบบ
+        const allStaffMap = new Map();
+        if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+            MASTER_STAFF_USERS.forEach(u => {
+                if (u && u.name) {
+                    allStaffMap.set(u.name.trim(), {
+                        name: u.name.trim(),
+                        email: u.email || '',
+                        role: (u.role || 'staff').toLowerCase(),
+                        department: u.department || ''
+                    });
+                }
+            });
+        }
+        if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
+            Array.from(window._dbUsersRoleMap.values()).forEach(u => {
+                const name = (u.display_name || u.name || '').trim();
+                if (name) {
+                    const existing = allStaffMap.get(name) || {};
+                    allStaffMap.set(name, {
+                        name,
+                        email: u.email || existing.email || '',
+                        role: (u.role || existing.role || 'staff').toLowerCase(),
+                        department: u.department || existing.department || ''
+                    });
+                }
+            });
+        }
+
+        const renderedNames = new Set();
+
+        // Helper: ฟังก์ชันวาดรายการพนักงาน (Standard UI)
         const renderOption = (name, label, color, icon = '👤', emailAddr = '') => {
-            if (!name || name === '-' || name === 'N/A') return '';
-            const finalEmail = emailAddr || ((typeof resolveStaffEmail === 'function') ? resolveStaffEmail(name) : (STAFF_EMAIL_MAP[name] || ''));
+            if (!name || name === '-' || name === 'N/A' || name === '--') return '';
+            const trimmedName = name.trim();
+            renderedNames.add(trimmedName.toLowerCase());
+            const finalEmail = emailAddr || ((typeof resolveStaffEmail === 'function') ? resolveStaffEmail(trimmedName) : (STAFF_EMAIL_MAP[trimmedName] || ''));
             return `
                 <div class="modal-ac-item" 
-                     style="padding: 9px 12px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9;"
-                     onmousedown="event.preventDefault(); applyModalAC('staff', '${name.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                    <div style="display: flex; flex-direction: column; gap: 1px;">
+                     style="padding: 9px 12px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s;"
+                     onmouseenter="this.style.background='#f8fafc'"
+                     onmouseleave="this.style.background='transparent'"
+                     onmousedown="event.preventDefault(); applyModalAC('staff', '${trimmedName.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                    <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
                         <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 800; color: #0f172a; white-space: nowrap;">
-                            <span>${icon}</span> ${name}
+                            <span>${icon}</span> ${trimmedName}
                         </span>
-                        <span style="font-size: 9px; color: #64748b; padding-left: 18px; font-family: monospace;">${finalEmail}</span>
+                        <span style="font-size: 9px; color: #64748b; padding-left: 18px; font-family: monospace; overflow: hidden; text-overflow: ellipsis;">${finalEmail}</span>
                     </div>
-                    <span style="font-size: 8px; background: ${color}; color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 900; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;">
+                    <span style="font-size: 8px; background: ${color}; color: #fff; padding: 2px 7px; border-radius: 4px; font-weight: 900; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;">
                         ${label}
                     </span>
                 </div>`;
         };
 
         // --------------------------------------------------------
-        // 🔹 [PART A]: ช่อง ISSUE BY (ดึงพนักงานทุกคนจากตาราง Agent)
+        // 🔹 [PART A]: ช่อง ISSUE BY (ผู้จัดทำ / วิศวกร)
         // --------------------------------------------------------
         if (inputEl.id === 'prob-issue-by') {
-            htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: #2563eb; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase;">👥 รายชื่อผู้จัดทำ (ISSUE BY)</div>`;
+            htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: #2563eb; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase;">👥 รายชื่อทีมงานวิศวกรและผู้จัดทำ (ISSUE BY)</div>`;
 
-            // 1. ถ้ามี Matrix ให้แสดง Assigned Engineer ประจำ Vendor ที่ด้านบนสุด
-            if (matrix) {
-                const assignedEng = isRP ? (matrix.iqc_eng_name || matrix.iqc_engineer) : (matrix.engineer || matrix.sqe_engineer);
-                if (assignedEng && assignedEng !== '-' && (!query || assignedEng.toLowerCase().includes(query))) {
-                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #0284c7; background: #f0f9ff;">🎯 ASSIGNED ${isRP ? 'IQC' : 'SQE'} ENGINEER (MATRIX)</div>`;
-                    htmlContent += renderOption(assignedEng, isRP ? 'IQC ENG' : 'SQE ENG', '#0284c7', '⭐');
-                }
+            if (matrix && matrix.engineer && matrix.engineer !== '-') {
+                htmlContent += renderOption(matrix.engineer, 'DESIGNATED SQE', '#2563eb', '⭐', matrix.sqe_email);
+            }
+            if (matrix && matrix.iqc_eng_name && matrix.iqc_eng_name !== '-' && matrix.iqc_eng_name !== matrix.engineer) {
+                htmlContent += renderOption(matrix.iqc_eng_name, 'DESIGNATED IQC', '#0284c7', '⭐', matrix.iqc_eng_email);
             }
 
-            // 2. ดึงข้อมูลจาก Map ของพนักงาน (ตาราง users / Agent)
-            if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
-                Array.from(window._dbUsersRoleMap.values())
+            Array.from(allStaffMap.values())
+                .filter(u => {
+                    if (renderedNames.has(u.name.toLowerCase())) return false;
+                    const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
+                    return !query || searchStr.includes(query);
+                })
+                .forEach(u => {
+                    const roleLabel = (u.role || 'STAFF').toUpperCase();
+                    htmlContent += renderOption(u.name, roleLabel, '#3b82f6', '👤', u.email);
+                });
+        }
+
+        // --------------------------------------------------------
+        // 🔹 [PART B]: ช่อง CONFIRM BY (เฉพาะหัวหน้างาน / ผู้ตรวจสอบตาม Vendor Matrix)
+        // --------------------------------------------------------
+        else if (inputEl.id === 'prob-confirm-by') {
+            if (matrix) {
+                const title = isRP ? "🟢 CONFIRM RP (หัวหน้างานตาม VENDOR MATRIX)" : "🔵 CONFIRM VF (หัวหน้างานตาม VENDOR MATRIX)";
+                const confirmName = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
+                const confirmEmail = isRP ? (matrix.confirm_rp_email || matrix.supervisor_email) : (matrix.confirm_vf_email || matrix.supervisor_email);
+                const color = isRP ? "#059669" : "#1e40af";
+                
+                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">🛡️ ${title}</div>`;
+                
+                if (confirmName && confirmName !== '-') {
+                    htmlContent += renderOption(confirmName, 'SUPERVISOR (VENDOR MATRIX)', color, '🛡️', confirmEmail);
+                }
+                if (matrix.supervisor_name && matrix.supervisor_name !== '-' && matrix.supervisor_name !== confirmName) {
+                    htmlContent += renderOption(matrix.supervisor_name, 'SUPERVISOR (VENDOR MATRIX)', '#d97706', '🎖️', matrix.supervisor_email);
+                }
+
+                // If user typed a search query, allow matching other supervisors strictly
+                if (query) {
+                    const extraSupervisors = Array.from(allStaffMap.values()).filter(u => {
+                        if (renderedNames.has(u.name.toLowerCase())) return false;
+                        const roleLower = (u.role || '').toLowerCase();
+                        const isSupervisor = roleLower.includes('super') || roleLower.includes('head') || roleLower.includes('supervisor');
+                        if (!isSupervisor) return false;
+                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
+                        return searchStr.includes(query);
+                    });
+                    if (extraSupervisors.length > 0) {
+                        htmlContent += `<div style="padding: 6px 12px; font-size: 8.5px; font-weight: 900; color: #64748b; background: #f1f5f9; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #cbd5e1;">🔍 ผลการค้นหาหัวหน้างานเพิ่มเติม</div>`;
+                        extraSupervisors.forEach(u => {
+                            htmlContent += renderOption(u.name, 'SUPERVISOR', '#d97706', '🛡️', u.email);
+                        });
+                    }
+                }
+            } else {
+                // กรณีไม่พบ Vendor ใน Matrix ให้แสดงเฉพาะหัวหน้างาน (Supervisors)
+                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: #d97706; background: #fffbeb; border-bottom: 1.5px solid #fde68a;">⚠️ รายชื่อหัวหน้างาน (SUPERVISORS)</div>`;
+                Array.from(allStaffMap.values())
                     .filter(u => {
-                        const searchStr = (u.display_name || u.email || "").toLowerCase();
+                        if (renderedNames.has(u.name.toLowerCase())) return false;
+                        const roleLower = (u.role || '').toLowerCase();
+                        const isSupervisor = roleLower.includes('super') || roleLower.includes('head') || roleLower.includes('supervisor');
+                        if (!isSupervisor) return false;
+                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
                         return !query || searchStr.includes(query);
                     })
                     .forEach(u => {
-                        const name = u.display_name || u.email.split('@')[0].toUpperCase();
-                        const roleLabel = (u.role || 'STAFF').toUpperCase();
-                        htmlContent += renderOption(name, roleLabel, '#2563eb', '👤', u.email);
+                        htmlContent += renderOption(u.name, 'SUPERVISOR', '#d97706', '🛡️', u.email);
                     });
-            } else {
-                STAFF_LIST.filter(m => !query || m.toLowerCase().includes(query)).forEach(m => {
-                    htmlContent += renderOption(m, 'STAFF', '#64748b', '👤');
-                });
             }
         }
 
         // --------------------------------------------------------
-        // 🔹 [PART B]: ช่อง CONFIRM BY (ดึงตาม Matrix ของ Vendor)
-        // --------------------------------------------------------
-        else if (inputEl.id === 'prob-confirm-by') {
-            const title = isRP ? "🟢 CONFIRM RP (FROM MATRIX)" : "🔵 CONFIRM VF (FROM MATRIX)";
-            const color = isRP ? "#059669" : "#1e40af";
-
-            if (matrix) {
-                const confirmName = isRP ? (matrix.confirm_rp_name || matrix.confirm_rp) : (matrix.confirm_vf_name || matrix.confirm_vf);
-                const assignedEng = isRP ? (matrix.iqc_eng_name || matrix.iqc_engineer) : (matrix.engineer || matrix.sqe_engineer);
-                
-                htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">${title}</div>`;
-                
-                let renderedCount = 0;
-                if (confirmName && confirmName !== '-' && (!query || confirmName.toLowerCase().includes(query))) {
-                    htmlContent += renderOption(confirmName, 'AUTHORIZED CONFIRMER', color, '🛡️');
-                    renderedCount++;
-                }
-
-                if (assignedEng && assignedEng !== '-' && assignedEng !== confirmName && (!query || assignedEng.toLowerCase().includes(query))) {
-                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #0284c7; background: #f0f9ff; border-top: 1px solid #e0f2fe;">📋 วิศวกรผู้รับผิดชอบ (REVIEWER)</div>`;
-                    htmlContent += renderOption(assignedEng, isRP ? 'IQC ENG' : 'SQE ENG', '#0284c7', '🔍');
-                    renderedCount++;
-                }
-
-                if (renderedCount === 0 && !query) {
-                    htmlContent += `<div style="padding: 12px; text-align: center; color: #94a3b8; font-size: 10.5px;">ไม่พบรายชื่อผู้ตรวจสอบใน Matrix ของ ${vendorName || 'Vendor'}</div>`;
-                }
-
-                // ถ้ามีการพิมพ์ค้นหา ให้แสดงรายชื่อหัวหน้า/วิศวกรคนอื่นในระบบด้วย
-                if (query) {
-                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #64748b; background: #f1f5f9; border-top: 1px solid #cbd5e1;">🔎 ผลการค้นหาอื่นๆ ในระบบ</div>`;
-                    STAFF_LIST.filter(m => m.toLowerCase().includes(query) && m !== confirmName && m !== assignedEng).forEach(m => {
-                        htmlContent += renderOption(m, 'SUPERVISOR', '#64748b', '👤');
-                    });
-                }
-            } else {
-                htmlContent += `<div style="padding: 10px 12px; text-align: left; color: #b45309; font-size: 10px; font-weight: 800; background: #fffbeb; border-bottom: 1px solid #fde68a;">⚠️ ไม่พบ Matrix ของ "${vendorName || 'ไม่ระบุ Vendor'}" (แสดงรายชื่อที่สามารถเลือกได้)</div>`;
-                STAFF_LIST.filter(m => !query || m.toLowerCase().includes(query)).forEach(m => {
-                    htmlContent += renderOption(m, 'SUPERVISOR', '#64748b', '👤');
-                });
-            }
-        }
-
-        // --------------------------------------------------------
-        // 🔹 [PART C]: ช่อง APPROVED BY (ดึงตาม Matrix + ผู้อนุมัติร่วม)
+        // 🔹 [PART C]: ช่อง APPROVED BY (ผู้อนุมัติ / ผู้จัดการ)
         // --------------------------------------------------------
         else if (inputEl.id === 'prob-approved-by') {
-            const title = isRP ? "🟢 APPROVE RP (FROM MATRIX)" : "🔵 APPROVE VF (FROM MATRIX)";
-            const color = isRP ? "#059669" : "#1e40af";
-
             if (matrix) {
-                const primaryAppr = isRP ? (matrix.approve_rp_name || matrix.approve_rp) : (matrix.approve_vf_name || matrix.approve_vf);
-                const jointAppr = matrix.approve_vf_rp_name || matrix.approve_vf_rp; // ผู้อนุมัติร่วม (Joint Approval)
+                const title = isRP ? "🟢 APPROVE RP (ตาม VENDOR MATRIX)" : "🔵 APPROVE VF (ตาม VENDOR MATRIX)";
+                const primaryAppr = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
+                const primaryEmail = isRP ? (matrix.approve_rp_email || matrix.approve_vf_rp_email || matrix.manager_email) : (matrix.approve_vf_email || matrix.approve_vf_rp_email || matrix.manager_email);
+                const jointAppr = matrix.approve_vf_rp_name; // ผู้อนุมัติร่วม (Joint Approval)
+                const jointEmail = matrix.approve_vf_rp_email;
+                const color = isRP ? "#059669" : "#1e40af";
 
-                htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">${title}</div>`;
+                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">👑 ${title}</div>`;
                 
-                let renderedCount = 0;
                 // 1. แสดงผู้อนุมัติหลัก (Primary Approver)
-                if (primaryAppr && primaryAppr !== '-' && (!query || primaryAppr.toLowerCase().includes(query))) {
-                    htmlContent += renderOption(primaryAppr, 'PRIMARY APPROVER', color, '👑');
-                    renderedCount++;
+                if (primaryAppr && primaryAppr !== '-') {
+                    htmlContent += renderOption(primaryAppr, 'PRIMARY APPROVER (VENDOR MATRIX)', color, '👑', primaryEmail);
                 }
 
                 // 2. แสดงผู้อนุมัติร่วม / ผู้จัดการ (Joint Approver)
-                if (jointAppr && jointAppr !== '-' && jointAppr !== primaryAppr && (!query || jointAppr.toLowerCase().includes(query))) {
+                if (jointAppr && jointAppr !== '-' && jointAppr !== primaryAppr) {
                     htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #7c3aed; background: #f5f3ff; border-top: 1px solid #ddd6fe;">🟣 ผู้มีอำนาจอนุมัติร่วม (MANAGEMENT)</div>`;
-                    htmlContent += renderOption(jointAppr, 'JOINT APPROVAL', '#7c3aed', '👑');
-                    renderedCount++;
+                    htmlContent += renderOption(jointAppr, 'JOINT APPROVAL (MANAGEMENT)', '#7c3aed', '🟣', jointEmail);
                 }
 
-                if (renderedCount === 0 && !query) {
-                    htmlContent += `<div style="padding: 12px; text-align: center; color: #94a3b8; font-size: 10.5px;">ไม่พบรายชื่อผู้อนุมัติใน Matrix</div>`;
+                if (matrix.manager_name && matrix.manager_name !== '-' && matrix.manager_name !== primaryAppr && matrix.manager_name !== jointAppr) {
+                    htmlContent += renderOption(matrix.manager_name, 'SECTION MANAGER (VENDOR MATRIX)', '#0f766e', '🏛️', matrix.manager_email);
                 }
 
-                // ถ้ามีการพิมพ์ค้นหา ให้แสดงรายชื่อผู้อนุมัติคนอื่นในกลุ่ม Management
+                // If user typed a search query, allow matching other managers/approvers
                 if (query) {
-                    const approvedTeam = STAFF_TEAMS.find(t => t.team === 'Approved')?.members || [];
-                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #64748b; background: #f1f5f9; border-top: 1px solid #cbd5e1;">🔎 ผู้อนุมัติอื่นในระบบ Management</div>`;
-                    approvedTeam.filter(m => m.toLowerCase().includes(query) && m !== primaryAppr && m !== jointAppr).forEach(m => {
-                        htmlContent += renderOption(m, 'MANAGEMENT', '#7c3aed', '👑');
+                    const extraApprovers = Array.from(allStaffMap.values()).filter(u => {
+                        if (renderedNames.has(u.name.toLowerCase())) return false;
+                        const roleLower = (u.role || '').toLowerCase();
+                        const isApprover = roleLower.includes('manager') || roleLower.includes('admin') || roleLower.includes('approve') || u.department === 'Approved';
+                        if (!isApprover) return false;
+                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
+                        return searchStr.includes(query);
                     });
+                    if (extraApprovers.length > 0) {
+                        htmlContent += `<div style="padding: 6px 12px; font-size: 8.5px; font-weight: 900; color: #64748b; background: #f1f5f9; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #cbd5e1;">🔍 ผลการค้นหาผู้อนุมัติเพิ่มเติม</div>`;
+                        extraApprovers.forEach(u => {
+                            const isMgr = (u.role || '').toLowerCase().includes('manager');
+                            htmlContent += renderOption(u.name, isMgr ? 'MANAGER' : 'APPROVER', isMgr ? '#0f766e' : '#7c3aed', isMgr ? '🏛️' : '👑', u.email);
+                        });
+                    }
                 }
             } else {
-                htmlContent += `<div style="padding: 10px 12px; text-align: left; color: #b45309; font-size: 10px; font-weight: 800; background: #fffbeb; border-bottom: 1px solid #fde68a;">⚠️ ไม่พบ Matrix ของ "${vendorName || 'ไม่ระบุ Vendor'}" (แสดงรายชื่อผู้อนุมัติ)</div>`;
-                const approvedTeam = STAFF_TEAMS.find(t => t.team === 'Approved')?.members || STAFF_LIST;
-                approvedTeam.filter(m => !query || m.toLowerCase().includes(query)).forEach(m => {
-                    htmlContent += renderOption(m, 'MANAGEMENT', '#7c3aed', '👑');
-                });
+                // กรณีไม่พบ Vendor ใน Matrix ให้แสดงเฉพาะผู้จัดการและผู้อนุมัติ
+                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: #7c3aed; background: #f5f3ff; border-bottom: 1.5px solid #c4b5fd;">👑 รายชื่อผู้จัดการและผู้อนุมัติ (MANAGERS & APPROVERS)</div>`;
+                Array.from(allStaffMap.values())
+                    .filter(u => {
+                        if (renderedNames.has(u.name.toLowerCase())) return false;
+                        const roleLower = (u.role || '').toLowerCase();
+                        const isApprover = roleLower.includes('manager') || roleLower.includes('admin') || roleLower.includes('approve') || u.department === 'Approved';
+                        if (!isApprover) return false;
+                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
+                        return !query || searchStr.includes(query);
+                    })
+                    .forEach(u => {
+                        const isMgr = (u.role || '').toLowerCase().includes('manager');
+                        htmlContent += renderOption(u.name, isMgr ? 'MANAGER' : 'APPROVER', isMgr ? '#0f766e' : '#7c3aed', isMgr ? '🏛️' : '👑', u.email);
+                    });
             }
         }
     }
@@ -28568,63 +28797,75 @@ async function fetchCases() {
     if (!targetUser) return [];
 
     // ดึงค่า Case ID จาก URL (ถ้ามี)
-    const linkParams = (typeof window.checkDeepLinkParams === 'function') ? window.checkDeepLinkParams() : null;
+    const linkParams = window.checkDeepLinkParams();
     const deepCaseId = linkParams ? linkParams.caseId : null;
 
-    // Helper โหลดข้อมูลสำรองจากแคชในเครื่อง
-    const loadFromLocalBackup = () => {
+    if (navigator.onLine) {
         try {
-            const cached = localStorage.getItem(`sqe_8d_cases_${targetUser}`) || localStorage.getItem('sqe_8d_cases');
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    _cases = parsed;
-                    S.eightDCases = _cases;
-                    if (typeof invalidate8DCaseMap === 'function') invalidate8DCaseMap();
-                    return _cases;
-                }
+            let query = sqeClient.from(TABLE).select('*');
+
+            // ✅ Logic: 
+            // 1. ถ้ามี Deep Link: ให้ดึง (เคสของตัวเอง) OR (เคสที่ระบุในลิงก์)
+            // 2. ถ้าไม่มีลิงก์: ดึงเฉพาะเคสของตัวเองตามปกติ
+            if (deepCaseId) {
+                query = query.or(`user_id.eq."${targetUser}",id.eq."${deepCaseId}"`);
+            } else {
+                query = query.eq('user_id', targetUser);
             }
-        } catch (err) {}
-        if (Array.isArray(S.eightDCases) && S.eightDCases.length > 0) {
-            _cases = S.eightDCases;
-            if (typeof invalidate8DCaseMap === 'function') invalidate8DCaseMap();
+
+            const { data, error } = await query.order('created_at', { ascending: false });
+
+            if (error) throw error;
+            
+            _cases = data || [];
+            S.eightDCases = _cases;
+            try {
+                safeLocalStorageSet(`eight_d_cases_cache_${targetUser}`, JSON.stringify(_cases));
+                safeLocalStorageSet('eight_d_cases_cache_last', JSON.stringify(_cases));
+                if (window.SQEIndexedDBManager && typeof SQEIndexedDBManager.saveTableCache === 'function') {
+                    SQEIndexedDBManager.saveTableCache(`eight_d_${targetUser}`, _cases);
+                }
+            } catch (ce) {}
+            invalidate8DCaseMap();
             return _cases;
+        } catch (e) { 
+            console.warn("[8D Fetch Fallback triggered]:", e?.message || e); 
         }
-        return _cases || [];
-    };
-
-    const client = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
-    if (!client || !navigator.onLine) {
-        return loadFromLocalBackup();
     }
 
+    // Fallback: ดึงจากแคชท้องถิ่น
     try {
-        let query = client.from(TABLE).select('*');
-
-        // ✅ Logic ใหม่: 
-        // 1. ถ้ามี Deep Link: ให้ดึง (เคสของตัวเอง) OR (เคสที่ระบุในลิงก์)
-        // 2. ถ้าไม่มีลิงก์: ดึงเฉพาะเคสของตัวเองตามปกติ
-        if (deepCaseId) {
-            query = query.or(`user_id.eq."${targetUser}",id.eq."${deepCaseId}"`);
-        } else {
-            query = query.eq('user_id', targetUser);
+        let cached = localStorage.getItem(`eight_d_cases_cache_${targetUser}`) || localStorage.getItem('eight_d_cases_cache_last');
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                _cases = parsed;
+                S.eightDCases = _cases;
+                invalidate8DCaseMap();
+                return _cases;
+            }
         }
+    } catch(err) {}
 
-        const { data, error } = await query.order('created_at', { ascending: false });
-
-        if (error) throw error;
-        
-        _cases = data || [];
+    if (window.SQEIndexedDBManager && typeof SQEIndexedDBManager.getTableCache === 'function') {
         try {
-            localStorage.setItem(`sqe_8d_cases_${targetUser}`, JSON.stringify(_cases));
-        } catch (e) {}
-        S.eightDCases = _cases;
-        if (typeof invalidate8DCaseMap === 'function') invalidate8DCaseMap();
-        return _cases;
-    } catch (e) { 
-        console.warn("8D Fetch Fallback (offline/cached mode):", e && e.message ? e.message : e); 
-        return loadFromLocalBackup(); 
+            const idbData = await SQEIndexedDBManager.getTableCache(`eight_d_${targetUser}`);
+            if (Array.isArray(idbData) && idbData.length > 0) {
+                _cases = idbData;
+                S.eightDCases = _cases;
+                invalidate8DCaseMap();
+                return _cases;
+            }
+        } catch(idbErr) {}
     }
+
+    if (Array.isArray(S.eightDCases) && S.eightDCases.length > 0) {
+        _cases = S.eightDCases;
+        invalidate8DCaseMap();
+        return _cases;
+    }
+
+    return [];
 }
 
 /// --- 1. ฟังก์ชันตัดคำนำหน้าชื่อ (ช่วยให้ลายเซ็นดูสะอาด) ---
@@ -29160,44 +29401,60 @@ async function processSignature(slot, staffName, decision, remark) {
             const nextPerson = document.getElementById('prob-confirm-by')?.value?.trim() || vf.confirm_by || "";
             if (nextPerson) {
                 sendApprovalRequestEmail(slot, nextPerson, _currentCase, decision, remark);
+                vf.confirm_by = nextPerson;
             }
-            // ล้าง/ซ่อนชื่อใน CONFIRM BY และ APPROVED BY เพื่อให้ผู้ตรวจและผู้อนุมัติต้องพิมพ์/เลือกชื่อตนเองเมื่อเปิดเข้ามา
-            vf.confirm_by = "";
             vf.confirm_sig_active = false;
-            vf.approved_by = "";
+
+            const currentAppr = document.getElementById('prob-approved-by')?.value?.trim() || vf.approved_by || "";
+            if (currentAppr) {
+                vf.approved_by = currentAppr;
+            }
             vf.approved_sig_active = false;
         } 
         else if (slot === 'confirm') {
             const targetApproverName = document.getElementById('prob-approved-by')?.value?.trim() || vf.approved_by || "";
             if (targetApproverName) {
                 sendApprovalRequestEmail(slot, targetApproverName, _currentCase, decision, remark);
+                vf.approved_by = targetApproverName;
             }
-            // ล้าง/ซ่อนชื่อใน APPROVED BY เพื่อให้ผู้อนุมัติต้องพิมพ์/เลือกชื่อตนเองเมื่อเปิดเข้ามา
-            vf.approved_by = "";
             vf.approved_sig_active = false;
         }
         else if (slot === 'approved') {
+            _currentCase.status = 'Approved';
             // เมื่อคนสุดท้ายเซ็น ให้ส่งเมลผลอนุมัติกลับหาคนออกรายงาน (Issuer) และ CC คนตรวจ
             const issuerName = vf.issue_by;
             if (issuerName) {
                 sendFinalStatusEmail(issuerName, vf.confirm_by, staffName, _currentCase, decision, remark);
             }
         }
-        toast(`✅ บันทึกและส่งเมลเรียบร้อย`, "success");
     }
 
-    // 3. บันทึกลง Cloud และวาดหน้าจอใหม่
+    // 3. บันทึกลง Cloud และวาดหน้าจอใหม่ พร้อม fallback ป้องกัน error เมื่อติดโควต้า
     try {
-        await sqeClient.from('eight_d_reports')
-            .update({ report_data: _currentCase.report_data, status: _currentCase.status })
-            .eq('id', _currentCase.id);
-
-        toast(`✅ บันทึกและส่งเมลเรียบร้อย`, "success");
-        renderSlide();
-        if (typeof updateExportAndEmailButtons === 'function') {
-            updateExportAndEmailButtons();
+        if (sqeClient && navigator.onLine) {
+            await sqeClient.from('eight_d_reports')
+                .update({ report_data: _currentCase.report_data, status: _currentCase.status })
+                .eq('id', _currentCase.id);
         }
-    } catch (err) { toast("Error: " + err.message, "error"); }
+    } catch (err) {
+        console.warn("[8D Save Signature fallback to local]:", err?.message || err);
+    }
+
+    try {
+        if (Array.isArray(S.eightDCases)) {
+            const idx = S.eightDCases.findIndex(c => c.id === _currentCase.id);
+            if (idx >= 0) S.eightDCases[idx] = { ..._currentCase };
+            else S.eightDCases.unshift({ ..._currentCase });
+        }
+        safeLocalStorageSet(`eight_d_cases_cache_${S.currentUser || 'last'}`, JSON.stringify(S.eightDCases || []));
+        safeLocalStorageSet('eight_d_cases_cache_last', JSON.stringify(S.eightDCases || []));
+    } catch(e) {}
+
+    toast(`✅ บันทึกและลงนามเรียบร้อย`, "success");
+    renderSlide();
+    if (typeof updateExportAndEmailButtons === 'function') {
+        updateExportAndEmailButtons();
+    }
 }
 
 async function sendFinalStatusEmail(issuerName, confirmerName, approverName, caseData, decision, remark) {
@@ -29391,16 +29648,17 @@ const renderSigCell = (slot, displayName, sigActive, timestamp) => {
 
     if (isSigned) {
         const sigImgUrl = getStaffSignatureImage(displayName);
+        const svgFallback = typeof window.generateSignatureSvgDataUrl === 'function' ? window.generateSignatureSvgDataUrl(displayName) : '';
 
         return `
             <div class="vf-sig-cell-container" style="display: flex; align-items: center; justify-content: flex-start; height: 32px; width: 100%; position: relative; padding: 0 4px; box-sizing: border-box; background: transparent; overflow: visible;">
                 
-                <div class="vf-sig-holder" style="flex: 0 0 100px; display: flex; align-items: center; justify-content: center; height: 100%; text-align: left;">
-                    <img src="${sigImgUrl}" 
+                <div class="vf-sig-holder" style="flex: 0 0 110px; display: flex; align-items: center; justify-content: center; height: 100%; text-align: left;">
+                    <img src="${sigImgUrl || svgFallback}" 
                          alt="${cleanName}" 
                          class="vf-sig-img" 
-                         style="height: 28px; width: auto; max-width: 100px; object-fit: contain; display: block; image-rendering: auto;"
-                         onerror="this.style.display='none';">
+                         style="height: 28px; width: auto; max-width: 110px; object-fit: contain; display: block; image-rendering: auto;"
+                         onerror="if(!this.dataset.triedSvg){ this.dataset.triedSvg='1'; this.src=(window.generateSignatureSvgDataUrl ? window.generateSignatureSvgDataUrl('${displayName.replace(/'/g, "\\'")}') : ''); }">
                 </div>
                 
                 <div class="hide-on-export" style="display: flex; align-items: center; height: 100%; padding-right: 2px; flex: 1; min-width: 80px; border-left: 1px solid #dbeafe; margin-left: 8px; padding-left: 8px;">
@@ -29739,9 +29997,33 @@ function showEmailPreparationCartoonLoader(docNumber, reportTag, supplierName) {
  * 📧 ฟังก์ชันเตรียมข้อมูลและเปิดหน้าต่างส่งอีเมล
  * ปรับปรุง: แสดงอนิเมชั่นการ์ตูนโหลดขึ้นทันที 0ms ทันทีที่กดปุ่ม แล้วค่อยประมวลผลเบื้องหลัง
  */
+/**
+ * 📧 ฟังก์ชันเตรียมข้อมูลและเปิดหน้าต่างส่งอีเมล
+ * แก้ไข: บังคับดูดข้อมูลจากหน้าจอ (Live Scrape) ก่อนสร้าง PDF เพื่อให้ข้อมูลล่าสุดติดไปในไฟล์
+ */
 async function sendIssueByEmail() {
     if (!_currentCase) return toast("❌ ไม่พบข้อมูลเคส", "error");
     
+    // --- 1. [จุดแก้ไขสำคัญ] LIVE SCRAPE: ดูดข้อมูลที่พิมพ์สดบนหน้าจอเข้าสู่ตัวแปร ---
+    const vfDoc = document.getElementById('vf-paper-doc');
+    if (vfDoc && _currentCase.report_data) {
+        if (!_currentCase.report_data.vf_data) _currentCase.report_data.vf_data = {};
+        const vfData = _currentCase.report_data.vf_data;
+        const editables = vfDoc.querySelectorAll('[contenteditable="true"]');
+        
+        editables.forEach((el, index) => {
+            // เก็บข้อมูล HTML ล่าสุดจากหน้าจอเข้าสู่ Object เพื่อให้ PDF ดึงไปใช้ถูก
+            vfData[`vf_field_${index}`] = el.innerHTML;
+        });
+
+        // เก็บค่าจากฟิลด์หลักๆ ที่อาจถูกแก้ไข
+        const vendorEl = document.getElementById('vf-doc-vendor');
+        if (vendorEl) vfData.vendor = vendorEl.innerText.trim();
+        
+        const vendorCodeEl = document.getElementById('vf-doc-vendor-code');
+        if (vendorCodeEl) vfData.vendor_code = vendorCodeEl.innerText.trim();
+    }
+
     const c = _currentCase;
     const d = c.report_data || {};
     const vf = d.vf_data || {};
@@ -29751,127 +30033,80 @@ async function sendIssueByEmail() {
     const reportTag = isRP ? 'RP' : 'VF';
     const vendorOnDoc = document.getElementById('vf-doc-vendor')?.innerText?.trim() || vf.vendor || c.supplier || "";
 
-    // ⚡ 1. แสดงอนิเมชั่นการ์ตูนโหลดทันทีระดับ Microsecond ทันทีที่คลิกปุ่ม!
+    // ⚡ 2. แสดงอนิเมชั่นการ์ตูนโหลด
     const loader = showEmailPreparationCartoonLoader(docNumber, reportTag, vendorOnDoc);
     const startTime = Date.now();
 
-    // ⚡ 2. ยอมให้เบราว์เซอร์ Render หน้าจอและเริ่มหมุนอนิเมชั่น 60fps ทันทีโดยไม่สะดุด
     await new Promise(r => setTimeout(r, 40));
+    loader.updateProgress(20, `<span class="animate-spin text-xs">🌀</span> กำลังซิงค์ข้อมูลล่าสุดและดึง Matrix...`, 1);
 
-    loader.updateProgress(20, `<span class="animate-spin text-xs">🌀</span> กำลังบันทึกข้อมูลและดึง Matrix...`, 1);
-
-    // 3. เซฟความคืบหน้าล่าสุดลง Cloud ในเบื้องหลัง
+    // 3. บันทึกข้อมูลที่ดูดมาเมื่อกี้ลง Cloud ทันที (Auto-Save background)
     if (typeof Wap8DSystem.saveCurrentProgress === 'function') {
         try { Wap8DSystem.saveCurrentProgress(); } catch(e) {}
     }
     
-    // 4. ดึงข้อมูลจากเอกสาร / Matrix Database
+    // 4. ดึงข้อมูลจาก Matrix Database
     const vendorCodeOnDoc = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() || vf.vendor_code || c.vendor_code || "";
-    
     let matrix = (typeof window.getVFRPMatrixForSupplier === 'function')
         ? window.getVFRPMatrixForSupplier(vendorOnDoc, vendorCodeOnDoc, '')
         : null;
 
-    // 5. จัดรูปแบบชื่อผู้จัดทำ (Sender) สำหรับชื่อลงท้าย
-    const emailPrefix = (S.currentUser || 'user').split('@')[0];
-    const senderLastNameFirst = emailPrefix.includes('.') 
-        ? `${emailPrefix.split('.')[1].toUpperCase()}, ${emailPrefix.split('.')[0].toUpperCase()}`
-        : emailPrefix.toUpperCase();
-    const senderFullName = emailPrefix.replace(/\./g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-    // 6. จัดการเรื่องวันที่ (Issue Date & Follow-up Date +14 วัน)
-    const now = new Date();
-    const issueDateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
-    
-    const followUpDate = new Date();
-    followUpDate.setDate(now.getDate() + 14);
-    const followUpDateStr = followUpDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }).replace(/ /g, ' ');
-
-    // 7. สกัดชื่อ "ผู้แจ้ง / พื้นที่" (Area/Dept) ออกจากประโยคปัญหา
-    let extractedAreaDept = "Production Line";
-    
-    if (!isRP) {
-        const areaMatch = c.problem_title ? c.problem_title.match(/On\s+\d{1,2}\s+[A-Za-z']+\d{2}\s+(.*?)\s+inform/i) : null;
-        if (areaMatch && areaMatch[1]) {
-            extractedAreaDept = areaMatch[1].trim();
-        } else if (vf.defect_location && vf.defect_location !== '-') {
-            extractedAreaDept = vf.defect_location;
-        }
-    }
-
-    const finalFoundLocation = isRP ? "QAP Incoming inspection" : extractedAreaDept;
-
-    // 8. สกัดข้อมูลพาร์ทและอาการเสีย (Parsed Data)
-    const parsedData = (typeof parseProblemTitleForD2 === 'function') ? parseProblemTitleForD2(c.problem_title, c) : {};
-    const actualPartName = (document.getElementById('vf-doc-part-name')?.innerText?.trim() || parsedData.partName || c.part_name || "PART").toUpperCase();
-    const actualDrawingNo = (document.getElementById('vf-doc-drawing-no')?.innerText?.trim() || vf.drawing_no || c.part_no || "N/A").toUpperCase();
-    const defectName = (vf.criteria_defect || vf.defect || parsedData.defectName || "Defect").replace(/^[:\s-]+/, '').trim();
-
-    // 9. เตรียมที่อยู่อีเมล (TO/CC) จาก Matrix
+    // 5. เตรียมที่อยู่อีเมล (TO/CC) จาก Matrix
     let finalTo = matrix ? (matrix.inform_email_to || matrix.recipient_to || "") : (vf.inform_email_to || "");
     let finalCc = matrix ? (matrix.team_member_email || matrix.inform_email_cc || "") : (vf.team_member_email || "");
     
-    const cleanTo = (typeof window.parseEmailArray === 'function' ? [...new Set(window.parseEmailArray(finalTo))] : [finalTo]).filter(Boolean).join('; ');
-    const cleanCc = (typeof window.parseEmailArray === 'function' ? [...new Set(window.parseEmailArray(finalCc))] : [finalCc]).filter(Boolean).join('; ');
+    // รวมตัวเราเองเข้าใน CC และลบตัวซ้ำ
+    const combinedCcSet = new Set([...window.parseEmailArray(finalCc), S.currentUser]);
+    const cleanTo = window.parseEmailArray(finalTo).filter(Boolean).join('; ');
+    const cleanCc = Array.from(combinedCcSet).filter(Boolean).join('; ');
 
-    const evidenceImg = c.report_data?.evidence_img || c.evidence_img || c.image_url || '';
+    // 6. จัดการชื่อผู้ส่งและวันที่
+    const emailPrefix = (S.currentUser || 'user').split('@')[0];
+    const senderName = emailPrefix.replace(/\./g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    
+    const now = new Date();
+    const issueDateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
+    const followUpDateStr = new Date(now.setDate(now.getDate() + 14)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }).replace(/ /g, ' ');
 
-    loader.updateProgress(45, `<span class="animate-pulse text-xs">📄</span> กำลังเรนเดอร์รายงาน ${reportTag} (PDF)...`, 2);
-    await new Promise(r => setTimeout(r, 40));
+    // 7. สร้างไฟล์แนบ PDF และเตรียมรูปภาพ (ตอนนี้ PDF จะได้ข้อมูลล่าสุดจากข้อ 1 แล้ว)
+    loader.updateProgress(50, `<span class="animate-pulse text-xs">📄</span> กำลังเรนเดอร์ PDF จากข้อมูลที่แก้ไข...`, 2);
+    
+    const evidenceImg = d.evidence_img || c.image_url || '';
+    const [preloadedVf, preloadedImgBase64] = await Promise.all([
+        generateVFPdfBlob(c.id).catch(() => null),
+        evidenceImg ? _pptGetImageDataUrl(evidenceImg).catch(() => null) : Promise.resolve(null)
+    ]);
 
-    // ทำงานคู่ขนาน: สร้าง PDF blob และแปลงรูปภาพหลักฐาน
-    const pdfPromise = generateVFPdfBlob(c.id).catch(err => {
-        console.error("Prep PDF error:", err);
-        return null;
-    });
-
-    const imgPromise = (evidenceImg && typeof _pptGetImageDataUrl === 'function')
-        ? _pptGetImageDataUrl(evidenceImg).catch(err => {
-            console.error("Prep Img error:", err);
-            return null;
-        })
-        : Promise.resolve(null);
-
-    let [preloadedVf, preloadedImgBase64] = await Promise.all([pdfPromise, imgPromise]);
-
-    loader.updateProgress(90, `<span class="animate-pulse text-xs">📸</span> จัดเตรียมภาพถ่ายหลักฐานและเนื้อหาอีเมล...`, 3);
-
-    // หน่วงเวลาอย่างน้อยให้ได้ชมอนิเมชั่นการ์ตูนนุ่มนวลอย่างน้อย 1.2 วินาที
+    loader.updateProgress(90, `<span class="animate-pulse text-xs">📸</span> จัดเตรียมหน้าพรีวิว...`, 3);
+    
     const elapsed = Date.now() - startTime;
-    if (elapsed < 1200) {
-        await new Promise(r => setTimeout(r, 1200 - elapsed));
-    }
+    if (elapsed < 1200) await new Promise(r => setTimeout(r, 1200 - elapsed));
 
-    // แจ้งจบการโหลดด้วยอนิเมชั่นสำเร็จ
     await loader.complete();
 
-    // 10. ส่งข้อมูลทั้งหมดเข้าสู่ Modal Email Preview พร้อมข้อมูลที่เตรียมไว้แล้ว
+    // 8. เปิดหน้าต่างพรีวิว
     showEmailDispatchModalWithAttachments({
         caseData: c,
         targetEmail: cleanTo,
         ccEmail: cleanCc,
         dearVendor: (matrix?.dear_vendor && matrix.dear_vendor !== '-') 
             ? (matrix.dear_vendor.toLowerCase().startsWith('dear') ? matrix.dear_vendor : `Dear ${matrix.dear_vendor}`) 
-            : `Dear K.Suwari`,
-        
+            : `Dear Team ${vendorOnDoc}`,
         docNumber,
         supplierName: vendorOnDoc,
-        defectName: defectName,
+        defectName: (vf.criteria_defect || vf.defect || "Defect").replace(/^[:\s-]+/, '').trim(),
         issueDate: issueDateStr,
         followUpDate: followUpDateStr,
-        partInfo: `${actualPartName} / ${actualDrawingNo}`,
-        extPartName: actualPartName,
-        extDrawingNo: actualDrawingNo,
-        formattedInspector: senderLastNameFirst,
-        senderName: senderFullName,
+        partInfo: `${(c.part_name || "PART").toUpperCase()} / ${(vf.drawing_no || c.part_no || "N/A").toUpperCase()}`,
+        extPartName: (c.part_name || "PART").toUpperCase(),
+        extDrawingNo: (vf.drawing_no || c.part_no || "N/A").toUpperCase(),
+        formattedInspector: emailPrefix.toUpperCase(),
+        senderName: senderName,
         lotTotal: c.lot_no || "0",
         ngTotal: c.ng_qty || "0",
-        
         poInvDisplay: (vf.po_no || '-') + " / " + (vf.inv_no || '-'),
         replacementQty: vf.request_replacement || c.lot_no || "0",
-        
-        foundLocation: finalFoundLocation,
-        
+        foundLocation: isRP ? "QAP Incoming inspection" : (vf.defect_location || "Production Line"),
         isRP: isRP,
         vfFileName: `Report_${docNumber}.pdf`,
         pptxFileName: `8D_${docNumber}.pptx`,
@@ -30384,20 +30619,26 @@ const prepare8dAuto = async () => {
 };
 
     // รันเตรียม PDF ทันทีที่เปิดหน้าจอ
-    prepareVfAuto();
+    if (chkVf && chkVf.checked) {
+        prepareVfAuto();
+    }
 
     // 6. ผูกเหตุการณ์เมื่อติ๊ก Checkbox
-    chkVf.onchange = () => {
-        if (chkVf.checked) prepareVfAuto();
-        else refreshSlotUI(vfActionContainer, null, `รายงาน ${reportTag}`);
-        refreshBodyPreview();
-    };
+    if (chkVf) {
+        chkVf.onchange = () => {
+            if (chkVf.checked) prepareVfAuto();
+            else refreshSlotUI(vfActionContainer, null, `รายงาน ${reportTag}`);
+            refreshBodyPreview();
+        };
+    }
 
-    chk8d.onchange = () => {
-        if (chk8d.checked) prepare8dAuto();
-        else refreshSlotUI(eightdActionContainer, null, 'รายงาน 8D');
-        refreshBodyPreview();
-    };
+    if (chk8d) {
+        chk8d.onchange = () => {
+            if (chk8d.checked) prepare8dAuto();
+            else refreshSlotUI(eightdActionContainer, null, 'รายงาน 8D');
+            refreshBodyPreview();
+        };
+    }
 
     // อัปเดตตัวเลขนับอีเมลแบบ Real-time เมื่อมีการพิมพ์/ลบ
     const targetInputEl = modalEl.querySelector('#dispatch-target-emails');
@@ -30419,91 +30660,97 @@ const prepare8dAuto = async () => {
     }
 
     // ปุ่มคัดลอกข้อความ Body
-    modalEl.querySelector('#btn-copy-body-text').onclick = () => {
-        const is8d = chk8d ? chk8d.checked : false;
-        const bodyText = generateEmailBodyText(is8d);
-        navigator.clipboard.writeText(bodyText).then(() => toast("📋 คัดลอกข้อความสำเร็จ", "success"));
-    };
+    const copyBodyBtn = modalEl.querySelector('#btn-copy-body-text');
+    if (copyBodyBtn) {
+        copyBodyBtn.onclick = () => {
+            const is8d = chk8d ? chk8d.checked : false;
+            const bodyText = generateEmailBodyText(is8d);
+            navigator.clipboard.writeText(bodyText).then(() => toast("📋 คัดลอกข้อความสำเร็จ", "success"));
+        };
+    }
 
-    btnSend.onclick = async () => {
-        // ตรวจสอบก่อนว่ามีการติ๊กเลือก แต่ไฟล์ยังเตรียมไม่เสร็จหรือไม่
-        if ((chkVf.checked && !cachedVf) || (chk8d.checked && !cached8d)) {
-            toast("⚠️ ระบบกำลังเตรียมไฟล์แนบ กรุณารอเข็มขัดเขียวขึ้นก่อนกดส่ง", "warn");
-            return;
-        }
-
-        btnSend.disabled = true;
-        btnSendLabel.textContent = "กำลังรวบรวมไฟล์แนบและรูปภาพ...";
-
-        try {
-            const attachments = [];
-
-            // ✅ ใช้ก้อนข้อมูลที่แสดงผลในปุ่ม "เปิดดู" (ก้อนเดียวกับพรีวิว)
-            if (chkVf.checked && cachedVf) {
-                attachments.push({
-                    filename: cachedVf.filename,
-                    mimeType: 'application/pdf',
-                    base64: cachedVf.base64 // ดึงจาก Memory ตรงๆ ไม่ไปสร้างใหม่
-                });
-            }
-
-            if (chk8d.checked && cached8d) {
-                attachments.push({
-                    filename: cached8d.filename,
-                    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                    base64: cached8d.base64 // ดึงจาก Memory ตรงๆ
-                });
-            }
-
-            // รวบรวมรูปภาพหลักจาก NON - CONFORMANCE DETAILS
-            if (evidenceImg && !cachedImgBase64) {
-                cachedImgBase64 = await _pptGetImageDataUrl(evidenceImg);
-            }
-
-            const inlineImages = [];
-            if (cachedImgBase64) {
-                inlineImages.push({
-                    cid: 'non_conformance_img',
-                    base64: cachedImgBase64,
-                    mimeType: 'image/jpeg',
-                    filename: 'non_conformance_details.jpg'
-                });
-            }
-
+    if (btnSend) {
+        btnSend.onclick = async () => {
+            // ตรวจสอบก่อนว่ามีการติ๊กเลือก แต่ไฟล์ยังเตรียมไม่เสร็จหรือไม่
+            const isVfChecked = chkVf ? chkVf.checked : false;
             const is8dChecked = chk8d ? chk8d.checked : false;
-            const liveTo = modalEl.querySelector('#dispatch-target-emails')?.value || targetEmail;
-            const liveCc = modalEl.querySelector('#dispatch-cc-emails')?.value || ccEmail;
+            if ((isVfChecked && !cachedVf) || (is8dChecked && !cached8d)) {
+                toast("⚠️ ระบบกำลังเตรียมไฟล์แนบ กรุณารอเข็มขัดเขียวขึ้นก่อนกดส่ง", "warn");
+                return;
+            }
 
-            // สร้างก้อนข้อมูลอีเมล .eml พร้อมข้อความ Body และ HTML + Inline Image + ไฟล์แนบ
-            const emlBlob = generateEmlBlob({
-                to: liveTo,
-                cc: liveCc,
-                subject: baseSubject,
-                body: generateEmailBodyText(is8dChecked),
-                htmlBody: generateEmailHtmlBody(is8dChecked, inlineImages.length > 0),
-                attachments: attachments,
-                inlineImages: inlineImages
-            });
+            btnSend.disabled = true;
+            if (btnSendLabel) btnSendLabel.textContent = "กำลังรวบรวมไฟล์แนบและรูปภาพ...";
 
-            // ดาวน์โหลดไฟล์ .eml ไปเปิดใน Outlook
-            const a = document.createElement('a');
-            const safeDoc = docNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
-            a.href = URL.createObjectURL(emlBlob);
-            a.download = `Email_${safeDoc}.eml`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+            try {
+                const attachments = [];
 
-            toast("✅ ดึงไฟล์แนบและสร้างร่างอีเมลสำเร็จ!", "success");
-            setTimeout(() => modalEl.remove(), 500);
+                // ✅ ใช้ก้อนข้อมูลที่แสดงผลในปุ่ม "เปิดดู" (ก้อนเดียวกับพรีวิว)
+                if (isVfChecked && cachedVf) {
+                    attachments.push({
+                        filename: cachedVf.filename,
+                        mimeType: 'application/pdf',
+                        base64: cachedVf.base64 // ดึงจาก Memory ตรงๆ ไม่ไปสร้างใหม่
+                    });
+                }
 
-        } catch (err) {
-            console.error("Email Attachment Error:", err);
-            toast("❌ การแนบไฟล์ขัดข้อง", "error");
-            btnSend.disabled = false;
-            btnSendLabel.textContent = "ส่งออกอีเมล (.eml)";
-        }
-    };
+                if (is8dChecked && cached8d) {
+                    attachments.push({
+                        filename: cached8d.filename,
+                        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                        base64: cached8d.base64 // ดึงจาก Memory ตรงๆ
+                    });
+                }
+
+                // รวบรวมรูปภาพหลักจาก NON - CONFORMANCE DETAILS
+                if (evidenceImg && !cachedImgBase64) {
+                    cachedImgBase64 = await _pptGetImageDataUrl(evidenceImg);
+                }
+
+                const inlineImages = [];
+                if (cachedImgBase64) {
+                    inlineImages.push({
+                        cid: 'non_conformance_img',
+                        base64: cachedImgBase64,
+                        mimeType: 'image/jpeg',
+                        filename: 'non_conformance_details.jpg'
+                    });
+                }
+
+                const liveTo = modalEl.querySelector('#dispatch-target-emails')?.value || targetEmail;
+                const liveCc = modalEl.querySelector('#dispatch-cc-emails')?.value || ccEmail;
+
+                // สร้างก้อนข้อมูลอีเมล .eml พร้อมข้อความ Body และ HTML + Inline Image + ไฟล์แนบ
+                const emlBlob = generateEmlBlob({
+                    to: liveTo,
+                    cc: liveCc,
+                    subject: baseSubject,
+                    body: generateEmailBodyText(is8dChecked),
+                    htmlBody: generateEmailHtmlBody(is8dChecked, inlineImages.length > 0),
+                    attachments: attachments,
+                    inlineImages: inlineImages
+                });
+
+                // ดาวน์โหลดไฟล์ .eml ไปเปิดใน Outlook
+                const a = document.createElement('a');
+                const safeDoc = docNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+                a.href = URL.createObjectURL(emlBlob);
+                a.download = `Email_${safeDoc}.eml`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+
+                toast("✅ ดึงไฟล์แนบและสร้างร่างอีเมลสำเร็จ!", "success");
+                setTimeout(() => modalEl.remove(), 500);
+
+            } catch (err) {
+                console.error("Email Attachment Error:", err);
+                toast("❌ การแนบไฟล์ขัดข้อง", "error");
+                btnSend.disabled = false;
+                if (btnSendLabel) btnSendLabel.textContent = "ส่งออกอีเมล (.eml)";
+            }
+        };
+    }
 }
 
     // Render Carrier Official Vendor Failure Report (VF/RP)
@@ -30716,6 +30963,20 @@ const productionTypeRowHtml = `
 `;
         // --- [จบส่วนแก้ไข] ---
 
+    // Auto-resolve matrix default names for issue, confirm and approve
+    const matrixIssueName = vfMatrix ? (isRP ? (vfMatrix.iqc_eng_name || vfMatrix.engineer || '') : (vfMatrix.engineer || vfMatrix.iqc_eng_name || '')) : '';
+    const matrixConfirmName = vfMatrix ? (isRP ? (vfMatrix.confirm_rp_name || vfMatrix.supervisor_name || '') : (vfMatrix.confirm_vf_name || vfMatrix.supervisor_name || '')) : '';
+    const matrixApproveName = vfMatrix ? (isRP ? (vfMatrix.approve_rp_name || vfMatrix.approve_vf_rp_name || vfMatrix.manager_name || '') : (vfMatrix.approve_vf_name || vfMatrix.approve_vf_rp_name || vfMatrix.manager_name || '')) : '';
+
+    const effectiveIssueBy = vf.issue_by || matrixIssueName || '';
+    const effectiveConfirmBy = vf.confirm_by || matrixConfirmName || '';
+    const effectiveApprovedBy = vf.approved_by || matrixApproveName || '';
+
+    // Automatically sync back to vf data state if not present
+    if (!vf.confirm_by && matrixConfirmName) vf.confirm_by = matrixConfirmName;
+    if (!vf.approved_by && matrixApproveName) vf.approved_by = matrixApproveName;
+    if (!vf.issue_by && matrixIssueName) vf.issue_by = matrixIssueName;
+
 return `
 <div id="vf-paper-doc" class="vf-official-document" style="width: 100%; max-width: 900px; margin: 0 auto; background: #ffffff; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15); font-family: Arial, sans-serif; color: #000000; box-sizing: border-box; padding: 10px 20px; position: relative;">
     <div style="border: 4px solid #000000; padding: 12px; box-sizing: border-box;">      
@@ -30772,7 +31033,7 @@ return `
         <td style="border: 1px solid #000; padding: 4px 6px;" contenteditable="true">${subjDisplay}</td>
         <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">ISSUE BY</td>
         <td style="border: 1px solid #000; padding: 0 4px; position: relative; height: 32px; vertical-align: middle; text-align: left;">
-            ${renderSigCell('issue', vf.issue_by, vf.issue_sig_active, vf.issue_timestamp)}
+            ${renderSigCell('issue', effectiveIssueBy, vf.issue_sig_active, vf.issue_timestamp)}
         </td>
     </tr>
 
@@ -30782,7 +31043,7 @@ return `
         <td id="vf-doc-cc-display" style="border: 1px solid #000; padding: 4px 6px;" contenteditable="true">${ccDisplay}</td>
         <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">CONFIRM BY</td>
         <td style="border: 1px solid #000; padding: 0 4px; position: relative; height: 32px; vertical-align: middle; text-align: left;">
-            ${renderSigCell('confirm', vf.confirm_by, vf.confirm_sig_active, vf.confirm_timestamp)}
+            ${renderSigCell('confirm', effectiveConfirmBy, vf.confirm_sig_active, vf.confirm_timestamp)}
         </td>
     </tr>
 
@@ -30792,7 +31053,7 @@ return `
         <td style="border: 1px solid #000; padding: 4px 6px;"></td>
         <td style="border: 1px solid #000; padding: 4px 6px; ${cyanBg}">APPROVED BY</td>
         <td style="border: 1px solid #000; padding: 0 4px; position: relative; height: 32px; vertical-align: middle; text-align: left;">
-            ${renderSigCell('approved', vf.approved_by, vf.approved_sig_active, vf.approved_timestamp)}
+            ${renderSigCell('approved', effectiveApprovedBy, vf.approved_sig_active, vf.approved_timestamp)}
         </td>
     </tr>
             </table>
@@ -31060,7 +31321,7 @@ return `
 
     // 3. บันทึกลง Cloud Auto-Save (ใช้ sqeClient)
     async function saveCurrentProgress() {
-        if (!_currentCase || S.userRole === 'supervisor' || _isSaving) return;
+        if (!_currentCase || _isSaving) return;
         _isSaving = true;
         
         const updatedReportData = { ...(_currentCase.report_data || {}) };
@@ -31081,16 +31342,13 @@ return `
         }
 
         try {
-            const client = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
-            if (client && navigator.onLine) {
-                await client.from(TABLE).update({ 
-                    report_data: updatedReportData,
-                    updated_at: new Date().toISOString()
-                }).eq('id', _currentCase.id);
-                console.log("✅ SQE Cloud Synchronized");
-            }
+            await sqeClient.from(TABLE).update({ 
+                report_data: updatedReportData,
+                updated_at: new Date().toISOString()
+            }).eq('id', _currentCase.id);
             _currentCase.report_data = updatedReportData; 
-        } catch (e) { console.warn("Auto-save sync offline notice:", e && e.message ? e.message : e); }
+            console.log("✅ SQE Cloud Synchronized");
+        } catch (e) { console.error("Save failed:", e); }
         finally { _isSaving = false; }
     }
 
@@ -31166,9 +31424,7 @@ async function openReport(id, forceVf = false) {
         console.log(`📡 Case ${id} not in local list. Fetching directly from Cloud...`);
         
         try {
-            const client = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
-            if (!client) throw new Error('Database client not initialized');
-            const { data, error } = await client
+            const { data, error } = await sqeClient
                 .from('eight_d_reports') // หรือใช้ตัวแปร TABLE
                 .select('*')
                 .eq('id', id)
@@ -31359,13 +31615,7 @@ async function deleteCase(id) {
     const isOwner = (target.user_id === S.currentUser);
     const isMasterAdmin = (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
 
-    // ถ้าไม่ใช่เจ้าของ และไม่ใช่ Admin และอยู่ในโหมด Supervisor (คนอื่นแอบมาดู) ถึงจะบล็อก
-    if (!isOwner && !isMasterAdmin && S.userRole === 'supervisor') { 
-        toast('⚠️ เฉพาะเจ้าของรายงานหรือ Admin เท่านั้นที่ลบรายการนี้ได้', 'error'); 
-        return; 
-    }
-
-    // 3. แสดงหน้าต่างยืนยันการลบ (ถ้าผ่านเงื่อนไขด้านบน)
+    // 3. แสดงหน้าต่างยืนยันการลบ
     showCustomConfirmDialog({
         title: "ยืนยันการลบรายงาน 8D Report",
         subtitle: "รายงานนี้จะถูกลบออกจากฐานข้อมูลถาวร เจ้าของงานยืนยันการลบหรือไม่?",
@@ -31380,6 +31630,14 @@ async function deleteCase(id) {
         cancelText: "ยกเลิก",
         onConfirm: async () => {
             try {
+                // ลบรูปภาพใน Storage (ถ้ามี)
+                if (target.evidence_img || target.image_url || target.report_data?.evidence_img || target.report_data?.vf_data?.image_url) {
+                    const imgUrl = target.evidence_img || target.image_url || target.report_data?.evidence_img || target.report_data?.vf_data?.image_url;
+                    if (typeof deleteFromSupabaseStorage === 'function') {
+                        await deleteFromSupabaseStorage(imgUrl, 'evidences').catch(err => console.warn('8D storage image delete warning:', err));
+                    }
+                }
+
                 // ส่งคำสั่งลบไปยัง Supabase
                 const { error } = await sqeClient
                     .from('eight_d_reports')
@@ -31388,7 +31646,7 @@ async function deleteCase(id) {
 
                 if (error) throw error;
 
-                toast("🗑️ ลบรายงานสำเร็จโดยเจ้าของงาน", "success");
+                toast("🗑️ ลบรายงานและไฟล์ในฐานข้อมูลสำเร็จ", "success");
                 
                 // อัปเดตข้อมูลหน้าจอ
                 _cases = _cases.filter(c => c.id !== id);
@@ -33176,6 +33434,10 @@ function generateEmlBlob({ to, cc, subject, body, htmlBody, attachments, inlineI
 
 let _eightDScroller = null;
 
+/**
+ * 🛠️ UPGRADED: 8D/VF DASHBOARD FILTER ENGINE (V6.5)
+ * ปรับปรุงการเชื่อมโยงข้อมูลกับ Header และความถูกต้องของประเภทรายงาน (Tab)
+ */
 function renderDashboard() {
     const tbody = document.getElementById('eight-d-list-body');
     const statTotal = document.getElementById('stat-8d-total');
@@ -33184,47 +33446,60 @@ function renderDashboard() {
 
     const now = new Date();
 
-    // ดึงค่าตัวกรองวันที่และ Vendor จาก Header
-    const startDateStr = (typeof claimDashFilterDate !== 'undefined' && claimDashFilterDate.start) || document.getElementById('cd-start-date')?.value || '';
-    const endDateStr = (typeof claimDashFilterDate !== 'undefined' && claimDashFilterDate.end) || document.getElementById('cd-end-date')?.value || '';
-    const vendorSelectEl = document.getElementById('claim-vendor-filter');
-    const vendorVal = (vendorSelectEl && !vendorSelectEl.classList.contains('hidden') && vendorSelectEl.value !== 'ALL') ? vendorSelectEl.value.trim().toUpperCase() : '';
+    // 1. ดึงค่าตัวกรองจาก Header ส่วนกลาง (อ่านค่าสดจาก DOM ทุกครั้งที่ Render)
+    const startDateStr = document.getElementById('cd-start-date')?.value || '';
+    const endDateStr = document.getElementById('cd-end-date')?.value || '';
+    const vendorVal = document.getElementById('claim-vendor-filter')?.value || 'ALL';
 
-    // กรองตาม Tab (8D vs VF/RP), วันที่ (Date Range), และ Vendor
+    console.log(`🔍 [8D Engine] Tab: ${_activeSqeTab} | Filter: ${startDateStr} to ${endDateStr} | Vendor: ${vendorVal}`);
+
+    // 2. เริ่มต้นการกรองรายการเคสทั้งหมด (_cases)
     const tabCases = _cases.filter(c => {
-        // 1. กรอง Tab
-        const srcType = (c.report_data?.source_report_type || c.report_type || '').toString().toUpperCase();
-        const isVf = (srcType === 'VF' || srcType === 'RP');
+        
+        // --- ชั้นที่ 1: กรองตามประเภท Tab (Strict Tab Isolation) ---
+        const reportType = (c.report_data?.source_report_type || c.report_type || "").toString().toUpperCase();
+        const isVfRp = reportType.includes('VF') || reportType.includes('RP');
+
         if (_activeSqeTab === 'vf') {
-            // Show all or explicit VF/RP cases
+            // ถ้าอยู่หน้า VF/RP: แสดงเฉพาะเคสที่ระบุว่าเป็น VF หรือ RP เท่านั้น
+            if (!isVfRp) return false;
+        } else {
+            // ถ้าอยู่หน้า 8D: แสดงทุกอย่างที่เป็นเคสแก้ปัญหา (ยกเว้นเคสที่เป็นแค่ Records ทั่วไป)
+            if (reportType === 'RECORDS') return false;
         }
 
-        // 2. กรองช่วงวันที่ (Date Range)
+        // --- ชั้นที่ 2: กรองช่วงวันที่ (Global Date Filter) ---
         if (startDateStr || endDateStr) {
-            let caseDateStr = '';
-            if (c.created_at) {
-                caseDateStr = String(c.created_at).slice(0, 10);
-            } else if (c.report_data?.occurrence_date) {
+            // ดึงวันที่ที่แม่นยำที่สุด (เน้น created_at จาก Server)
+            let caseDateStr = (c.created_at || c.date || "").toString().slice(0, 10);
+            
+            // กรณีไม่มีวันที่หลัก ให้ลองหาใน report_data
+            if (!caseDateStr && c.report_data?.occurrence_date) {
                 caseDateStr = String(c.report_data.occurrence_date).slice(0, 10);
-            } else if (c.date) {
-                caseDateStr = String(c.date).slice(0, 10);
             }
 
             if (startDateStr && caseDateStr && caseDateStr < startDateStr) return false;
             if (endDateStr && caseDateStr && caseDateStr > endDateStr) return false;
         }
 
-        // 3. กรอง Vendor
-        if (vendorVal) {
-            const vendorName = (c.vendor_name || c.supplier || c.vendor || c.report_data?.vendor_name || c.report_data?.supplier || c.report_data?.vf_data?.vendor || '').trim().toUpperCase();
-            if (!vendorName.includes(vendorVal)) return false;
+        // --- ชั้นที่ 3: กรองซัพพลายเออร์ (Global Vendor Filter) ---
+        if (vendorVal !== 'ALL') {
+            const targetVendor = vendorVal.trim().toUpperCase();
+            // ตรวจสอบชื่อ Vendor จากทุกจุดที่อาจเป็นไปได้ (รวมถึงที่พิมพ์แก้ไขบนหน้ากระดาษ)
+            const actualVendor = (
+                c.report_data?.vf_data?.vendor || 
+                c.supplier || 
+                c.vendor_name || 
+                c.vendor || ""
+            ).toString().toUpperCase();
+
+            if (!actualVendor.includes(targetVendor)) return false;
         }
 
         return true;
     });
 
-    // 1. คำนวณตัวเลข Quick Stats (Total Cases, D1-D3 Open และ Overdue >15d)
-    const totalCount = tabCases.length;
+    // 3. ประมวลผลสถิติจากรายการที่ผ่านการกรองแล้ว
     let d1ToD3Count = 0;
     let overdueCount = 0;
 
@@ -33235,23 +33510,17 @@ function renderDashboard() {
         const openDays = Math.floor(Math.max(0, now - createdAt) / (1000 * 60 * 60 * 24));
 
         const stepMatch = s.match(/D(\d+)/);
-        let stepNum = 1;
-        if (stepMatch) {
-            stepNum = parseInt(stepMatch[1], 10);
-        }
+        let stepNum = stepMatch ? parseInt(stepMatch[1], 10) : 1;
         
-        if (stepNum >= 1 && stepNum <= 3 && !isClosed) {
-            d1ToD3Count++;
-        }
-
-        if (!isClosed && openDays >= 15) {
-            overdueCount++;
-        }
+        if (stepNum >= 1 && stepNum <= 3 && !isClosed) d1ToD3Count++;
+        if (!isClosed && openDays >= 15) overdueCount++;
     });
 
-    if (statTotal) statTotal.textContent = totalCount;
+    if (statTotal) statTotal.textContent = tabCases.length;
     if (statPending) statPending.textContent = d1ToD3Count;
     if (statOverdue) statOverdue.textContent = overdueCount;
+
+    // ... (ส่วนการวาดตารางลง tbody และ Virtual Scroller คงเดิม) ...
 
     // 2. ปรับแต่ง UI ของ Stat Cards ปุ่มที่เลือกอยู่ (แสดงผลเส้นขอบสีเด่นชัดเจนตามภาพ)
     const cardTotal = document.getElementById('card-stat-8d-total');
@@ -34949,8 +35218,6 @@ else if (_currentSlide === 15) {
     }
 // ฟังก์ชันสำหรับเปลี่ยนจุดติ๊ก Production Type และบันทึกลง Cloud
     async function updateProdType(caseId, typeValue) {
-        if (S.userRole === 'supervisor') return;
-
         // 1. ค้นหาเคสที่เลือก
         const targetCase = _cases.find(x => String(x.id) === String(caseId));
         if (!targetCase) return;
@@ -35123,26 +35390,25 @@ const WapRNSystem = (function() {
         renderTable();
     }
 
-// ค้นหาฟังก์ชัน switchRnTab ใน WapRNSystem
     function switchRnTab(tab) {
         _activeTab = tab;
         const btnVf = document.getElementById('btn-rn-tab-vf');
         const btnRp = document.getElementById('btn-rn-tab-rp');
+        const accent = document.getElementById('rn-table-accent');
         const title = document.getElementById('rn-table-title');
 
         if (tab === 'vf') {
-            // ปรับปุ่ม VF เป็นสีน้ำเงิน / ปุ่ม RP เป็นสีพื้นปกติ
-            btnVf.className = "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all bg-blue-600 text-white shadow-sm";
-            btnRp.className = "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all text-slate-500 hover:text-blue-600";
+            if(btnVf) btnVf.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all bg-blue-600 text-white shadow-sm";
+            if(btnRp) btnRp.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-blue-600";
+            if(accent) accent.className = "h-1.5 w-full bg-blue-600 transition-all duration-500";
             if(title) title.textContent = "VF Running Number Registry";
         } else {
-            // ปรับปุ่ม RP เป็นสีแดง (Rose) / ปุ่ม VF เป็นสีพื้นปกติ
-            btnRp.className = "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all bg-rose-600 text-white shadow-sm";
-            btnVf.className = "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all text-slate-500 hover:text-rose-600";
+            if(btnRp) btnRp.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all bg-rose-600 text-white shadow-sm";
+            if(btnVf) btnVf.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all text-slate-500 dark:text-slate-400 hover:text-rose-600";
+            if(accent) accent.className = "h-1.5 w-full bg-rose-600 transition-all duration-500";
             if(title) title.textContent = "RP Running Number Registry";
         }
-        
-        renderTable(); // สั่งวาดตารางใหม่เพื่อกรองข้อมูลตาม Tab ที่เลือก
+        renderTable();
     }
 
     function renderTable() {
@@ -35157,44 +35423,9 @@ const WapRNSystem = (function() {
         });
 
         const allCases = (typeof Wap8DSystem !== 'undefined') ? Wap8DSystem.getCases() : [];
-        
-        // ดึงค่าตัวกรองวันที่และ Vendor จาก Header
-        const startDateStr = (typeof claimDashFilterDate !== 'undefined' && claimDashFilterDate.start) || document.getElementById('cd-start-date')?.value || '';
-        const endDateStr = (typeof claimDashFilterDate !== 'undefined' && claimDashFilterDate.end) || document.getElementById('cd-end-date')?.value || '';
-        const vendorSelectEl = document.getElementById('claim-vendor-filter');
-        const vendorVal = (vendorSelectEl && !vendorSelectEl.classList.contains('hidden') && vendorSelectEl.value !== 'ALL') ? vendorSelectEl.value.trim().toUpperCase() : '';
-
         const filteredCases = allCases.filter(c => {
-            const d = c.report_data || {};
-            const vf = d.vf_data || {};
-
-            // 1. กรองประเภท Tab (VF vs RP)
-            const type = (d.source_report_type || c.report_type || '').toUpperCase();
-            const tabMatch = _activeTab === 'vf' ? (type === 'VF') : (type === 'RP');
-            if (!tabMatch) return false;
-
-            // 2. กรองวันที่ (Date Range)
-            if (startDateStr || endDateStr) {
-                let caseDate = c.date || d.event_date || (c.created_at ? c.created_at.split('T')[0] : '');
-                if (caseDate) {
-                    if (startDateStr && caseDate < startDateStr) return false;
-                    if (endDateStr && caseDate > endDateStr) return false;
-                }
-            }
-
-            // 3. กรอง Vendor
-            if (vendorVal) {
-                const parsedInfo = (typeof parseProblemTitleForD2 === 'function') 
-                                   ? parseProblemTitleForD2(c.problem_title, c) 
-                                   : { supplier: '-' };
-                const vName = (vf.vendor || d.supplier || c.supplier || parsedInfo.supplier || '').trim().toUpperCase();
-                const vCode = (vf.vendor_code || '').trim().toUpperCase();
-                if (!vName.includes(vendorVal) && !vCode.includes(vendorVal) && vendorVal !== vName && vendorVal !== vCode) {
-                    return false;
-                }
-            }
-
-            return true;
+            const type = (c.report_data?.source_report_type || c.report_type || '').toUpperCase();
+            return _activeTab === 'vf' ? (type === 'VF') : (type === 'RP');
         }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
         if (document.getElementById('rn-record-count')) {
@@ -35363,20 +35594,13 @@ const progressDropdown = `
 return { 
     init, 
     switchRnTab, 
-    renderTable,
     updateStatus, 
     updateCompleteDate,
-    updatePPMCount
+    updatePPMCount // เพิ่มบรรทัดนี้
 };
 })();
 
 async function updateStatus(caseId, newStatus) {
-    if (S.userRole === 'supervisor') {
-        toast("⚠️ Supervisor ไม่สามารถแก้ไขสถานะได้", "error");
-        renderTable(); 
-        return;
-    }
-
     try {
         toast("⏳ กำลังบันทึกสถานะ...", "info");
         
@@ -35400,12 +35624,6 @@ async function updateStatus(caseId, newStatus) {
     }
 }
 async function updateCompleteDate(caseId, newDate) {
-    if (S.userRole === 'supervisor') {
-        toast("⚠️ Supervisor ไม่สามารถแก้ไขวันที่ได้", "error");
-        renderTable();
-        return;
-    }
-
     // 1. หาข้อมูลเคสปัจจุบันในเครื่อง
     const targetCase = Wap8DSystem.getCases().find(x => String(x.id) === String(caseId));
     if (!targetCase) return;
@@ -35437,12 +35655,6 @@ async function updateCompleteDate(caseId, newDate) {
     }
 }
 async function updatePPMCount(caseId, newValue) {
-    if (S.userRole === 'supervisor') {
-        toast("⚠️ Supervisor ไม่สามารถแก้ไขข้อมูลได้", "error");
-        renderTable();
-        return;
-    }
-
     const targetCase = Wap8DSystem.getCases().find(x => String(x.id) === String(caseId));
     if (!targetCase) return;
 
@@ -36502,41 +36714,33 @@ next_due: item.next_due && item.next_due !== '-' ? item.next_due : '2027-08-20',
         }
     }
 
-    async function loadFromCloud() {
-        try {
-            const sb = getSupabaseClient();
-            if (!sb) return false;
-            const { data: rows, error } = await sb.from('calibration_records').select('*');
-            if (error) {
-                console.warn('[Calibration Supabase Load Error]', error.message);
-                // พยายามส่งข้อมูลปัจจุบันขึ้นตาราง Supabase
-                await syncAllToCloud(true);
-                return false;
+    // ภายใน WapCalibrationSystem
+async function loadFromCloud() {
+    try {
+        const sb = getSupabaseClient();
+        if (!sb) return;
+
+        const { data, error } = await sb.from('calibration_records').select('*').order('code_no');
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            _data = data.map(item => ({
+                ...item,
+                // ตรวจสอบรูปภาพ: ถ้าใน DB ไม่มี ให้เช็คในโฟลเดอร์ assetsinstruments/ อัตโนมัติ
+                imageUrl: item.image_url || getInstrumentImageUrl(item)
+            }));
+
+            // บันทึกลง IndexedDB ในเครื่องเพื่อความเร็ว
+            if (localDB.calibrationMaster) {
+                await localDB.calibrationMaster.bulkPut(_data);
             }
-            if (rows && rows.length > 0) {
-                const mapped = rows.map(r => ({
-                    ...r,
-                    imageUrl: getInstrumentImageUrl(r) || ""
-                }));
-                _data = mapped;
-                if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
-                    try { await localDB.calibrationMaster.bulkPut(mapped); } catch(e) {}
-                }
-                render();
-                updateOverdueBadge();
-                console.log('[Calibration] Synced online data from Supabase:', rows.length, 'records');
-                return true;
-            } else {
-                // ถ้าใน Supabase ยังไม่มีข้อมูล ให้ส่งข้อมูลเริ่มต้นทั้งหมดขึ้น Cloud ทันที!
-                console.log('[Calibration] Supabase table empty, uploading all inventory data now...');
-                await syncAllToCloud(true);
-                return true;
-            }
-        } catch(err) {
-            console.warn('[Calibration Supabase Load Exception]', err);
-            return false;
+            render();
+            updateOverdueBadge();
         }
+    } catch (e) {
+        console.warn("Cloud Load Failed:", e.message);
     }
+}
 
     function initRealtime() {
         if (_realtimeSubscribed) return;
@@ -38715,11 +38919,6 @@ function handleSaveNew() {
 // --- เพิ่มเข้าไปใน WapCalibrationSystem ---
 
 function clearAll() {
-    if (S.userRole === 'supervisor') { 
-        toast('⚠️ โหมดอ่านอย่างเดียว: ไม่สามารถลบข้อมูลได้', 'error'); 
-        return; 
-    }
-    
     if (_data.length === 0) {
         toast('ไม่มีข้อมูลให้ลบ', 'info');
         return;

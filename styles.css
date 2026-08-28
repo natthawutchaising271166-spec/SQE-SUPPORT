@@ -7459,79 +7459,103 @@ body {
     background-color: var(--bg-card) !important;
     border-color: var(--border-color);
 }
-/* --- [NEW] Synthetic Nature Login Styles --- */
+/* --- [NEW] Cyber Constellation Deep Blue Animated Login Styles --- */
 
-.background-scene {
-    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+.login-animated-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 50% 30%, #0d2247 0%, #081329 50%, #020612 100%);
 }
-.background-scene video {
-    width: 100%; height: 100%; object-fit: cover; filter: brightness(1.1) saturate(1.2);
+
+#login-particles-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 3;
+    pointer-events: none;
 }
-.vignette-overlay {
-    position: absolute; inset: 0;
-    background: radial-gradient(circle, rgba(0,0,0,0) 20%, rgba(0,0,0,0.5) 100%);
+
+.login-bg-glow-top {
+    position: absolute;
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 850px;
+    height: 550px;
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.35) 0%, rgba(56, 189, 248, 0.15) 45%, rgba(0, 0, 0, 0) 75%);
     z-index: 1;
+    filter: blur(50px);
+    animation: floatOrbTop 10s ease-in-out infinite alternate;
 }
 
-/* Carrier Logo Outside Box */
-
-
-.carrier-logo-svg .oval-outer {
-    fill: none; stroke: rgba(255, 255, 255, 0.2); stroke-width: 1.5;
-}
-.carrier-logo-svg .oval-inner {
-    fill: none; stroke: #ffffff; stroke-width: 2.5;
-}
-.carrier-logo-svg .carrier-text {
-    font-family: 'Times New Roman', Times, serif; font-weight: 900; font-style: italic; font-size: 48px; fill: #ffffff; letter-spacing: -1px;
-}
-
-
-/* Glass Card */
-
-
-.login-tabs {
-    display: flex; background: rgba(0, 0, 0, 0.2); padding: 4px; margin: 15px 15px 5px; border-radius: 14px;
+.login-bg-glow-center {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 650px;
+    height: 650px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(30, 58, 138, 0.12) 50%, rgba(0, 0, 0, 0) 80%);
+    z-index: 1;
+    filter: blur(60px);
+    animation: floatOrbCenter 12s ease-in-out infinite alternate;
 }
 
-
-
-.login-form-area {
-    padding: 20px 30px 25px;
-}
-.input-label-small {
-    display: block; font-size: 8px; font-weight: 900; color: rgba(255,255,255,0.4);
-    text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;
-}
-.glass-input {
-    width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);
-    color: white; border-radius: 14px; padding: 12px 18px; font-size: 13px; outline: none; transition: 0.3s;
-}
-.glass-input:focus {
-    border-color: #4c83e5; background: rgba(0,0,0,0.45);
+.login-bg-glow-bottom {
+    position: absolute;
+    bottom: -15%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 450px;
+    background: radial-gradient(circle, rgba(14, 165, 233, 0.2) 0%, rgba(37, 99, 235, 0.08) 50%, rgba(0, 0, 0, 0) 75%);
+    z-index: 1;
+    filter: blur(55px);
+    animation: floatOrbBottom 9s ease-in-out infinite alternate;
 }
 
-/* Butterfly */
-.butterfly-system {
-    position: absolute; inset: 0; z-index: 5; pointer-events: none;
+.login-bg-grid-overlay {
+    position: absolute;
+    inset: 0;
+    background-image: 
+        linear-gradient(rgba(56, 189, 248, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.07) 1px, transparent 1px);
+    background-size: 44px 44px;
+    z-index: 2;
+    mask-image: radial-gradient(circle at 50% 45%, black 45%, transparent 90%);
+    -webkit-mask-image: radial-gradient(circle at 50% 45%, black 45%, transparent 90%);
+    animation: cyberGridDrift 20s linear infinite;
 }
-.butterfly {
-    position: absolute; width: 18px; height: 18px; transform-style: preserve-3d; opacity: 0.7;
+
+@keyframes floatOrbTop {
+    0% { transform: translateX(-50%) translateY(0px) scale(0.95); opacity: 0.7; }
+    50% { transform: translateX(-48%) translateY(20px) scale(1.05); opacity: 1; }
+    100% { transform: translateX(-52%) translateY(-15px) scale(1); opacity: 0.8; }
 }
-.wing {
-    position: absolute; width: 10px; height: 15px; background: rgba(255, 255, 255, 0.7); border-radius: 50% 50% 20% 50%; transform-origin: right center; box-shadow: 0 0 8px rgba(255,255,255,0.3);
+
+@keyframes floatOrbCenter {
+    0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
+    50% { transform: translate(-47%, -48%) scale(1.1); opacity: 0.95; }
+    100% { transform: translate(-53%, -52%) scale(1); opacity: 0.7; }
 }
-.wing-right {
-    left: 10px; transform-origin: left center; border-radius: 50% 50% 50% 20%; animation: flap-right 0.2s infinite ease-in-out;
+
+@keyframes floatOrbBottom {
+    0% { transform: translateX(-50%) translateY(0px) scale(0.95); opacity: 0.7; }
+    100% { transform: translateX(-50%) translateY(-25px) scale(1.1); opacity: 1; }
 }
-.wing-left {
-    animation: flap-left 0.2s infinite ease-in-out;
+
+@keyframes cyberGridDrift {
+    0% { background-position: 0 0; }
+    100% { background-position: 44px 44px; }
 }
-@keyframes flap-left {
-    0%, 100% { transform: rotateY(0deg); } 50% { transform: rotateY(-75deg); }
-}
-@keyframes flap-right {
-    0%, 100% { transform: rotateY(0deg); } 50% { transform: rotateY(75deg); }
+
+@keyframes pulseGlow {
+    0% { opacity: 0.7; transform: translateX(-50%) scale(0.95); }
+    100% { opacity: 1; transform: translateX(-50%) scale(1.08); }
 }
 /* จัดการหน้าจอหลักให้เป็น Flex */
 
@@ -7719,7 +7743,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center; /* กึ่งกลางแนวตั้ง */
-    background: #050a08; /* กึ่งกลางแนวนอน */
+    background: transparent; /* ให้เห็น background animation ด้านหลังอย่างชัดเจน */
     overflow: hidden;
 }
 
@@ -7742,22 +7766,29 @@ body {
     text-align: center;
     text-transform: uppercase;
     flex: 1;
-    padding: 12px;
-    border: none;
-    background: none;
-    color: rgba(255, 255, 255, 0.3);
-    font-size: 10px;
-    font-weight: 900;
-    letter-spacing: 1px;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
     cursor: pointer;
-    transition: 0.3s;
-    border-radius: 14px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 12px;
+    outline: none;
+}
+
+.login-tab-btn:hover {
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .login-tab-btn.active {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    background: linear-gradient(180deg, #13284f 0%, #0d1e3d 100%);
+    border-color: rgba(56, 189, 248, 0.5);
+    color: #38bdf8;
+    box-shadow: 0 4px 16px rgba(14, 165, 233, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 
@@ -7835,77 +7866,111 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    text-align: center; /* จัดกึ่งกลางแนวนอน */
+    text-align: center;
     width: 100%;
-    margin-top: 60px;
-    margin-bottom: 30px; /* เพิ่มระยะห่างจากขอบบนสุดของจอ (ปรับเพิ่มได้ถ้าอยากให้ต่ำลงอีก) */
-    /* ระยะห่างก่อนถึงกล่องล็อกอิน */
+    margin-top: 10px;
+    margin-bottom: 24px;
 }
 
-/* ขยายขนาดโลโก้ Carrier ให้ใหญ่ขึ้น */
-.carrier-logo-svg {
-    width: 210px;
-    height: auto; /* เพิ่มขนาดขึ้นเป็น 240px (จากเดิม 130px) เพื่อความโดดเด่น */
-    filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.3));
-    display: block; /* เพิ่มรัศมีแสงจางๆ รอบโลโก้ */
-    transition: all 0.3s ease;
-    /* เพิ่มอนิเมชั่นเวลาเปลี่ยนขนาดจอ */
+/* ป้ายโลโก้ SQE & WAP Crest รูปทรงสี่เหลี่ยมโค้งมนพร้อมแสง Glow - คมชัด Ultra HD คริสตัลเคลียร์ */
+.login-logo-badge {
+    width: 144px;
+    height: 144px;
+    border-radius: 30px;
+    padding: 0;
+    overflow: hidden;
+    background: #081126;
+    border: 2px solid rgba(56, 189, 248, 0.5);
+    box-shadow: 0 0 45px rgba(56, 189, 248, 0.4), 0 12px 32px rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(56, 189, 248, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(16px);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateZ(0);
+    will-change: transform, box-shadow;
+}
+
+.login-logo-badge:hover {
+    box-shadow: 0 0 65px rgba(56, 189, 248, 0.7), 0 16px 40px rgba(0, 0, 0, 0.8), inset 0 0 25px rgba(56, 189, 248, 0.35);
+    transform: translateY(-2px) scale(1.04);
+    border-color: rgba(56, 189, 248, 0.85);
+}
+
+.login-logo-badge img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 28px;
+    image-rendering: auto;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 /* ปรับแต่งข้อความ Subtitle ให้กึ่งกลางและอ่านง่าย */
 .portal-main-subtitle {
     color: #ffffff;
-    font-size: 10px;
-    font-weight: 800; /* ปรับขนาดตัวอักษรให้พอดีกับโลโก้ที่เล็กลง */
-    letter-spacing: 0.4em;
-    text-transform: uppercase; /* เว้นระยะตัวอักษรให้ดูพรีเมียม */
-    margin-top: 15px;
-    opacity: 0.8; /* ระยะห่างระหว่างโลโก้กับตัวอักษร */
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-top: 14px;
+    opacity: 0.95;
+    text-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
     width: 100%;
 }
+
 /* ขยายความกว้างรวมของชุด Login */
 .login-perfect-center {
     position: relative;
     z-index: 20;
     width: 100%;
-    max-width: 420px;
-    padding: 20px; /* ขยายจาก 380px เป็น 420px */
+    max-width: 440px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    transform: translateY(-5%);
 }
 
 /* เพิ่มพื้นที่ภายในตัวการ์ด */
 .modern-glass-card {
     width: 100%;
-    background: rgba(255, 255, 255, 0.04);
-    -webkit-backdrop-filter: blur(30px) saturate(150%);
-    backdrop-filter: blur(30px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 35px;
-    padding: 15px; /* เพิ่มความมนอีกเล็กน้อยให้ดูพรีเมียม */
-    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6); /* เพิ่ม Padding รอบนอกกล่อง */
+    background: rgba(8, 15, 34, 0.78);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid rgba(59, 130, 246, 0.28);
+    border-radius: 26px;
+    padding: 16px 20px 22px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(37, 99, 235, 0.12);
 }
-
-
-/* ขยายความสูงช่อง Email และ Security Key */
-
 
 /* ขยายปุ่ม INITIALIZE SESSION */
 .btn-initialize-session {
     position: relative;
     width: 100%;
-    height: 60px;
-    background: linear-gradient(135deg, #003366 0%, #0055b3 100%); /* เพิ่มจาก 54px เป็น 60px */
-    border: none;
-    border-radius: 18px;
+    height: 52px;
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #3b82f6 100%);
+    border: 1px solid rgba(147, 197, 253, 0.3);
+    border-radius: 14px;
     cursor: pointer;
     overflow: hidden;
     transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 12px 25px rgba(0, 51, 102, 0.4);
-    margin-top: 10px;
-    /* เพิ่มระยะห่างด้านบนปุ่ม */
+    box-shadow: 0 10px 25px rgba(37, 99, 235, 0.45);
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-initialize-session:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #60a5fa 100%);
+    box-shadow: 0 12px 30px rgba(37, 99, 235, 0.6);
+    transform: translateY(-1px);
+}
+
+.btn-initialize-session:active {
+    transform: scale(0.98);
 }
 
 .btn-text {
@@ -7914,8 +7979,8 @@ body {
     z-index: 2;
     position: relative;
     color: white;
-    font-size: 13px;
-    font-weight: 900; /* ขยายตัวอักษรบนปุ่มจาก 11.5px เป็น 13px */
+    font-size: 12.5px;
+    font-weight: 900;
     letter-spacing: 0.25em;
 }
 /* Real-time Validation Colors */
@@ -8093,20 +8158,20 @@ body {
     from { transform: translateY(-100%); }
     to { transform: translateY(0); }
 }
-/* 1. ลดระยะห่างด้านล่างของแถบปุ่มสลับ (Tabs) */
+/* 1. แถบปุ่มสลับ (Tabs) */
 .login-tab-switcher {
     display: flex;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 5px;
-    border-radius: 18px;
-    margin-bottom: 0px !important;
-    /* ปรับจาก 5px เป็น 0px */
+    background: rgba(3, 7, 18, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 4px;
+    border-radius: 16px;
+    margin: 12px 0 16px;
+    gap: 4px;
 }
 
-/* 2. ลดช่องว่างด้านบน (Padding-Top) ของพื้นที่กรอกข้อมูล */
+/* 2. พื้นที่กรอกข้อมูล */
 .login-input-area {
-    /* เพิ่มช่องว่างภายในพื้นที่กรอกข้อมูล */
-    padding: 12px 25px 25px !important; /* เดิมอาจจะเป็น 30px หรือ 25px ให้ลดเหลือประมาณ 10-12px */
+    padding: 4px 6px 10px !important;
 }
 
 /* 3. (เพิ่มเติม) ลดระยะห่างของหัวข้อ Label "ACCESS EMAIL" */
@@ -17867,8 +17932,8 @@ header {
 
 .evidence-multi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+    gap: 8px;
     width: 100%;
 }
 
@@ -17876,595 +17941,79 @@ header {
     position: relative;
     border-radius: 10px;
     overflow: hidden;
-    background: #0f172a;
+    background: #f1f5f9;
     border: 1.5px solid #cbd5e1;
     aspect-ratio: 4 / 3;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     transition: all 0.2s ease;
 }
 
 .dark .evidence-thumb-card {
-    background: #090d16;
+    background: #1e293b;
     border-color: #334155;
 }
 
-.evidence-thumb-card:hover {
-    border-color: #38bdf8;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-}
-
-.evidence-thumb-img-wrap {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-    background: #0b1120;
-}
-
-.evidence-thumb-img-wrap img {
+.evidence-thumb-card img {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    display: block;
+    background: #0f172a;
+    padding: 2px;
 }
 
-.evidence-thumb-top-bar {
+.evidence-thumb-delete-btn {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 5;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 5px;
-    background: linear-gradient(180deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.6) 70%, transparent 100%);
-    pointer-events: auto;
-}
-
-.evidence-thumb-tag {
-    font-size: 10px;
-    font-weight: 800;
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.22);
-    padding: 1px 5px;
-    border-radius: 4px;
-    line-height: 1.3;
-    backdrop-filter: blur(4px);
-    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-    user-select: none;
-}
-
-.evidence-thumb-actions {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-}
-
-.evidence-thumb-action-btn {
+    top: 3px;
+    right: 3px;
     width: 22px;
     height: 22px;
-    min-width: 22px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    background: rgba(30, 41, 59, 0.85);
-    color: #ffffff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    backdrop-filter: blur(4px);
-    padding: 0;
-    margin: 0;
-    line-height: 1;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-    user-select: none;
-}
-
-.evidence-thumb-action-btn:hover {
-    transform: scale(1.12);
-}
-
-.evidence-thumb-action-btn.btn-annot-toggle {
-    background: #334155;
-    border-color: #94a3b8;
-}
-
-.evidence-thumb-action-btn.btn-annot-toggle.is-defect {
-    background: #e11d48;
-    border-color: #fda4af;
-    color: #ffffff;
-}
-
-.evidence-thumb-action-btn.btn-annot-toggle.is-defect:hover {
-    background: #be123c;
-    border-color: #ffffff;
-}
-
-.evidence-thumb-action-btn.btn-annot-toggle.is-raw {
-    background: #475569;
-    border-color: #94a3b8;
-    color: #cbd5e1;
-}
-
-.evidence-thumb-action-btn.btn-annot-toggle.is-raw:hover {
-    background: #334155;
-    border-color: #e2e8f0;
-}
-
-.evidence-thumb-action-btn.btn-annot {
-    background: #e11d48;
-    border-color: #fda4af;
-}
-
-.evidence-thumb-action-btn.btn-annot:hover {
-    background: #be123c;
-    border-color: #ffffff;
-}
-
-.evidence-thumb-action-btn.btn-rot {
-    background: #2563eb;
-    border-color: #93c5fd;
-}
-
-.evidence-thumb-action-btn.btn-rot:hover {
-    background: #1d4ed8;
-    border-color: #ffffff;
-}
-
-.evidence-thumb-action-btn.btn-del {
-    background: #ef4444;
-    border-color: #fca5a5;
-}
-
-.evidence-thumb-action-btn.btn-del:hover {
-    background: #dc2626;
-    border-color: #ffffff;
-}
-
-.evidence-thumb-bottom-bar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 4;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 3px 4px;
-    background: linear-gradient(0deg, rgba(15,23,42,0.85) 0%, transparent 100%);
-    pointer-events: none;
-}
-
-.evidence-thumb-status {
-    font-size: 9.5px;
-    font-weight: 700;
-    color: #e2e8f0;
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: rgba(15, 23, 42, 0.75);
-    backdrop-filter: blur(4px);
-    line-height: 1.2;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-    user-select: none;
-}
-
-.evidence-thumb-status.status-defect {
-    color: #ffffff;
-    background: rgba(225, 29, 72, 0.88);
-    border: 0.5px solid rgba(255, 255, 255, 0.3);
-}
-
-.evidence-thumb-status.status-raw {
-    color: #f1f5f9;
-    background: rgba(51, 65, 85, 0.88);
-    border: 0.5px solid rgba(255, 255, 255, 0.2);
-}
-
-.evidence-preview-btn.btn-toggle-annot {
-    background: #f1f5f9;
-    color: #334155;
-    border-color: #cbd5e1;
-}
-
-.dark .evidence-preview-btn.btn-toggle-annot {
-    background: #1e293b;
-    color: #cbd5e1;
-    border-color: #475569;
-}
-
-.evidence-preview-btn.btn-toggle-annot.active {
-    background: #fff1f2;
-    color: #e11d48;
-    border-color: #fecdd3;
-}
-
-.dark .evidence-preview-btn.btn-toggle-annot.active {
-    background: rgba(225, 29, 72, 0.2);
-    color: #fda4af;
-    border-color: rgba(225, 29, 72, 0.4);
-}
-
-.evidence-preview-btn.btn-toggle-annot:hover {
-    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-    transform: translateY(-1px);
-}
-
-.evidence-preview-btn.btn-annotate {
-    background: #fff1f2;
-    color: #e11d48;
-    border-color: #fecdd3;
-}
-
-.dark .evidence-preview-btn.btn-annotate {
-    background: rgba(225, 29, 72, 0.15);
-    color: #fda4af;
-    border-color: rgba(225, 29, 72, 0.3);
-}
-
-.evidence-preview-btn.btn-annotate:hover {
-    background: #e11d48;
-    color: #ffffff;
-    border-color: #e11d48;
-    box-shadow: 0 2px 4px rgba(225, 29, 72, 0.25);
-}
-
-/* ═════════════════════════════════════════════════════════════════════
-   🎨 EVIDENCE IMAGE ANNOTATION STUDIO MODAL (CANVAS OVERLAY)
-   ═════════════════════════════════════════════════════════════════════ */
-.evidence-annotator-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 99999;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    animation: fadeIn 0.2s ease-out;
-}
-
-.evidence-annotator-modal {
-    background: #ffffff;
-    border-radius: 16px;
-    width: 100%;
-    max-width: 1100px;
-    max-height: 92vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
-    overflow: hidden;
-    border: 1px solid #cbd5e1;
-}
-
-.dark .evidence-annotator-modal {
-    background: #0f172a;
-    border-color: #334155;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-
-.evidence-annotator-header {
-    padding: 12px 20px;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.dark .evidence-annotator-header {
-    background: #1e293b;
-    border-bottom-color: #334155;
-}
-
-.evidence-annotator-toolbar {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: #f1f5f9;
-    border-bottom: 1px solid #e2e8f0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
-}
-
-.evidence-annotator-toolbar::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
-}
-
-.dark .evidence-annotator-toolbar {
-    background: #182234;
-    border-bottom-color: #334155;
-}
-
-.annot-tool-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    background: #ffffff;
-    padding: 2.5px 5px;
-    border-radius: 7px;
-    border: 1px solid #cbd5e1;
-    flex-shrink: 0;
-    white-space: nowrap;
-}
-
-.dark .annot-tool-group {
-    background: #0f172a;
-    border-color: #334155;
-}
-
-.annot-btn {
-    background: transparent;
-    border: 1px solid transparent;
-    color: #475569;
-    padding: 4px 7px;
-    border-radius: 5px;
-    font-size: 11px;
-    font-weight: 750;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    transition: all 0.15s ease;
-    user-select: none;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.dark .annot-btn {
-    color: #cbd5e1;
-}
-
-.annot-btn:hover {
-    background: #e2e8f0;
-    color: #0f172a;
-}
-
-.dark .annot-btn:hover {
-    background: #334155;
-    color: #ffffff;
-}
-
-.annot-btn.active {
-    background: #2563eb !important;
-    color: #ffffff !important;
-    border-color: #1d4ed8 !important;
-    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.35);
-}
-
-.annot-color-dot {
-    width: 18px;
-    height: 18px;
     border-radius: 50%;
-    cursor: pointer;
-    border: 2px solid #ffffff;
-    box-shadow: 0 0 0 1px #cbd5e1;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    flex-shrink: 0;
-}
-
-.annot-color-dot.active {
-    transform: scale(1.22);
-    box-shadow: 0 0 0 2px #2563eb, 0 2px 5px rgba(0,0,0,0.25);
-}
-
-.evidence-annotator-body {
-    position: relative;
-    flex: 1;
-    min-height: 420px;
-    max-height: calc(92vh - 130px);
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #1e293b;
-    background-image: 
-        radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0);
-    background-size: 24px 24px;
-    padding: 16px;
-    user-select: none;
-    touch-action: none;
-}
-
-.dark .evidence-annotator-body {
-    background: #090d16;
-    background-image: 
-        radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
-    background-size: 24px 24px;
-}
-
-.annot-canvas-stage-wrapper {
-    position: relative;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    overflow: hidden;
-    line-height: 0;
-    max-width: 100%;
-    transform-origin: center center;
-    will-change: transform;
-}
-
-.annot-canvas-stage {
-    display: block;
-    max-width: 100%;
-    max-height: 70vh;
-    cursor: crosshair;
-    user-select: none;
-    -webkit-user-drag: none;
-}
-
-.annot-zoom-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px 6px;
-}
-
-.annot-zoom-btn {
-    width: 26px;
-    height: 26px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    color: #1e293b;
-    font-size: 12px;
-    font-weight: 900;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    padding: 0;
-}
-
-.dark .annot-zoom-btn {
-    background: #1e293b;
-    border-color: #475569;
-    color: #f1f5f9;
-}
-
-.annot-zoom-btn:hover {
-    background: #2563eb;
-    color: #ffffff;
-    border-color: #1d4ed8;
-    transform: scale(1.08);
-}
-
-.annot-zoom-badge {
-    min-width: 44px;
-    text-align: center;
-    font-size: 11px;
-    font-weight: 800;
-    color: #0f172a;
-    font-variant-numeric: tabular-nums;
-    user-select: none;
-}
-
-.dark .annot-zoom-badge {
-    color: #f8fafc;
-}
-
-.annot-stage-hint {
-    position: absolute;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(15, 23, 42, 0.85);
-    color: #e2e8f0;
-    font-size: 10.5px;
-    font-weight: 600;
-    padding: 4px 14px;
-    border-radius: 20px;
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    pointer-events: none;
-    z-index: 10;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    white-space: nowrap;
-    opacity: 0.9;
-    transition: opacity 0.2s ease;
-}
-
-.annot-floating-nav {
-    position: absolute;
-    bottom: 12px;
-    right: 14px;
-    z-index: 12;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: rgba(15, 23, 42, 0.9);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    padding: 3px 6px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-}
-
-.annot-text-input-overlay {
-    position: absolute;
-    z-index: 100;
-    background: rgba(15, 23, 42, 0.92);
-    color: #ffffff;
-    border: 1.5px solid #38bdf8;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 13px;
-    font-weight: 700;
-    font-family: inherit;
-    outline: none;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
-    min-width: 160px;
-}
-
-.annot-crop-actions {
-    position: absolute;
-    z-index: 110;
-    transform: translate(-50%, 0);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(56, 189, 248, 0.4);
-    padding: 4px 8px;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    white-space: nowrap;
-    animation: fadeIn 0.15s ease-out;
-}
-
-.annot-crop-confirm-btn {
-    background: #0284c7;
+    background: #ef4444;
     color: #ffffff;
     border: none;
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 11.5px;
-    font-weight: 800;
     cursor: pointer;
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 4px;
-    transition: background 0.15s ease, transform 0.1s ease;
-}
-
-.annot-crop-confirm-btn:hover {
-    background: #0369a1;
-    transform: scale(1.03);
-}
-
-.annot-crop-cancel-btn {
-    background: transparent;
-    color: #94a3b8;
-    border: 1px solid #475569;
-    padding: 5px 8px;
-    border-radius: 5px;
+    justify-content: center;
     font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
+    font-weight: 900;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    transition: transform 0.15s ease, background 0.15s ease;
+    z-index: 6;
 }
 
-.annot-crop-cancel-btn:hover {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    border-color: #ef4444;
+.evidence-thumb-delete-btn:hover {
+    transform: scale(1.15);
+    background: #dc2626;
+}
+
+.evidence-thumb-rotate-btn {
+    position: absolute;
+    top: 3px;
+    right: 28px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 900;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    transition: transform 0.2s ease, background 0.15s ease;
+    z-index: 6;
+}
+
+.evidence-thumb-rotate-btn:hover {
+    transform: scale(1.15) rotate(45deg);
+    background: #1d4ed8;
 }
 
 .evidence-single-preview-wrap {
@@ -18474,106 +18023,427 @@ header {
     align-items: center;
     justify-content: center;
     max-width: 100%;
-    gap: 8px;
-    padding: 8px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.dark .evidence-single-preview-wrap {
-    background: #1e293b;
-    border-color: #334155;
+    width: 100%;
 }
 
 .evidence-single-actions {
-    position: static;
+    display: none;
+}
+
+/* 🎯 Evidence Tool Actions Bar (ทำเครื่องหมาย/วาด, หมุน, ขยาย, ลบ) */
+.evidence-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #ffffff;
+    border-radius: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    border: 1px solid rgba(203, 213, 225, 0.6);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.dark .evidence-toolbar {
+    background: #0f172a;
+    border-color: #334155;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.evidence-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border: 1px solid transparent;
+    background: #f8fafc;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    user-select: none;
+}
+
+.dark .evidence-tool-btn {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+.evidence-tool-btn:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+}
+
+.dark .evidence-tool-btn:hover {
+    background: #334155;
+    border-color: #475569;
+}
+
+.evidence-tool-btn:active {
+    transform: scale(0.97);
+}
+
+.evidence-tool-btn.btn-annotate {
+    color: #c2410c;
+    background: #fff7ed;
+    border-color: #fed7aa;
+}
+.evidence-tool-btn.btn-annotate:hover {
+    background: #ffedd5;
+    border-color: #fb923c;
+    color: #9a3412;
+}
+
+.evidence-tool-btn.btn-rotate {
+    color: #0369a1;
+    background: #f0f9ff;
+    border-color: #bae6fd;
+}
+.evidence-tool-btn.btn-rotate:hover {
+    background: #e0f2fe;
+    border-color: #38bdf8;
+    color: #075985;
+}
+
+.evidence-tool-btn.btn-zoom {
+    color: #1d4ed8;
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+.evidence-tool-btn.btn-zoom:hover {
+    background: #dbeafe;
+    border-color: #60a5fa;
+    color: #1e40af;
+}
+
+.evidence-tool-btn.btn-delete {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+.evidence-tool-btn.btn-delete:hover {
+    background: #fee2e2;
+    border-color: #f87171;
+    color: #991b1b;
+}
+
+/* 🎨 Image Annotation Modal Styles (100% Match with Screenshot) */
+.annotator-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    background: rgba(3, 7, 18, 0.82);
+    backdrop-filter: blur(12px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.annotator-container {
+    width: 100%;
+    max-width: 1440px;
+    height: 92vh;
+    max-height: 920px;
+    background: #0d1527;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 1. Header (White Background, Clear Typography & Action Buttons) */
+.annotator-header {
+    padding: 14px 22px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.annotator-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.annotator-header-icon {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.annotator-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.annotator-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+}
+
+.annotator-subtitle {
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+}
+
+.annotator-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.annotator-header-btn {
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    z-index: 10;
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    padding: 4px 8px;
-    border-radius: 9999px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    margin-top: 2px;
+    outline: none;
 }
 
-.dark .evidence-single-actions {
-    background: #0f172a;
-    border-color: #334155;
+.annotator-header-btn.btn-close-modal {
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    padding: 8px 18px;
+}
+
+.annotator-header-btn.btn-close-modal:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.annotator-header-btn.btn-save-modal {
+    background: #16a34a;
+    color: #ffffff;
+    border: 1px solid #15803d;
+    padding: 8px 22px;
+    box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3);
+}
+
+.annotator-header-btn.btn-save-modal:hover {
+    background: #15803d;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+}
+
+/* 2. Floating Toolbar Row (Horizontal White Toolbar with Rounded Pill Groups) */
+.annotator-floating-toolbar-wrap {
+    padding: 10px 22px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
+}
+
+.annotator-floating-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.annotator-pill-group {
+    display: inline-flex;
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    padding: 3px 4px;
+    gap: 2px;
+}
+
+.annotator-pill-btn {
+    padding: 6px 9px;
+    border-radius: 9999px;
+    border: none;
+    background: transparent;
+    color: #475569;
+    font-size: 11.5px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    outline: none;
+}
+
+.annotator-pill-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.annotator-pill-btn.active {
+    background: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+.annotator-pill-btn.btn-clear-canvas:hover {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.annotator-zoom-display {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #0f172a;
+    padding: 0 6px;
+    min-width: 44px;
+    text-align: center;
+    user-select: none;
+}
+
+.annotator-color-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 8px;
+    display: flex;
+    gap: 6px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 50;
+    animation: fadeIn 0.15s ease-out;
+}
+
+.color-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+    border: 2px solid transparent;
+}
+
+.color-swatch:hover {
+    transform: scale(1.15);
+}
+
+.color-swatch.active {
+    border-color: #0f172a;
+    transform: scale(1.15);
+}
+
+/* 3. Canvas Viewport with Grid & Zoom */
+.annotator-canvas-viewport {
+    flex: 1;
+    background-color: #0c1527;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    cursor: crosshair;
+    user-select: none;
+    touch-action: none;
+}
+
+.annotator-stage {
+    display: inline-block;
+    transform-origin: center center;
+    will-change: transform;
+}
+
+#annotator-canvas {
+    display: block;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    background: #000000;
+}
+
+/* 4. Bottom Floating Help Bar */
+.annotator-bottom-help {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 20;
+}
+
+.help-pill {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 7px 20px;
+    border-radius: 9999px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
 }
 
 .evidence-preview-btn {
-    background: #eff6ff;
-    color: #1d4ed8;
-    border: 1px solid #bfdbfe;
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
     border-radius: 6px;
-    padding: 3px 8px;
-    font-size: 10.5px;
-    font-weight: 700;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 800;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     gap: 4px;
     transition: all 0.15s ease;
-    white-space: nowrap;
-    user-select: none;
-}
-
-.dark .evidence-preview-btn {
-    background: rgba(37, 99, 235, 0.15);
-    color: #93c5fd;
-    border-color: rgba(37, 99, 235, 0.3);
 }
 
 .evidence-preview-btn:hover {
-    background: #2563eb;
-    color: #ffffff;
-    border-color: #2563eb;
+    background: #1d4ed8;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
 }
 
 .evidence-preview-btn.btn-del {
-    background: #fef2f2;
-    color: #dc2626;
-    border-color: #fecaca;
-}
-
-.dark .evidence-preview-btn.btn-del {
-    background: rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
-    border-color: rgba(239, 68, 68, 0.3);
+    background: #ef4444;
 }
 
 .evidence-preview-btn.btn-del:hover {
-    background: #ef4444;
-    color: #ffffff;
-    border-color: #ef4444;
-    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);
+    background: #dc2626;
 }
 
 .evidence-preview-btn.btn-download {
-    background: #ecfdf5;
-    color: #059669;
-    border-color: #a7f3d0;
-}
-
-.dark .evidence-preview-btn.btn-download {
-    background: rgba(16, 185, 129, 0.15);
-    color: #6ee7b7;
-    border-color: rgba(16, 185, 129, 0.3);
+    background: #059669;
 }
 
 .evidence-preview-btn.btn-download:hover {
-    background: #059669;
-    color: #ffffff;
-    border-color: #059669;
-    box-shadow: 0 2px 4px rgba(5, 150, 105, 0.25);
+    background: #047857;
 }
 
 .evidence-stitch-loading {
@@ -18664,61 +18534,9 @@ header {
 }
 
 .dark .evidence-stitched-preview {
-    background: #1e293b;
+    background: #0f172a;
     border-color: #16a34a;
 }
 
-/* ลดความหนาและช่องว่างของแถบเครื่องมือหลัก */
-.evidence-annotator-toolbar {
-    display: flex;
-    flex-wrap: nowrap; /* บังคับให้อยู่แถวเดียวกัน */
-    align-items: center;
-    gap: 4px; /* ลดระยะห่างระหว่างกลุ่มลง */
-    padding: 4px 8px; /* ลด padding บน-ล่าง */
-    background: #f1f5f9;
-    border-bottom: 1px solid #e2e8f0;
-    overflow-x: auto; /* ถ้าจอยังแคบมาก ให้เลื่อนในตัวได้แทนการล้นจอ */
-}
 
-/* ลดขนาดกล่องกลุ่มเครื่องมือ */
-.annot-tool-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    background: #ffffff;
-    padding: 2px 4px;
-    border-radius: 6px;
-    border: 1px solid #cbd5e1;
-    flex-shrink: 0;
-}
 
-/* ลดขนาดปุ่ม และตัวหนังสือในปุ่ม */
-.annot-btn {
-    padding: 3px 6px; /* ลดขนาดปุ่ม */
-    font-size: 10px; /* ลดขนาดตัวอักษรจาก 11px */
-    font-weight: 800;
-    gap: 3px;
-}
-
-/* ปรับขนาดกล่องเลือกสีให้เล็กลง */
-.annot-color-dot {
-    width: 14px; /* ลดจาก 18px */
-    height: 14px;
-    border-radius: 50%;
-}
-
-/* ปรับกลุ่ม Zoom ให้เล็กลง */
-.annot-zoom-group {
-    gap: 2px;
-}
-
-.annot-zoom-btn {
-    width: 22px; /* ลดจาก 26px */
-    height: 22px;
-    font-size: 10px;
-}
-
-.annot-zoom-badge {
-    min-width: 35px; /* ลดพื้นที่แสดงตัวเลข % */
-    font-size: 9.5px;
-}

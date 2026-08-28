@@ -38,13 +38,6 @@
 
     <!-- 4. Local Stylesheet -->
     <link rel="stylesheet" href="styles.css">
-    <script>
-        // Global safety stubs to prevent early ReferenceError
-        window.renderEmployeeLoginDropdown = window.renderEmployeeLoginDropdown || function() {};
-        window.handleEmployeeInput = window.handleEmployeeInput || function() {};
-        window.toggleEmployeeLoginDropdown = window.toggleEmployeeLoginDropdown || function() {};
-        window.selectEmployeeLoginOption = window.selectEmployeeLoginOption || function() {};
-    </script>
 </head>
 <body>
     <div id="system-announcement" class="system-banner hidden">
@@ -109,13 +102,13 @@
         <p id="boot-detail" class="text-slate-500 font-mono text-[7px] mt-2 uppercase tracking-widest">Hard Refreshing Project Data</p>
     </div>
 </div>
-    <!-- Background System (วิดีโอธรรมชาติและผีเสื้อ) -->
-    <div class="background-scene">
-        <div class="vignette-overlay"></div>
-        <video autoplay muted loop playsinline>
-            <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260619_191346_9d19d66e-86a4-47f7-8dc6-712c1788c3b2.mp4" type="video/mp4">
-        </video>
-        <div class="butterfly-system" id="butterfly-court"></div>
+    <!-- Animated Deep Blue Cyber Constellation Background (No Video) -->
+    <div class="login-animated-bg">
+        <canvas id="login-particles-canvas"></canvas>
+        <div class="login-bg-glow-top"></div>
+        <div class="login-bg-glow-center"></div>
+        <div class="login-bg-glow-bottom"></div>
+        <div class="login-bg-grid-overlay"></div>
     </div>
 
     <!-- ส่วนที่จัดกึ่งกลางจอที่สุด (Main Wrapper) -->
@@ -123,11 +116,9 @@
         
         <!-- ส่วนโลโก้ (อยู่นอกกล่องเพื่อความโปร่ง) -->
         <div class="login-brand-header">
-            <svg class="carrier-logo-svg" viewBox="0 0 200 80">
-                <ellipse class="oval-outer" cx="100" cy="40" rx="98" ry="38" />
-                <ellipse class="oval-inner" cx="100" cy="40" rx="90" ry="34" />
-                <text x="50%" y="57" text-anchor="middle" class="carrier-text">Carrier</text>
-            </svg>
+            <div class="login-logo-badge">
+                <img src="sqe_portal_badge.jpg" onerror="this.onerror=null; this.src='src/assets/images/sqe_portal_badge.jpg';" alt="SQE & WAP Crest" class="w-full h-full object-cover" loading="eager" decoding="sync" />
+            </div>
             <p class="portal-main-subtitle">SQE & WAP SUPPORT PORTAL</p>
         </div>
 
@@ -163,10 +154,10 @@
         <div class="flex items-center gap-1.5 whitespace-nowrap shrink-0 min-w-0">
             <!-- จุดสีฟ้ากระพริบ (Gimmick) -->
             <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
-            <span class="text-[9px] font-black uppercase tracking-wider text-blue-300">Select Operator / Staff</span>
+            <span id="login-role-label" class="text-[9px] font-black uppercase tracking-wider text-blue-300">Select Operator / Staff</span>
         </div>
         <!-- Badge ขวาล่าง -->
-        <span class="text-[8.5px] font-black text-blue-400 uppercase tracking-wider bg-blue-950/70 px-2 py-0.5 rounded border border-blue-500/40 whitespace-nowrap shrink-0">
+        <span id="login-role-badge" class="text-[8.5px] font-black text-blue-400 uppercase tracking-wider bg-blue-950/70 px-2 py-0.5 rounded border border-blue-500/40 whitespace-nowrap shrink-0">
             👤 SQE SUPPORT
         </span>
     </div>
@@ -182,16 +173,16 @@
        class="premium-input pr-9 text-xs font-semibold text-white bg-slate-900/90 border-blue-500/40 focus:border-blue-400 cursor-pointer" 
        autocomplete="off"
        spellcheck="false"
-       oninput="typeof handleEmployeeInput === 'function' ? handleEmployeeInput(this.value) : (window.handleEmployeeInput && window.handleEmployeeInput(this.value))"
-       onfocus="typeof renderEmployeeLoginDropdown === 'function' ? renderEmployeeLoginDropdown(this.value) : (window.renderEmployeeLoginDropdown && window.renderEmployeeLoginDropdown(this.value))"
-       onclick="typeof renderEmployeeLoginDropdown === 'function' ? renderEmployeeLoginDropdown(this.value) : (window.renderEmployeeLoginDropdown && window.renderEmployeeLoginDropdown(this.value))"
+       oninput="handleEmployeeInput(this.value)"
+       onfocus="renderEmployeeLoginDropdown(this.value)"
+       onclick="renderEmployeeLoginDropdown(this.value)"
        title="ระบุชื่อหรืออีเมลพนักงาน" 
        aria-label="ระบุชื่อหรืออีเมลพนักงาน">
             
             <!-- ปุ่มลูกศรด้านขวา (Chevron) -->
             <button type="button" 
                     id="employee-chevron-btn"
-                    onclick="typeof toggleEmployeeLoginDropdown === 'function' ? toggleEmployeeLoginDropdown(event) : (window.toggleEmployeeLoginDropdown && window.toggleEmployeeLoginDropdown(event))" 
+                    onclick="toggleEmployeeLoginDropdown(event)" 
                     class="absolute right-2 text-slate-400 hover:text-white transition-all p-1"
                     title="แสดงรายชื่อพนักงานทั้งหมด">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -452,19 +443,6 @@
     <span class="sidebar-text">Running Number</span>
 </div>
 
-<!-- Calibration Menu -->
-<div onclick="switchPage('Calibration', this)" class="nav-item sub-nav-item">
-    <div class="icon-bg">
-        <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 5h18v3H7v12a1 1 0 01-1 1H4a1 1 0 01-1-1V5z" />
-            <path d="M3 5V2.5A1.5 1.5 0 014.5 1h1A1.5 1.5 0 017 2.5V5" />
-            <path d="M10 5v2m3-2v2m3-2v2m3-2v2" />
-            <path d="M11 8v12a1 1 0 001 1h2a1 1 0 001-1V8h-4z" />
-            <path d="M11 8V5.5A1.5 1.5 0 0112.5 4h1A1.5 1.5 0 0115 5.5V8" />
-        </svg>
-    </div>
-    <span class="sidebar-text">Calibration List</span>
-</div>
     </div>
 </div>
 </div>
@@ -506,16 +484,16 @@
 </div>
 </aside>
 <div id="sidebar-backdrop" onclick="toggleSidebar('close')"></div>
-        <main class="flex-1 flex flex-col overflow-hidden bg-slate-50 min-w-0 relative">
-<header class="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-2 sm:px-3 md:px-3.5 h-13 sm:h-14 min-h-[52px] sm:min-h-[56px] flex items-center justify-between gap-1 sm:gap-1.5 md:gap-2 sticky top-0 z-[100] shrink-0 overflow-visible min-w-0">
+        <main class="flex-1 flex flex-col overflow-hidden bg-slate-50 min-w-0">
+<header class="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-2 sm:px-3 md:px-4 h-14 min-h-[56px] flex items-center justify-between gap-1.5 sm:gap-2 relative z-50 overflow-visible min-w-0">
     <!-- [กลุ่มฝั่งซ้าย]: ปุ่มเมนูมือถือ + หัวข้อหน้า + ปุ่มสลับแท็บ SQE EN -->
-    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <button  onclick="toggleSidebar('open')" class="sm:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-200 mr-1" title="Toggle Sidebar" aria-label="Toggle Sidebar">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
         <div class="min-w-0 shrink-0 hidden sm:block">
             <p class="text-[7px] text-slate-400 font-bold uppercase tracking-widest leading-none">CLAIM OPERATIONS</p>
-            <h2 id="header-title" class="font-bold text-slate-800 dark:text-slate-100 text-[10px] sm:text-[11px] truncate uppercase max-w-[100px] xs:max-w-[130px] sm:max-w-[160px] md:max-w-[190px] xl:max-w-[240px]">PART LINE CLAIM</h2>
+            <h2 id="header-title" class="font-bold text-slate-800 dark:text-slate-100 text-[10px] sm:text-[11px] truncate uppercase max-w-[100px] xs:max-w-[130px] sm:max-w-[170px] md:max-w-none">PART LINE CLAIM</h2>
         </div>
 
         <!-- [แถบสลับหน้า SQE EN]: วางต่อท้าย CLAIM OPERATIONS / SQE EN -->
@@ -597,7 +575,7 @@
 
 
     <!-- [กลุ่มฝั่งขวาสุด]: Online Badge + Staff Selector + Filter Bar -->
-    <div id="header-right-tools" class="flex items-center gap-1 sm:gap-1.5 ml-auto shrink-0 flex-nowrap min-w-0">
+    <div class="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0 flex-nowrap">
         <!-- ดรอปดาวน์พนักงาน (Custom Dropdown สำหรับ Supervisor) -->
         <div id="staff-selector-wrap" class="hidden items-center gap-1 shrink-0 relative z-50">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">:</span>
@@ -605,12 +583,12 @@
                 <button type="button" 
                         id="staff-custom-select-btn" 
                         onclick="window.toggleStaffCustomDropdown(event)"
-                        class="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 h-6.5 sm:h-7 text-[10px] sm:text-[10.5px] font-semibold rounded-lg bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-2xs transition-all duration-150 cursor-pointer min-w-[115px] max-w-[160px] sm:min-w-[130px] sm:max-w-[185px] lg:max-w-[215px] justify-between"
+                        class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-2xs transition-all duration-150 cursor-pointer min-w-[170px] max-w-[240px] justify-between"
                         title="เลือกผู้ปฏิบัติงาน"
                         aria-label="เลือกผู้ปฏิบัติงาน">
-                    <div class="flex items-center gap-1 sm:gap-1.5 truncate">
+                    <div class="flex items-center gap-1.5 truncate">
                         <span class="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 shrink-0"></span>
-                        <span id="staff-custom-select-label" class="truncate font-bold max-w-[85px] sm:max-w-[120px] lg:max-w-[150px]">-- เลือกผู้ปฏิบัติงาน --</span>
+                        <span id="staff-custom-select-label" class="truncate font-bold">-- เลือกผู้ปฏิบัติงาน --</span>
                     </div>
                     <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0 transition-transform duration-200" id="staff-select-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -669,46 +647,33 @@
         </div>
 
         <!-- [FILTER TOOLBAR]: เฉพาะหน้า DASHBOARD -->
-        <div id="claim-dash-filter-wrap" class="hidden items-center gap-0.5 sm:gap-1 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-md p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex-nowrap shrink-0 max-w-full">
+        <div id="claim-dash-filter-wrap" class="hidden items-center gap-1 sm:gap-1.5 bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-md p-0.5 sm:p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex-nowrap shrink-0 max-w-full">
             <!-- ปุ่ม Preset -->
-            <div class="flex items-center gap-0.5 sm:gap-1 shrink-0">
-                <button  id="cd-preset-today" onclick="applyClaimDashPreset('today')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8px] sm:text-[8.5px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Today" aria-label="Today">Today</button>
-                <button  id="cd-preset-7days" onclick="applyClaimDashPreset('7days')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8px] sm:text-[8.5px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Last 7 Days" aria-label="Last 7 Days">7 Days</button>
-                <button  id="cd-preset-month" onclick="applyClaimDashPreset('month')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8px] sm:text-[8.5px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Month" aria-label="Month">Month</button>
+            <div class="flex items-center gap-1 shrink-0">
+                <button  id="cd-preset-today" onclick="applyClaimDashPreset('today')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8.5px] sm:text-[9px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Today" aria-label="Today">Today</button>
+                <button  id="cd-preset-7days" onclick="applyClaimDashPreset('7days')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8.5px] sm:text-[9px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Last 7 Days" aria-label="Last 7 Days">7 Days</button>
+                <button  id="cd-preset-month" onclick="applyClaimDashPreset('month')" class="h-5.5 sm:h-6 px-1.5 sm:px-2 text-[8.5px] sm:text-[9px] font-black bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all uppercase whitespace-nowrap shadow-2xs" title="Month" aria-label="Month">Month</button>
             </div>
 
-            <div class="w-[1px] h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
+            <div class="w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
 
             <!-- ส่วนเลือกวันที่เอง (Custom Range) -->
-            <div class="cd-date-range-box flex items-center gap-0.5 px-1 py-0.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-700 shrink-0 h-5.5 sm:h-6">
-                <input  type="date" id="cd-start-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[8.5px] sm:text-[9.5px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[60px] xs:w-[66px] sm:w-[72px] md:w-[76px] h-4.5 cursor-pointer px-0.5" title="Cd Start Date" aria-label="Cd Start Date">
-                <svg class="cd-date-arrow w-2.5 h-2.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-width="2.5" stroke-linecap="round"></path></svg>
-                <input  type="date" id="cd-end-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[8.5px] sm:text-[9.5px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[60px] xs:w-[66px] sm:w-[72px] md:w-[76px] h-4.5 cursor-pointer px-0.5" title="Cd End Date" aria-label="Cd End Date">
+            <div class="cd-date-range-box flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-0.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/80 dark:border-slate-700 shrink-0">
+                <input  type="date" id="cd-start-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[9px] sm:text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[68px] xs:w-[74px] sm:w-[80px] md:w-[84px] h-5 cursor-pointer px-0.5" title="Cd Start Date" aria-label="Cd Start Date">
+                <svg class="cd-date-arrow w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-width="2.5" stroke-linecap="round"></path></svg>
+                <input  type="date" id="cd-end-date" onchange="onClaimDashDateChange()" class="bg-transparent border-none text-[9px] sm:text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none w-[68px] xs:w-[74px] sm:w-[80px] md:w-[84px] h-5 cursor-pointer px-0.5" title="Cd End Date" aria-label="Cd End Date">
             </div>
 
-            <div id="vendor-divider" class="hidden w-[1px] h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
-            <select  id="claim-vendor-filter" onchange="updateAllModuleFilters()" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[9.5px] font-extrabold text-blue-600 dark:text-blue-400 outline-none h-5.5 sm:h-6 px-1 cursor-pointer max-w-[90px] truncate shrink-0" title="Claim Vendor Filter" aria-label="Claim Vendor Filter">
+            <div id="vendor-divider" class="hidden w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
+            <select  id="claim-vendor-filter" onchange="updateAllModuleFilters()" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-extrabold text-blue-600 dark:text-blue-400 outline-none h-6 px-1.5 cursor-pointer max-w-[100px] truncate shrink-0" title="Claim Vendor Filter" aria-label="Claim Vendor Filter">
                 <option value="ALL">ALL VENDORS</option>
             </select>
 
-            <div class="w-[1px] h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
+            <div class="w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
 
             <!-- ปุ่ม Reset -->
             <button  onclick="resetClaimDashFilter()" class="h-5.5 w-5.5 sm:h-6 sm:w-6 flex items-center justify-center bg-white dark:bg-slate-700 text-slate-400 dark:text-slate-300 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 dark:hover:bg-rose-950/50 dark:hover:text-rose-400 transition-all shrink-0" title="Reset Filters" data-i18n-title="btn_reset_filter" aria-label="Action">
-                <svg class="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            </button>
-
-            <div class="w-[1px] h-3 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
-
-            <!-- กระดิ่งแจ้งเตือนเครื่องมือที่เลยกำหนดเทียบ (Overdue / Expired Notification Bell) -->
-            <button id="cal-overdue-bell-btn" onclick="WapCalibrationSystem.goToOverdue()" class="h-5.5 px-1.5 sm:h-6 sm:px-2 flex items-center gap-1 bg-white dark:bg-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-600 dark:text-slate-200 hover:text-rose-600 rounded-lg border border-slate-200/80 dark:border-slate-600 hover:border-rose-300 transition-all shadow-2xs shrink-0 cursor-pointer group" title="รายการเครื่องมือที่เลยกำหนดเทียบ (Overdue / Expired Instruments)" aria-label="Overdue Instruments Notification">
-                <div class="relative flex items-center justify-center">
-                    <svg class="cal-bell-icon w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500 group-hover:text-rose-500 transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-                    </svg>
-                    <span id="cal-overdue-bell-dot" class="hidden absolute -top-1 -right-1 w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping"></span>
-                </div>
-                <span id="cal-overdue-bell-count" class="px-1 py-0.5 bg-rose-500 text-white rounded-full text-[8.5px] font-black leading-none min-w-[14px] text-center shadow-xs">0</span>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
             </button>
         </div>
     </div>
@@ -2640,275 +2605,6 @@
                     <!-- ข้อมูลจะว่างเปล่าตามคำขอ -->
                 </tbody>
             </table>
-        </div>
-    </div>
-</div>
-
-<!-- ==========================================
-     10. CALIBRATION MANAGEMENT SYSTEM (REBUILT)
-     ========================================== -->
-<div id="calibration-content" class="hidden-view h-full flex flex-col p-4 gap-4 overflow-hidden bg-[#f8fafc] dark:bg-slate-950">
-    
-    <!-- Top Header: Title & Main Actions -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-end shrink-0 gap-3">
-        <div>
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 5h18v3H7v12a1 1 0 01-1 1H4a1 1 0 01-1-1V5z" />
-                        <path d="M3 5V2.5A1.5 1.5 0 014.5 1h1A1.5 1.5 0 017 2.5V5" />
-                        <path d="M10 5v2.5m3-2.5v2.5m3-2.5v2.5m3-2.5v2.5" />
-                        <path d="M11 8v12a1 1 0 001 1h2a1 1 0 001-1V8h-4z" />
-                        <path d="M11 8V5.5A1.5 1.5 0 0112.5 4h1A1.5 1.5 0 0115 5.5V8" />
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Instrument Inventory</h3>
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">Carrier Calibration & Asset Management System</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="flex items-center gap-2 w-full md:w-auto">
-            <button onclick="WapCalibrationSystem.syncCalibrationData(false)" id="cal-sync-cloud-btn" title="ซิงก์ข้อมูลรายการเครื่องมือจาก Dexie IndexedDB ขึ้นสู่ฐานข้อมูล Supabase" class="flex-1 md:flex-none h-9 px-4 bg-white dark:bg-slate-800 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400 rounded-xl text-[10px] font-black uppercase hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-all flex items-center justify-center gap-2 shadow-sm">
-                <svg class="cal-sync-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="M12 13v6m-3-3 3-3 3 3"/></svg>
-                <span class="cal-sync-btn-text">Sync Calibration Data</span>
-            </button>
-
-            <button onclick="WapCalibrationSystem.triggerImport()" class="flex-1 md:flex-none h-9 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
-                Import Excel
-            </button>
-            <input type="file" id="cal-import-input" hidden accept=".xlsx, .xls" onchange="WapCalibrationSystem.handleImport(event)">
-
-            <button onclick="WapCalibrationSystem.openAddModal()" class="flex-1 md:flex-none h-9 px-5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 hover:bg-blue-700 active:scale-95 transition-all">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Register New
-            </button>
-
-            <button onclick="WapCalibrationSystem.clearAll()" class="w-9 h-9 flex items-center justify-center bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900/50 text-rose-500 rounded-xl hover:bg-rose-50 transition-all shadow-sm">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- Filter Toolbar -->
-    <div class="bg-white dark:bg-slate-900 p-2 md:p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 shrink-0">
-        <!-- Search Input Bar (Expands flexibly with good minimum width) -->
-        <div class="relative flex-1 min-w-[200px] md:min-w-[260px] lg:min-w-[300px]">
-            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-width="2.5"/></svg>
-            <input type="text" id="cal-search" placeholder="Search by Name, S/N, Code, Dept..." 
-                   class="w-full h-8 pl-8 pr-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-        </div>
-
-        <!-- Action Controls Group (Compact, sleek buttons) -->
-        <div class="flex flex-wrap items-center gap-1.5 shrink-0">
-            <!-- View Mode Switcher: Table vs Monthly View -->
-            <div class="bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg flex items-center border border-slate-200 dark:border-slate-700">
-                <button type="button" id="cal-view-btn-table" onclick="WapCalibrationSystem.setViewMode('TABLE')" 
-                        class="h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs cursor-pointer" 
-                        title="Switch to Standard Table List View">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                    <span>Table View</span>
-                </button>
-                <button type="button" id="cal-view-btn-month" onclick="WapCalibrationSystem.setViewMode('CALENDAR')" 
-                        class="h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer" 
-                        title="Switch to Interactive Monthly Calendar View">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <span>Monthly View</span>
-                </button>
-            </div>
-
-            <!-- Dept Selector -->
-            <select id="cal-filter-dept" onchange="WapCalibrationSystem.render()" 
-                    class="h-8 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[10.5px] font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
-                <option value="ALL">ALL DEPT</option>
-            </select>
-
-            <!-- Status Selector -->
-            <select id="cal-filter-status" onchange="WapCalibrationSystem.render()" 
-                    class="cal-filter-status h-8 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[10.5px] font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
-                <option value="ALL">ALL STATUS</option>
-                <option value="IN_CALIBRATION">🚚 ส่งแคลอยู่ (IN CALIBRATION)</option>
-                <option value="CALIBRATED">✅ CALIBRATED</option>
-                <option value="DUE_SOON">⏳ DUE SOON</option>
-                <option value="EXPIRED">🚨 EXPIRED</option>
-            </select>
-
-            <!-- Reset Status Button -->
-            <button type="button" id="cal-reset-status-btn" onclick="WapCalibrationSystem.resetStatusFilter()" 
-                    title="Reset Status to All and clear filters"
-                    class="h-8 px-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg text-[10.5px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1 transition-all cursor-pointer shadow-2xs">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                    <path d="M3 3v5h5"/>
-                </svg>
-                <span class="hidden sm:inline">Reset</span>
-            </button>
-
-            <!-- Counter Badge -->
-            <div class="h-8 px-2.5 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center border border-slate-200 dark:border-slate-700">
-                <span id="cal-count-badge" class="text-[10px] font-black text-blue-600 dark:text-blue-400 whitespace-nowrap font-mono">0 / 0</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bulk Selection & Action Bar -->
-    <div id="cal-bulk-bar" class="hidden bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-xl border border-blue-500/40 items-center justify-between gap-3 shrink-0 transition-all duration-300">
-        <div class="flex items-center gap-3 flex-wrap">
-            <div class="w-7 h-7 rounded-xl bg-blue-500/30 border border-blue-400/50 flex items-center justify-center font-black text-xs text-blue-300">
-                <span id="cal-selected-count">0</span>
-            </div>
-            <span class="text-xs font-bold tracking-wide">Instruments selected (เลือกเครื่องมือแล้ว)</span>
-            <span class="text-slate-500 text-xs hidden sm:inline">|</span>
-            <button type="button" onclick="WapCalibrationSystem.selectAllFiltered()" class="text-[11px] text-blue-300 hover:text-white underline underline-offset-2 font-bold cursor-pointer transition-colors">
-                Select All Filtered
-            </button>
-            <button type="button" onclick="WapCalibrationSystem.clearSelection()" class="text-[11px] text-slate-400 hover:text-rose-300 underline underline-offset-2 font-medium cursor-pointer transition-colors">
-                Clear Selection
-            </button>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <button type="button" onclick="WapCalibrationSystem.openBatchEditNotesModal()" class="h-8.5 px-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-indigo-600/30 flex items-center gap-1.5 transition-all cursor-pointer">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                <span>Edit History Notes (แก้ไขบันทึกประวัติ)</span>
-            </button>
-            <button type="button" onclick="WapCalibrationSystem.openBulkCalibrateModal()" class="h-8.5 px-3.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-500/30 flex items-center gap-1.5 transition-all cursor-pointer">
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                <span>Set to 'Calibrated' (สอบเทียบแล้ว)</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Data Table Area (List Mode) -->
-    <div id="cal-table-area" class="flex-1 bg-white dark:bg-slate-900 rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
-        <div id="cal-table-container" class="overflow-auto flex-1 scroll-custom">
-            <table class="w-full border-collapse text-left" style="min-width: 1800px; table-layout: auto;">
-<thead class="sticky top-0 z-20">
-    <tr class="bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-        <th class="py-2.5 px-2 text-center" style="width: 55px;">
-            <div class="flex flex-col items-center justify-center gap-1">
-                <span class="leading-none tracking-wider">NO.</span>
-                <input type="checkbox" id="cal-select-all" onclick="WapCalibrationSystem.toggleSelectAll(this)" class="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 transition-all" title="Select / Deselect All Filtered">
-            </div>
-        </th>
-        <th class="py-3 px-4 text-center" style="width: 120px;">Photo / ID</th>
-        <th class="py-3 px-4" style="width: auto; min-width: 200px; white-space: nowrap;">
-            Instrument Details (Name / Brand / S/N)
-        </th>
-        <th class="py-3 px-4" style="width: 140px;">Model</th>
-        <th class="py-3 px-4" style="width: 110px;">Size</th>
-        <th class="py-3 px-4 text-center" style="width: auto; min-width: 150px; white-space: nowrap;">
-            Calibration Schedule (Next Due / Last)
-        </th>
-        <th class="py-3 px-4 text-center" style="width: 140px; white-space: nowrap;">
-            Department
-        </th>
-        <th class="py-3 px-4" style="width: auto; min-width: 150px; white-space: nowrap;">
-           RESPONSIBLE (PIC)</th>
-        <th class="py-3 px-4 text-center" style="width: 110px;">Reg Date</th>
-        <th class="py-3 px-4 text-center" style="width: 80px;">Freq</th>
-        <th class="py-3 px-4 text-center" style="width: 100px;">Month</th>
-        <th class="py-3 px-4 text-center" style="width: 100px;">Action</th>
-    </tr>
-</thead>
-                <tbody id="cal-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/50">
-                    <!-- Virtual Rows will be injected here -->
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Monthly Calendar View Area (Calendar Mode) -->
-    <div id="cal-calendar-area" class="hidden flex-1 bg-white dark:bg-slate-900 rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
-        <!-- Calendar Control Header -->
-        <div class="p-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/60 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 shrink-0">
-            <!-- Left: Month Navigation -->
-            <div class="flex items-center gap-2.5 flex-wrap">
-                <div class="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-xs">
-                    <button type="button" onclick="WapCalibrationSystem.changeCalendarMonth(-1)" 
-                            class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer" 
-                            title="Previous Month">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-                    </button>
-                    <button type="button" onclick="WapCalibrationSystem.goToCurrentMonth()" 
-                            class="h-8 px-3 rounded-lg text-xs font-black text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer" 
-                            title="Go to Today's Month">
-                        Today
-                    </button>
-                    <button type="button" onclick="WapCalibrationSystem.changeCalendarMonth(1)" 
-                            class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer" 
-                            title="Next Month">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <span id="cal-month-title" class="text-base font-black text-slate-800 dark:text-white uppercase tracking-tight">August 2026</span>
-                    <select id="cal-month-jump-select" onchange="WapCalibrationSystem.jumpCalendarMonth(this.value)" 
-                            class="h-8 px-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-300 outline-none cursor-pointer">
-                        <!-- Populated dynamically -->
-                    </select>
-                </div>
-            </div>
-
-            <!-- Right: Monthly KPI Ribbon -->
-            <div class="flex items-center gap-2 flex-wrap text-[11px] font-black">
-                <div class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 rounded-xl">
-                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                    <span>Total Due: <strong id="cal-month-kpi-total" class="font-mono font-black text-xs">0</strong></span>
-                </div>
-                <div class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-xl">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Calibrated: <strong id="cal-month-kpi-calibrated" class="font-mono font-black text-xs">0</strong></span>
-                </div>
-                <div class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 rounded-xl">
-                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                    <span>Due Soon: <strong id="cal-month-kpi-duesoon" class="font-mono font-black text-xs">0</strong></span>
-                </div>
-                <div class="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl">
-                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                    <span>Overdue: <strong id="cal-month-kpi-overdue" class="font-mono font-black text-xs">0</strong></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Calendar Main Layout (Grid + Agenda Split) -->
-        <div class="flex-1 flex flex-col xl:flex-row overflow-hidden">
-            <!-- 1. The Month Grid -->
-            <div class="flex-1 flex flex-col overflow-auto scroll-custom min-w-0 border-b xl:border-b-0 xl:border-r border-slate-200 dark:border-slate-800">
-                <!-- Day of Week Headers (Mon-Sun) -->
-                <div class="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 text-[10.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center sticky top-0 z-10">
-                    <div class="py-2.5 border-r border-slate-200 dark:border-slate-800">MON</div>
-                    <div class="py-2.5 border-r border-slate-200 dark:border-slate-800">TUE</div>
-                    <div class="py-2.5 border-r border-slate-200 dark:border-slate-800">WED</div>
-                    <div class="py-2.5 border-r border-slate-200 dark:border-slate-800">THU</div>
-                    <div class="py-2.5 border-r border-slate-200 dark:border-slate-800">FRI</div>
-                    <div class="py-2.5 border-r border-slate-200 dark:border-slate-800 text-sky-600 dark:text-sky-400">SAT</div>
-                    <div class="py-2.5 text-rose-600 dark:text-rose-400">SUN</div>
-                </div>
-
-                <!-- 7x5 or 7x6 Calendar Cells Container -->
-                <div id="cal-grid-cells" class="grid grid-cols-7 flex-1 auto-rows-fr bg-slate-200 dark:bg-slate-800 gap-[1px]">
-                    <!-- Cells dynamically injected here -->
-                </div>
-            </div>
-
-            <!-- 2. Selected Month/Day Schedule & Agenda Inspector -->
-            <div class="w-full xl:w-96 flex flex-col bg-slate-50/50 dark:bg-slate-900/60 shrink-0 overflow-hidden">
-                <div class="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-800">
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-xs">
-                            📅
-                        </div>
-                        <h4 id="cal-agenda-title" class="text-xs font-black text-slate-800 dark:text-slate-100 uppercase">Upcoming Tasks</h4>
-                    </div>
-                    <span id="cal-agenda-count" class="text-[10px] font-black px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-mono">0 TASKS</span>
-                </div>
-                <div id="cal-agenda-list" class="flex-1 overflow-auto p-3 space-y-2.5 scroll-custom">
-                    <!-- Agenda task cards injected here -->
-                </div>
-            </div>
         </div>
     </div>
 </div>
