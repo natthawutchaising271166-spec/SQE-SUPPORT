@@ -38,6 +38,52 @@
 
     <!-- 4. Local Stylesheet -->
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* ApexCharts Tooltip Universal Top Stacking & Styling */
+        .apexcharts-tooltip,
+        .apexcharts-tooltip.apexcharts-theme-light,
+        .apexcharts-tooltip.apexcharts-theme-dark {
+            z-index: 999999999 !important;
+            pointer-events: none !important;
+            overflow: visible !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            transition: opacity 0.12s ease, transform 0.12s ease !important;
+        }
+
+        .compact-main-grid {
+            position: relative !important;
+            z-index: 45 !important;
+        }
+
+        .compact-main-grid:hover,
+        .compact-main-grid:focus-within {
+            z-index: 85 !important;
+        }
+
+        .compact-main-grid .white-box:has(#trend-chart),
+        .compact-main-grid .white-box:has(.apexcharts-canvas) {
+            position: relative !important;
+            z-index: 50 !important;
+            overflow: visible !important;
+        }
+
+        .compact-main-grid .white-box:has(#trend-chart):hover {
+            z-index: 120 !important;
+        }
+
+        .compact-feed-grid {
+            position: relative !important;
+            z-index: 10 !important;
+        }
+
+        .chart-wrapper,
+        .chart-canvas-wrap,
+        .apexcharts-canvas {
+            overflow: visible !important;
+        }
+    </style>
 </head>
 <body>
     <div id="system-announcement" class="system-banner hidden">
@@ -576,6 +622,14 @@
 
     <!-- [กลุ่มฝั่งขวาสุด]: Online Badge + Staff Selector + Filter Bar -->
     <div class="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0 flex-nowrap">
+        <!-- [ADMIN USER CONTROL HEADER TOOLS]: ปุ่มคำสั่งพิเศษสำหรับ Admin (วางฝั่งขวาบนสุด) -->
+        <div id="admin-header-tools" class="hidden items-center gap-1.5 sm:gap-2 shrink-0">
+            <button id="btn-admin-header-import-json" onclick="if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerUniversalImport === 'function') { window.WapAdminSystem.triggerUniversalImport(); } else if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerJSONImport === 'function') { window.WapAdminSystem.triggerJSONImport(); } else if(typeof triggerUniversalImport === 'function') { triggerUniversalImport(); }" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-black uppercase tracking-wider transition-all bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white shadow-md shadow-emerald-900/20 border border-emerald-400/40 active:scale-95 cursor-pointer shrink-0" title="นำเข้าไฟล์ CSV หรือ JSON จาก Supabase เพื่อบันทึกข้อมูลเดิมลงฐานข้อมูลใหม่ (พร้อมระบบป้องกันข้อมูลซ้ำซ้อนทุกหน้า)" aria-label="นำเข้าไฟล์ CSV หรือ JSON">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                <span class="whitespace-nowrap">📥 นำเข้าไฟล์ CSV / JSON (กันซ้ำ)</span>
+            </button>
+        </div>
+
         <!-- ดรอปดาวน์พนักงาน (Custom Dropdown สำหรับ Supervisor) -->
         <div id="staff-selector-wrap" class="hidden items-center gap-1 shrink-0 relative z-50">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">:</span>
@@ -2160,7 +2214,9 @@
 
             <!-- Right: Action Buttons (Contained within white box) -->
             <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto justify-start lg:justify-end">
-                <input type="file" id="admin-csv-file-input" accept=".csv,text/csv" class="hidden" onchange="if(window.WapAdminSystem && typeof window.WapAdminSystem.handleCSVFileSelected === 'function') { window.WapAdminSystem.handleCSVFileSelected(event); } else if(typeof handleCSVFileSelected === 'function') { handleCSVFileSelected(event); }">
+                <input type="file" id="admin-universal-file-input" accept=".csv,.json,text/csv,application/json" class="hidden" onchange="if(window.WapAdminSystem && typeof window.WapAdminSystem.handleUniversalFileSelected === 'function') { window.WapAdminSystem.handleUniversalFileSelected(event); } else if(window.WapAdminSystem && typeof window.WapAdminSystem.handleJSONFileSelected === 'function') { window.WapAdminSystem.handleJSONFileSelected(event); }">
+                <input type="file" id="admin-csv-file-input" accept=".csv,text/csv" class="hidden" onchange="if(window.WapAdminSystem && typeof window.WapAdminSystem.handleUniversalFileSelected === 'function') { window.WapAdminSystem.handleUniversalFileSelected(event); } else if(window.WapAdminSystem && typeof window.WapAdminSystem.handleCSVFileSelected === 'function') { window.WapAdminSystem.handleCSVFileSelected(event); }">
+                <input type="file" id="admin-json-file-input" accept=".json,application/json" class="hidden" onchange="if(window.WapAdminSystem && typeof window.WapAdminSystem.handleUniversalFileSelected === 'function') { window.WapAdminSystem.handleUniversalFileSelected(event); } else if(window.WapAdminSystem && typeof window.WapAdminSystem.handleJSONFileSelected === 'function') { window.WapAdminSystem.handleJSONFileSelected(event); }">
                 
                 <button onclick="WapAdminSystem.harvestFromHistory()" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-700/60 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 rounded-lg text-[10.5px] sm:text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs shrink-0" title="ดึงข้อมูล Master จากประวัติรายการเก่า">
                     <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -2172,9 +2228,9 @@
                     <span>ซิงค์ Supabase</span>
                 </button>
 
-                <button onclick="if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerCSVImport === 'function') { window.WapAdminSystem.triggerCSVImport(); } else if(typeof triggerCSVImport === 'function') { triggerCSVImport(); }" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/80 rounded-lg text-[10.5px] sm:text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs shrink-0" title="นำเข้าไฟล์ CSV เพื่อทับข้อมูลเดิม">
+                <button onclick="if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerUniversalImport === 'function') { window.WapAdminSystem.triggerUniversalImport(); } else if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerJSONImport === 'function') { window.WapAdminSystem.triggerJSONImport(); }" class="px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white border border-emerald-400/40 rounded-lg text-[10.5px] sm:text-[11px] font-black transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm shadow-emerald-900/20 shrink-0" title="นำเข้าไฟล์ CSV หรือ JSON จาก Supabase เพื่อบันทึกข้อมูลเดิมลงฐานข้อมูลใหม่ (พร้อมระบบป้องกันข้อมูลซ้ำซ้อนทุกหน้า)">
                     <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                    <span>นำเข้า CSV</span>
+                    <span>📥 นำเข้า CSV / JSON (กันซ้ำ)</span>
                 </button>
 
                 <button id="admin-btn-add-new" onclick="WapAdminSystem.handleAddNew()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10.5px] sm:text-[11px] font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm shadow-blue-600/25 border border-blue-500 cursor-pointer shrink-0" title="เพิ่มข้อมูลใหม่">
