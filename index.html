@@ -39,17 +39,63 @@
     <!-- 4. Local Stylesheet -->
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* ApexCharts Tooltip Universal Top Stacking & Styling */
+        /* ApexCharts Tooltip Universal High-Contrast HUD Styling */
         .apexcharts-tooltip,
         .apexcharts-tooltip.apexcharts-theme-light,
         .apexcharts-tooltip.apexcharts-theme-dark {
             z-index: 999999999 !important;
             pointer-events: none !important;
             overflow: visible !important;
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
+            background: #081126 !important;
+            border: 1px solid rgba(56, 189, 248, 0.5) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 20px rgba(56, 189, 248, 0.25) !important;
+            color: #ffffff !important;
+            backdrop-filter: blur(12px) !important;
+            padding: 0 !important;
             transition: opacity 0.12s ease, transform 0.12s ease !important;
+        }
+
+        .apexcharts-tooltip-title {
+            background: #0e1d3e !important;
+            border-bottom: 1px solid rgba(56, 189, 248, 0.3) !important;
+            color: #38bdf8 !important;
+            font-weight: 800 !important;
+            font-size: 11px !important;
+            padding: 7px 12px !important;
+            letter-spacing: 0.03em !important;
+            display: block !important;
+            margin: 0 !important;
+        }
+
+        .apexcharts-tooltip-series-group {
+            padding: 7px 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            background: transparent !important;
+            margin: 0 !important;
+        }
+
+        .apexcharts-tooltip-text {
+            color: #ffffff !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+        }
+
+        .apexcharts-tooltip-text-y-label,
+        .apexcharts-tooltip-text-label {
+            color: #94a3b8 !important;
+            font-weight: 700 !important;
+            margin-right: 4px !important;
+        }
+
+        .apexcharts-tooltip-text-y-value,
+        .apexcharts-tooltip-text-value,
+        .apexcharts-tooltip-text-goals-value {
+            color: #38bdf8 !important;
+            font-weight: 900 !important;
+            font-family: 'DM Mono', monospace !important;
         }
 
         .compact-main-grid {
@@ -157,148 +203,194 @@
         <div class="login-bg-grid-overlay"></div>
     </div>
 
-    <!-- ส่วนที่จัดกึ่งกลางจอที่สุด (Main Wrapper) -->
+    <!-- ส่วนที่จัดกึ่งกลางจอที่สุด (Main Wrapper - Compact Laptop Proportions) -->
     <div class="login-perfect-center">
         
-        <!-- ส่วนโลโก้ (อยู่นอกกล่องเพื่อความโปร่ง) -->
+        <!-- ส่วนโลโก้ (อยู่นอกกล่องเพื่อความโปร่งและกระชับ) -->
         <div class="login-brand-header">
-            <div class="login-logo-badge">
-                <img src="sqe_portal_badge.jpg" onerror="this.onerror=null; this.src='src/assets/images/sqe_portal_badge.jpg';" alt="SQE & WAP Crest" class="w-full h-full object-cover" loading="eager" decoding="sync" />
+            <div class="login-holo-wrap">
+                <div class="login-holo-ring-outer"></div>
+                <div class="login-holo-ring-inner"></div>
+                <div class="login-logo-badge">
+                    <img src="sqe_portal_badge.jpg" onerror="this.onerror=null; this.src='src/assets/images/sqe_portal_badge.jpg';" alt="SQE & WAP Crest" class="w-full h-full object-cover" loading="eager" decoding="sync" />
+                </div>
             </div>
             <p class="portal-main-subtitle">SQE & WAP SUPPORT PORTAL</p>
+            <div class="portal-security-badge">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>CARRIER ENTERPRISE SECURITY CLEARANCE</span>
+            </div>
         </div>
 
-        <!-- บัตรล็อกอิน Glassmorphism -->
-        <div class="modern-glass-card">
-                <div class="card-status-bar">
-        <!-- Network Status Indicator -->
-        <div id="login-net-indicator" class="net-status-pill">
-            <span class="net-dot"></span>
-            <span id="net-text">Checking System...</span>
-        </div>
+        <!-- บัตรล็อกอิน Glassmorphism (ลอยเหนือทุกอย่างเพื่อไม่ให้ Dropdown โดนตัดขอบ) -->
+        <div class="modern-glass-card relative">
+            <!-- Cyber Bracket Accents -->
+            <div class="cyber-bracket-tl"></div>
+            <div class="cyber-bracket-tr"></div>
+            <div class="cyber-bracket-bl"></div>
+            <div class="cyber-bracket-br"></div>
+            <div class="absolute inset-0 overflow-hidden rounded-[20px] pointer-events-none z-[4]">
+                <div class="cyber-scanline"></div>
+            </div>
 
-        <!-- Language Selector -->
-        <div class="login-lang-selector">
-            <button  onclick="changeLanguage('en')" id="lang-en" class="lang-btn" title="EN" aria-label="EN">EN</button>
-            <span class="lang-sep">|</span>
-            <button  onclick="changeLanguage('th')" id="lang-th" class="lang-btn" title="TH" aria-label="TH">TH</button>
-        </div>
-    </div>
+            <div class="card-status-bar">
+                <!-- Network Status Indicator -->
+                <div id="login-net-indicator" class="net-status-pill">
+                    <span class="net-dot"></span>
+                    <span id="net-text">Checking System...</span>
+                </div>
+
+                <!-- Language Selector -->
+                <div class="login-lang-selector">
+                    <button onclick="changeLanguage('en')" id="lang-en" class="lang-btn" title="EN" aria-label="EN">EN</button>
+                    <span class="lang-sep">|</span>
+                    <button onclick="changeLanguage('th')" id="lang-th" class="lang-btn" title="TH" aria-label="TH">TH</button>
+                </div>
+            </div>
     
             <div class="login-tab-switcher">
-                <button  id="tab-support" onclick="switchLoginTab('sqe_support')" class="login-tab-btn active" title="SQE SUPPORT" aria-label="SQE SUPPORT">SQE SUPPORT</button>
-                <button  id="tab-supervisor" onclick="switchLoginTab('supervisor')" class="login-tab-btn" title="SUPERVISOR" aria-label="SUPERVISOR">SUPERVISOR</button>
+                <button id="tab-support" onclick="switchLoginTab('sqe_support')" class="login-tab-btn active" title="SQE SUPPORT" aria-label="SQE SUPPORT">
+                    <span class="tab-glow-dot"></span>
+                    SQE SUPPORT
+                </button>
+                <button id="tab-supervisor" onclick="switchLoginTab('supervisor')" class="login-tab-btn" title="SUPERVISOR" aria-label="SUPERVISOR">
+                    <span class="tab-glow-dot"></span>
+                    SUPERVISOR
+                </button>
             </div>
 
             <div class="login-input-area">
-    <div class="space-y-5">
-  <!-- Container หลักของระบบเลือกรายชื่อ -->
-<div id="employee-select-wrap" class="input-group relative">
-    
-    <!-- ส่วนหัว (Label & Badge) -->
-    <div class="flex items-center justify-between mb-1.5 gap-2 flex-nowrap w-full">
-        <div class="flex items-center gap-1.5 whitespace-nowrap shrink-0 min-w-0">
-            <!-- จุดสีฟ้ากระพริบ (Gimmick) -->
-            <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
-            <span id="login-role-label" class="text-[9px] font-black uppercase tracking-wider text-blue-300">Select Operator / Staff</span>
-        </div>
-        <!-- Badge ขวาล่าง -->
-        <span id="login-role-badge" class="text-[8.5px] font-black text-blue-400 uppercase tracking-wider bg-blue-950/70 px-2 py-0.5 rounded border border-blue-500/40 whitespace-nowrap shrink-0">
-            👤 SQE SUPPORT
-        </span>
-    </div>
+                <div class="space-y-2.5">
+                    <!-- Container หลักของระบบเลือกรายชื่อ -->
+                    <div id="employee-select-wrap" class="input-group relative">
+                        
+                        <!-- ส่วนหัว (Label & Badge) -->
+                        <div class="flex items-center justify-between mb-1 gap-2 flex-nowrap w-full">
+                            <div class="flex items-center gap-1.5 whitespace-nowrap shrink-0 min-w-0">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
+                                <span id="login-role-label" class="text-[9px] font-black uppercase tracking-wider text-blue-300">Select Operator / Staff</span>
+                            </div>
+                            <!-- Badge ขวาล่าง -->
+                            <span id="login-role-badge" class="text-[8.5px] font-black text-blue-400 uppercase tracking-wider bg-blue-950/70 px-2 py-0.5 rounded border border-blue-500/40 whitespace-nowrap shrink-0 shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                                👤 SQE SUPPORT
+                            </span>
+                        </div>
 
-    <!-- ส่วน Input และปุ่มกด -->
-    <div class="relative w-full">
-        <div class="relative flex items-center">
-            <!-- ช่องค้นหา (Search Input) -->
-<!-- ช่องค้นหา (Search Input) -->
-<input type="text" 
-       id="login-email" 
-       placeholder="🔍 ค้นหาชื่อพนักงาน หรือทีมที่สังกัด..." 
-       class="premium-input pr-9 text-xs font-semibold text-white bg-slate-900/90 border-blue-500/40 focus:border-blue-400 cursor-pointer" 
-       autocomplete="off"
-       spellcheck="false"
-       oninput="handleEmployeeInput(this.value)"
-       onfocus="renderEmployeeLoginDropdown(this.value)"
-       onclick="renderEmployeeLoginDropdown(this.value)"
-       title="ระบุชื่อหรืออีเมลพนักงาน" 
-       aria-label="ระบุชื่อหรืออีเมลพนักงาน">
-            
-            <!-- ปุ่มลูกศรด้านขวา (Chevron) -->
-            <button type="button" 
-                    id="employee-chevron-btn"
-                    onclick="toggleEmployeeLoginDropdown(event)" 
-                    class="absolute right-2 text-slate-400 hover:text-white transition-all p-1"
-                    title="แสดงรายชื่อพนักงานทั้งหมด">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </button>
-        </div>
-        
-        <!-- แผงรายการผลลัพธ์ (Dropdown Panel) -->
-        <!-- ส่วนนี้จะถูกฉีด HTML เข้าไปผ่านฟังก์ชัน renderEmployeeLoginDropdown ใน JS -->
-        <div id="login-employee-dropdown" 
-             class="hidden absolute top-full left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-xl bg-slate-950/95 border border-blue-500/50 shadow-2xl z-[99999] backdrop-blur-xl p-1.5 custom-scrollbar text-left">
-            <!-- ตัวอย่างรายการที่จะแสดง (Placeholder) -->
-            <div class="p-3 text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-                Initializing Directory...
-            </div>
-        </div>
-    </div>
-</div>
-        
-        <!-- 2. Password Input พร้อม Toggle & Caps Lock Detection -->
-<div id="password-field" class="input-group relative">
-    <label class="input-tiny-label">Security Key</label>
-    <div class="relative">
-        <!-- ช่องกรอกรหัสผ่าน (เพิ่ม autocomplete="one-time-code") -->
-        <input type="password" 
-               id="login-pass" 
-               class="premium-input pr-12" 
-               placeholder="••••••••" 
-               autocomplete="one-time-code" 
-               onkeyup="checkCapsLock(event)" 
-               title="••••••••" 
-               aria-label="••••••••">
-        
-        <!-- ปุ่มดวงตา -->
-        <button type="button" onclick="togglePassVisibility()" class="absolute right-4 top-1/2 -translate-y-1/2 z-50 text-slate-400 hover:text-white transition-all" title="Toggle Password Visibility" aria-label="Toggle Password Visibility">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-                <line id="eye-slash" x1="3" y1="3" x2="21" y2="21" style="display:none;"></line>
-            </svg>
-        </button>
-    </div>
-    <!-- จุดแจ้งเตือน Caps Lock -->
-    <div id="caps-lock-warning" class="hidden absolute -bottom-5 left-0 text-[8px] font-black text-amber-400 uppercase">
-        ⚠️ Caps Lock is ON
-    </div>
-</div>
+                        <!-- Department Quick Filter Pills -->
+                        <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 mb-1.5 scrollbar-none" id="login-quick-filter-pills">
+                            <button type="button" data-dept="ALL" onclick="filterLoginStaffByDept('ALL')" class="login-dept-pill active">ALL</button>
+                            <button type="button" data-dept="SUPPORT" onclick="filterLoginStaffByDept('SUPPORT')" class="login-dept-pill">SUPPORT</button>
+                            <button type="button" data-dept="IQC" onclick="filterLoginStaffByDept('IQC')" class="login-dept-pill">IQC</button>
+                            <button type="button" data-dept="ENGINEER" onclick="filterLoginStaffByDept('ENGINEER')" class="login-dept-pill">ENGINEER</button>
+                            <button type="button" data-dept="MANAGEMENT" onclick="filterLoginStaffByDept('MANAGEMENT')" class="login-dept-pill">MANAGEMENT</button>
+                        </div>
 
-        <!-- 3. Remember Me & Forget Key Row -->
-        <div class="flex items-center justify-between px-1">
-            <label class="flex items-center cursor-pointer group">
-                <input  type="checkbox" id="remember-me" class="hidden" title="Remember Me" aria-label="Remember Me">
-                <div id="custom-check" class="w-4 h-4 border border-white/20 rounded bg-black/40 flex items-center justify-center group-hover:border-blue-500/50 transition-all">
-                    <div id="check-inner" class="hidden w-2 h-2 bg-blue-500 rounded-[2px]"></div>
+                        <!-- ส่วน Input และปุ่มกด -->
+                        <div class="relative w-full">
+                            <div class="relative flex items-center">
+                                <input type="text" 
+                                       id="login-email" 
+                                       placeholder="🔍 ค้นหาชื่อพนักงาน หรือทีมที่สังกัด..." 
+                                       class="premium-input pr-9 text-xs font-semibold text-white bg-slate-900/90 border-blue-500/40 focus:border-blue-400 cursor-pointer shadow-[0_0_15px_rgba(59,130,246,0.15)]" 
+                                       autocomplete="off"
+                                       spellcheck="false"
+                                       oninput="handleEmployeeInput(this.value)"
+                                       onfocus="renderEmployeeLoginDropdown(this.value)"
+                                       onclick="renderEmployeeLoginDropdown(this.value)"
+                                       title="ระบุชื่อหรืออีเมลพนักงาน" 
+                                       aria-label="ระบุชื่อหรืออีเมลพนักงาน">
+                                
+                                <!-- ปุ่มลูกศรด้านขวา (Chevron) -->
+                                <button type="button" 
+                                        id="employee-chevron-btn"
+                                        onclick="toggleEmployeeLoginDropdown(event)" 
+                                        class="absolute right-2 text-blue-400 hover:text-white transition-all p-1 hover:scale-110"
+                                        title="แสดงรายชื่อพนักงานทั้งหมด">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <!-- แผงรายการผลลัพธ์ (Dropdown Panel) -->
+                            <div id="login-employee-dropdown" 
+                                 class="hidden absolute top-full left-0 right-0 mt-1.5 max-h-64 overflow-y-auto rounded-xl bg-slate-950/95 border border-blue-500/50 shadow-[0_20px_60px_rgba(0,0,0,0.9),0_0_30px_rgba(59,130,246,0.25)] z-[99999] backdrop-blur-xl p-1.5 custom-scrollbar text-left">
+                                <div class="p-3 text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                                    Initializing Directory...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 2. Password Input พร้อม Toggle & Caps Lock Detection -->
+                    <div id="password-field" class="input-group relative">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="input-tiny-label">Security Key</label>
+                            <span id="pass-shield-badge" class="text-[8px] font-mono font-bold text-blue-400/80 tracking-wider">SECURE PIN / KEY</span>
+                        </div>
+                        <div class="relative">
+                            <input type="password" 
+                                   id="login-pass" 
+                                   class="premium-input pr-12 text-sm tracking-widest font-mono" 
+                                   placeholder="••••••••" 
+                                   autocomplete="one-time-code" 
+                                   oninput="updatePassStrength(this.value)"
+                                   onkeyup="checkCapsLock(event); updatePassStrength(this.value)" 
+                                   title="••••••••" 
+                                   aria-label="••••••••">
+                            
+                            <!-- ปุ่มดวงตา -->
+                            <button type="button" onclick="togglePassVisibility()" class="absolute right-4 top-1/2 -translate-y-1/2 z-50 text-slate-400 hover:text-blue-300 transition-all p-1 hover:scale-110" title="Toggle Password Visibility" aria-label="Toggle Password Visibility">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <line id="eye-slash" x1="3" y1="3" x2="21" y2="21" style="display:none;"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <!-- Live Password Strength Meter -->
+                        <div class="flex items-center justify-between mt-1 px-0.5">
+                            <div class="flex items-center gap-1" id="pass-strength-meter">
+                                <span class="w-5 h-1 rounded-full bg-slate-700 pass-bar-1 transition-all"></span>
+                                <span class="w-5 h-1 rounded-full bg-slate-700 pass-bar-2 transition-all"></span>
+                                <span class="w-5 h-1 rounded-full bg-slate-700 pass-bar-3 transition-all"></span>
+                                <span class="w-5 h-1 rounded-full bg-slate-700 pass-bar-4 transition-all"></span>
+                            </div>
+                            <span class="text-[7.5px] font-mono text-slate-500 tracking-wider">AES-256 GCM</span>
+                        </div>
+                        <!-- จุดแจ้งเตือน Caps Lock -->
+                        <div id="caps-lock-warning" class="hidden absolute -bottom-5 left-0 text-[8px] font-black text-amber-400 uppercase tracking-widest bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40">
+                            ⚠️ Caps Lock is ON
+                        </div>
+                    </div>
+
+                    <!-- 3. Remember Me & Forget Key Row -->
+                    <div class="flex items-center justify-between px-1 pt-0.5">
+                        <label class="flex items-center cursor-pointer group">
+                            <input type="checkbox" id="remember-me" class="hidden" title="Remember Me" aria-label="Remember Me">
+                            <div id="custom-check" class="w-4 h-4 border border-blue-500/40 rounded bg-slate-900/80 flex items-center justify-center group-hover:border-blue-400 transition-all shadow-[0_0_8px_rgba(59,130,246,0.2)]">
+                                <div id="check-inner" class="hidden w-2 h-2 bg-blue-400 rounded-[2px] shadow-[0_0_6px_#60a5fa]"></div>
+                            </div>
+                            <span class="ml-2 text-[9px] font-black text-slate-400 group-hover:text-slate-200 transition-colors uppercase tracking-widest">Remember Account</span>
+                        </label>
+                        <button onclick="toast('Please contact SQE Admin for key reset','info')" class="text-[9px] font-black text-blue-400/80 hover:text-blue-300 transition-colors uppercase tracking-widest" title="Forgot Key?" aria-label="Forgot Key?">Forgot Key?</button>
+                    </div>
+
+                    <div id="login-error" class="hidden error-alert"></div>
+                    
+                    <button id="login-btn" onclick="handleLogin()" class="btn-initialize-session" title="INITIALIZE SESSION" aria-label="INITIALIZE SESSION">
+                        <div class="btn-shimmer"></div>
+                        <span id="login-btn-text" class="btn-text">INITIALIZE SESSION</span>
+                        <div id="login-spinner" class="hidden spinner-white"></div>
+                    </button>
+
+                    <!-- Network security footer pill -->
+                    <div class="flex items-center justify-center gap-2 pt-0.5 text-[8px] font-mono text-slate-400/80 tracking-wider uppercase">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>TLS 1.3 ENCRYPTED · SECURE GATEWAY</span>
+                    </div>
                 </div>
-                <span class="ml-2 text-[9px] font-black text-slate-400 group-hover:text-slate-200 transition-colors uppercase tracking-widest">Remember Account</span>
-            </label>
-            <button  onclick="toast('Please contact SQE Admin for key reset','info')" class="text-[9px] font-black text-blue-400/80 hover:text-blue-400 transition-colors uppercase tracking-widest" title="Forgot Key?" aria-label="Forgot Key?">Forgot Key?</button>
-        </div>
-
-        <div id="login-error" class="hidden error-alert"></div>
-        
-        <button  id="login-btn" onclick="handleLogin()" class="btn-initialize-session" title="INITIALIZE SESSION" aria-label="INITIALIZE SESSION">
-            <div class="btn-shimmer"></div>
-            <span id="login-btn-text" class="btn-text">INITIALIZE SESSION</span>
-            <div id="login-spinner" class="hidden spinner-white"></div>
-        </button>
-    </div>
-</div>
+            </div>
         </div>
 
         <!-- ข้อความเวอร์ชั่นด้านล่าง -->
@@ -335,6 +427,74 @@
             <span class="status-dot-pulse"></span>
             <p class="brand-sub">WAPAPP & SQE SYSTEM V1.0</p>
         </div>
+    </div>
+
+    <!-- ดรอปดาวน์พนักงาน (Custom Dropdown สำหรับ Supervisor ย้ายมาอยู่ใต้ brand-sub ภายในโซน Sidebar) -->
+    <div id="staff-selector-wrap" class="hidden flex-col w-full px-1.5 pt-1 relative z-50">
+        <div class="relative w-full">
+            <button type="button" 
+                    id="staff-custom-select-btn" 
+                    onclick="window.toggleStaffCustomDropdown(event)"
+                    class="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10.5px] font-bold rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-blue-50/80 dark:hover:bg-slate-700/80 border border-slate-300/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs transition-all duration-150 cursor-pointer justify-between"
+                    title="เลือกผู้ปฏิบัติงาน"
+                    aria-label="เลือกผู้ปฏิบัติงาน">
+                <div class="flex items-center gap-1.5 truncate">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                    <span id="staff-custom-select-label" class="truncate font-bold text-[10.5px]">-- เลือกผู้ปฏิบัติงาน --</span>
+                </div>
+                <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-400 shrink-0 transition-transform duration-200" id="staff-select-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+
+            <!-- Custom Dropdown Panel -->
+            <div id="staff-custom-dropdown-panel" 
+                 class="hidden absolute left-0 right-0 top-full mt-1.5 w-full min-w-[230px] max-w-[270px] max-h-80 flex-col rounded-xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 shadow-2xl z-[999999] backdrop-blur-xl transition-all overflow-hidden">
+                <!-- Search header & Category Chips -->
+                <div class="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex flex-col gap-1.5">
+                    <div class="flex items-center justify-between px-0.5">
+                        <span class="text-[9.5px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                            ผู้ปฏิบัติงานในระบบ
+                        </span>
+                        <span id="staff-custom-count-badge" class="text-[8.5px] font-bold px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/60">
+                            0 คน
+                        </span>
+                    </div>
+                    <div class="relative flex items-center">
+                        <span class="absolute left-2 text-slate-400 text-xs">🔍</span>
+                        <input type="text" 
+                               id="staff-custom-search-input" 
+                               placeholder="ค้นหาชื่อ, อีเมล หรือตำแหน่ง..." 
+                               class="w-full pl-6 pr-6 py-1 text-[11px] font-medium rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                               oninput="window.filterStaffCustomDropdown(this.value)"
+                               onkeydown="window.handleStaffDropdownKeydown(event)"
+                               onclick="event.stopPropagation()">
+                        <button type="button" 
+                                id="staff-custom-search-clear" 
+                                onclick="window.clearStaffDropdownSearch(event)"
+                                class="hidden absolute right-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-3.5 h-3.5 rounded-full items-center justify-center bg-slate-100 dark:bg-slate-800 transition-colors"
+                                title="ล้างคำค้นหา">✕</button>
+                    </div>
+                    <!-- Quick Role Filters -->
+                    <div id="staff-custom-role-filters" class="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
+                        <button type="button" onclick="window.setStaffRoleFilter('ALL', event)" class="staff-role-chip active px-1.5 py-0.5 rounded-md text-[8.5px] font-black uppercase tracking-wider transition-all bg-blue-600 text-white shadow-2xs">ALL</button>
+                        <button type="button" onclick="window.setStaffRoleFilter('IQC', event)" class="staff-role-chip px-1.5 py-0.5 rounded-md text-[8.5px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">IQC</button>
+                        <button type="button" onclick="window.setStaffRoleFilter('ENGINEER', event)" class="staff-role-chip px-1.5 py-0.5 rounded-md text-[8.5px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">EN</button>
+                        <button type="button" onclick="window.setStaffRoleFilter('SUPERVISOR', event)" class="staff-role-chip px-1.5 py-0.5 rounded-md text-[8.5px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">SUP</button>
+                        <button type="button" onclick="window.setStaffRoleFilter('MANAGER', event)" class="staff-role-chip px-1.5 py-0.5 rounded-md text-[8.5px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">MGR</button>
+                    </div>
+                </div>
+                <!-- Staff List items container -->
+                <div id="staff-custom-list-container" class="p-1 overflow-y-auto max-h-56 custom-scrollbar flex flex-col gap-1">
+                    <!-- Items populated dynamically -->
+                </div>
+            </div>
+        </div>
+        <!-- Hidden native select kept for compatibility -->
+        <select id="staff-filter-select" class="hidden" onchange="onStaffSelect(this.value)" title="Staff Filter Select" aria-label="Staff Filter Select">
+            <option value="">-- เลือกผู้ปฏิบัติงาน --</option>
+        </select>
     </div>
 </div>
 
@@ -620,7 +780,7 @@
 </div>
 
 
-    <!-- [กลุ่มฝั่งขวาสุด]: Online Badge + Staff Selector + Filter Bar -->
+    <!-- [กลุ่มฝั่งขวาสุด]: Online Badge + Filter Bar -->
     <div class="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0 flex-nowrap">
         <!-- [ADMIN USER CONTROL HEADER TOOLS]: ปุ่มคำสั่งพิเศษสำหรับ Admin (วางฝั่งขวาบนสุด) -->
         <div id="admin-header-tools" class="hidden items-center gap-1.5 sm:gap-2 shrink-0">
@@ -628,76 +788,6 @@
                 <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                 <span class="whitespace-nowrap">📥 นำเข้าไฟล์ CSV / JSON (กันซ้ำ)</span>
             </button>
-        </div>
-
-        <!-- ดรอปดาวน์พนักงาน (Custom Dropdown สำหรับ Supervisor) -->
-        <div id="staff-selector-wrap" class="hidden items-center gap-1 shrink-0 relative z-50">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">:</span>
-            <div class="relative">
-                <button type="button" 
-                        id="staff-custom-select-btn" 
-                        onclick="window.toggleStaffCustomDropdown(event)"
-                        class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-300/80 dark:border-slate-600/80 text-slate-700 dark:text-slate-200 shadow-2xs transition-all duration-150 cursor-pointer min-w-[170px] max-w-[240px] justify-between"
-                        title="เลือกผู้ปฏิบัติงาน"
-                        aria-label="เลือกผู้ปฏิบัติงาน">
-                    <div class="flex items-center gap-1.5 truncate">
-                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 shrink-0"></span>
-                        <span id="staff-custom-select-label" class="truncate font-bold">-- เลือกผู้ปฏิบัติงาน --</span>
-                    </div>
-                    <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0 transition-transform duration-200" id="staff-select-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
-
-                <!-- Custom Dropdown Panel -->
-                <div id="staff-custom-dropdown-panel" 
-                     class="hidden absolute right-0 top-full mt-1.5 w-80 max-h-96 flex-col rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 shadow-2xl z-[999999] backdrop-blur-xl transition-all overflow-hidden">
-                    <!-- Search header & Category Chips -->
-                    <div class="p-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex flex-col gap-2">
-                        <div class="flex items-center justify-between px-0.5">
-                            <span class="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                ผู้ปฏิบัติงานในระบบ
-                            </span>
-                            <span id="staff-custom-count-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/60">
-                                0 คน
-                            </span>
-                        </div>
-                        <div class="relative flex items-center">
-                            <span class="absolute left-2.5 text-slate-400 text-xs">🔍</span>
-                            <input type="text" 
-                                   id="staff-custom-search-input" 
-                                   placeholder="ค้นหาชื่อ, อีเมล หรือตำแหน่ง..." 
-                                   class="w-full pl-7 pr-7 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-500 transition-all"
-                                   oninput="window.filterStaffCustomDropdown(this.value)"
-                                   onkeydown="window.handleStaffDropdownKeydown(event)"
-                                   onclick="event.stopPropagation()">
-                            <button type="button" 
-                                    id="staff-custom-search-clear" 
-                                    onclick="window.clearStaffDropdownSearch(event)"
-                                    class="hidden absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-4 h-4 rounded-full items-center justify-center bg-slate-100 dark:bg-slate-800 transition-colors"
-                                    title="ล้างคำค้นหา">✕</button>
-                        </div>
-                        <!-- Quick Role Filters -->
-                        <div id="staff-custom-role-filters" class="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
-                            <button type="button" onclick="window.setStaffRoleFilter('ALL', event)" class="staff-role-chip active px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider transition-all bg-blue-600 text-white shadow-2xs">ALL</button>
-                            <button type="button" onclick="window.setStaffRoleFilter('IQC', event)" class="staff-role-chip px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">IQC</button>
-                            <button type="button" onclick="window.setStaffRoleFilter('ENGINEER', event)" class="staff-role-chip px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">EN</button>
-                            <button type="button" onclick="window.setStaffRoleFilter('SUPERVISOR', event)" class="staff-role-chip px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">SUP</button>
-                            <button type="button" onclick="window.setStaffRoleFilter('MANAGER', event)" class="staff-role-chip px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">MGR</button>
-                        </div>
-                    </div>
-                    <!-- Staff List items container -->
-                    <div id="staff-custom-list-container" class="p-1.5 overflow-y-auto max-h-64 custom-scrollbar flex flex-col gap-1">
-                        <!-- Items populated dynamically -->
-                    </div>
-                </div>
-            </div>
-            <!-- Hidden native select kept for compatibility -->
-            <select id="staff-filter-select" class="hidden" onchange="onStaffSelect(this.value)" title="Staff Filter Select" aria-label="Staff Filter Select">
-                <option value="">-- เลือกผู้ปฏิบัติงาน --</option>
-
-            </select>
         </div>
 
         <!-- [FILTER TOOLBAR]: เฉพาะหน้า DASHBOARD -->
