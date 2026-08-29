@@ -5207,6 +5207,7 @@ function getInstrumentImageUrl(item) {
 window.INSTRUMENT_IMAGE_MAP = INSTRUMENT_IMAGE_MAP;
 window.getInstrumentImageUrl = getInstrumentImageUrl;
 window.resolveInstrumentAssetUrl = resolveInstrumentAssetUrl;
+
 // --- ฟังก์ชันทำความสะอาดชื่อ (ลบ Mr. Ms. ฯลฯ) ---
 function cleanSignatureName(name) {
     if (!name) return "";
@@ -5215,6 +5216,62 @@ function cleanSignatureName(name) {
         .replace(/^(?:นาย|นางสาว|นาง|คุณ)\s*/gi, '')
         .trim();
 }
+window.cleanSignatureName = cleanSignatureName;
+
+// --- ฟังก์ชันจัดระเบียบชื่อพนักงานให้คงคำนำหน้า (Mr. / Ms.) เสมอ และตัดชื่อซ้ำที่ไม่มีคำนำหน้าออก ---
+function canonicalStaffDisplayName(rawName, email = '') {
+    if (!rawName || rawName === '-' || rawName === '--' || rawName === 'N/A') return '';
+    let str = String(rawName).trim();
+    
+    // จัดรูปแบบคำนำหน้าที่มีอยู่แล้วให้เป็นมาตรฐาน (เช่น "Mr. Aphinan P." -> "Mr.Aphinan P.")
+    str = str.replace(/^(Mr|Ms|Mrs|Miss|Dr|Khun)\.?\s+/i, (match, p1) => {
+        const prefix = p1.charAt(0).toUpperCase() + p1.slice(1).toLowerCase();
+        return `${prefix}.`;
+    });
+    
+    const emLower = email ? String(email).trim().toLowerCase() : '';
+    const cleanRaw = cleanSignatureName(str).toLowerCase().trim();
+    
+    // 1. ตรวจสอบใน MASTER_STAFF_USERS (32 คนหลักที่มีคำนำหน้า Mr. หรือ Ms. ครบถ้วน)
+    if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+        const found = MASTER_STAFF_USERS.find(u => {
+            if (emLower && u.email && u.email.toLowerCase().trim() === emLower) return true;
+            if (cleanRaw) {
+                const uClean = cleanSignatureName(u.name).toLowerCase().trim();
+                return uClean === cleanRaw;
+            }
+            return false;
+        });
+        if (found && found.name) {
+            return found.name.trim(); // คืนค่าชื่อที่มีคำนำหน้าเสมอ
+        }
+    }
+    
+    // 2. ตรวจสอบใน STAFF_LIST
+    if (typeof STAFF_LIST !== 'undefined' && Array.isArray(STAFF_LIST)) {
+        const found = STAFF_LIST.find(s => {
+            const sClean = cleanSignatureName(s).toLowerCase().trim();
+            return sClean === cleanRaw;
+        });
+        if (found) return String(found).trim();
+    }
+    
+    // 3. ตรวจสอบใน STAFF_EMAIL_MAP
+    if (typeof STAFF_EMAIL_MAP === 'object' && STAFF_EMAIL_MAP !== null) {
+        for (const [sName, sEmail] of Object.entries(STAFF_EMAIL_MAP)) {
+            if (emLower && sEmail && sEmail.toLowerCase().trim() === emLower) {
+                if (/^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(sName)) return sName.trim();
+            }
+            const sClean = cleanSignatureName(sName).toLowerCase().trim();
+            if (cleanRaw && sClean === cleanRaw && /^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(sName)) {
+                return sName.trim();
+            }
+        }
+    }
+    
+    return str;
+}
+window.canonicalStaffDisplayName = canonicalStaffDisplayName;
 
 // --- ฟังก์ชันระบุทีมของพนักงาน (Mold, Printing, Steel, Piping and Mat, Electronic) ---
 function getStaffTeamName(inputName) {
@@ -5551,9 +5608,12 @@ window.fetchDbUsersForDirectory = async function() {
             data.forEach(u => {
                 if (u && u.email) {
                     const em = u.email.toLowerCase().trim();
+                    const canonical = (typeof window.canonicalStaffDisplayName === 'function')
+                        ? window.canonicalStaffDisplayName(u.display_name, u.email)
+                        : (u.display_name || u.email.split('@')[0].toUpperCase());
                     window._dbUsersRoleMap.set(em, {
                         email: u.email,
-                        display_name: u.display_name || u.email.split('@')[0].toUpperCase(),
+                        display_name: canonical || u.display_name || u.email.split('@')[0].toUpperCase(),
                         role: u.role || 'staff',
                         status: u.status || 'active'
                     });
@@ -5650,9 +5710,12 @@ window.getEngineeringAndApprovalDirectory = function() {
         // 🌟 ดึงระดับสิทธิ์/ตำแหน่งจริงจากตาราง users ในฐานข้อมูล
         const dbUser = window._dbUsersRoleMap ? window._dbUsersRoleMap.get(key) : null;
         const realRole = (dbUser && dbUser.role) ? dbUser.role : fallbackRole;
-        const finalDisplayName = (dbUser && dbUser.display_name && dbUser.display_name !== '-')
+        let rawNameCandidate = (dbUser && dbUser.display_name && dbUser.display_name !== '-')
             ? dbUser.display_name
             : ((name && name !== '-') ? name.trim() : cleanEm.split('@')[0]);
+        const finalDisplayName = (typeof window.canonicalStaffDisplayName === 'function')
+            ? window.canonicalStaffDisplayName(rawNameCandidate, cleanEm)
+            : rawNameCandidate;
 
         if (!emailMap.has(key)) {
             const entry = {
@@ -8586,13 +8649,17 @@ async function loadStaffList() {
             const dbUser = window._dbUsersRoleMap ? window._dbUsersRoleMap.get(email) : null;
             const rawRole = String(staff.role || (dbUser && dbUser.role) || staff.category || '').toLowerCase();
 
-            name = name.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+            name = (typeof window.canonicalStaffDisplayName === 'function')
+                ? window.canonicalStaffDisplayName(name, email)
+                : name;
 
             if (!name || name === '-' || name.includes('@')) {
                 if (typeof window.getEngineeringAndApprovalDirectory === 'function') {
                     const found = window.getEngineeringAndApprovalDirectory().find(d => d.email && d.email.toLowerCase() === email);
                     if (found && found.name && found.name !== '-') {
-                        name = found.name.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+                        name = (typeof window.canonicalStaffDisplayName === 'function')
+                            ? window.canonicalStaffDisplayName(found.name, email)
+                            : found.name;
                     }
                 }
             }
@@ -8600,7 +8667,9 @@ async function loadStaffList() {
                 if (typeof STAFF_EMAIL_MAP === 'object') {
                     for (const [sName, sEmail] of Object.entries(STAFF_EMAIL_MAP)) {
                         if (sEmail && sEmail.toLowerCase().trim() === email) {
-                            name = sName.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+                            name = (typeof window.canonicalStaffDisplayName === 'function')
+                                ? window.canonicalStaffDisplayName(sName, email)
+                                : sName;
                             break;
                         }
                     }
@@ -25961,15 +26030,25 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
                 [r.engineer, r.sqe_email, 'SQE Engineer']
             ];
             pairs.forEach(([n, em, role]) => {
-                const cleanN = String(n || '').trim();
+                let cleanN = String(n || '').trim();
                 let cleanEm = String(em || '').trim();
-                if (cleanN && cleanN !== '-') {
+                if (cleanN && cleanN !== '-' && cleanN !== '--') {
                     cleanEm = (typeof window.resolveStaffEmail === 'function')
                         ? window.resolveStaffEmail(cleanN, cleanEm)
                         : cleanEm;
+                    cleanN = (typeof window.canonicalStaffDisplayName === 'function')
+                        ? window.canonicalStaffDisplayName(cleanN, cleanEm)
+                        : cleanN;
                     const key = cleanEm ? cleanEm.toLowerCase() : cleanN.toLowerCase();
-                    if (!map.has(key) && cleanEm && cleanEm !== '-') {
-                        map.set(key, { name: cleanN, email: cleanEm, role });
+                    if (cleanEm && cleanEm !== '-') {
+                        if (!map.has(key)) {
+                            map.set(key, { name: cleanN, email: cleanEm, role });
+                        } else {
+                            const exist = map.get(key);
+                            if (/^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(cleanN) && !/^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(exist.name)) {
+                                exist.name = cleanN;
+                            }
+                        }
                     }
                 }
             });
@@ -27929,10 +28008,77 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
 })();
 
 /**
- * 🛡️ ULTRA-ROBUST MATRIX LOOKUP ENGINE
- * ออกแบบมาเพื่อรองรับการทำงานทั้งบน Server และการเปิดไฟล์ HTML ตรงๆ (file://)
+ * 🛡️ ULTRA-ROBUST MATRIX LOOKUP & SYNC ENGINE
+ * รองรับการซิงค์ข้อมูล VF & RP Email Rules จาก Supabase, Local JSON Seed และ LocalStorage
  */
-window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
+window.loadVFRPDataFromCloud = async function() {
+    let list = null;
+
+    // 1. ตรวจสอบจาก Supabase (Cloud Database)
+    try {
+        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) 
+            || (typeof sqeClient !== 'undefined' ? sqeClient : null)
+            || (typeof wapClient !== 'undefined' ? wapClient : null);
+        if (sb && typeof sb.from === 'function') {
+            const { data, error } = await sb.from('vf_rp_email_rules').select('*').limit(1000);
+            if (!error && Array.isArray(data) && data.length > 0) {
+                list = data;
+            }
+        }
+    } catch (err) {
+        console.warn('[VF_RP Matrix] Direct Supabase fetch note:', err);
+    }
+
+    // 2. Fallback: โหลดจาก Local JSON File (seed_vf_rp_rules.json)
+    if (!list || list.length === 0) {
+        try {
+            const resp = await fetch('./seed_vf_rp_rules.json');
+            if (resp.ok) {
+                const seedData = await resp.json();
+                if (Array.isArray(seedData) && seedData.length > 0) {
+                    list = seedData;
+                }
+            }
+        } catch (_) {}
+    }
+
+    // 3. Fallback: โหลดจาก LocalStorage แคชเดิม
+    if (!list || list.length === 0) {
+        try {
+            const cached = localStorage.getItem('carrier_vf_rp_master_data');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    list = parsed;
+                }
+            }
+        } catch (_) {}
+    }
+
+    if (list && Array.isArray(list) && list.length > 0) {
+        window.VF_RP_MASTER_DATA = list;
+        try {
+            localStorage.setItem('carrier_vf_rp_master_data', JSON.stringify(list));
+        } catch (_) {}
+        console.log(`[VF_RP Matrix] Synchronized ${list.length} vendor rules into memory.`);
+    }
+
+    return window.VF_RP_MASTER_DATA || [];
+};
+
+// เริ่มโหลดข้อมูลกฎ Matrix ทันทีในพื้นหลัง
+if (typeof window !== 'undefined') {
+    setTimeout(() => {
+        if (typeof window.loadVFRPDataFromCloud === 'function') {
+            window.loadVFRPDataFromCloud();
+        }
+    }, 100);
+}
+
+/**
+ * 🛡️ ค้นหากฎ Matrix ทั้งหมดที่ตรงกับ Vendor (รองรับ Vendor ที่มีหลาย Rule)
+ */
+window.getAllVFRPMatricesForSupplier = function(supplierName, vendorCode, initials) {
     let list = [];
 
     // 1. ดึงข้อมูลจาก Memory (ลำดับความสำคัญสูงสุด)
@@ -27940,24 +28086,22 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         list = window.WapAdminSystem.getEmailRules();
     } 
     
-    if ((!list || !list.length) && window.VF_RP_MASTER_DATA) {
+    if ((!list || !list.length) && window.VF_RP_MASTER_DATA && Array.isArray(window.VF_RP_MASTER_DATA) && window.VF_RP_MASTER_DATA.length > 0) {
         list = window.VF_RP_MASTER_DATA;
     }
 
-    // 2. Fallback: ค้นหาจาก LocalStorage (กรณีเปิดไฟล์ตรงๆ หรือออฟไลน์)
+    // 2. Fallback: ค้นหาจาก LocalStorage
     if (!list || !list.length) {
         try {
-            // สแกนหาจากทุก Key ที่เป็นไปได้ที่ระบบอาจจะบันทึกไว้
-            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_cache', 'carrier_latest_app_state_backup'];
+            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_cache'];
             for (const key of backupKeys) {
                 const cached = localStorage.getItem(key);
                 if (cached) {
                     const parsed = JSON.parse(cached);
-                    // รองรับทั้งแบบ Array ตรงๆ และแบบ Snapshot Object
                     const actualData = parsed.app_state ? (parsed.app_state.eight_d_cases || []) : parsed;
                     if (Array.isArray(actualData) && actualData.length > 0) {
                         list = actualData;
-                        window.VF_RP_MASTER_DATA = list; // กู้คืนกลับเข้า Memory
+                        window.VF_RP_MASTER_DATA = list;
                         break;
                     }
                 }
@@ -27967,16 +28111,18 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         }
     }
     
-    // หากยังไม่พบฐานข้อมูลเลย ให้คืนค่า null
     if (!list || !list.length) {
-        return null;
+        if (typeof window.loadVFRPDataFromCloud === 'function') {
+            window.loadVFRPDataFromCloud();
+        }
+        return [];
     }
 
     // 3. ฟังก์ชันทำความสะอาดข้อความระดับลึก (Deep Cleaning)
     const deepClean = (val) => {
         if (!val || val === '-' || val === '--') return "";
         return String(val).trim().toLowerCase()
-            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V. นำหน้า
+            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V_ นำหน้า
             .replace(/\b(co\.,\s*ltd|co\.,ltd|co\s+ltd|ltd|company\s+limited|inc|corp|corporation|จำกัด|บริษัท|vendor)\b/gi, '') 
             .replace(/[-_>]/g, ' ')
             .replace(/[^a-z0-9ก-๙\s]/gi, '') // ลบสัญลักษณ์พิเศษทั้งหมด
@@ -28010,11 +28156,9 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
     const targetCode = deepClean(vCode);
     const targetInit = deepClean(sInit);
 
-    // ป้องกันการค้นหาด้วยค่าว่าง
-    if (!targetName && !targetCode && !targetInit) return null;
+    if (!targetName && !targetCode && !targetInit) return [];
 
-    // 4. เริ่มการค้นหาแบบลำดับความสำคัญ (Matching Logic)
-    return list.find(r => {
+    return list.filter(r => {
         const dbName = deepClean(r.supplier_name || r.supplier || '');
         const dbCode = deepClean(r.vendor_code || r.supplier_code || '');
         const dbInit = deepClean(r.initials_name || '');
@@ -28027,7 +28171,7 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         // กฎที่ 2: ตัวย่อ (Initials) ตรงกัน
         if (targetInit && dbInit && (dbInit === targetInit || dbInit.includes(targetInit))) return true;
 
-        // กฎที่ 3: ชื่อบริษัทตรงกันเป๊ะ หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา หรือเทียบจากชื่อผู้ติดต่อ
+        // กฎที่ 3: ชื่อบริษัทตรงกัน หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา หรือเทียบจากชื่อผู้ติดต่อ
         if (targetName) {
             if (dbName && (dbName === targetName || dbName.includes(targetName) || targetName.includes(dbName))) return true;
             if (dbInit && (dbInit === targetName || targetName.includes(dbInit))) return true;
@@ -28036,7 +28180,14 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         }
 
         return false;
-    }) || null;
+    });
+};
+
+window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
+    const all = (typeof window.getAllVFRPMatricesForSupplier === 'function')
+        ? window.getAllVFRPMatricesForSupplier(supplierName, vendorCode, initials)
+        : [];
+    return (all && all.length > 0) ? all[0] : null;
 };
 
 // --- แก้ไขฟังก์ชันซิงค์ข้อมูลเมื่อมีการแก้ไข VENDOR บนหน้าเอกสาร (Document Sync Engine) ---
@@ -28050,7 +28201,6 @@ window.onVfDocVendorChange = function(el) {
         : null;
 
     // 2. อัปเดตข้อมูลเข้าสู่สถานะตัวแปรปัจจุบัน (Internal State Update)
-    // จุดนี้สำคัญมาก! เพราะหน้าส่งเมล์จะดึงข้อมูลจาก currentCase ไปใช้
     const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
         ? Wap8DSystem.getCurrentCase()
         : null;
@@ -28062,13 +28212,10 @@ window.onVfDocVendorChange = function(el) {
         vf.vendor = rawVal; 
 
         if (matrix) {
-            // ถ้าเจอใน Matrix ให้หยอดค่าที่เกี่ยวข้องลงใน Data Object ทันที
             vf.vendor_code = matrix.vendor_code || vf.vendor_code;
             vf.part_group = matrix.parts_group || vf.part_group;
-            
-            // หยอดอีเมลที่แมปมาจาก Matrix เข้าไปเก็บไว้ใน Case เพื่อให้ปุ่มส่งเมล์มองเห็น
             vf.inform_email_to = matrix.inform_email_to || matrix.recipient_to;
-            vf.team_member_email = matrix.team_member_email; // 3.3 ที่คุณต้องการ
+            vf.team_member_email = matrix.team_member_email;
         }
     }
 
@@ -28085,14 +28232,20 @@ window.onVfDocVendorChange = function(el) {
         if (vCodeEl && matrix.vendor_code && matrix.vendor_code !== '-') vCodeEl.innerText = matrix.vendor_code;
         if (partGrpEl && matrix.parts_group && matrix.parts_group !== '-') partGrpEl.innerText = matrix.parts_group;
 
-        // อัปเดตชื่อหัวหน้างานและผู้อนุมัติ (CONFIRM BY & APPROVED BY) ตาม Vendor Matrix
+        // อัปเดตชื่อวิศวกร, หัวหน้างาน และผู้อนุมัติ ตาม Vendor Matrix
         const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
         const isRP = reportType.includes('RP');
+        const mIssue = isRP ? (matrix.iqc_eng_name || matrix.engineer) : (matrix.engineer || matrix.iqc_eng_name);
         const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
         const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
 
         if (curCase?.report_data?.vf_data) {
             const vf = curCase.report_data.vf_data;
+            if (!vf.issue_sig_active && mIssue) {
+                vf.issue_by = mIssue;
+                const iInput = document.getElementById('prob-issue-by');
+                if (iInput) iInput.value = mIssue;
+            }
             if (!vf.confirm_sig_active && mConfirm) {
                 vf.confirm_by = mConfirm;
                 const cInput = document.getElementById('prob-confirm-by');
@@ -28105,9 +28258,8 @@ window.onVfDocVendorChange = function(el) {
             }
         }
 
-        toast(`🔗 เชื่อมโยงข้อมูล ${rawVal} สำเร็จ (พร้อมส่งอีเมล)`, "success");
+        toast(`🔗 เชื่อมโยงข้อมูล ${rawVal} สำเร็จ (พร้อมสิทธิ์การเซ็นตาม Matrix)`, "success");
     } else {
-        // กรณีพิมพ์ชื่อแล้วหาใน Matrix ไม่เจอ
         console.warn(`[Matrix] Supplier "${rawVal}" not found in master database.`);
     }
 
@@ -28128,6 +28280,7 @@ window.onVfDocVendorCodeChange = function(el) {
         const ccEl = document.getElementById('vf-doc-cc-display');
         const vEl = document.getElementById('vf-doc-vendor');
         const partGrpEl = document.getElementById('vf-doc-part-group');
+
         if (toEl && matrix.to_vf_rp_report && matrix.to_vf_rp_report !== '-') toEl.innerText = matrix.to_vf_rp_report;
         if (ccEl && matrix.cc_vf_rp_report && matrix.cc_vf_rp_report !== '-') ccEl.innerText = matrix.cc_vf_rp_report;
         if (vEl && matrix.supplier) vEl.innerText = matrix.supplier.toUpperCase();
@@ -28140,8 +28293,15 @@ window.onVfDocVendorCodeChange = function(el) {
             const vf = curCase.report_data.vf_data;
             const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
             const isRP = reportType.includes('RP');
+            const mIssue = isRP ? (matrix.iqc_eng_name || matrix.engineer) : (matrix.engineer || matrix.iqc_eng_name);
             const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
             const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
+
+            if (!vf.issue_sig_active && mIssue) {
+                vf.issue_by = mIssue;
+                const iInput = document.getElementById('prob-issue-by');
+                if (iInput) iInput.value = mIssue;
+            }
             if (!vf.confirm_sig_active && mConfirm) {
                 vf.confirm_by = mConfirm;
                 const cInput = document.getElementById('prob-confirm-by');
@@ -29413,13 +29573,19 @@ let currentModalACIndex = -1;
 let tempAvatarBase64 = null; // ตัวแปรพักรูปภาพ
 
 /**
- * 🧠 MASTER MODAL AUTO-COMPLETE ENGINE (Strict Matrix Integration)
- * อัปเดต: ดึงหมวดหมู่พาร์ทจาก Proficiency Breakdown (Skill Matrix)
+ * 🧠 MASTER MODAL AUTO-COMPLETE ENGINE (Vibrant & Aesthetic Dropdown Edition)
+ * ออกแบบกล่องดรอปดาวน์และไอคอนให้สดใส สวยงาม ตรงตามภาพตัวอย่าง:
+ * 1. กล่องขอบสีฟ้าสดใส (Sky-blue 2px solid #38bdf8), มุมโค้งมน 12px, เงาฟุ้งนุ่มนวล
+ * 2. แถบหัวข้อสีครีมพาสเทลอบอุ่นสดใส (Warm Pastel Cream #fffbeb) พร้อมเส้นคั่นสีเหลืองทอง (#fde68a) และข้อความส้มสดใสตามภาพตัวอย่าง
+ * 3. ไอคอนหยดน้ำ 3D สองเฉดสีสดใส (Split 3D Teardrop) คู่กับกิมมิกตามระดับสิทธิ์ (👑 มงกุฎ, 🔑 กุญแจ, ✒️ ปากกา, 📝 สมุด)
+ * 4. แถบสถานะ Focus/Hover ไฮไลต์พื้นหลังฟ้าอ่อน (#f0f7ff) พร้อมเส้นบอกตำแหน่งสีน้ำเงินชัดเจน (border-left 4px solid #0284c7)
+ * 5. ป้ายระดับสิทธิ์ด้านขวา (Badges) สีพื้นสดใสตัวอักษรขาวคมชัด สไตล์ปุ่ม SUPERVISOR ในภาพตัวอย่าง
+ * 6. คงตรรกะความถูกต้องตาม Vendor Matrix (ภาพที่ 2) ทุกประการ
  */
 function renderModalAC(type, inputEl) {
     if (!inputEl || inputEl._suppressAC) return;
     
-    // 1. ปิดดรอปดาวน์ตัวอื่นทั้งหมดในหน้าจอทันที เพื่อให้แสดงเฉพาะช่องล่าสุดที่คลิกเสมอ
+    // 1. ปิดดรอปดาวน์ตัวอื่นทั้งหมดในหน้าจอทันที เพื่อให้แสดงเฉพาะช่องล่าสุดที่กำลังคลิก
     document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
         if (dd.parentElement !== inputEl.parentElement) {
             dd.style.display = 'none';
@@ -29433,21 +29599,40 @@ function renderModalAC(type, inputEl) {
     if (!dd) {
         dd = document.createElement('div');
         dd.className = 'modal-ac-dropdown';
-        dd.style.cssText = `
-            position: absolute; top: 100%; left: 0; width: max-content; min-width: 310px; max-width: 420px;
-            max-height: 280px; overflow-y: auto; background: #ffffff;
-            border: 1.5px solid #3b82f6; border-radius: 10px;
-            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18); z-index: 20000; display: none;
-        `;
         wrap.style.position = 'relative';
         wrap.appendChild(dd);
+    }
+
+    // กล่องดรอปดาวน์สดใส ขอบฟ้า 38bdf8 โค้งมน 12px สไตล์พรีเมียมตามภาพตัวอย่าง
+    dd.style.cssText = `
+        position: absolute; top: calc(100% + 4px); left: 0;
+        width: 320px; max-width: 94vw;
+        max-height: 260px; overflow-y: auto; overflow-x: hidden;
+        background: #ffffff; border: 2px solid #38bdf8; border-radius: 12px;
+        box-shadow: 0 12px 28px -4px rgba(14, 165, 233, 0.22), 0 6px 16px -2px rgba(15, 23, 42, 0.08);
+        z-index: 20000; display: none;
+    `;
+
+    // จัดการปิดดรอปดาวน์ทันทีเมื่อคลิกพื้นที่ว่างภายนอก
+    if (!window._modalACOutsideClickBound) {
+        window._modalACOutsideClickBound = true;
+        document.addEventListener('pointerdown', function(e) {
+            const openDropdowns = document.querySelectorAll('.modal-ac-dropdown');
+            openDropdowns.forEach(d => {
+                if (d.style.display === 'none') return;
+                const parent = d.parentElement;
+                if (parent && parent.contains(e.target)) return;
+                d.style.display = 'none';
+            });
+            if (typeof currentModalACIndex !== 'undefined') currentModalACIndex = -1;
+        }, true);
     }
 
     const query = inputEl.value.trim().toLowerCase();
     let htmlContent = '';
 
     // ============================================================
-    // ✍️ กรณีการลงนาม (Sign-off): ISSUE BY | CONFIRM BY | APPROVED BY
+    // ✍️ การลงนาม (Sign-off): ISSUE BY | CONFIRM BY | APPROVED BY
     // ============================================================
     if (type === 'staff') {
         const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
@@ -29456,234 +29641,564 @@ function renderModalAC(type, inputEl) {
         
         const vfData = curCase?.report_data?.vf_data || {};
         
-        // 1. ตรวจสอบประเภทรายงานปัจจุบัน (RP หรือ VF) เพื่อใช้เลือกช่องใน Matrix
-        const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
+        // 1. ตรวจสอบประเภทรายงานปัจจุบัน (RP หรือ VF) จากทุกจุดอ้างอิง
+        const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || document.getElementById('f-sup-report')?.value || '').toString().toUpperCase();
         const docTypeLabel = (document.getElementById('vf-doc-type-label')?.innerText || '').toUpperCase();
         const isRP = reportType.includes('RP') || docTypeLabel.includes('RP');
+        const docBadgeColor = isRP ? '#059669' : '#0284c7';
+        const docBadgeBg = isRP ? '#ecfdf5' : '#eff6ff';
 
-        // 2. ดึงข้อมูล Vendor จากหน้าเอกสารและ Case เพื่อไปค้นหาในฐานข้อมูล Matrix
-        const vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() 
+        // 2. ดึงข้อมูล Vendor จากหน้าเอกสารและ Case เพื่อค้นหาในฐานข้อมูล Matrix (ภาพที่ 2)
+        let vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() 
             || vfData.vendor 
             || curCase?.supplier 
             || curCase?.vendor 
             || curCase?.report_data?.supplier 
+            || curCase?.report_data?.supplier_name 
+            || document.getElementById('f-sup-supplier')?.value?.trim()
             || "";
-        const vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() 
+        let vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() 
             || vfData.vendor_code 
             || curCase?.vendor_code 
             || curCase?.supplier_code 
+            || curCase?.report_data?.vendor_code 
+            || curCase?.report_data?.supplier_code 
+            || document.getElementById('f-sup-vendor-code')?.value?.trim()
             || "";
         const docToDisplay = document.getElementById('vf-doc-to-display')?.innerText?.trim() || vfData.to || "";
 
-        let matrix = null;
-        if (typeof window.getVFRPMatrixForSupplier === 'function') {
-            matrix = window.getVFRPMatrixForSupplier(vendorName, vendorCode, '')
-                  || window.getVFRPMatrixForSupplier(curCase?.supplier || '', curCase?.vendor_code || '', '')
-                  || window.getVFRPMatrixForSupplier(docToDisplay, '', '');
+        if (vendorName) {
+            vendorName = vendorName.replace(/-->\s*vendor/gi, '').replace(/\bvendor\b/gi, '').replace(/^to:\s*/i, '').trim();
         }
 
-        // 3. Helper: รวบรวมรายชื่อพนักงานและบทบาทจากระบบ
-        const allStaffMap = new Map();
-        if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
-            MASTER_STAFF_USERS.forEach(u => {
-                if (u && u.name) {
-                    allStaffMap.set(u.name.trim(), {
-                        name: u.name.trim(),
-                        email: u.email || '',
-                        role: (u.role || 'staff').toLowerCase(),
-                        department: u.department || ''
-                    });
+        if (!vendorCode && vendorName && typeof VENDOR_MASTER === 'object' && VENDOR_MASTER !== null) {
+            const foundKey = Object.keys(VENDOR_MASTER).find(key => 
+                VENDOR_MASTER[key].toUpperCase().includes(vendorName.toUpperCase()) ||
+                vendorName.toUpperCase().includes(VENDOR_MASTER[key].toUpperCase())
+            );
+            if (foundKey) vendorCode = foundKey;
+        }
+
+        // ค้นหากฎ Matrix ของ Vendor นี้จากระบบ (ตรงตามภาพที่ 2)
+        let matrixRules = [];
+        if (typeof window.getAllVFRPMatricesForSupplier === 'function') {
+            matrixRules = window.getAllVFRPMatricesForSupplier(vendorName, vendorCode, '');
+            if (!matrixRules || matrixRules.length === 0) {
+                matrixRules = window.getAllVFRPMatricesForSupplier(curCase?.supplier || '', curCase?.vendor_code || '', '');
+            }
+            if (!matrixRules || matrixRules.length === 0) {
+                matrixRules = window.getAllVFRPMatricesForSupplier(docToDisplay, '', '');
+            }
+        }
+        
+        // Fallback ค้นหาแบบ Deep Fuzzy Match เพื่อให้จับคู่กับภาพที่ 2 ได้เสมอ
+        if (!matrixRules || matrixRules.length === 0) {
+            let allList = [];
+            if (window.WapAdminSystem && typeof window.WapAdminSystem.getEmailRules === 'function') {
+                allList = window.WapAdminSystem.getEmailRules();
+            }
+            if (!allList || allList.length === 0) {
+                allList = window.VF_RP_MASTER_DATA || [];
+            }
+            if (Array.isArray(allList) && allList.length > 0) {
+                const cleanStr = (s) => (s || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+                const vClean = cleanStr(vendorName);
+                const cClean = cleanStr(vendorCode);
+                matrixRules = allList.filter(item => {
+                    const iSup = cleanStr(item.supplier || item.supplier_name || '');
+                    const iCode = cleanStr(item.vendor_code || item.supplier_code || '');
+                    if (cClean && iCode && (iCode === cClean || iCode.includes(cClean) || cClean.includes(iCode))) return true;
+                    if (vClean && iSup && (iSup.includes(vClean) || vClean.includes(iSup))) return true;
+                    return false;
+                });
+            }
+        }
+
+        const vDisplay = vendorName || (curCase?.supplier) || (matrixRules[0]?.supplier_name) || (matrixRules[0]?.supplier) || 'Vendor';
+        const cDisplay = vendorCode || (curCase?.vendor_code) || (matrixRules[0]?.vendor_code) || '';
+
+        // Set ป้องกันรายชื่อซ้ำในการแสดงผล
+        const renderedPersonKeys = new Set();
+
+        // 🔍 Helper: ค้นหาข้อมูลระดับสิทธิ์ แผนก และตำแหน่งจริงจากฐานข้อมูล (Supabase _dbUsersRoleMap & MASTER_STAFF_USERS) 100%
+        const getStaffDbProfile = (name, emailAddr = '') => {
+            if (!name || name === '-' || name === 'N/A' || name === '--') return null;
+
+            let em = (emailAddr || '').toLowerCase().trim();
+            if (!em && typeof resolveStaffEmail === 'function') {
+                em = (resolveStaffEmail(name) || '').toLowerCase().trim();
+            }
+            if (!em && typeof STAFF_EMAIL_MAP !== 'undefined' && STAFF_EMAIL_MAP[name]) {
+                em = STAFF_EMAIL_MAP[name].toLowerCase().trim();
+            }
+
+            const clean = (typeof cleanSignatureName === 'function')
+                ? cleanSignatureName(name).toLowerCase().trim()
+                : String(name).replace(/^(Mr|Ms|Mrs)\.?\s+/i, '').toLowerCase().trim();
+
+            // 1. ค้นหาใน window._dbUsersRoleMap (ตาราง profiles จาก Supabase)
+            let dbUser = null;
+            if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
+                if (em && window._dbUsersRoleMap.has(em)) {
+                    dbUser = window._dbUsersRoleMap.get(em);
+                } else {
+                    for (const [k, u] of window._dbUsersRoleMap.entries()) {
+                        const uClean = (typeof cleanSignatureName === 'function')
+                            ? cleanSignatureName(u.display_name || '').toLowerCase().trim()
+                            : String(u.display_name || '').replace(/^(Mr|Ms|Mrs)\.?\s+/i, '').toLowerCase().trim();
+                        if (clean && (uClean === clean || uClean.includes(clean) || clean.includes(uClean))) {
+                            dbUser = u;
+                            if (!em) em = k;
+                            break;
+                        }
+                    }
                 }
-            });
-        }
-        if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
-            Array.from(window._dbUsersRoleMap.values()).forEach(u => {
-                const name = (u.display_name || u.name || '').trim();
-                if (name) {
-                    const existing = allStaffMap.get(name) || {};
-                    allStaffMap.set(name, {
-                        name,
-                        email: u.email || existing.email || '',
-                        role: (u.role || existing.role || 'staff').toLowerCase(),
-                        department: u.department || existing.department || ''
-                    });
-                }
-            });
-        }
+            }
 
-        const renderedNames = new Set();
+            // 2. ค้นหาใน MASTER_STAFF_USERS (32 รายชื่อหลักพร้อมแผนกและสิทธิ์จริงในฐานข้อมูล)
+            let masterUser = null;
+            if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+                masterUser = MASTER_STAFF_USERS.find(u => {
+                    if (em && u.email && u.email.toLowerCase().trim() === em) return true;
+                    const uClean = (typeof cleanSignatureName === 'function')
+                        ? cleanSignatureName(u.name).toLowerCase().trim()
+                        : String(u.name).replace(/^(Mr|Ms|Mrs)\.?\s+/i, '').toLowerCase().trim();
+                    if (clean && (uClean === clean || uClean.includes(clean) || clean.includes(uClean))) return true;
+                    return false;
+                });
+            }
 
-        // Helper: ฟังก์ชันวาดรายการพนักงาน (Standard UI)
-        const renderOption = (name, label, color, icon = '👤', emailAddr = '') => {
-            if (!name || name === '-' || name === 'N/A' || name === '--') return '';
-            const trimmedName = name.trim();
-            renderedNames.add(trimmedName.toLowerCase());
-            const finalEmail = emailAddr || ((typeof resolveStaffEmail === 'function') ? resolveStaffEmail(trimmedName) : (STAFF_EMAIL_MAP[trimmedName] || ''));
+            // ชื่อแสดงผลทางการ
+            const canonical = (typeof window.canonicalStaffDisplayName === 'function')
+                ? window.canonicalStaffDisplayName(masterUser?.name || dbUser?.display_name || name, em)
+                : (masterUser?.name || dbUser?.display_name || name);
+
+            const finalEmail = em || masterUser?.email || dbUser?.email || '';
+
+            // ระดับสิทธิ์จริงจากฐานข้อมูล (Role)
+            let rawRole = (dbUser && dbUser.role) ? dbUser.role : (masterUser && masterUser.role ? masterUser.role : '');
+            rawRole = String(rawRole || '').trim().toLowerCase();
+
+            // แผนกจริงจากฐานข้อมูล (Department)
+            let department = (masterUser && masterUser.department) ? masterUser.department : '';
+            if (!department && typeof getStaffTeamName === 'function') {
+                department = getStaffTeamName(canonical) || getStaffTeamName(name) || '';
+            }
+            if (!department) department = 'Carrier Quality Team';
+
+            // แปลงระดับสิทธิ์เป็น Badge, Icon, และคำอธิบายตำแหน่งจริงตามฐานข้อมูล 100%
+            let roleBadge = 'STAFF';
+            let roleTitle = 'พนักงาน Carrier';
+            let roleIcon = '👤';
+            let badgeBg = '#475569';
+            let badgeShadow = 'rgba(71, 85, 105, 0.25)';
+            let avatarGradient = 'linear-gradient(135deg, #64748b, #475569)';
+            let avatarBorder = '#94a3b8';
+
+            if (rawRole === 'admin' || rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) {
+                roleBadge = 'ADMIN';
+                roleTitle = 'ผู้ดูแลระบบ (Admin)';
+                roleIcon = '👑';
+                badgeBg = '#7c3aed';
+                badgeShadow = 'rgba(124, 58, 237, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #7c3aed, #4f46e5)';
+                avatarBorder = '#a855f7';
+            } else if (rawRole === 'manager' || rawRole.includes('manag') || rawRole.includes('ผู้จัดการ')) {
+                roleBadge = 'MANAGER';
+                roleTitle = 'ผู้จัดการ (Manager)';
+                roleIcon = '👔';
+                badgeBg = '#e11d48';
+                badgeShadow = 'rgba(225, 29, 72, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #f43f5e, #be123c)';
+                avatarBorder = '#fb7185';
+            } else if (rawRole === 'supervisor' || rawRole.includes('super') || rawRole.includes('หัวหน้า')) {
+                roleBadge = 'SUPERVISOR';
+                roleTitle = 'หัวหน้างาน (Supervisor)';
+                roleIcon = '⚡';
+                badgeBg = '#d97706';
+                badgeShadow = 'rgba(217, 119, 6, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                avatarBorder = '#fbbf24';
+            } else if (rawRole === 'engineer' || rawRole.includes('engineer') || rawRole.includes('วิศวกร')) {
+                roleBadge = 'ENGINEER';
+                roleTitle = 'วิศวกร (Engineer)';
+                roleIcon = '🔧';
+                badgeBg = '#059669';
+                badgeShadow = 'rgba(5, 150, 105, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #10b981, #059669)';
+                avatarBorder = '#34d399';
+            } else if (rawRole === 'iqc') {
+                roleBadge = 'IQC';
+                roleTitle = 'ตรวจสอบคุณภาพ (IQC)';
+                roleIcon = '🔍';
+                badgeBg = '#0284c7';
+                badgeShadow = 'rgba(2, 132, 199, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #0ea5e9, #0284c7)';
+                avatarBorder = '#38bdf8';
+            } else if (rawRole.includes('sqe') || rawRole.includes('support')) {
+                roleBadge = 'SQE SUPPORT';
+                roleTitle = 'ฝ่ายสนับสนุนคุณภาพ (SQE)';
+                roleIcon = '👤';
+                badgeBg = '#4f46e5';
+                badgeShadow = 'rgba(79, 70, 229, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+                avatarBorder = '#818cf8';
+            }
+
+            // ไอคอนแผนกจากฐานข้อมูล
+            let deptIcon = '🏢';
+            const depLow = department.toLowerCase();
+            if (depLow.includes('mold')) deptIcon = '🏭';
+            else if (depLow.includes('printing')) deptIcon = '🖨️';
+            else if (depLow.includes('steel')) deptIcon = '🔩';
+            else if (depLow.includes('piping')) deptIcon = '🔧';
+            else if (depLow.includes('elect')) deptIcon = '⚡';
+            else if (depLow.includes('approv')) deptIcon = '⭐';
+
+            // อักษรย่อสำหรับ Avatar Initials
+            const nameWithoutPrefix = canonical.replace(/^(Mr|Ms|Mrs)\.?\s*/i, '').trim();
+            const parts = nameWithoutPrefix.split(/\s+/).filter(Boolean);
+            let initials = '';
+            if (parts.length >= 2) {
+                initials = (parts[0][0] + parts[1][0]).toUpperCase();
+            } else if (parts.length === 1) {
+                initials = parts[0].substring(0, 2).toUpperCase();
+            } else {
+                initials = 'CP';
+            }
+
+            return {
+                name: canonical,
+                email: finalEmail,
+                rawRole,
+                roleBadge,
+                roleTitle,
+                roleIcon,
+                department,
+                deptIcon,
+                initials,
+                badgeBg,
+                badgeShadow,
+                avatarGradient,
+                avatarBorder
+            };
+        };
+
+        // 🎨 Helper: เรนเดอร์การ์ดรายชื่อพนักงานพร้อมกิมมิกและตำแหน่งจริงจากระดับสิทธิ์ฐานข้อมูล 100% (เอาโล่สีฟ้าออกทั้งหมด)
+        const renderAuthorizedCard = (name, matrixContext = '', emailAddr = '') => {
+            const profile = getStaffDbProfile(name, emailAddr);
+            if (!profile) return '';
+
+            // ตรวจสอบตัวกรองค้นหา (Filter)
+            if (query) {
+                const searchTarget = `${profile.name} ${profile.email} ${profile.roleBadge} ${profile.roleTitle} ${profile.department}`.toLowerCase();
+                if (!searchTarget.includes(query)) return '';
+            }
+
+            const personKey = (profile.email ? profile.email.toLowerCase().trim() : '') || 
+                              (typeof cleanSignatureName === 'function' ? cleanSignatureName(profile.name).toLowerCase().trim() : profile.name.toLowerCase().trim());
+            
+            if (!personKey || renderedPersonKeys.has(personKey)) return '';
+            renderedPersonKeys.add(personKey);
+
+            const deptInfo = `${profile.deptIcon} แผนก ${profile.department}`;
+            const emailInfo = profile.email || 'carrier.com';
+            const bottomLabel = matrixContext || profile.roleTitle;
+
             return `
                 <div class="modal-ac-item" 
-                     style="padding: 9px 12px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s;"
-                     onmouseenter="this.style.background='#f8fafc'"
-                     onmouseleave="this.style.background='transparent'"
-                     onmousedown="event.preventDefault(); applyModalAC('staff', '${trimmedName.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                    <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
-                        <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 800; color: #0f172a; white-space: nowrap;">
-                            <span>${icon}</span> ${trimmedName}
-                        </span>
-                        <span style="font-size: 9px; color: #64748b; padding-left: 18px; font-family: monospace; overflow: hidden; text-overflow: ellipsis;">${finalEmail}</span>
+                     data-value="${profile.name.replace(/"/g, '&quot;')}"
+                     style="padding: 7px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 9px; border-bottom: 1px solid #f1f5f9; border-left: 4px solid transparent; transition: all 0.15s; background: #ffffff;"
+                     onmouseenter="this.style.background='#f0f7ff'; this.style.borderLeft='4px solid #0284c7';"
+                     onmouseleave="this.style.background='#ffffff'; this.style.borderLeft='4px solid transparent';"
+                     onmousedown="event.preventDefault(); applyModalAC('staff', '${profile.name.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                    
+                    <!-- ด้านซ้าย: Avatar กิมมิกตัวอักษรย่อ + ไอคอนสิทธิ์ฐานข้อมูล + ข้อมูลพนักงานจริง -->
+                    <div style="display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1;">
+                        <div style="position: relative; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: ${profile.avatarGradient}; border: 1.5px solid ${profile.avatarBorder}; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.12);">
+                            <span style="font-size: 10.5px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">${profile.initials}</span>
+                            <span style="position: absolute; bottom: -2px; right: -2px; width: 13px; height: 13px; background: #ffffff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.25);" title="${profile.roleTitle}">${profile.roleIcon}</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+                            <span style="font-size: 11.5px; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                ${profile.name}
+                            </span>
+                            <div style="display: flex; align-items: center; gap: 4px; font-size: 9px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                <span style="font-weight: 700; color: #475569;">${deptInfo}</span>
+                                <span style="color: #cbd5e1;">•</span>
+                                <span style="font-family: monospace; color: #64748b;">${emailInfo}</span>
+                            </div>
+                        </div>
                     </div>
-                    <span style="font-size: 8px; background: ${color}; color: #fff; padding: 2px 7px; border-radius: 4px; font-weight: 900; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;">
-                        ${label}
-                    </span>
+
+                    <!-- ด้านขวา: ป้ายตำแหน่งจริงจากระดับสิทธิ์ในฐานข้อมูล 100% -->
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 1.5px; flex-shrink: 0;">
+                        <span style="font-size: 8.5px; font-weight: 800; background: ${profile.badgeBg}; color: #ffffff; padding: 2px 6.5px; border-radius: 4.5px; white-space: nowrap; letter-spacing: 0.4px; box-shadow: 0 1.5px 3px ${profile.badgeShadow}; text-transform: uppercase; display: flex; align-items: center; gap: 3px;">
+                            <span>${profile.roleIcon}</span>
+                            <span>${profile.roleBadge}</span>
+                        </span>
+                        <span style="font-size: 8px; color: #64748b; font-weight: 700; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${bottomLabel}
+                        </span>
+                    </div>
                 </div>`;
         };
 
-        // --------------------------------------------------------
-        // 🔹 [PART A]: ช่อง ISSUE BY (ผู้จัดทำ / วิศวกร)
-        // --------------------------------------------------------
-        if (inputEl.id === 'prob-issue-by') {
-            htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: #2563eb; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase;">👥 รายชื่อทีมงานวิศวกรและผู้จัดทำ (ISSUE BY)</div>`;
-
-            if (matrix && matrix.engineer && matrix.engineer !== '-') {
-                htmlContent += renderOption(matrix.engineer, 'DESIGNATED SQE', '#2563eb', '⭐', matrix.sqe_email);
-            }
-            if (matrix && matrix.iqc_eng_name && matrix.iqc_eng_name !== '-' && matrix.iqc_eng_name !== matrix.engineer) {
-                htmlContent += renderOption(matrix.iqc_eng_name, 'DESIGNATED IQC', '#0284c7', '⭐', matrix.iqc_eng_email);
-            }
-
-            Array.from(allStaffMap.values())
-                .filter(u => {
-                    if (renderedNames.has(u.name.toLowerCase())) return false;
-                    const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                    return !query || searchStr.includes(query);
-                })
-                .forEach(u => {
-                    const roleLabel = (u.role || 'STAFF').toUpperCase();
-                    htmlContent += renderOption(u.name, roleLabel, '#3b82f6', '👤', u.email);
-                });
-        }
+        // 🌟 [HEADER 1]: แสดงข้อมูล Vendor หลักแบบสว่าง สดใส
+        htmlContent += `
+            <div style="padding: 7px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+                <div style="display: flex; align-items: center; gap: 7px; overflow: hidden; min-width: 0;">
+                    <span style="font-size: 13px;">🏢</span>
+                    <div style="display: flex; flex-direction: column; min-width: 0;">
+                        <span style="font-size: 11px; font-weight: 800; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${vDisplay} ${cDisplay ? `<span style="color: #0284c7; font-weight: 700;">(${cDisplay})</span>` : ''}
+                        </span>
+                        <span style="font-size: 8.5px; color: #64748b; font-weight: 600;">Vendor Matrix Reference</span>
+                    </div>
+                </div>
+                <span style="font-size: 8.5px; font-weight: 800; background: ${docBadgeBg}; color: ${docBadgeColor}; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; border: 1px solid ${docBadgeColor}; white-space: nowrap;">
+                    ${isRP ? 'RP' : 'VF'}
+                </span>
+            </div>`;
 
         // --------------------------------------------------------
-        // 🔹 [PART B]: ช่อง CONFIRM BY (เฉพาะหัวหน้างาน / ผู้ตรวจสอบตาม Vendor Matrix)
+        // 🔹 [PART 1]: ช่อง CONFIRM BY (กิมมิก: กุญแจ 🔑 - ผู้ยืนยัน/ตรวจสอบคุมสายงาน LV.2)
+        // หัวข้อสีครีมพาสเทลสดใสตามภาพตัวอย่าง ⚠️ รายชื่อหัวหน้างาน (SUPERVISORS)
         // --------------------------------------------------------
-        else if (inputEl.id === 'prob-confirm-by') {
-            if (matrix) {
-                const title = isRP ? "🟢 CONFIRM RP (หัวหน้างานตาม VENDOR MATRIX)" : "🔵 CONFIRM VF (หัวหน้างานตาม VENDOR MATRIX)";
-                const confirmName = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
-                const confirmEmail = isRP ? (matrix.confirm_rp_email || matrix.supervisor_email) : (matrix.confirm_vf_email || matrix.supervisor_email);
-                const color = isRP ? "#059669" : "#1e40af";
-                
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">🛡️ ${title}</div>`;
-                
-                if (confirmName && confirmName !== '-') {
-                    htmlContent += renderOption(confirmName, 'SUPERVISOR (VENDOR MATRIX)', color, '🛡️', confirmEmail);
-                }
-                if (matrix.supervisor_name && matrix.supervisor_name !== '-' && matrix.supervisor_name !== confirmName) {
-                    htmlContent += renderOption(matrix.supervisor_name, 'SUPERVISOR (VENDOR MATRIX)', '#d97706', '🎖️', matrix.supervisor_email);
-                }
+        if (inputEl.id === 'prob-confirm-by') {
+            const headerTitle = isRP 
+                ? "รายชื่อผู้มีสิทธิ์ยืนยัน (CONFIRM RP)"
+                : "รายชื่อผู้มีสิทธิ์ยืนยัน (CONFIRM VF)";
 
-                // If user typed a search query, allow matching other supervisors strictly
-                if (query) {
-                    const extraSupervisors = Array.from(allStaffMap.values()).filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isSupervisor = roleLower.includes('super') || roleLower.includes('head') || roleLower.includes('supervisor');
-                        if (!isSupervisor) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return searchStr.includes(query);
-                    });
-                    if (extraSupervisors.length > 0) {
-                        htmlContent += `<div style="padding: 6px 12px; font-size: 8.5px; font-weight: 900; color: #64748b; background: #f1f5f9; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #cbd5e1;">🔍 ผลการค้นหาหัวหน้างานเพิ่มเติม</div>`;
-                        extraSupervisors.forEach(u => {
-                            htmlContent += renderOption(u.name, 'SUPERVISOR', '#d97706', '🛡️', u.email);
-                        });
+            htmlContent += `
+                <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #b45309; background: #fffbeb; border-bottom: 1.5px solid #fde68a; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 12px;">⚠️</span>
+                        <span>${headerTitle}</span>
+                    </div>
+                    <span style="font-size: 8.5px; font-weight: 800; background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 1px 6px; border-radius: 4px;">🔑 LV.2</span>
+                </div>`;
+
+            let hasMatched = false;
+
+            if (matrixRules.length > 0) {
+                matrixRules.forEach(r => {
+                    if (isRP) {
+                        // เอกสาร RP: ดึง IQC Engineer (หมวด 4) และ Confirm RP (หมวด 5) ตามภาพที่ 2
+                        const iqcName = (r.iqc_eng_name || '').trim();
+                        const iqcEmail = r.iqc_eng_email || '';
+                        const confName = (r.confirm_rp_name || '').trim();
+                        const confEmail = r.confirm_rp_email || '';
+
+                        // 1. IQC Engineer (รายงาน RP) จากหมวด 4 ในตารางภาพที่ 2
+                        if (iqcName && iqcName !== '-' && iqcName !== '--') {
+                            const card = renderAuthorizedCard(iqcName, '✦ วิศวกร RP (Matrix)', iqcEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+
+                        // 2. Confirm RP จากหมวด 5 ในตารางภาพที่ 2
+                        if (confName && confName !== '-' && confName !== '--') {
+                            const card = renderAuthorizedCard(confName, '✦ สิทธิ์ยืนยัน RP (Matrix)', confEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+
+                        // 3. SQE Engineer ประจำ Vendor
+                        const sqeName = (r.engineer || '').trim();
+                        const sqeEmail = r.sqe_email || '';
+                        if (sqeName && sqeName !== '-' && sqeName !== '--') {
+                            const card = renderAuthorizedCard(sqeName, '✦ SQE เวนเดอร์ (Matrix)', sqeEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+                    } else {
+                        // เอกสาร VF: ดึง SQE Engineer (หมวด 4) และ Confirm VF (หมวด 5) ตามภาพที่ 2
+                        const sqeName = (r.engineer || '').trim();
+                        const sqeEmail = r.sqe_email || '';
+                        const confName = (r.confirm_vf_name || '').trim();
+                        const confEmail = r.confirm_vf_email || '';
+
+                        // 1. SQE Engineer (รายงาน VF) จากหมวด 4 ในตารางภาพที่ 2
+                        if (sqeName && sqeName !== '-' && sqeName !== '--') {
+                            const card = renderAuthorizedCard(sqeName, '✦ วิศวกร VF (Matrix)', sqeEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+
+                        // 2. Confirm VF จากหมวด 5 ในตารางภาพที่ 2
+                        if (confName && confName !== '-' && confName !== '--') {
+                            const card = renderAuthorizedCard(confName, '✦ สิทธิ์ยืนยัน VF (Matrix)', confEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+
+                        // 3. IQC Engineer ประจำ Vendor
+                        const iqcName = (r.iqc_eng_name || '').trim();
+                        const iqcEmail = r.iqc_eng_email || '';
+                        if (iqcName && iqcName !== '-' && iqcName !== '--') {
+                            const card = renderAuthorizedCard(iqcName, '✦ IQC เวนเดอร์ (Matrix)', iqcEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
                     }
-                }
-            } else {
-                // กรณีไม่พบ Vendor ใน Matrix ให้แสดงเฉพาะหัวหน้างาน (Supervisors)
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: #d97706; background: #fffbeb; border-bottom: 1.5px solid #fde68a;">⚠️ รายชื่อหัวหน้างาน (SUPERVISORS)</div>`;
-                Array.from(allStaffMap.values())
-                    .filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isSupervisor = roleLower.includes('super') || roleLower.includes('head') || roleLower.includes('supervisor');
-                        if (!isSupervisor) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return !query || searchStr.includes(query);
-                    })
-                    .forEach(u => {
-                        htmlContent += renderOption(u.name, 'SUPERVISOR', '#d97706', '🛡️', u.email);
-                    });
+                });
+            }
+
+            // ถ้าไม่พบข้อมูล หรือพิมพ์คำค้นหาไม่เจอใน Matrix ของเวนเดอร์นี้
+            if (!hasMatched) {
+                htmlContent += `
+                    <div style="padding: 14px 12px; text-align: center; color: #64748b; font-size: 10.5px; background: #fffbeb;">
+                        <div style="font-size: 16px; margin-bottom: 2px;">⚠️</div>
+                        <div style="font-weight: 700; color: #92400e;">ไม่พบผู้มีสิทธิ์ใน Matrix ของเวนเดอร์นี้</div>
+                        <div style="font-size: 8.5px; color: #b45309;">อ้างอิงหมวด 4 & 5 ในตารางภาพที่ 2</div>
+                    </div>`;
             }
         }
 
         // --------------------------------------------------------
-        // 🔹 [PART C]: ช่อง APPROVED BY (ผู้อนุมัติ / ผู้จัดการ)
+        // 🔹 [PART 2]: ช่อง APPROVED BY (กิมมิก: มงกุฎ 👑 - ระดับอนุมัติสูงสุด LV.3)
         // --------------------------------------------------------
         else if (inputEl.id === 'prob-approved-by') {
-            if (matrix) {
-                const title = isRP ? "🟢 APPROVE RP (ตาม VENDOR MATRIX)" : "🔵 APPROVE VF (ตาม VENDOR MATRIX)";
-                const primaryAppr = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
-                const primaryEmail = isRP ? (matrix.approve_rp_email || matrix.approve_vf_rp_email || matrix.manager_email) : (matrix.approve_vf_email || matrix.approve_vf_rp_email || matrix.manager_email);
-                const jointAppr = matrix.approve_vf_rp_name; // ผู้อนุมัติร่วม (Joint Approval)
-                const jointEmail = matrix.approve_vf_rp_email;
-                const color = isRP ? "#059669" : "#1e40af";
+            const headerTitle = isRP 
+                ? "รายชื่อผู้อนุมัติเอกสาร (APPROVE RP)"
+                : "รายชื่อผู้อนุมัติเอกสาร (APPROVE VF)";
+            
+            htmlContent += `
+                <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #6d28d9; background: #faf5ff; border-bottom: 1.5px solid #e9d5ff; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 12px;">👑</span>
+                        <span>${headerTitle}</span>
+                    </div>
+                    <span style="font-size: 8.5px; font-weight: 800; background: #f3e8ff; color: #6d28d9; border: 1px solid #e9d5ff; padding: 1px 6px; border-radius: 4px;">👑 LV.3</span>
+                </div>`;
 
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">👑 ${title}</div>`;
-                
-                // 1. แสดงผู้อนุมัติหลัก (Primary Approver)
-                if (primaryAppr && primaryAppr !== '-') {
-                    htmlContent += renderOption(primaryAppr, 'PRIMARY APPROVER (VENDOR MATRIX)', color, '👑', primaryEmail);
-                }
+            let hasMatched = false;
 
-                // 2. แสดงผู้อนุมัติร่วม / ผู้จัดการ (Joint Approver)
-                if (jointAppr && jointAppr !== '-' && jointAppr !== primaryAppr) {
-                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #7c3aed; background: #f5f3ff; border-top: 1px solid #ddd6fe;">🟣 ผู้มีอำนาจอนุมัติร่วม (MANAGEMENT)</div>`;
-                    htmlContent += renderOption(jointAppr, 'JOINT APPROVAL (MANAGEMENT)', '#7c3aed', '🟣', jointEmail);
-                }
+            if (matrixRules.length > 0) {
+                matrixRules.forEach(r => {
+                    if (isRP) {
+                        // 1. Approve RP จากหมวด 5 ในตารางภาพที่ 2
+                        const apprRp = (r.approve_rp_name || '').trim();
+                        const apprRpEmail = r.approve_rp_email || '';
+                        if (apprRp && apprRp !== '-' && apprRp !== '--') {
+                            const card = renderAuthorizedCard(apprRp, '✦ สิทธิ์อนุมัติ RP (Matrix)', apprRpEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
 
-                if (matrix.manager_name && matrix.manager_name !== '-' && matrix.manager_name !== primaryAppr && matrix.manager_name !== jointAppr) {
-                    htmlContent += renderOption(matrix.manager_name, 'SECTION MANAGER (VENDOR MATRIX)', '#0f766e', '🏛️', matrix.manager_email);
-                }
+                        // 2. APPROVE VF/RP (ผู้อนุมัติร่วม) จากหมวด 5
+                        const apprJoint = (r.approve_vf_rp_name || '').trim();
+                        const apprJointEmail = r.approve_vf_rp_email || '';
+                        if (apprJoint && apprJoint !== '-' && apprJoint !== '--') {
+                            const card = renderAuthorizedCard(apprJoint, '✦ อนุมัติร่วม (Joint)', apprJointEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+                    } else {
+                        // 1. Approve VF จากหมวด 5 ในตารางภาพที่ 2
+                        const apprVf = (r.approve_vf_name || '').trim();
+                        const apprVfEmail = r.approve_vf_email || '';
+                        if (apprVf && apprVf !== '-' && apprVf !== '--') {
+                            const card = renderAuthorizedCard(apprVf, '✦ สิทธิ์อนุมัติ VF (Matrix)', apprVfEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
 
-                // If user typed a search query, allow matching other managers/approvers
-                if (query) {
-                    const extraApprovers = Array.from(allStaffMap.values()).filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isApprover = roleLower.includes('manager') || roleLower.includes('admin') || roleLower.includes('approve') || u.department === 'Approved';
-                        if (!isApprover) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return searchStr.includes(query);
-                    });
-                    if (extraApprovers.length > 0) {
-                        htmlContent += `<div style="padding: 6px 12px; font-size: 8.5px; font-weight: 900; color: #64748b; background: #f1f5f9; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #cbd5e1;">🔍 ผลการค้นหาผู้อนุมัติเพิ่มเติม</div>`;
-                        extraApprovers.forEach(u => {
-                            const isMgr = (u.role || '').toLowerCase().includes('manager');
-                            htmlContent += renderOption(u.name, isMgr ? 'MANAGER' : 'APPROVER', isMgr ? '#0f766e' : '#7c3aed', isMgr ? '🏛️' : '👑', u.email);
-                        });
+                        // 2. APPROVE VF/RP (ผู้อนุมัติร่วม) จากหมวด 5
+                        const apprJoint = (r.approve_vf_rp_name || '').trim();
+                        const apprJointEmail = r.approve_vf_rp_email || '';
+                        if (apprJoint && apprJoint !== '-' && apprJoint !== '--') {
+                            const card = renderAuthorizedCard(apprJoint, '✦ อนุมัติร่วม (Joint)', apprJointEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+                    }
+                });
+            }
+
+            // ถ้าไม่พบข้อมูล หรือพิมพ์คำค้นหาไม่เจอใน Matrix ของเวนเดอร์นี้
+            if (!hasMatched) {
+                htmlContent += `
+                    <div style="padding: 14px 12px; text-align: center; color: #64748b; font-size: 10.5px; background: #faf5ff;">
+                        <div style="font-size: 16px; margin-bottom: 2px;">⚠️</div>
+                        <div style="font-weight: 700; color: #581c87;">ไม่พบผู้อนุมัติใน Matrix ของเวนเดอร์นี้</div>
+                        <div style="font-size: 8.5px; color: #7c3aed;">อ้างอิงหมวด 5 ในตารางภาพที่ 2</div>
+                    </div>`;
+            }
+        }
+
+        // --------------------------------------------------------
+        // 🔹 [PART 3]: ช่อง ISSUE BY (กิมมิก: ปากกา ✒️ - ระดับวิศวกรผู้จัดทำ/เปิดเอกสาร LV.1)
+        // --------------------------------------------------------
+        else if (inputEl.id === 'prob-issue-by') {
+            htmlContent += `
+                <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #0369a1; background: #f0f9ff; border-bottom: 1.5px solid #bae6fd; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 12px;">✒️</span>
+                        <span>วิศวกรประจำ VENDOR (ภาพที่ 2)</span>
+                    </div>
+                    <span style="font-size: 8.5px; font-weight: 800; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 1px 6px; border-radius: 4px;">✒️ LV.1</span>
+                </div>`;
+
+            let hasEng = false;
+
+            if (matrixRules.length > 0) {
+                matrixRules.forEach(r => {
+                    const primaryEng = isRP ? (r.iqc_eng_name || r.engineer) : (r.engineer || r.iqc_eng_name);
+                    const primaryEmail = isRP ? (r.iqc_eng_email || r.sqe_email) : (r.sqe_email || r.iqc_eng_email);
+
+                    if (primaryEng && primaryEng !== '-' && primaryEng !== '--') {
+                        const card = renderAuthorizedCard(primaryEng, '✦ วิศวกรประจำเวนเดอร์ (Matrix)', primaryEmail);
+                        if (card) { htmlContent += card; hasEng = true; }
+                    }
+
+                    const altEng = isRP ? r.engineer : r.iqc_eng_name;
+                    const altEmail = isRP ? r.sqe_email : r.iqc_eng_email;
+                    if (altEng && altEng !== '-' && altEng !== '--' && altEng !== primaryEng) {
+                        const card = renderAuthorizedCard(altEng, '✦ วิศวกรประจำเวนเดอร์ (Matrix)', altEmail);
+                        if (card) { htmlContent += card; hasEng = true; }
+                    }
+                });
+            }
+
+            // แสดงรายชื่อพนักงานทั้งหมดเพิ่มเติม (กรณีมอบหมายผู้อื่นเปิดเอกสารแทน) ดึงจาก MASTER_STAFF_USERS และ _dbUsersRoleMap
+            const allStaffMap = new Map();
+            if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+                MASTER_STAFF_USERS.forEach(u => {
+                    if (u && u.name) {
+                        const canon = (typeof window.canonicalStaffDisplayName === 'function')
+                            ? window.canonicalStaffDisplayName(u.name, u.email)
+                            : u.name.trim();
+                        const key = (u.email || canon).toLowerCase().trim();
+                        if (!allStaffMap.has(key)) {
+                            allStaffMap.set(key, { name: canon, email: u.email || '' });
+                        }
+                    }
+                });
+            }
+
+            const extraStaff = Array.from(allStaffMap.values()).filter(u => {
+                const key = (u.email || u.name).toLowerCase().trim();
+                return !renderedPersonKeys.has(key);
+            });
+
+            if (extraStaff.length > 0) {
+                let extraAdded = 0;
+                let extraHtml = '';
+                for (const u of extraStaff) {
+                    const card = renderAuthorizedCard(u.name, '✦ รายชื่อในฐานข้อมูล', u.email);
+                    if (card) {
+                        extraHtml += card;
+                        extraAdded++;
+                        if (extraAdded >= 15) break;
                     }
                 }
-            } else {
-                // กรณีไม่พบ Vendor ใน Matrix ให้แสดงเฉพาะผู้จัดการและผู้อนุมัติ
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: #7c3aed; background: #f5f3ff; border-bottom: 1.5px solid #c4b5fd;">👑 รายชื่อผู้จัดการและผู้อนุมัติ (MANAGERS & APPROVERS)</div>`;
-                Array.from(allStaffMap.values())
-                    .filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isApprover = roleLower.includes('manager') || roleLower.includes('admin') || roleLower.includes('approve') || u.department === 'Approved';
-                        if (!isApprover) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return !query || searchStr.includes(query);
-                    })
-                    .forEach(u => {
-                        const isMgr = (u.role || '').toLowerCase().includes('manager');
-                        htmlContent += renderOption(u.name, isMgr ? 'MANAGER' : 'APPROVER', isMgr ? '#0f766e' : '#7c3aed', isMgr ? '🏛️' : '👑', u.email);
-                    });
+                if (extraHtml) {
+                    htmlContent += `
+                        <div style="padding: 5px 12px; font-size: 9.5px; font-weight: 800; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span>📋</span>
+                                <span>พนักงาน Carrier ทั้งหมดในระบบ (เลือกจัดทำแทน)</span>
+                            </div>
+                            <span style="font-size: 8.5px; font-weight: 700; color: #94a3b8;">${extraStaff.length}</span>
+                        </div>` + extraHtml;
+                }
             }
         }
     }
     // ============================================================
-    // กรณีที่ 2: ข้อมูลทั่วไป
+    // กรณีที่ 2: ข้อมูลทั่วไป (partno, partname, supplier, category, defect, action, report)
     // ============================================================
     else {
         let source = [];
@@ -29695,55 +30210,55 @@ function renderModalAC(type, inputEl) {
             source = Array.from(smartMemory.values.partName || []);
         } else if (typeLower === 'supplier') {
             source = Array.from(smartMemory.values.supplier || []);
-        } 
-        // 🎯 📦 ส่วนที่แก้ไข: ดึงมาจาก Proficiency Breakdown (หมวดหมู่ SQE มาตรฐาน)
-// ค้นหาส่วนนี้ในฟังก์ชัน renderModalAC (ประมาณบรรทัด 3901)
-else if (typeLower === 'category' || type === 'part') {
-    source = [
-        "Plastic Resin Mold Part",
-        "Plastic Resin (Assy)",
-        "Packaging part Form",
-        "Aluminium Part",
-        "Steel",
-        "Copper Part",
-        "Terminal",
-        "Remote Control",
-        "Motors",
-        "Electric Controls",
-        "PCBA",
-        "Compressors",
-        "Piping Part",
-        "Printing part"
-    ];
-    // ส่วนนี้จะดึงค่าจากประวัติที่เคยพิมพ์ไว้มาแสดงต่อท้าย (คงไว้เหมือนเดิม)
-    const historyCats = Array.from(smartMemory.values.category || []);
-    historyCats.forEach(c => { if(!source.includes(c)) source.push(c); });
-}
-        else if (typeLower === 'user') {
+        } else if (typeLower === 'category' || type === 'part') {
+            source = [
+                "Plastic Resin Mold Part",
+                "Plastic Resin (Assy)",
+                "Packaging part Form",
+                "Aluminium Part",
+                "Steel",
+                "Copper Part",
+                "Terminal",
+                "Remote Control",
+                "Motors",
+                "Electric Controls",
+                "PCBA",
+                "Compressors",
+                "Piping Part",
+                "Printing part"
+            ];
+            const historyCats = Array.from(smartMemory.values.category || []);
+            historyCats.forEach(c => { if(!source.includes(c)) source.push(c); });
+        } else if (typeLower === 'user') {
             source = Array.from(smartMemory.values.line || []); 
         } else if (typeLower === 'defect') {
             source = Array.from(smartMemory.values.defect || []);
-        } 
-// ค้นหาส่วนนี้ในฟังก์ชัน renderModalAC
-else if (typeLower === 'action') {
-    source = [
-        "Rework (แก้ไขงานซ่อม)",
-        "Repair (ซ่อมแซมตามเงื่อนไข)",
-        "Replace (เปลี่ยนชิ้นส่วนใหม่)",
-        "Sorting 100% (คัดแยกชิ้นงาน 100%)",
-        "Screening & Re-inspection",
-        "Use as is / Concession",
-        "Scrap (ทำลายชิ้นงาน NG)",
-        "RTV (ส่งคืนซัพพลายเออร์)",
-        "Containment / Hold",
-        "Engineering Change (EC/ECN)",
-        "Poka - Yoke / Jig Adjustment",
-        "Supplier On-site Sorting"
-    ];
-}
-        else if (typeLower === 'report') {
+        } else if (typeLower === 'action') {
+            source = [
+                "Rework (แก้ไขงานซ่อม)",
+                "Repair (ซ่อมแซมตามเงื่อนไข)",
+                "Replace (เปลี่ยนชิ้นส่วนใหม่)",
+                "Sorting 100% (คัดแยกชิ้นงาน 100%)",
+                "Screening & Re-inspection",
+                "Use as is / Concession",
+                "Scrap (ทำลายชิ้นงาน NG)",
+                "RTV (ส่งคืนซัพพลายเออร์)",
+                "Containment / Hold",
+                "Engineering Change (EC/ECN)",
+                "Poka - Yoke / Jig Adjustment",
+                "Supplier On-site Sorting"
+            ];
+        } else if (typeLower === 'report') {
             source = ["VF Report", "RP Report", "Records"];
         }
+
+        let itemIcon = '🔹';
+        if (typeLower === 'partno') itemIcon = '🔢';
+        else if (typeLower === 'partname' || typeLower === 'part' || typeLower === 'category') itemIcon = '📦';
+        else if (typeLower === 'supplier') itemIcon = '🏢';
+        else if (typeLower === 'defect') itemIcon = '⚠️';
+        else if (typeLower === 'action') itemIcon = '⚡';
+        else if (typeLower === 'report') itemIcon = '📄';
 
         // กรองและเรียงลำดับ
         let matched = query ? source.filter(v => v && v.toString().toLowerCase().includes(query)) : source;
@@ -29753,9 +30268,13 @@ else if (typeLower === 'action') {
         if (matched.length > 0) {
             htmlContent = matched.map(v => `
                 <div class="modal-ac-item" 
-                     style="padding: 12px 14px; font-size: 12px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9;"
+                     data-value="${v.toString().replace(/"/g, '&quot;')}"
+                     style="padding: 7px 12px; font-size: 11.5px; font-weight: 600; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9; border-left: 4px solid transparent; transition: all 0.15s; display: flex; align-items: center; gap: 8px;"
+                     onmouseenter="this.style.background='#f0f7ff'; this.style.color='#0284c7'; this.style.borderLeft='4px solid #0284c7';"
+                     onmouseleave="this.style.background='transparent'; this.style.color='#1e293b'; this.style.borderLeft='4px solid transparent';"
                      onmousedown="event.preventDefault(); applyModalAC('${type}', '${v.toString().replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                    ${v}
+                    <span style="font-size: 11px; flex-shrink: 0;">${itemIcon}</span>
+                    <span>${v}</span>
                 </div>
             `).join('');
         }
@@ -29773,15 +30292,15 @@ else if (typeLower === 'action') {
 function applyModalAC(type, value, inputEl) {
     if (!inputEl) return;
 
-    // 1. ใส่ค่าที่เลือก (เช่น ชื่อพนักงาน, รหัสพาร์ท) ลงในช่อง Input
+    // 1. ใส่ค่าที่เลือกลงในช่อง Input
     inputEl.value = value;
 
-    // 2. ปิดดรอปดาวน์ Autocomplete
+    // 2. ปิดดรอปดาวน์ Autocomplete ทันที
     const wrap = inputEl.parentElement;
     const dd = wrap ? wrap.querySelector('.modal-ac-dropdown') : null;
     if (dd) dd.style.display = 'none';
 
-    // 3. บันทึกลง Memory ของ Case (Auto-save) - เก็บเฉพาะชื่อ ไม่เก็บสถานะลายเซ็น
+    // 3. บันทึกลง Memory ของ Case (Auto-save)
     const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
         ? Wap8DSystem.getCurrentCase()
         : null;
@@ -29791,21 +30310,6 @@ function applyModalAC(type, value, inputEl) {
         
         if (inputEl.id === 'prob-issue-by') {
             curCase.report_data.vf_data.issue_by = value;
-            
-            // ตรวจสอบว่าถ้าช่อง CONFIRM BY มีชื่อเดิมอยู่แล้วแต่ไม่ได้อยู่ในทีมเดียวกับ ISSUE BY ให้รีเซ็ตช่อง CONFIRM BY
-            const confirmInput = document.getElementById('prob-confirm-by');
-            if (confirmInput && confirmInput.value) {
-                const issueTeam = typeof getStaffTeamName === 'function' ? getStaffTeamName(value) : null;
-                const confirmTeam = typeof getStaffTeamName === 'function' ? getStaffTeamName(confirmInput.value) : null;
-                if (issueTeam && confirmTeam && issueTeam !== confirmTeam) {
-                    confirmInput.value = "";
-                    curCase.report_data.vf_data.confirm_by = "";
-                    curCase.report_data.vf_data.confirm_by_sig_active = false;
-                    curCase.report_data.vf_data.confirm_sig_active = false;
-                    const confirmSig = document.getElementById('sig-prob-confirm-by');
-                    if (confirmSig) confirmSig.innerHTML = '';
-                }
-            }
         } else if (inputEl.id === 'prob-confirm-by') {
             curCase.report_data.vf_data.confirm_by = value;
         } else if (inputEl.id === 'prob-approved-by') {
@@ -29813,7 +30317,7 @@ function applyModalAC(type, value, inputEl) {
         }
     }
 
-    // 4. แจ้งระบบอัปเดตสถานะ (Trigger input events)
+    // 4. แจ้งระบบอัปเดตสถานะ (Trigger input & change events)
     inputEl._suppressAC = true;
     inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -30009,9 +30513,15 @@ function updateSupportFormValidation() {
 // ฟังก์ชันอัปเดตแถบสีไฮไลต์
 function updateModalACHighlight(dd) {
     const items = dd.querySelectorAll('.modal-ac-item');
-    items.forEach(it => it.classList.remove('active'));
-    if (currentModalACIndex >= 0) {
+    items.forEach(it => {
+        it.classList.remove('active');
+        it.style.background = '#ffffff';
+        it.style.borderLeft = '4px solid transparent';
+    });
+    if (currentModalACIndex >= 0 && items[currentModalACIndex]) {
         items[currentModalACIndex].classList.add('active');
+        items[currentModalACIndex].style.background = '#f0f7ff';
+        items[currentModalACIndex].style.borderLeft = '4px solid #0284c7';
         items[currentModalACIndex].scrollIntoView({ block: 'nearest' });
     }
 }

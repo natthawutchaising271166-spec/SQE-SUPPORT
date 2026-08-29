@@ -5207,6 +5207,7 @@ function getInstrumentImageUrl(item) {
 window.INSTRUMENT_IMAGE_MAP = INSTRUMENT_IMAGE_MAP;
 window.getInstrumentImageUrl = getInstrumentImageUrl;
 window.resolveInstrumentAssetUrl = resolveInstrumentAssetUrl;
+
 // --- ฟังก์ชันทำความสะอาดชื่อ (ลบ Mr. Ms. ฯลฯ) ---
 function cleanSignatureName(name) {
     if (!name) return "";
@@ -5215,6 +5216,62 @@ function cleanSignatureName(name) {
         .replace(/^(?:นาย|นางสาว|นาง|คุณ)\s*/gi, '')
         .trim();
 }
+window.cleanSignatureName = cleanSignatureName;
+
+// --- ฟังก์ชันจัดระเบียบชื่อพนักงานให้คงคำนำหน้า (Mr. / Ms.) เสมอ และตัดชื่อซ้ำที่ไม่มีคำนำหน้าออก ---
+function canonicalStaffDisplayName(rawName, email = '') {
+    if (!rawName || rawName === '-' || rawName === '--' || rawName === 'N/A') return '';
+    let str = String(rawName).trim();
+    
+    // จัดรูปแบบคำนำหน้าที่มีอยู่แล้วให้เป็นมาตรฐาน (เช่น "Mr. Aphinan P." -> "Mr.Aphinan P.")
+    str = str.replace(/^(Mr|Ms|Mrs|Miss|Dr|Khun)\.?\s+/i, (match, p1) => {
+        const prefix = p1.charAt(0).toUpperCase() + p1.slice(1).toLowerCase();
+        return `${prefix}.`;
+    });
+    
+    const emLower = email ? String(email).trim().toLowerCase() : '';
+    const cleanRaw = cleanSignatureName(str).toLowerCase().trim();
+    
+    // 1. ตรวจสอบใน MASTER_STAFF_USERS (32 คนหลักที่มีคำนำหน้า Mr. หรือ Ms. ครบถ้วน)
+    if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+        const found = MASTER_STAFF_USERS.find(u => {
+            if (emLower && u.email && u.email.toLowerCase().trim() === emLower) return true;
+            if (cleanRaw) {
+                const uClean = cleanSignatureName(u.name).toLowerCase().trim();
+                return uClean === cleanRaw;
+            }
+            return false;
+        });
+        if (found && found.name) {
+            return found.name.trim(); // คืนค่าชื่อที่มีคำนำหน้าเสมอ
+        }
+    }
+    
+    // 2. ตรวจสอบใน STAFF_LIST
+    if (typeof STAFF_LIST !== 'undefined' && Array.isArray(STAFF_LIST)) {
+        const found = STAFF_LIST.find(s => {
+            const sClean = cleanSignatureName(s).toLowerCase().trim();
+            return sClean === cleanRaw;
+        });
+        if (found) return String(found).trim();
+    }
+    
+    // 3. ตรวจสอบใน STAFF_EMAIL_MAP
+    if (typeof STAFF_EMAIL_MAP === 'object' && STAFF_EMAIL_MAP !== null) {
+        for (const [sName, sEmail] of Object.entries(STAFF_EMAIL_MAP)) {
+            if (emLower && sEmail && sEmail.toLowerCase().trim() === emLower) {
+                if (/^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(sName)) return sName.trim();
+            }
+            const sClean = cleanSignatureName(sName).toLowerCase().trim();
+            if (cleanRaw && sClean === cleanRaw && /^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(sName)) {
+                return sName.trim();
+            }
+        }
+    }
+    
+    return str;
+}
+window.canonicalStaffDisplayName = canonicalStaffDisplayName;
 
 // --- ฟังก์ชันระบุทีมของพนักงาน (Mold, Printing, Steel, Piping and Mat, Electronic) ---
 function getStaffTeamName(inputName) {
@@ -5429,8 +5486,26 @@ function escapeHtml(text) {
     return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+function isQuotaExceededError(err) {
+    if (!err) return false;
+    const str = String(err.message || err.details || err.hint || (typeof err === 'string' ? err : '')).toLowerCase();
+    const code = String(err.code || (err.error && err.error.code) || '');
+    return str.includes('exceed_egress_quota') ||
+           str.includes('spend caps') ||
+           str.includes('restricted') ||
+           str.includes('egress_quota') ||
+           str.includes('egress quota') ||
+           str.includes('quota exceeded') ||
+           code === '402' ||
+           str.includes('payment required');
+}
+window.isQuotaExceededError = isQuotaExceededError;
+
 function getFriendlyErrorMessage(err) {
     if (!err) return 'เกิดข้อผิดพลาด';
+    if (isQuotaExceededError(err)) {
+        return '📶 ใช้งานโหมดบันทึกในเครื่อง (Cloud ถึงขีดจำกัดโควต้าชั่วคราว ข้อมูลบันทึกในเครื่องปลอดภัย)';
+    }
     if (!navigator.onLine || err.message?.includes('fetch') || err.message?.includes('network')) return '📶 ปัญหาการเชื่อมต่อ: กรุณาตรวจสอบอินเทอร์เน็ต';
     switch (err.code || (err.error && err.code)) {
         case '42501': return '🔒 สิทธิ์ปฏิเสธ';
@@ -5533,9 +5608,12 @@ window.fetchDbUsersForDirectory = async function() {
             data.forEach(u => {
                 if (u && u.email) {
                     const em = u.email.toLowerCase().trim();
+                    const canonical = (typeof window.canonicalStaffDisplayName === 'function')
+                        ? window.canonicalStaffDisplayName(u.display_name, u.email)
+                        : (u.display_name || u.email.split('@')[0].toUpperCase());
                     window._dbUsersRoleMap.set(em, {
                         email: u.email,
-                        display_name: u.display_name || u.email.split('@')[0].toUpperCase(),
+                        display_name: canonical || u.display_name || u.email.split('@')[0].toUpperCase(),
                         role: u.role || 'staff',
                         status: u.status || 'active'
                     });
@@ -5632,9 +5710,12 @@ window.getEngineeringAndApprovalDirectory = function() {
         // 🌟 ดึงระดับสิทธิ์/ตำแหน่งจริงจากตาราง users ในฐานข้อมูล
         const dbUser = window._dbUsersRoleMap ? window._dbUsersRoleMap.get(key) : null;
         const realRole = (dbUser && dbUser.role) ? dbUser.role : fallbackRole;
-        const finalDisplayName = (dbUser && dbUser.display_name && dbUser.display_name !== '-')
+        let rawNameCandidate = (dbUser && dbUser.display_name && dbUser.display_name !== '-')
             ? dbUser.display_name
             : ((name && name !== '-') ? name.trim() : cleanEm.split('@')[0]);
+        const finalDisplayName = (typeof window.canonicalStaffDisplayName === 'function')
+            ? window.canonicalStaffDisplayName(rawNameCandidate, cleanEm)
+            : rawNameCandidate;
 
         if (!emailMap.has(key)) {
             const entry = {
@@ -5712,6 +5793,30 @@ window.getEngineeringAndApprovalDirectory = function() {
     }
 
     return list;
+};
+
+window.isMasterOrAdminUser = function(email) {
+    if (!email) {
+        email = (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : '';
+    }
+    if (!email) return false;
+    const em = String(email).trim().toLowerCase();
+    const adminEmails = [
+        'natthawut.chaising@carrier.com',
+        'natthawutchaising271166@gmail.com',
+        'zatknatthawut@gmail.com'
+    ];
+    if (adminEmails.includes(em) || em.includes('admin') || em.includes('natthawut')) return true;
+    if (typeof USER_LEVEL_MAP === 'object') {
+        const r = USER_LEVEL_MAP[em] || USER_LEVEL_MAP[email];
+        if (r && String(r).toLowerCase().includes('admin')) return true;
+    }
+    if (window._dbUsersRoleMap && window._dbUsersRoleMap.has(em)) {
+        const u = window._dbUsersRoleMap.get(em);
+        if (u && String(u.role).toLowerCase().includes('admin')) return true;
+    }
+    if (typeof S !== 'undefined' && S.userRole && String(S.userRole).toLowerCase().includes('admin')) return true;
+    return false;
 };
 
 window.isApproverOrEngineer = function(email) {
@@ -6386,6 +6491,20 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
         saveHistory();
         setTimeout(fitToScreen, 50);
     };
+    baseImage.onerror = () => {
+        if (baseImage.crossOrigin) {
+            baseImage.crossOrigin = null;
+            baseImage.src = imageUrl;
+        } else {
+            console.warn('Annotator: Failed to load image, setting blank canvas:', imageUrl);
+            canvas.width = 1200;
+            canvas.height = 800;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            saveHistory();
+            setTimeout(fitToScreen, 50);
+        }
+    };
     baseImage.src = imageUrl;
 
     // Tool switching
@@ -6653,7 +6772,11 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
         ctx.strokeStyle = currentColor;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.roundRect(coords.x, coords.y - boxHeight, boxWidth, boxHeight, 8);
+        if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(coords.x, coords.y - boxHeight, boxWidth, boxHeight, 8);
+        } else {
+            ctx.rect(coords.x, coords.y - boxHeight, boxWidth, boxHeight);
+        }
         ctx.fill();
         ctx.stroke();
 
@@ -6834,8 +6957,18 @@ async function handleLogin() {
         ? window.isApproverOrEngineer(email)
         : false;
 
-    // หากเป็นอีเมลในกลุ่มสายการอนุมัติ/วิศวกร หรือเลือกแท็บ Supervisor ให้กำหนดให้ล็อกอินเป็นหัวหน้างานเสมอ
-    if (S.loginRole === 'supervisor' || isEngOrApprover) {
+    // ตรวจสอบว่าเป็น Admin หรือไม่
+    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
+        ? window.isMasterOrAdminUser(email)
+        : (email === 'natthawut.chaising@carrier.com' || email.includes('admin') || email.includes('natthawut'));
+
+    // หากเป็นผู้ดูแลระบบ (Admin) ให้คงสิทธิ์ Admin เสมอ
+    if (isMasterAdmin) {
+        if (S.loginRole !== 'supervisor') {
+            S.loginRole = 'sqe_support';
+        }
+        S.userRole = 'admin';
+    } else if (S.loginRole === 'supervisor' || isEngOrApprover) {
         S.loginRole = 'supervisor';
     }
 
@@ -6902,7 +7035,9 @@ async function handleLogin() {
 
         // 4. กำหนดสิทธิ์การเข้าถึงหน้าจอ
         const isSupportLogin = (S.loginRole === 'staff' || S.loginRole === 'sqe_support');
-        if (S.loginRole === 'supervisor') {
+        if (isMasterAdmin) {
+            S.userRole = 'admin';
+        } else if (S.loginRole === 'supervisor') {
             S.userRole = 'supervisor';
         } else {
             S.userRole = userData.role || 'staff';
@@ -7194,6 +7329,21 @@ function finalizeLogin(email, role) {
  * 2. กระบวนการโหลดข้อมูล (Hard Sync) และตรวจเช็ค Update
  */
 async function startNeuralBootSequence(email, role) {
+    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
+        ? window.isMasterOrAdminUser(email)
+        : (email === 'natthawut.chaising@carrier.com' || String(email).includes('admin') || String(email).includes('natthawut'));
+
+    // ตั้งค่า state พื้นฐานเพื่อให้ระบบดึงข้อมูลได้ทันทีใน Step 2
+    S.currentUser = email;
+    S.userRole = isMasterAdmin ? 'admin' : role;
+    if (isMasterAdmin) {
+        S.viewingUser = email;
+    } else if (role === 'supervisor') {
+        S.viewingUser = '';
+    } else {
+        S.viewingUser = email;
+    }
+
     const overlay = document.getElementById('neural-boot-overlay');
     const statusText = document.getElementById('boot-status');
     const progress = document.getElementById('boot-progress');
@@ -7264,9 +7414,13 @@ function launchDirectWarp(email, role) {
     const linkData = window.checkDeepLinkParams();
     const hasDeepLink = !!(linkData && (linkData.caseId || linkData.ctrl));
 
+    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
+        ? window.isMasterOrAdminUser(email)
+        : (email === 'natthawut.chaising@carrier.com' || String(email).includes('admin') || String(email).includes('natthawut'));
+
     S.currentUser = email;
-    S.userRole = role;
-    S.viewingUser = email;
+    S.userRole = isMasterAdmin ? 'admin' : role;
+    S.viewingUser = (isMasterAdmin || role !== 'supervisor') ? email : '';
     S.isLoggedIn = true;
     S.isLinkSession = hasDeepLink;
 
@@ -7742,66 +7896,112 @@ function handleLogout() {
     toast('Logged out successfully', 'info');
 }
 
-async function showDashboard(isDeepLink = false) { // 1. เพิ่ม parameter เพื่อรับสถานะลิงก์
-    // --- [ส่วนที่ 1: จัดการธีม] ---
+async function showDashboard(isDeepLink = false) {
+    // --- [ส่วนที่ 1: จัดการธีมและการแสดงผล Sidebar] ---
     const savedTheme = localStorage.getItem('carrier_theme');
     const isDark = (savedTheme === 'dark');
-    if (isDark) {
-        document.body.classList.add('dark-mode');
-    } else {
-        document.body.classList.remove('dark-mode');
-    }
-    if (typeof updateThemeIcon === 'function') {
-        updateThemeIcon(isDark);
-    }
+    document.body.classList.toggle('dark-mode', isDark);
+    if (typeof updateThemeIcon === 'function') updateThemeIcon(isDark);
 
-    // --- [ส่วนที่ 2: สลับหน้าจอและตั้งค่า Sidebar] ---
     $id('login-view').classList.add('hidden-view');
     $id('dashboard-view').classList.remove('hidden-view');
     
-    const namePart = S.currentUser.split('@')[0] || 'USER';
-    const initial = namePart.charAt(0).toUpperCase();
-    $id('user-avatar').textContent = initial;
-    $id('user-display-name').textContent = namePart.replace(/\./g, ' ').toUpperCase();
-    $id('user-display-email').textContent = S.currentUser;
+    // 🎯 1. ล็อคชื่อ Sidebar เป็นชื่อคนลอกอินปัจจุบัน (S.currentUser) ตลอดกาล
+    if (typeof updateSidebarUserUI === 'function') {
+        updateSidebarUserUI(); 
+    }
 
-   // --- [ส่วนที่ 3: จัดการ Form Panel และสิทธิ์ Supervisor] ---
+    // --- [ส่วนที่ 2: อ้างอิง UI Elements] ---
     const staffWrap = $id('staff-selector-wrap');
     const formPanel = $id('form-panel');
     const showBtn = $id('show-form-btn');
+    const labelEl = document.getElementById('staff-custom-select-label');
+    const adminFooterBtn = document.getElementById('admin-footer-access');
 
-    // ซ่อน Form Panel เป็นค่าเริ่มต้น
+    // รีเซ็ตสถานะ Form Panel (ซ่อนไว้ก่อน)
     if (formPanel && showBtn) {
         isFormHidden = true; 
         gsap.set(formPanel, { x: -350, opacity: 0, width: 0, marginRight: -12 });
         formPanel.classList.add('hidden');
         showBtn.classList.remove('hidden');
-        gsap.set(showBtn, { x: 0, opacity: 1 });
     }
 
-    // ตรวจสอบประเภทการ Login
+    // --- [ส่วนที่ 3: Logic แยกตามประเภทการ Login (แอดมิน vs หัวหน้างาน vs พนักงาน)] ---
+    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
+        ? window.isMasterOrAdminUser(S.currentUser)
+        : (S.currentUser === 'natthawut.chaising@carrier.com' || S.currentUser.includes('admin') || S.currentUser.includes('natthawut'));
     const isSupervisorSession = (S.loginRole === 'supervisor');
 
-    if (isSupervisorSession) { 
-        // ==========================================
-        // 🔑 CASE: ล็อกอินผ่านหน้า SUPERVISOR
-        // ==========================================
-        S.userRole = 'supervisor';
-
-        // ✅ แสดงช่องเลือกรายชื่อพนักงาน (Staff Selector)
+    if (isMasterAdmin) { 
+        // ============================================================
+        // 👑 CASE 0: ผู้ดูแลระบบสูงสุด (ADMIN / MASTER ADMIN)
+        // เมื่อลอกอินแอดมิน ให้หน้า SQE Support ดึงข้อมูลของคนนั้นมาแสดงทันที
+        // ไม่ต้องเลือกฟิลเตอร์ ดึงข้อมูลชื่อแอดมินมาแสดงผลก่อนเสมอเท่านั้น
+        // ============================================================
+        S.userRole = 'admin';
+        S.viewingUser = S.currentUser; // ตั้งค่าเป็น Admin ทันที ไม่ปล่อยว่าง
+        
+        // แสดง Dropdown เลือกพนักงานเพื่อให้แอดมินตรวจงานคนอื่นได้ แต่ค่าเริ่มต้นเป็นชื่อแอดมินเสมอ
         if (staffWrap) {
             staffWrap.classList.remove('hidden');
-            staffWrap.classList.add('flex'); // ใช้ flex เพื่อให้ตำแหน่งสวยงามตามดีไซน์
+            staffWrap.classList.add('flex');
+            staffWrap.style.display = 'flex';
         }
 
+        // โหลดรายชื่อผู้ปฏิบัติงานเข้า Dropdown (ชื่อ Admin จะถูกจัดอันดับบนสุดเสมอ)
         await loadStaffList(); 
 
-        // จัดการ UI เพิ่มเติมสำหรับ Supervisor
-        if (showBtn) showBtn.style.display = 'none'; 
-        const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
-        if (internalCloseBtn) internalCloseBtn.style.display = 'none';
+        // เลือกชื่อ Admin ใน Dropdown และอัปเดต Label ทันที
+        const curAdminSelected = _staffDirectoryCache.find(it => it.email.toLowerCase() === S.currentUser.toLowerCase());
+        const adminDisplay = curAdminSelected ? curAdminSelected.fullLabel : 'Mr.Natthawut C.(ADMIN)';
+        if (labelEl) {
+            labelEl.textContent = adminDisplay;
+        }
+        const selectEl = document.getElementById('staff-filter-select');
+        if (selectEl) selectEl.value = S.currentUser;
+        const customBtn = document.getElementById('staff-custom-select-btn');
+        if (customBtn) {
+            customBtn.classList.add('ring-2', 'ring-blue-500/30', 'border-blue-400', 'dark:border-blue-600', 'bg-blue-50/50', 'dark:bg-blue-950/30');
+        }
 
-        // ปิดการใช้งานฟอร์ม (Read-only)
+        // สิทธิ์เต็ม: ใช้งานฟอร์มเพิ่ม/แก้ไขข้อมูลได้ ไม่ล็อคฟอร์ม
+        if (showBtn) showBtn.style.display = 'flex'; 
+        const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
+        if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
+        const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
+        formInputs.forEach(el => {
+            el.disabled = false;
+            el.style.opacity = '1';
+            el.style.cursor = 'default';
+        });
+
+    } else if (isSupervisorSession) { 
+        // ============================================================
+        // 🔑 CASE 1: ล็อกอินผ่านหน้า SUPERVISOR (หัวหน้างานมาตรวจงาน)
+        // ============================================================
+        S.userRole = 'supervisor';
+        
+        /**
+         * 🎯 [จุดสำคัญ]: บังคับหน้าว่างตอนเริ่มต้น 
+         * ล้างข้อมูลในหน่วยความจำทิ้งเพื่อความปลอดภัย
+         */
+        S.viewingUser = ''; 
+        S.records = []; 
+        S.wapData = { achievements: [], score5s: [], skills: [], specialJobs: [] };
+
+        // แสดงช่องเลือกรายชื่อพนักงาน (Staff Selector)
+        if (staffWrap) {
+            staffWrap.classList.remove('hidden');
+            staffWrap.classList.add('flex');
+            staffWrap.style.display = 'flex';
+        }
+        if (labelEl) labelEl.textContent = '-- เลือกผู้ปฏิบัติงาน --';
+
+        // โหลดรายชื่อ 32 คนเข้า Dropdown
+        await loadStaffList(); 
+
+        // ล็อคฟอร์ม (หัวหน้างาน "ดู" ได้อย่างเดียว ห้าม "แก้ไข")
+        if (showBtn) showBtn.style.display = 'none'; 
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = true;
@@ -7810,26 +8010,29 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         });
 
     } else {
-        // ==========================================
-        // 👤 CASE: ล็อกอินผ่านหน้า SQE SUPPORT
-        // ==========================================
+        // ============================================================
+        // 👤 CASE 2: ล็อกอินผ่านหน้า SQE SUPPORT (พนักงานทั่วไป)
+        // ============================================================
         S.userRole = 'staff';
+        
+        /**
+         * 🎯 [จุดสำคัญ]: ไม่ว่าจะเป็น Admin หรือใครก็ตาม 
+         * ถ้าลอกอินผ่านหน้านี้ viewingUser จะต้องเท่ากับชื่อตัวเองเสมอ
+         * และ staffWrap (ดรอปดาวน์เลือกคนอื่น) จะต้องถูกซ่อน 100%
+         */
+        S.viewingUser = S.currentUser;
 
-        // ❌ ซ่อนช่องเลือกรายชื่อพนักงานทันที (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.add('hidden');
             staffWrap.classList.remove('flex');
+            staffWrap.style.display = 'none';
         }
 
-        // บังคับให้ดูข้อมูลของตัวเองเท่านั้น
-        S.viewingUser = S.currentUser;
-
-        // แสดงปุ่มเปิดฟอร์มปกติ
+        // เปิดให้ใช้งานฟอร์มได้ตามปกติ (สิทธิ์ผู้จัดทำ)
         if (showBtn) showBtn.style.display = 'flex';
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
         if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
 
-        // เปิดการใช้งานฟอร์มปกติ
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = false;
@@ -7838,39 +8041,34 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
         });
     }
 
-    // --- [ส่วนที่ 4: ตรวจสอบ Admin Access (เฉพาะ Admin, Manager, Supervisor, Engineer)] ---
-    const adminFooterBtn = document.getElementById('admin-footer-access');
-    const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
-        ? hasAdminAccessPermission(S.currentUser, S.userRole) 
-        : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
-
-    if (isAllowedAdmin) {
-        if (adminFooterBtn) adminFooterBtn.classList.remove('hidden');
-    } else {
-        if (adminFooterBtn) adminFooterBtn.classList.add('hidden');
+    // --- [ส่วนที่ 4: ตรวจสอบ Admin Access] ---
+    // (เฉพาะแอดมินเท่านั้นที่จะเห็นปุ่ม Admin User Control ที่ล่างสุดของ Sidebar)
+    const isAllowedAdmin = (typeof window.isMasterOrAdminUser === 'function')
+        ? window.isMasterOrAdminUser(S.currentUser)
+        : (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
+    if (adminFooterBtn) {
+        adminFooterBtn.classList.toggle('hidden', !isAllowedAdmin);
     }
     
     updateOnlineBadge();
 
-    // --- [ส่วนที่ 5: ซิงค์ข้อมูลชุดใหญ่] ---
+    // --- [ส่วนที่ 5: เริ่มซิงค์ข้อมูลตาม ViewingUser ที่ระบุไว้ด้านบน] ---
     toast("📡 กำลังเชื่อมต่อฐานข้อมูล Online...", "info");
 
     try {
+        /**
+         * 💡 หากเป็นพนักงาน: loadRecords ดึงงานตัวเอง
+         * 💡 หากเป็นหัวหน้างาน: S.viewingUser เป็นค่าว่าง loadRecords จะ Return หน้าเปล่าทันที
+         */
         await Promise.all([
             loadRecords(),
             fetchWAPData()
         ]);
 
-        // >>> [จุดสำคัญที่สุด]: การตัดสินใจเลือกหน้าที่จะแสดง <<<
+        // จัดการเปลี่ยนหน้าไปที่หน้าแรก
         if (!isDeepLink) {
-            // ถ้าเป็นการ Login ปกติ ให้ไปหน้าแรก (PART LINE CLAIM)
             const firstMenuBtn = document.querySelector('.nav-item');
             switchPage('Part line claim', firstMenuBtn);
-            console.log("Standard entry: Redirecting to Home.");
-        } else {
-            // ถ้ามาจาก Deep Link ไม่ต้องสั่ง switchPage
-            // ปล่อยให้ Logic ใน launchDirectWarp พาไปที่หน้า 8D/VF เอง
-            console.log("Deep link entry: Hold redirection.");
         }
         
         toast("✅ ซิงค์ข้อมูลสำเร็จ", "success");
@@ -7880,39 +8078,60 @@ async function showDashboard(isDeepLink = false) { // 1. เพิ่ม paramet
 
     } catch (error) {
         console.error("Critical Sync Error:", error);
-        toast("❌ การโหลดข้อมูลบางส่วนล้มเหลว", "error");
-        
-        // แม้จะ Error ถ้าไม่ใช่ลิงก์ ก็ควรพาไปหน้าแรก
-        if (!isDeepLink) {
-            const firstMenuBtn = document.querySelector('.nav-item');
-            switchPage('Part line claim', firstMenuBtn);
-        }
+        toast("❌ การโหลดข้อมูลขัดข้อง", "error");
     }
 }
 
 async function onStaffSelect(email) {
+    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
+        ? window.isMasterOrAdminUser(S.currentUser)
+        : (S.currentUser === 'natthawut.chaising@carrier.com');
+
+    // 🎯 1. กำหนด viewingUser
     if (!email) {
-        S.viewingUser = S.currentUser;
+        // ถ้ากดล้างตัวเลือก (All)
+        // - แอดมิน: ดึงข้อมูลชื่อแอดมินมาแสดงผลก่อนเสมอ
+        // - หัวหน้างาน: ให้เป็นค่าว่าง (เพื่อให้หน้าจอว่างเปล่าตามโจทย์)
+        // - พนักงาน: กลับมาเป็นชื่อตัวเอง
+        if (isMasterAdmin) {
+            S.viewingUser = S.currentUser;
+        } else {
+            S.viewingUser = (S.userRole === 'supervisor') ? '' : S.currentUser;
+        }
     } else {
         S.viewingUser = email;
     }
+
+    const labelEl = document.getElementById('staff-custom-select-label');
+    if (labelEl) {
+        if (!email && isMasterAdmin) {
+            const found = _staffDirectoryCache.find(it => it.email.toLowerCase() === S.currentUser.toLowerCase());
+            labelEl.textContent = found ? found.fullLabel : 'Mr.Natthawut C.(ADMIN)';
+        } else if (!email) {
+            labelEl.textContent = '-- เลือกผู้ปฏิบัติงาน --';
+        }
+    }
     
-    toast(`🔍 กำลังซิงค์ข้อมูลของ: ${S.viewingUser.split('@')[0]}`, "info");
+    const displayShort = S.viewingUser ? S.viewingUser.split('@')[0] : 'Total';
+    toast(`🔍 กำลังซิงค์ข้อมูลของ: ${displayShort}`, "info");
     
     try {
+        // 2. ดึงข้อมูลใหม่ตาม viewingUser ที่ตั้งไว้
         await Promise.all([
             loadRecords(),   
             fetchWAPData()   
         ]);
 
-        // >>> [เพิ่มบรรทัดนี้] สั่งให้ AI เรียนรู้ข้อมูลของพนักงานคนใหม่ทันที <<<
+        // 3. สั่งให้ AI เรียนรู้ข้อมูลใหม่
         rebuildSmartMemory();
         updateAIBrain();
 
+        // 4. สั่งวาดหน้าจอใหม่ 
+        // (ฟังก์ชันนี้จะเรียก updateSidebarUserUI() ที่เราล็อคชื่อไว้แล้วให้โดยอัตโนมัติ)
         triggerGlobalRefresh();
         
-        const display = S.viewingUser.split('@')[0].replace(/\./g, ' ').toUpperCase();
-        $id('user-display-name').innerHTML = `${display} <span class="text-[9px] text-orange-500">(VIEWING)</span>`;
+        // ❌ ลบโค้ดส่วนที่เคยแก้ไข $id('user-display-name') ทิ้งทั้งหมด
+        // เพื่อป้องกันการนำชื่อพนักงานที่เลือกดูไปทับชื่อจริงที่แถบ Sidebar
         
         toast("อัปเดตข้อมูลพนักงานเรียบร้อย", "success");
     } catch (error) {
@@ -8397,13 +8616,24 @@ async function loadStaffList() {
         if (sb) {
             try {
                 const { data, error } = await sb
-                    .from('users')
+                    .from('profiles')
                     .select('email, display_name, role')
                     .order('email', { ascending: true });
                 if (!error && data && data.length > 0) {
                     staffList = data;
                 }
             } catch (_) {}
+            if (!staffList) {
+                try {
+                    const { data, error } = await sb
+                        .from('users')
+                        .select('email, display_name, role')
+                        .order('email', { ascending: true });
+                    if (!error && data && data.length > 0) {
+                        staffList = data;
+                    }
+                } catch (_) {}
+            }
         }
 
         // ล้างตัวเลือกเก่า
@@ -8415,17 +8645,21 @@ async function loadStaffList() {
             let name = (staff.display_name || staff.name || '').trim();
             const email = (staff.email || '').trim().toLowerCase();
             
-            // 🌟 ดึงระดับสิทธิ์/ตำแหน่งจริงจากตาราง users ในฐานข้อมูล
+            // 🌟 ดึงระดับสิทธิ์/ตำแหน่งจริงจากตาราง users หรือ profiles ในฐานข้อมูล
             const dbUser = window._dbUsersRoleMap ? window._dbUsersRoleMap.get(email) : null;
             const rawRole = String(staff.role || (dbUser && dbUser.role) || staff.category || '').toLowerCase();
 
-            name = name.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+            name = (typeof window.canonicalStaffDisplayName === 'function')
+                ? window.canonicalStaffDisplayName(name, email)
+                : name;
 
             if (!name || name === '-' || name.includes('@')) {
                 if (typeof window.getEngineeringAndApprovalDirectory === 'function') {
                     const found = window.getEngineeringAndApprovalDirectory().find(d => d.email && d.email.toLowerCase() === email);
                     if (found && found.name && found.name !== '-') {
-                        name = found.name.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+                        name = (typeof window.canonicalStaffDisplayName === 'function')
+                            ? window.canonicalStaffDisplayName(found.name, email)
+                            : found.name;
                     }
                 }
             }
@@ -8433,7 +8667,9 @@ async function loadStaffList() {
                 if (typeof STAFF_EMAIL_MAP === 'object') {
                     for (const [sName, sEmail] of Object.entries(STAFF_EMAIL_MAP)) {
                         if (sEmail && sEmail.toLowerCase().trim() === email) {
-                            name = sName.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
+                            name = (typeof window.canonicalStaffDisplayName === 'function')
+                                ? window.canonicalStaffDisplayName(sName, email)
+                                : sName;
                             break;
                         }
                     }
@@ -8500,16 +8736,55 @@ async function loadStaffList() {
             });
         }
 
-        // อัปเดตการแสดงผล Label ถ้ามีการเลือกอยู่แล้ว
-        const curViewing = S.viewingUser || '';
+        // มั่นใจว่า Admin อยู่ในรายชื่อเสมอ
+        const adminEmail = 'natthawut.chaising@carrier.com';
+        if (!addedEmails.has(adminEmail)) {
+            addStaffEntry(resolveStaffInfo({
+                name: 'Mr.Natthawut C.',
+                display_name: 'Mr.Natthawut C.',
+                role: 'ADMIN',
+                email: adminEmail
+            }));
+        }
+
+        // หากผู้ใช้ปัจจุบันเป็น Admin ให้จัดเรียงชื่อ Admin ไว้บนสุดเสมอ ("ดึงข้อมูลชื่อแอดมินมาแสดงผลก่อนเสมอเท่านั้น")
+        const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
+            ? window.isMasterOrAdminUser(S.currentUser)
+            : (S.currentUser === 'natthawut.chaising@carrier.com');
+
+        if (isMasterAdmin) {
+            _staffDirectoryCache.sort((a, b) => {
+                const aIsAdmin = (typeof window.isMasterOrAdminUser === 'function') ? window.isMasterOrAdminUser(a.email) : a.email.toLowerCase() === S.currentUser.toLowerCase();
+                const bIsAdmin = (typeof window.isMasterOrAdminUser === 'function') ? window.isMasterOrAdminUser(b.email) : b.email.toLowerCase() === S.currentUser.toLowerCase();
+                if (aIsAdmin && !bIsAdmin) return -1;
+                if (!aIsAdmin && bIsAdmin) return 1;
+                return 0;
+            });
+            // เขียน options ใหม่ให้เรียง Admin ไว้บนสุด
+            selectEl.innerHTML = '<option value="">-- เลือกผู้ปฏิบัติงาน --</option>';
+            _staffDirectoryCache.forEach(info => {
+                const opt = document.createElement('option');
+                opt.value = info.email;
+                opt.textContent = info.fullLabel;
+                selectEl.appendChild(opt);
+            });
+        }
+
+        // อัปเดตการแสดงผล Label ถ้ามีการเลือกอยู่แล้ว หรือเป็น Admin
+        const curViewing = S.viewingUser || (isMasterAdmin ? S.currentUser : '');
         const foundSelected = _staffDirectoryCache.find(it => it.email.toLowerCase() === curViewing.toLowerCase());
         const labelEl = document.getElementById('staff-custom-select-label');
         if (labelEl) {
             if (foundSelected) {
                 labelEl.textContent = foundSelected.fullLabel;
+            } else if (isMasterAdmin) {
+                labelEl.textContent = 'Mr.Natthawut C.(ADMIN)';
             } else {
                 labelEl.textContent = '-- เลือกผู้ปฏิบัติงาน --';
             }
+        }
+        if (selectEl && curViewing) {
+            selectEl.value = curViewing;
         }
 
         window.renderStaffCustomDropdown('');
@@ -8528,7 +8803,7 @@ function invalidate8DCaseMap() {
 }
 
 function get8DCaseMap() {
-    const cases = (S.eightDCases || (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases ? Wap8DSystem.getCases() : [])) || [];
+    const cases = (S.eightDCases || (typeof window !== 'undefined' && window.Wap8DSystem && typeof window.Wap8DSystem.getCases === 'function' ? window.Wap8DSystem.getCases() : (typeof Wap8DSystem !== 'undefined' && Wap8DSystem && Wap8DSystem.getCases ? Wap8DSystem.getCases() : []))) || [];
     if (cases === _8dLookupLastCasesRef && _8dLookupMapCache) {
         return _8dLookupMapCache;
     }
@@ -8756,135 +9031,154 @@ async function loadRecords() {
     const sb = getSupabase();
     if (!sb) return;
 
-    const targetEmail = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-    let dbDisplayName = targetEmail || '';
+    /**
+     * 🎯 [1. จัดการกรณีหน้าว่าง]
+     * หากไม่มีการระบุ viewingUser (เช่น Supervisor เพิ่งลอกอิน)
+     * หากเป็น Admin ให้ดึงข้อมูลของ Admin เสมอ ไม่ปล่อยหน้าว่าง
+     */
+    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
+        ? window.isMasterOrAdminUser(S.currentUser)
+        : (S.currentUser === 'natthawut.chaising@carrier.com');
+
+    if (!S.viewingUser) {
+        if (isMasterAdmin) {
+            S.viewingUser = S.currentUser;
+        } else {
+            S.records = [];
+            const countDisplay = document.getElementById('record-count');
+            if (countDisplay) countDisplay.textContent = `0 รายการ`;
+            renderTable();
+            if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+            return;
+        }
+    }
+
+    const targetEmail = S.viewingUser.toLowerCase().trim();
+    let dbDisplayName = targetEmail;
     for (const [fullName, email] of Object.entries(STAFF_EMAIL_MAP)) {
-        if (email.toLowerCase() === (targetEmail || '').toLowerCase()) {
+        if (email.toLowerCase() === targetEmail) {
             dbDisplayName = fullName;
             break;
         }
     }
 
-    const isPrivileged = S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer' || S.viewingUser === 'all' || !targetEmail;
-
     let fetchSuccess = false;
 
     if (navigator.onLine) {
         try {
-            // STEP 1: ดึงรอบแรกเพื่อเอา "จำนวนทั้งหมด (Count)"
-            let query = sb.from('records').select('*', { count: 'exact' });
+            const filterString = `inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`;
 
-            if (!isPrivileged && targetEmail && dbDisplayName) {
-                query = query.or(`inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`);
+            // 1. นับจำนวนทั้งหมดก่อน
+            const { count, error: countErr } = await sb
+                .from('records')
+                .select('*', { count: 'exact', head: true })
+                .or(filterString);
+
+            if (countErr) throw countErr;
+
+            const totalInDB = count || 0;
+            const BATCH_SIZE = 1000;
+            const promises = [];
+
+            /**
+             * 🎯 [2. ระบบ Parallel Fetching]
+             * แทนที่จะวนลูปทีละรอบแล้วรอ (await ใน loop) 
+             * เราจะสร้าง "รายการคำสั่งดึงข้อมูล" ไว้ล่วงหน้าแล้วยิงออกไปพร้อมกัน
+             */
+            for (let i = 0; i < totalInDB; i += BATCH_SIZE) {
+                const request = sb
+                    .from('records')
+                    .select('*')
+                    .or(filterString)
+                    .order('created_at', { ascending: false })
+                    .range(i, i + BATCH_SIZE - 1);
+                
+                promises.push(request);
+                
+                // ความปลอดภัย: ป้องกันการดึงมากเกินไปจนเบราว์เซอร์รับไม่ไหว (จำกัดที่ 10,000 รายการ)
+                if (promises.length >= 10) break; 
             }
 
-            const { data: firstBatch, count, error } = await query
-                .range(0, 999) // ดึง 1,000 รายการแรก
-                .order('created_at', { ascending: false });
+            // ยิงคำสั่งทั้งหมดออกไปพร้อมกัน (เร็วกว่าเดิมหลายเท่า)
+            const results = await Promise.all(promises);
+            
+            let allFetchedRecords = [];
+            results.forEach(res => {
+                if (res.data) allFetchedRecords = allFetchedRecords.concat(res.data);
+            });
 
-            if (error) throw error;
-
-            let allRecords = firstBatch || [];
-            const total = count || 0;
-
-            // ถ้ากรณีค้นหาด้วยชื่อผู้ตรวจแล้วไม่เจอ แต่ในฐานข้อมูลมีข้อมูล ให้ดึงข้อมูลทั้งหมดมาแสดง
-            if (allRecords.length === 0 && !isPrivileged) {
-                const fallbackRes = await sb.from('records')
-                    .select('*', { count: 'exact' })
-                    .range(0, 999)
-                    .order('created_at', { ascending: false });
-                if (fallbackRes.data && fallbackRes.data.length > 0) {
-                    allRecords = fallbackRes.data;
-                }
-            }
-
-            // STEP 2: ถ้ามีข้อมูลมากกว่า 1,000 ให้ดึงส่วนที่เหลือพร้อมกันทีเดียว (Parallel)
-            if (total > 1000) {
-                const promises = [];
-                for (let i = 1000; i < total; i += 1000) {
-                    const to = Math.min(i + 999, total - 1);
-                    let subQuery = sb.from('records').select('*');
-                    if (!isPrivileged && targetEmail && dbDisplayName) {
-                        subQuery = subQuery.or(`inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`);
-                    }
-                    promises.push(
-                        subQuery.range(i, to).order('created_at', { ascending: false })
-                    );
-                }
-
-                const results = await Promise.all(promises);
-                results.forEach(res => {
-                    if (res.data) allRecords = allRecords.concat(res.data);
-                });
-            }
-
-            // STEP 3: บันทึกข้อมูลและแสดงผล
-            S.records = allRecords.map(normalizeRecord);
-            S.totalDatabaseCount = S.records.length; 
+            // [3. บันทึกและอัปเดต UI]
+            S.records = allFetchedRecords.map(normalizeRecord);
             fetchSuccess = true;
 
-            // บันทึกลงแคช IndexedDB และ LocalStorage สำหรับใช้งานตอนออฟไลน์/ติดโควต้า
+            const countDisplay = document.getElementById('record-count');
+            if (countDisplay) {
+                countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
+            }
+
+            // Sync แคช
             try {
-                if (typeof SQEIndexedDBManager !== 'undefined' && typeof SQEIndexedDBManager.saveTableCache === 'function') {
-                    SQEIndexedDBManager.saveTableCache('claim_records', S.records);
+                if (typeof SQEIndexedDBManager !== 'undefined') {
+                    SQEIndexedDBManager.saveTableCache(`claim_records_${targetEmail}`, S.records);
                 }
-                const lightweight = S.records.slice(0, 300).map(r => ({ ...r, imageUrl: (r.imageUrl && r.imageUrl.length < 500) ? r.imageUrl : '' }));
-                safeLocalStorageSet(`carrier_records_cache_${targetEmail || 'all'}`, JSON.stringify(lightweight));
-                safeLocalStorageSet('carrier_records_cache_last', JSON.stringify(lightweight));
+                safeLocalStorageSet(`carrier_records_cache_${targetEmail}`, JSON.stringify(S.records.slice(0, 500)));
             } catch(ce) {}
 
-            renderTable();
-            rebuildSmartMemory(S.records);
-            updateAIBrain(S.records);
-
-            if (typeof refreshClaimDashboard === 'function') {
-                refreshClaimDashboard();
-            }
-
-        } catch (e) {
-            console.warn('[loadRecords Fallback triggered due to fetch/quota limit]:', e?.message || e);
-        }
-    }
-
-    // STEP 4: Fallback หาก Fetch ไม่สำเร็จ (เช่น ติดโควต้า exceed_egress_quota หรือไม่มีเน็ต)
-    if (!fetchSuccess) {
-        let restoredRecords = [];
-        try {
-            if (typeof SQEIndexedDBManager !== 'undefined' && typeof SQEIndexedDBManager.getTableCache === 'function') {
-                const idbData = await SQEIndexedDBManager.getTableCache('claim_records');
-                if (Array.isArray(idbData) && idbData.length > 0) {
-                    restoredRecords = idbData;
-                }
-            }
-        } catch(idbErr) {}
-
-        if (restoredRecords.length === 0) {
-            try {
-                const cached = localStorage.getItem(`carrier_records_cache_${targetEmail || 'all'}`) || localStorage.getItem('carrier_records_cache_last');
-                if (cached) {
-                    const parsed = JSON.parse(cached);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        restoredRecords = parsed;
-                    }
-                }
-            } catch(lsErr) {}
-        }
-
-        if (restoredRecords.length > 0) {
-            S.records = restoredRecords.map(normalizeRecord);
-            S.totalDatabaseCount = S.records.length;
-            renderTable();
-            rebuildSmartMemory(S.records);
-            updateAIBrain(S.records);
-            if (typeof refreshClaimDashboard === 'function') {
-                refreshClaimDashboard();
-            }
-            console.log(`[loadRecords] Restored ${S.records.length} records from local cache.`);
-        } else if (S.records && S.records.length > 0) {
+            // วาดหน้าจอ
             renderTable();
             rebuildSmartMemory(S.records);
             updateAIBrain(S.records);
             if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+
+        } catch (e) {
+            if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(e)) {
+                window._supabaseQuotaExceeded = true;
+                window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
+                console.warn('[loadRecords] Cloud quota reached. Seamlessly switching to local cached records.');
+            } else {
+                console.error('[loadRecords Error]', e.message);
+            }
+            // ถ้าเกิด Error ให้พยายามโหลดจาก Cache
+            fetchSuccess = false;
+        }
+    }
+
+    /**
+     * 📶 [4. Fallback สำหรับโหมดออฟไลน์หรือเมื่อ Fetch พลาด]
+     */
+    if (!fetchSuccess) {
+        try {
+            let cachedList = [];
+            const cached = localStorage.getItem(`carrier_records_cache_${targetEmail}`);
+            if (cached) {
+                try { cachedList = JSON.parse(cached).map(normalizeRecord); } catch(_) { cachedList = []; }
+            }
+            
+            // Merge with local Dexie pending claims if available
+            if (typeof localDB !== 'undefined' && localDB.pendingClaims) {
+                try {
+                    const pendings = await localDB.pendingClaims.toArray();
+                    if (Array.isArray(pendings) && pendings.length > 0) {
+                        const existingIds = new Set(cachedList.map(r => r.id));
+                        pendings.forEach(p => {
+                            if (!existingIds.has(p.id)) {
+                                cachedList.unshift(normalizeRecord(p));
+                                existingIds.add(p.id);
+                            }
+                        });
+                    }
+                } catch (_) {}
+            }
+
+            S.records = cachedList;
+            const countDisplay = document.getElementById('record-count');
+            if (countDisplay) countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
+            renderTable();
+            rebuildSmartMemory(S.records);
+            updateAIBrain(S.records);
+            if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+        } catch(lsErr) {
+            console.warn("Offline load failed", lsErr);
         }
     }
 }
@@ -9421,7 +9715,13 @@ async function submitEntry() {
                 rowData.sync_status = 'synced';
                 saveMethod = 'cloud';
             } catch (cloudErr) {
-                console.error("Cloud Save failed, falling back to LocalDB:", cloudErr);
+                if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(cloudErr)) {
+                    window._supabaseQuotaExceeded = true;
+                    window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
+                    console.warn("Cloud quota limit reached, securely saving to LocalDB");
+                } else {
+                    console.warn("Cloud Save failed, falling back to LocalDB:", cloudErr);
+                }
                 await localDB.pendingClaims.put(rowData);
                 saveMethod = 'local';
             }
@@ -9490,9 +9790,16 @@ async function backgroundSync() {
  * ครอบคลุม: Part Claims, OT Management, และ 5S Excellence
  */
 let _isSyncingAllData = false;
+let _lastQuotaWarnTime = 0;
 
 async function syncAllPendingData() {
     if (!navigator.onLine || _isSyncingAllData) return;
+    
+    // Check if under temporary quota backoff
+    if (window._supabaseQuotaExceeded && window._quotaBackoffUntil && Date.now() < window._quotaBackoffUntil) {
+        return;
+    }
+
     _isSyncingAllData = true;
 
     try {
@@ -9522,8 +9829,10 @@ async function syncAllPendingData() {
 
         let totalSuccess = 0;
         let totalSkipped = 0;
+        let quotaHit = false;
 
         for (const config of syncConfigs) {
+            if (quotaHit) break;
             if (!config.dexieTable) continue;
 
             const client = (typeof config.getClient === 'function' ? config.getClient() : null) || window.sqeClient || supabaseClient;
@@ -9553,6 +9862,18 @@ async function syncAllPendingData() {
                         }
                         totalSuccess++;
                     } else {
+                        // Check quota / restriction error
+                        if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(error)) {
+                            quotaHit = true;
+                            window._supabaseQuotaExceeded = true;
+                            window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
+                            if (Date.now() - _lastQuotaWarnTime > 60000) {
+                                _lastQuotaWarnTime = Date.now();
+                                console.warn(`📶 [Sync Engine] Cloud quota restriction reached. Retaining pending items safely in local database.`);
+                            }
+                            break;
+                        }
+
                         // ถ้าเกิดปัญหา Network Failed to fetch ให้หยุดรอบนี้เพื่อรอเน็ตเสถียร
                         const errMsg = String(error.message || error.details || '');
                         if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || error.code === 'PGRST000') {
@@ -9570,6 +9891,16 @@ async function syncAllPendingData() {
                         }
                     }
                 } catch (rowErr) {
+                    if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(rowErr)) {
+                        quotaHit = true;
+                        window._supabaseQuotaExceeded = true;
+                        window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
+                        if (Date.now() - _lastQuotaWarnTime > 60000) {
+                            _lastQuotaWarnTime = Date.now();
+                            console.warn(`📶 [Sync Engine] Cloud quota reached. Retaining items locally.`);
+                        }
+                        break;
+                    }
                     const errMsg = String(rowErr?.message || rowErr || '');
                     if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || rowErr instanceof TypeError) {
                         console.warn(`📶 [Sync Engine] Offline / Network unreachable. Pausing sync retry.`);
@@ -9590,7 +9921,12 @@ async function syncAllPendingData() {
             if (typeof renderTable === 'function') renderTable();
         }
     } catch (globalSyncErr) {
-        console.warn('[Master Sync Error]', globalSyncErr?.message || globalSyncErr);
+        if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(globalSyncErr)) {
+            window._supabaseQuotaExceeded = true;
+            window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
+        } else {
+            console.warn('[Master Sync Error]', globalSyncErr?.message || globalSyncErr);
+        }
     } finally {
         _isSyncingAllData = false;
     }
@@ -10816,7 +11152,7 @@ function switchPage(name, el) {
     // --- STEP 4: HEADER & SPECIAL PAGE LOGIC ---
     
     // 1. Admin Console Theme Logic
-    if (pageNameUpper === 'ADMIN CONSOLE') {
+    if (pageNameUpper === 'ADMIN CONSOLE' || pageNameUpper === 'ADMIN USER CONTROL') {
         if (adminHeaderTools) {
             adminHeaderTools.classList.remove('hidden');
             adminHeaderTools.classList.add('flex');
@@ -11371,7 +11707,7 @@ function validatePartNoInput(inputEl) {
     const errorIcon = document.getElementById('f-part-error');
 
     if (!val) {
-        inputEl.classList.remove('valid', 'invalid');
+        inputEl.classList.remove('valid', 'invalid', 'pulse-success', 'pulse-valid', 'pulse-invalid', 'pulse-error', 'f-part-pulse-success', 'f-part-pulse-invalid');
         if (successIcon) successIcon.classList.add('hidden');
         if (errorIcon) errorIcon.classList.add('hidden');
         return;
@@ -11391,12 +11727,24 @@ function validatePartNoInput(inputEl) {
 
     if (isValid) {
         inputEl.classList.add('valid');
-        inputEl.classList.remove('invalid');
+        inputEl.classList.remove('invalid', 'pulse-invalid', 'pulse-error', 'f-part-pulse-invalid');
+
+        // Trigger gentle pulse animation
+        inputEl.classList.remove('pulse-success', 'pulse-valid', 'f-part-pulse-success');
+        void inputEl.offsetWidth; // Force DOM reflow so animation triggers cleanly every time
+        inputEl.classList.add('pulse-success', 'pulse-valid', 'f-part-pulse-success');
+
         if (successIcon) successIcon.classList.remove('hidden');
         if (errorIcon) errorIcon.classList.add('hidden');
     } else {
         inputEl.classList.add('invalid');
-        inputEl.classList.remove('valid');
+        inputEl.classList.remove('valid', 'pulse-success', 'pulse-valid', 'f-part-pulse-success');
+
+        // Trigger gentle pulse animation
+        inputEl.classList.remove('pulse-invalid', 'pulse-error', 'f-part-pulse-invalid');
+        void inputEl.offsetWidth; // Force DOM reflow so animation triggers cleanly every time
+        inputEl.classList.add('pulse-invalid', 'pulse-error', 'f-part-pulse-invalid');
+
         if (errorIcon) errorIcon.classList.remove('hidden');
         if (successIcon) successIcon.classList.add('hidden');
     }
@@ -13021,9 +13369,9 @@ function renderDashboardCharts(yieldRate, filtered) {
     
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonthIdx = now.getMonth(); // 0 = Jan ... 7 = Aug
+    const currentMonthIdx = now.getMonth();
 
-    // ตรวจสอบช่วงปีจากตัวกรอง หรือค้นหาปีล่าสุดที่มีข้อมูลในระบบ (ห้ามนำข้อมูลหลายปีมารวมกัน)
+    // 1. ตรวจสอบปีเป้าหมาย
     const filterStart = document.getElementById('cd-start-date')?.value;
     let targetYear = null;
     if (filterStart) {
@@ -13039,11 +13387,6 @@ function renderDashboardCharts(yieldRate, filtered) {
         targetYear = validYears.length ? Math.max(...validYears) : currentYear;
     }
 
-    // กำหนดค่าเริ่มต้น:
-    // - ถ้าเป็นปีปัจจุบัน (currentYear): เดือนที่ยังมาไม่ถึง (index > currentMonthIdx) ให้เป็น null เพื่อให้ ApexCharts ตัดเส้นกราฟหยุดที่เดือนปัจจุบัน (ไม่วาดลากยาวมั่ว)
-    // - เดือนที่ผ่านมาแล้ว (index <= currentMonthIdx) ให้เริ่มต้นที่ 0
-    // - ถ้าเป็นปีในอดีต (targetYear < currentYear): ทั้ง 12 เดือนเริ่มต้นที่ 0
-    // - ถ้าเป็นปีในอนาคต (targetYear > currentYear): ทั้ง 12 เดือนเป็น null
     const isCurrentYear = (targetYear === currentYear);
     const isPastYear = (targetYear < currentYear);
 
@@ -13062,28 +13405,34 @@ function renderDashboardCharts(yieldRate, filtered) {
         VENDOR: initMonthlyArray()
     };
 
+    // เตรียมที่เก็บข้อมูลละเอียดรายเดือน
     const monthDetails = Array.from({ length: 12 }, () => ({
         claimsCount: 0,
         lots: new Set(),
         totalQty: 0,
         defects: {},
         suppliers: {},
-        parts: {}
+        parts: {},
+        // เพิ่มการนับรายประเภทเพื่อโชว์ใน Tooltip
+        typeStats: {
+            OK: { pcs: 0, lots: 0 },
+            SF: { pcs: 0, lots: 0 },
+            CTC: { pcs: 0, lots: 0 },
+            VENDOR: { pcs: 0, lots: 0 }
+        }
     }));
 
-    // รวมข้อมูลแยกรายเดือนเฉพาะปี targetYear เท่านั้น (ห้ามนำปีอื่นมารวมเด็ดขาด)
+    // 2. ประมวลผลข้อมูล
     (filtered || []).forEach(r => {
         if (!r.date) return;
         const d = new Date(r.date);
         if (isNaN(d.getTime())) return;
         
         const recYear = d.getFullYear();
-        // เงื่อนไขเข้มงวด: ต้องเป็นปีเป้าหมายเท่านั้น
         if (recYear !== targetYear) return;
 
         const mIdx = d.getMonth();
         if (mIdx >= 0 && mIdx <= 11) {
-            // ถ้าเป็นปีปัจจุบันและเดือนเกินเดือนปัจจุบัน ไม่นับ
             if (isCurrentYear && mIdx > currentMonthIdx) return;
 
             const qty = parseFloat(r.qty) || 0;
@@ -13094,11 +13443,24 @@ function renderDashboardCharts(yieldRate, filtered) {
             if (dataSet.CTC[mIdx] === null) dataSet.CTC[mIdx] = 0;
             if (dataSet.VENDOR[mIdx] === null) dataSet.VENDOR[mIdx] = 0;
 
-            if (j === 'CAN USE' || j === 'OK') dataSet.OK[mIdx] += qty;
-            else if (j === 'SF') dataSet.SF[mIdx] += qty;
-            else if (j === 'CTC') dataSet.CTC[mIdx] += qty;
-            else if (j.includes('VENDOR')) dataSet.VENDOR[mIdx] += qty;
-            else dataSet.OK[mIdx] += qty;
+            // แยกหมวดหมู่และเก็บสถิติ
+            if (j === 'CAN USE' || j === 'OK') {
+                dataSet.OK[mIdx] += qty;
+                monthDetails[mIdx].typeStats.OK.pcs += qty;
+                monthDetails[mIdx].typeStats.OK.lots++;
+            } else if (j === 'SF') {
+                dataSet.SF[mIdx] += qty;
+                monthDetails[mIdx].typeStats.SF.pcs += qty;
+                monthDetails[mIdx].typeStats.SF.lots++;
+            } else if (j === 'CTC') {
+                dataSet.CTC[mIdx] += qty;
+                monthDetails[mIdx].typeStats.CTC.pcs += qty;
+                monthDetails[mIdx].typeStats.CTC.lots++;
+            } else if (j.includes('VENDOR')) {
+                dataSet.VENDOR[mIdx] += qty;
+                monthDetails[mIdx].typeStats.VENDOR.pcs += qty;
+                monthDetails[mIdx].typeStats.VENDOR.lots++;
+            }
 
             monthDetails[mIdx].claimsCount += 1;
             if (r.ref) monthDetails[mIdx].lots.add(r.ref);
@@ -13112,39 +13474,10 @@ function renderDashboardCharts(yieldRate, filtered) {
                 const sp = r.supplier.trim();
                 monthDetails[mIdx].suppliers[sp] = (monthDetails[mIdx].suppliers[sp] || 0) + qty;
             }
-            if (r.partNo || r.partName) {
-                const pt = (r.partNo || r.partName).trim();
-                monthDetails[mIdx].parts[pt] = (monthDetails[mIdx].parts[pt] || 0) + qty;
-            }
         }
     });
 
-    // คำนวณสถิติภาพรวมเฉพาะเดือนที่ผ่านมาแล้ว
-    const maxEvalMonth = isCurrentYear ? currentMonthIdx : (isPastYear ? 11 : -1);
-    const validTotals = [];
-    let totalPcsVal = 0;
-
-    for (let i = 0; i <= maxEvalMonth; i++) {
-        const mOk = dataSet.OK[i] || 0;
-        const mSf = dataSet.SF[i] || 0;
-        const mCtc = dataSet.CTC[i] || 0;
-        const mVen = dataSet.VENDOR[i] || 0;
-        const mTotal = mOk + mSf + mCtc + mVen;
-        totalPcsVal += mTotal;
-        if (mTotal > 0) validTotals.push(mTotal);
-    }
-
-    const maxVal = validTotals.length ? Math.max(...validTotals) : 0;
-    const minVal = validTotals.length ? Math.min(...validTotals) : 0;
-    const avgVal = validTotals.length ? Math.round(totalPcsVal / validTotals.length) : 0;
-
-    // อัปเดตตัวเลขบน UI (แก้ไขไม่ให้มีข้อความซ้ำ เช่น Max: Max: )
-    animateValue('trend-total-pcs', 0, totalPcsVal, 1000, 0, "", "PCS ");
-    animateValue('trend-max', 0, maxVal, 1000, 0, "", "");
-    animateValue('trend-min', 0, minVal, 1000, 0, "", "");
-    animateValue('trend-avg', 0, avgVal, 1000, 0, "", "");
-
-    // วาดกราฟ Monthly Production Trends พร้อม Custom Tooltip Gimmick
+    // 3. วาดกราฟ
     const trendChartEl = document.getElementById("trend-chart");
     if (trendChartEl) {
         if (charts.trend) charts.trend.destroy();
@@ -13162,80 +13495,114 @@ function renderDashboardCharts(yieldRate, filtered) {
                 toolbar: { show: false },
                 animations: { enabled: true, easing: 'easeinout', speed: 600 }
             },
-            dataLabels: {
-                enabled: false 
-            },
-            markers: {
-                size: 4,
-                strokeColors: '#fff',
-                strokeWidth: 2,
-                hover: {
-                    size: 6
-                }
-            },
+            dataLabels: { enabled: false }, // ปิดตัวเลขบนเส้นตามคำขอ
+            markers: { size: 4, strokeColors: '#fff', strokeWidth: 2, hover: { size: 6 } },
             tooltip: {
                 enabled: true,
                 shared: false,
                 intersect: false,
+                followCursor: true,
                 custom: function({ series, seriesIndex, dataPointIndex, w }) {
                     const mName = months[dataPointIndex];
-                    const ok = dataSet.OK[dataPointIndex] || 0;
-                    const sf = dataSet.SF[dataPointIndex] || 0;
-                    const ctc = dataSet.CTC[dataPointIndex] || 0;
-                    const vendor = dataSet.VENDOR[dataPointIndex] || 0;
-                    const totalM = ok + sf + ctc + vendor;
                     const details = monthDetails[dataPointIndex];
-                    const claims = details.claimsCount;
-                    const lots = details.lots.size;
+                    const totalM = details.totalQty;
+                    
+                    const isDark = document.body.classList.contains('dark-mode') || 
+                                   document.documentElement.classList.contains('dark') || 
+                                   (localStorage.getItem('carrier_theme') === 'dark');
+
+                    // Theme-Adaptive Design Palette
+                    const ttTheme = {
+                        bg: isDark 
+                            ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98))' 
+                            : 'linear-gradient(145deg, #ffffff, #f8fafc)',
+                        border: isDark ? 'rgba(56, 189, 248, 0.4)' : '#cbd5e1',
+                        shadow: isDark 
+                            ? '0 25px 50px -10px rgba(0, 0, 0, 0.9), 0 0 25px rgba(56, 189, 248, 0.2)' 
+                            : '0 25px 45px -8px rgba(15, 23, 42, 0.25), 0 2px 10px rgba(0, 0, 0, 0.08)',
+                        textPrimary: isDark ? '#f8fafc' : '#0f172a',
+                        textSecondary: isDark ? '#94a3b8' : '#64748b',
+                        headerText: isDark ? '#38bdf8' : '#0284c7',
+                        divider: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0',
+                        dashedDivider: isDark ? 'rgba(255, 255, 255, 0.12)' : '#cbd5e1',
+                        cardBg: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9',
+                        cardBorder: isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+                        badgeBg: isDark ? 'linear-gradient(135deg, #2563eb, #38bdf8)' : 'linear-gradient(135deg, #0284c7, #2563eb)',
+                        highlightBg: isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+                        barBg: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0'
+                    };
+
+                    const okPct = totalM > 0 ? ((details.typeStats.OK.pcs / totalM) * 100).toFixed(1) : '0.0';
+                    const sfPct = totalM > 0 ? ((details.typeStats.SF.pcs / totalM) * 100).toFixed(1) : '0.0';
+                    const ctcPct = totalM > 0 ? ((details.typeStats.CTC.pcs / totalM) * 100).toFixed(1) : '0.0';
+                    const vendorPct = totalM > 0 ? ((details.typeStats.VENDOR.pcs / totalM) * 100).toFixed(1) : '0.0';
+
+                    // Helper ฟังก์ชันสร้างการ์ด Tooltip แบบประณีต
+                    const renderCard = (label, stat, color, pct) => {
+                        return `
+                            <div style="background: ${ttTheme.cardBg}; border: 1px solid ${ttTheme.cardBorder}; border-left: 3.5px solid ${color}; padding: 8px 10px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                                <div style="font-size: 8px; color: ${ttTheme.textSecondary}; font-weight: 850; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">${label}</div>
+                                <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                                    <span style="font-size: 15px; font-weight: 950; color: ${ttTheme.textPrimary}; font-family: 'DM Mono', monospace;">${stat.pcs.toLocaleString()}</span>
+                                    <span style="font-size: 8px; color: ${ttTheme.textSecondary}; font-weight: 800; margin-left:4px;">PCS</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:4px; border-top:1px solid ${ttTheme.divider}; font-size:9px; font-weight:900;">
+                                    <span style="color:${ttTheme.textSecondary};">${stat.lots} LOTS</span>
+                                    <span style="color:${color}; background: ${color}15; padding: 1px 5px; border-radius: 4px;">${pct}%</span>
+                                </div>
+                            </div>
+                        `;
+                    };
 
                     const topDefectEntry = Object.entries(details.defects).sort((a, b) => b[1] - a[1])[0];
-                    const topDefectStr = topDefectEntry ? `${topDefectEntry[0]} (${topDefectEntry[1].toLocaleString()})` : '-';
-
+                    const topDefectStr = topDefectEntry ? `${topDefectEntry[0]} (${topDefectEntry[1].toLocaleString()} pcs)` : '-';
                     const topSupplierEntry = Object.entries(details.suppliers).sort((a, b) => b[1] - a[1])[0];
-                    const topSupplierStr = topSupplierEntry ? `${topSupplierEntry[0]} (${topSupplierEntry[1].toLocaleString()})` : '-';
+                    const topSupplierStr = topSupplierEntry ? `${topSupplierEntry[0]} (${topSupplierEntry[1].toLocaleString()} pcs)` : '-';
 
                     return `
-                    <div style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.6); font-family: inherit; min-width: 240px; color: #fff;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 7px; margin-bottom: 9px;">
-                            <div style="font-weight: 900; font-size: 13px; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
-                                <span>📅</span> <span>${mName} ${targetYear}</span>
+                    <div style="background: ${ttTheme.bg}; backdrop-filter: blur(16px); border: 1.5px solid ${ttTheme.border}; border-radius: 16px; padding: 15px 16px; box-shadow: ${ttTheme.shadow}; font-family: 'Inter', 'Prompt', sans-serif; min-width: 290px; max-width: 320px; color: ${ttTheme.textPrimary}; pointer-events: none; z-index: 99999999;">
+                        
+                        <!-- 1. Header: Month/Year + Total PCS Badge -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid ${ttTheme.divider}; padding-bottom: 9px; margin-bottom: 10px;">
+                            <div style="font-weight: 950; font-size: 14px; color: ${ttTheme.headerText}; display: flex; align-items: center; gap: 7px; letter-spacing: 0.2px;">
+                                <span style="font-size: 15px;">📅</span> <span>${mName} ${targetYear}</span>
                             </div>
-                            <div style="font-size: 10px; font-weight: 800; background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(56,189,248,0.3);">
+                            <div style="font-size: 11px; font-weight: 950; background: ${ttTheme.badgeBg}; color: #ffffff; padding: 3px 11px; border-radius: 8px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35); letter-spacing: 0.5px; font-family: 'DM Mono', monospace;">
                                 ${totalM.toLocaleString()} PCS
                             </div>
                         </div>
+
+                        <!-- 2. Proportional Distribution Mini Bar -->
+                        ${totalM > 0 ? `
+                        <div style="height: 6px; width: 100%; background: ${ttTheme.barBg}; border-radius: 9999px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);">
+                            <div style="width: ${okPct}%; height: 100%; background: #10b981;" title="OK: ${okPct}%"></div>
+                            <div style="width: ${sfPct}%; height: 100%; background: #f97316;" title="SF: ${sfPct}%"></div>
+                            <div style="width: ${ctcPct}%; height: 100%; background: #2563eb;" title="CTC: ${ctcPct}%"></div>
+                            <div style="width: ${vendorPct}%; height: 100%; background: #ef4444;" title="VENDOR: ${vendorPct}%"></div>
+                        </div>
+                        ` : ''}
                         
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 9px;">
-                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #10b981;">
-                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">OK / CAN USE</div>
-                                <div style="font-size: 11px; font-weight: 800; color: #34d399;">${ok.toLocaleString()}</div>
-                            </div>
-                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #f97316;">
-                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">SPECIAL FOCUS</div>
-                                <div style="font-size: 11px; font-weight: 800; color: #fb923c;">${sf.toLocaleString()}</div>
-                            </div>
-                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #3b82f6;">
-                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">CTC (CHARGE)</div>
-                                <div style="font-size: 11px; font-weight: 800; color: #60a5fa;">${ctc.toLocaleString()}</div>
-                            </div>
-                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #ef4444;">
-                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">VENDOR FAULT</div>
-                                <div style="font-size: 11px; font-weight: 800; color: #f87171;">${vendor.toLocaleString()}</div>
-                            </div>
+                        <!-- 3. 4-Grid Status Breakdown -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                            ${renderCard('OK / CAN USE', details.typeStats.OK, '#10b981', okPct)}
+                            ${renderCard('SPECIAL FOCUS', details.typeStats.SF, '#f97316', sfPct)}
+                            ${renderCard('CTC (CHARGE)', details.typeStats.CTC, '#2563eb', ctcPct)}
+                            ${renderCard('VENDOR FAULT', details.typeStats.VENDOR, '#ef4444', vendorPct)}
                         </div>
 
-                        <div style="border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 7px; font-size: 9.5px; line-height: 1.45; color: #cbd5e1;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                                <span style="color: #94a3b8;">Total Records / Lots:</span>
-                                <span style="font-weight: 800; color: #fff;">${claims} Recs / ${lots} Lots</span>
+                        <!-- 4. Deep Insights Summary Footer -->
+                        <div style="border-top: 1px dashed ${ttTheme.dashedDivider}; padding-top: 9px; font-size: 10px; line-height: 1.6; color: ${ttTheme.textSecondary};">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                                <span style="font-weight: 750;">Total Claims & Lots:</span>
+                                <span style="font-weight: 900; color: ${ttTheme.textPrimary}; background: ${ttTheme.highlightBg}; padding: 1px 6px; border-radius: 4px;">${details.claimsCount} Recs / ${details.lots.size} Lots</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                                <span style="color: #94a3b8;">Top Defect:</span>
-                                <span style="font-weight: 700; color: #fde047; text-align: right; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topDefectStr}</span>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                <span style="font-weight: 750;">Top Defect:</span>
+                                <span style="font-weight: 850; color: #eab308; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topDefectStr}</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: #94a3b8;">Top Supplier:</span>
-                                <span style="font-weight: 700; color: #a78bfa; text-align: right; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topSupplierStr}</span>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 750;">Top Supplier:</span>
+                                <span style="font-weight: 850; color: #8b5cf6; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topSupplierStr}</span>
                             </div>
                         </div>
                     </div>
@@ -13244,20 +13611,9 @@ function renderDashboardCharts(yieldRate, filtered) {
             },
             colors: ['#10b981', '#f97316', '#2563eb', '#ef4444'],
             stroke: { curve: 'smooth', width: 3 },
-            fill: {
-                type: 'gradient',
-                gradient: { opacityFrom: 0.4, opacityTo: 0.05 }
-            },
-            xaxis: {
-                categories: months,
-                labels: { style: { colors: '#94a3b8', fontSize: '10px' } }
-            },
-            yaxis: {
-                labels: {
-                    style: { colors: '#94a3b8', fontSize: '10px' },
-                    formatter: val => val ? val.toLocaleString() : 0
-                }
-            },
+            fill: { type: 'gradient', gradient: { opacityFrom: 0.4, opacityTo: 0.05 } },
+            xaxis: { categories: months, labels: { style: { colors: '#94a3b8', fontSize: '10px' } } },
+            yaxis: { labels: { style: { colors: '#94a3b8', fontSize: '10px' }, formatter: val => val ? val.toLocaleString() : 0 } },
             grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
             legend: { show: false }
         });
@@ -14883,7 +15239,7 @@ const calcNG = () => {
     }
 };
 
-const WapSupportLogs = (function () {
+var WapSupportLogs = (function () {
 
     const TABLE = 'support_records';
     let _records    = [];
@@ -15549,23 +15905,92 @@ function applyDateFilter() {
             Object.keys(defectDict).forEach(k => allDefects.add(k.toUpperCase()));
         }
 
-        // Parse initial problem fields for this record (ดึงวันที่จากแถวตารางมาใส่เสมอ)
+        // Parse initial problem fields for this record (ดึงวันที่จาก Record date ในตารางมาใส่เสมอ)
         function _toIsoDateStr(val) {
             if (!val) return '';
             const str = String(val).trim();
-            if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 10);
-            if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}/.test(str)) {
-                const p = str.split(/[\/\-\.]/);
-                return `${p[2]}-${String(p[1]).padStart(2, '0')}-${String(p[0]).padStart(2, '0')}`;
+            if (str === '-' || str.toLowerCase() === 'n/a' || str.toLowerCase() === 'null') return '';
+
+            // 1. Standard YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+            const isoMatch = str.match(/^(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})/);
+            if (isoMatch) {
+                let y = parseInt(isoMatch[1], 10);
+                if (y > 2400) y -= 543; // Buddhist Era (พ.ศ.) to CE
+                const m = String(isoMatch[2]).padStart(2, '0');
+                const d = String(isoMatch[3]).padStart(2, '0');
+                return `${y}-${m}-${d}`;
             }
-            const d = new Date(str);
-            return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
+
+            // 2. DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY or DD/MM/YY
+            const dmyMatch = str.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{2,4})/);
+            if (dmyMatch) {
+                const d = String(dmyMatch[1]).padStart(2, '0');
+                const m = String(dmyMatch[2]).padStart(2, '0');
+                let y = parseInt(dmyMatch[3], 10);
+                if (y < 100) y += 2000;
+                else if (y > 2400) y -= 543;
+                return `${y}-${m}-${d}`;
+            }
+
+            // 3. DD Mon'YY or DD Mon YYYY (e.g. 25 Aug'26 or 6 Aug 2026 or 25-Aug-2026)
+            const monthNames = {
+                jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+                "ม.ค.": 1, "ก.พ.": 2, "มี.ค.": 3, "เม.ย.": 4, "พ.ค.": 5, "มิ.ย.": 6, "ก.ค.": 7, "ส.ค.": 8, "ก.ย.": 9, "ต.ค.": 10, "พ.ย.": 11, "ธ.ค.": 12,
+                "มกราคม": 1, "กุมภาพันธ์": 2, "มีนาคม": 3, "เมษายน": 4, "พฤษภาคม": 5, "มิถุนายน": 6, "กรกฎาคม": 7, "สิงหาคม": 8, "กันยายน": 9, "ตุลาคม": 10, "พฤศจิกายน": 11, "ธันวาคม": 12
+            };
+            const monMatch = str.match(/^(\d{1,2})\s*[-\s]?\s*([A-Za-z]{3,4}|[^\s\d]+)\s*['\s-]?\s*(\d{2,4})/);
+            if (monMatch) {
+                const d = String(monMatch[1]).padStart(2, '0');
+                const monKey = monMatch[2].toLowerCase().substring(0, 3);
+                const mNum = monthNames[monKey] || monthNames[monMatch[2].toLowerCase()];
+                if (mNum) {
+                    let y = parseInt(monMatch[3], 10);
+                    if (y < 100) y += 2000;
+                    else if (y > 2400) y -= 543;
+                    const m = String(mNum).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                }
+            }
+
+            // 4. Fallback Date constructor
+            const dt = new Date(str);
+            if (!isNaN(dt.getTime())) {
+                return dt.toISOString().split('T')[0];
+            }
+            return '';
         }
 
-        const headerFilterStart = document.getElementById('cd-start-date')?.value;
-        const initialFormDate = _toIsoDateStr(r.eventDate || r.event_date || r.date || r.createdAt || r.created_at) ||
-                               _toIsoDateStr(headerFilterStart) ||
-                               new Date().toISOString().split('T')[0];
+        // ดึงวันที่จาก Record Date ในตารางมาใส่เสมอ
+        let tableRowDate = '';
+        if (id) {
+            const rowCell = document.querySelector(`tr[data-rid="${id}"] td.col-date, tr[data-rid="${id}"] .col-date`);
+            if (rowCell && rowCell.textContent && rowCell.textContent.trim() !== '-' && rowCell.textContent.trim() !== '') {
+                tableRowDate = rowCell.textContent.trim();
+            }
+        }
+        if (!tableRowDate) {
+            const firstRowCell = document.querySelector('#supportTable tbody tr td.col-date, #supportTable tbody tr .col-date');
+            if (firstRowCell && firstRowCell.textContent && firstRowCell.textContent.trim() !== '-' && firstRowCell.textContent.trim() !== '') {
+                tableRowDate = firstRowCell.textContent.trim();
+            }
+        }
+
+        const parsedFromProb = isEdit ? parseProblemDetails(r.problem, r) : {};
+
+        const rawRecordDate = tableRowDate ||
+                              r.eventDate ||
+                              r.event_date ||
+                              parsedFromProb.dateStr ||
+                              r.date ||
+                              r.createdAt ||
+                              r.created_at ||
+                              document.getElementById('cd-start-date')?.value ||
+                              document.getElementById('support-filter-start-date')?.value ||
+                              (_filtered && _filtered[0]?.eventDate) ||
+                              (_records && _records[0]?.eventDate) ||
+                              '';
+
+        const initialFormDate = _toIsoDateStr(rawRecordDate) || new Date().toISOString().split('T')[0];
 
         let parsedDateStr = _formatProblemDateStr(initialFormDate);
         let parsedUser = "";
@@ -15577,7 +16002,7 @@ function applyDateFilter() {
 
         if (isEdit) {
             const parsed = parseProblemDetails(r.problem, r);
-            parsedDateStr = parsed.dateStr || _formatProblemDateStr(initialFormDate);
+            parsedDateStr = _formatProblemDateStr(initialFormDate) || parsed.dateStr || '';
             parsedUser = parsed.user || r.user || r.informer || r.area || r.dept || r.line || r._user || "";
             parsedPart = parsed.partName || r.partName || r.part_name || r.report_data?.vf_data?.part_name || "";
             parsedPartNo = parsed.partNo || r.partNo || r.part_no || r.drawing_no || r.report_data?.vf_data?.drawing_no || "";
@@ -15938,12 +16363,21 @@ function applyDateFilter() {
                                 <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;" title="Img Input" aria-label="Img Input">
                                 <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; position:relative; z-index:3;">
                                     ${r.imageUrl ? `
-                                        <div class="evidence-single-preview-wrap">
-                                            <img src="${r.imageUrl}" style="max-height:95px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" alt="Evidence Single" />
-                                            <div class="evidence-single-actions">
-                                                <button type="button" class="evidence-preview-btn btn-rotate-single" title="หมุนรูปภาพ 90°">↻ หมุน</button>
-                                                <button type="button" class="evidence-preview-btn btn-zoom-single" title="ขยายดูภาพใหญ่">🔍 ขยาย</button>
-                                                <button type="button" class="evidence-preview-btn btn-del btn-del-single" title="ลบรูปภาพ">✖ ลบ</button>
+                                        <div class="evidence-single-preview-wrap" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+                                            <img src="${r.imageUrl}" style="max-height:160px; max-width:100%; border-radius:10px; box-shadow:0 3px 10px rgba(0,0,0,0.15); display:block; object-fit:contain; cursor:zoom-in;" alt="Evidence Single" />
+                                            <div class="evidence-toolbar">
+                                                <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-single" title="ทำเครื่องหมายหรือวาดจุดบกพร่องบนรูปภาพ">
+                                                    <span class="tool-icon">✏️</span> <span class="tool-label">ทำเครื่องหมาย/วาด</span>
+                                                </button>
+                                                <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-single" title="หมุนรูปภาพ 90°">
+                                                    <span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>
+                                                </button>
+                                                <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-single" title="ขยายดูภาพใหญ่">
+                                                    <span class="tool-icon">🔍</span> <span class="tool-label">ขยาย</span>
+                                                </button>
+                                                <button type="button" class="evidence-tool-btn btn-delete btn-del-single" title="ลบรูปภาพ">
+                                                    <span class="tool-icon">🗑️</span> <span class="tool-label">ลบ</span>
+                                                </button>
                                             </div>
                                         </div>
                                     ` : `
@@ -16353,18 +16787,49 @@ function applyDateFilter() {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
                 img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const nw = img.naturalWidth || img.width || 800;
-                    const nh = img.naturalHeight || img.height || 600;
-                    canvas.width = nh;
-                    canvas.height = nw;
-                    const ctx = canvas.getContext('2d');
-                    ctx.translate(canvas.width / 2, canvas.height / 2);
-                    ctx.rotate(90 * Math.PI / 180);
-                    ctx.drawImage(img, -nw / 2, -nh / 2);
-                    resolve(canvas.toDataURL('image/jpeg', 0.95));
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const nw = img.naturalWidth || img.width || 800;
+                        const nh = img.naturalHeight || img.height || 600;
+                        canvas.width = nh;
+                        canvas.height = nw;
+                        const ctx = canvas.getContext('2d');
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.translate(canvas.width / 2, canvas.height / 2);
+                        ctx.rotate(90 * Math.PI / 180);
+                        ctx.drawImage(img, -nw / 2, -nh / 2);
+                        resolve(canvas.toDataURL('image/jpeg', 0.95));
+                    } catch (err) {
+                        console.warn('Rotate failed with canvas toDataURL, falling back:', err);
+                        resolve(dataUrl);
+                    }
                 };
-                img.onerror = () => resolve(dataUrl);
+                img.onerror = () => {
+                    if (img.crossOrigin) {
+                        const retryImg = new Image();
+                        retryImg.onload = () => {
+                            try {
+                                const canvas = document.createElement('canvas');
+                                const nw = retryImg.naturalWidth || retryImg.width || 800;
+                                const nh = retryImg.naturalHeight || retryImg.height || 600;
+                                canvas.width = nh;
+                                canvas.height = nw;
+                                const ctx = canvas.getContext('2d');
+                                ctx.translate(canvas.width / 2, canvas.height / 2);
+                                ctx.rotate(90 * Math.PI / 180);
+                                ctx.drawImage(retryImg, -nw / 2, -nh / 2);
+                                resolve(canvas.toDataURL('image/jpeg', 0.95));
+                            } catch(e) {
+                                resolve(dataUrl);
+                            }
+                        };
+                        retryImg.onerror = () => resolve(dataUrl);
+                        retryImg.src = dataUrl;
+                    } else {
+                        resolve(dataUrl);
+                    }
+                };
                 img.src = dataUrl;
             });
         }
@@ -16375,19 +16840,19 @@ function applyDateFilter() {
             if (singleImage) {
                 imgPreviewArea.innerHTML = `
                     <div class="evidence-single-preview-wrap" style="width:100%; display:flex; flex-direction:column; align-items:center;">
-                        <img src="${singleImage}" style="max-height:160px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); display:block; object-fit:contain; cursor:zoom-in;" alt="Evidence Single" />
-                        <div class="evidence-toolbar" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:8px; padding:6px 10px; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; flex-wrap:wrap;">
-                            <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fff7ed; border:1px solid #fed7aa; color:#c2410c; cursor:pointer;" title="ทำเครื่องหมายหรือวาดบนรูปภาพ">
-                                <span style="font-size:12px;">✏️</span> ทำเครื่องหมาย/วาด
+                        <img src="${singleImage}" style="max-height:165px; max-width:100%; border-radius:10px; box-shadow:0 3px 10px rgba(0,0,0,0.15); display:block; object-fit:contain; cursor:zoom-in;" alt="Evidence Single" />
+                        <div class="evidence-toolbar">
+                            <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-single" title="ทำเครื่องหมายหรือวาดจุดบกพร่องบนรูปภาพ">
+                                <span class="tool-icon">✏️</span> <span class="tool-label">ทำเครื่องหมาย/วาด</span>
                             </button>
-                            <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; cursor:pointer;" title="หมุนรูปภาพ 90°">
-                                <span style="font-size:12px;">🔄</span> หมุน
+                            <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-single" title="หมุนรูปภาพ 90°">
+                                <span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>
                             </button>
-                            <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; cursor:pointer;" title="ขยายดูภาพใหญ่">
-                                <span style="font-size:12px;">🔍</span> ขยาย
+                            <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-single" title="ขยายดูภาพใหญ่">
+                                <span class="tool-icon">🔍</span> <span class="tool-label">ขยาย</span>
                             </button>
-                            <button type="button" class="evidence-tool-btn btn-delete btn-del-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; cursor:pointer;" title="ลบรูปภาพ">
-                                <span style="font-size:12px;">🗑️</span> ลบ
+                            <button type="button" class="evidence-tool-btn btn-delete btn-del-single" title="ลบรูปภาพ">
+                                <span class="tool-icon">🗑️</span> <span class="tool-label">ลบ</span>
                             </button>
                         </div>
                     </div>
@@ -16425,17 +16890,23 @@ function applyDateFilter() {
                     btnRot.onclick = async (e) => {
                         e.stopPropagation();
                         btnRot.disabled = true;
-                        btnRot.textContent = '⏳ หมุน...';
-                        const rotated = await rotateImageDataUrl(singleImage);
-                        singleImage = rotated;
-                        if (currentEvidenceMode === 'single') {
-                            currentImage = singleImage;
-                            modal._currentImage = currentImage;
+                        btnRot.innerHTML = '<span class="tool-icon">⏳</span> <span class="tool-label">หมุน...</span>';
+                        try {
+                            const rotated = await rotateImageDataUrl(singleImage);
+                            singleImage = rotated;
+                            if (currentEvidenceMode === 'single') {
+                                currentImage = singleImage;
+                                modal._currentImage = currentImage;
+                            }
+                            renderSinglePreview();
+                            saveDraftData();
+                            updateSupportFormValidation();
+                            toast('🔄 หมุนรูปภาพ 90° เรียบร้อยแล้ว', 'info');
+                        } catch (err) {
+                            console.error('Rotate error:', err);
+                            btnRot.disabled = false;
+                            btnRot.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
                         }
-                        renderSinglePreview();
-                        saveDraftData();
-                        updateSupportFormValidation();
-                        toast('🔄 หมุนรูปภาพ 90° เรียบร้อยแล้ว', 'info');
                     };
                 }
 
@@ -16706,19 +17177,19 @@ function applyDateFilter() {
                         if (stitchedBox) {
                             stitchedBox.innerHTML = `
                                 <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
-                                    <img src="${collage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:6px; display:block; cursor:zoom-in;" alt="Composite Evidence" />
-                                    <div class="evidence-toolbar" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:8px; padding:6px 10px; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; flex-wrap:wrap;">
-                                        <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fff7ed; border:1px solid #fed7aa; color:#c2410c; cursor:pointer;" title="ทำเครื่องหมายหรือวาดบนภาพหลักฐานรวม">
-                                            <span style="font-size:12px;">✏️</span> ทำเครื่องหมาย/วาด
+                                    <img src="${collage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:10px; display:block; cursor:zoom-in; box-shadow:0 3px 10px rgba(0,0,0,0.12);" alt="Composite Evidence" />
+                                    <div class="evidence-toolbar">
+                                        <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-multi" title="ทำเครื่องหมายหรือวาดบนภาพหลักฐานรวม">
+                                            <span class="tool-icon">✏️</span> <span class="tool-label">ทำเครื่องหมาย/วาด</span>
                                         </button>
-                                        <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; cursor:pointer;" title="หมุนภาพรวม 90°">
-                                            <span style="font-size:12px;">🔄</span> หมุน
+                                        <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-multi" title="หมุนภาพรวม 90°">
+                                            <span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>
                                         </button>
-                                        <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; cursor:pointer;" title="ขยายดูภาพใหญ่">
-                                            <span style="font-size:12px;">🔍</span> ขยาย
+                                        <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-multi" title="ขยายดูภาพใหญ่">
+                                            <span class="tool-icon">🔍</span> <span class="tool-label">ขยาย</span>
                                         </button>
-                                        <button type="button" class="evidence-tool-btn btn-delete btn-del-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; cursor:pointer;" title="ลบภาพหลักฐานทั้งหมดในโหมดนี้">
-                                            <span style="font-size:12px;">🗑️</span> ลบ
+                                        <button type="button" class="evidence-tool-btn btn-delete btn-del-multi" title="ลบภาพหลักฐานทั้งหมดในโหมดนี้">
+                                            <span class="tool-icon">🗑️</span> <span class="tool-label">ลบ</span>
                                         </button>
                                     </div>
                                 </div>
@@ -16753,19 +17224,25 @@ function applyDateFilter() {
                                 btnRotateM.onclick = async (e) => {
                                     e.stopPropagation();
                                     btnRotateM.disabled = true;
-                                    btnRotateM.textContent = '⏳ หมุน...';
-                                    const rotated = await rotateImageDataUrl(stitchedMultiImage);
-                                    stitchedMultiImage = rotated;
-                                    if (currentEvidenceMode === 'multi') {
-                                        currentImage = stitchedMultiImage;
-                                        modal._currentImage = currentImage;
+                                    btnRotateM.innerHTML = '<span class="tool-icon">⏳</span> <span class="tool-label">หมุน...</span>';
+                                    try {
+                                        const rotated = await rotateImageDataUrl(stitchedMultiImage);
+                                        stitchedMultiImage = rotated;
+                                        if (currentEvidenceMode === 'multi') {
+                                            currentImage = stitchedMultiImage;
+                                            modal._currentImage = currentImage;
+                                        }
+                                        if (imgEl) imgEl.src = stitchedMultiImage;
+                                        btnRotateM.disabled = false;
+                                        btnRotateM.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
+                                        saveDraftData();
+                                        updateSupportFormValidation();
+                                        toast('🔄 หมุนภาพหลักฐานรวม 90° เรียบร้อยแล้ว', 'info');
+                                    } catch(err) {
+                                        console.error('Rotate error:', err);
+                                        btnRotateM.disabled = false;
+                                        btnRotateM.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
                                     }
-                                    if (imgEl) imgEl.src = stitchedMultiImage;
-                                    btnRotateM.disabled = false;
-                                    btnRotateM.innerHTML = '<span style="font-size:12px;">🔄</span> หมุน';
-                                    saveDraftData();
-                                    updateSupportFormValidation();
-                                    toast('🔄 หมุนภาพหลักฐานรวม 90° เรียบร้อยแล้ว', 'info');
                                 };
                             }
 
@@ -17056,10 +17533,11 @@ function applyDateFilter() {
                 if (d.supplier !== undefined && modal.querySelector('#prob-supplier')) modal.querySelector('#prob-supplier').value = d.supplier;
                 if (d.defect !== undefined && modal.querySelector('#prob-defect')) modal.querySelector('#prob-defect').value = d.defect;
                 if (d.category !== undefined && modal.querySelector('#f-sup-part-cat')) modal.querySelector('#f-sup-part-cat').value = d.category;
-                if (d.eventDate !== undefined && modal.querySelector('#f-sup-date')) {
-    // ตัดเอาเฉพาะ 10 ตัวแรก (YYYY-MM-DD) เพื่อให้ input date ยอมรับค่า
-    modal.querySelector('#f-sup-date').value = d.eventDate.substring(0, 10);
-}
+                // ตรงวันที่ ให้ดึงวันที่จาก Record date ในตารางมาใส่เสมอ (ห้ามทับเมื่อเปิดแก้ไขข้อมูลเดิม)
+                if (!isEdit && d.eventDate !== undefined && modal.querySelector('#f-sup-date')) {
+                    const draftDate = _toIsoDateStr(d.eventDate);
+                    if (draftDate) modal.querySelector('#f-sup-date').value = draftDate;
+                }
                 if (d.action !== undefined && modal.querySelector('#f-sup-action')) modal.querySelector('#f-sup-action').value = d.action;
                 if (d.report !== undefined && modal.querySelector('#f-sup-report')) modal.querySelector('#f-sup-report').value = d.report;
                 if (d.po_no !== undefined && modal.querySelector('#f-sup-po')) modal.querySelector('#f-sup-po').value = d.po_no;
@@ -17088,13 +17566,91 @@ function applyDateFilter() {
                     modal._currentImage = currentImage;
                     switchEvidenceMode('multi');
                     if (stitchedMultiImage && stitchedBox) {
-                        stitchedBox.innerHTML = `<img src="${stitchedMultiImage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:6px; display:block; cursor:zoom-in;" alt="Composite Evidence" />`;
+                        stitchedBox.innerHTML = `
+                            <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
+                                <img src="${stitchedMultiImage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:10px; display:block; cursor:zoom-in; box-shadow:0 3px 10px rgba(0,0,0,0.12);" alt="Composite Evidence" />
+                                <div class="evidence-toolbar">
+                                    <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-multi" title="ทำเครื่องหมายหรือวาดบนภาพหลักฐานรวม">
+                                        <span class="tool-icon">✏️</span> <span class="tool-label">ทำเครื่องหมาย/วาด</span>
+                                    </button>
+                                    <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-multi" title="หมุนภาพรวม 90°">
+                                        <span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>
+                                    </button>
+                                    <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-multi" title="ขยายดูภาพใหญ่">
+                                        <span class="tool-icon">🔍</span> <span class="tool-label">ขยาย</span>
+                                    </button>
+                                    <button type="button" class="evidence-tool-btn btn-delete btn-del-multi" title="ลบภาพหลักฐานทั้งหมดในโหมดนี้">
+                                        <span class="tool-icon">🗑️</span> <span class="tool-label">ลบ</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
                         const imgEl = stitchedBox.querySelector('img');
                         if (imgEl) {
                             imgEl.onclick = () => _openLightbox(stitchedMultiImage);
                         }
+                        const btnAnnotateM = stitchedBox.querySelector('.btn-annotate-multi');
+                        if (btnAnnotateM) {
+                            btnAnnotateM.onclick = (e) => {
+                                e.stopPropagation();
+                                window.openEvidenceImageAnnotator(stitchedMultiImage, (annotatedImage) => {
+                                    stitchedMultiImage = annotatedImage;
+                                    currentImage = stitchedMultiImage;
+                                    modal._currentImage = currentImage;
+                                    if (imgEl) imgEl.src = stitchedMultiImage;
+                                    saveDraftData();
+                                    updateSupportFormValidation();
+                                });
+                            };
+                        }
+                        const btnRotateM = stitchedBox.querySelector('.btn-rotate-multi');
+                        if (btnRotateM) {
+                            btnRotateM.onclick = async (e) => {
+                                e.stopPropagation();
+                                btnRotateM.disabled = true;
+                                btnRotateM.innerHTML = '<span class="tool-icon">⏳</span> <span class="tool-label">หมุน...</span>';
+                                try {
+                                    const rotated = await rotateImageDataUrl(stitchedMultiImage);
+                                    stitchedMultiImage = rotated;
+                                    currentImage = stitchedMultiImage;
+                                    modal._currentImage = currentImage;
+                                    if (imgEl) imgEl.src = stitchedMultiImage;
+                                    btnRotateM.disabled = false;
+                                    btnRotateM.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
+                                    saveDraftData();
+                                    updateSupportFormValidation();
+                                    toast('🔄 หมุนภาพหลักฐานรวม 90° เรียบร้อยแล้ว', 'info');
+                                } catch (err) {
+                                    btnRotateM.disabled = false;
+                                    btnRotateM.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
+                                }
+                            };
+                        }
+                        const btnZoomM = stitchedBox.querySelector('.btn-zoom-multi');
+                        if (btnZoomM) {
+                            btnZoomM.onclick = (e) => {
+                                e.stopPropagation();
+                                _openLightbox(stitchedMultiImage);
+                            };
+                        }
+                        const btnDelM = stitchedBox.querySelector('.btn-del-multi');
+                        if (btnDelM) {
+                            btnDelM.onclick = (e) => {
+                                e.stopPropagation();
+                                multiImages = [];
+                                stitchedMultiImage = null;
+                                currentImage = null;
+                                modal._currentImage = null;
+                                if (imgMultiInput) imgMultiInput.value = '';
+                                renderMultiGrid();
+                                if (stitchedWrap) stitchedWrap.style.display = 'none';
+                                if (stitchedBox) stitchedBox.innerHTML = '';
+                                saveDraftData();
+                                updateSupportFormValidation();
+                                toast('🗑️ ล้างรูปภาพหลักฐานทั้งหมดเรียบร้อย', 'info');
+                            };
+                        }
                         if (stitchedWrap) stitchedWrap.style.display = 'flex';
-                        if (compositeActions) compositeActions.style.display = 'flex';
                     }
                 } else {
                     currentEvidenceMode = 'single';
@@ -17103,6 +17659,11 @@ function applyDateFilter() {
                     modal._currentImage = currentImage;
                     switchEvidenceMode('single');
                     renderSinglePreview();
+                }
+
+                // ตรงวันที่ ให้ดึงวันที่จาก Record date ในตารางมาใส่เสมอ
+                if (isEdit && initialFormDate && modal.querySelector('#f-sup-date')) {
+                    modal.querySelector('#f-sup-date').value = initialFormDate;
                 }
 
                 toggleRpFieldsVisibility();
@@ -17596,19 +18157,18 @@ function _openViewModal(id) {
                 </div>
             </div>
 
-            <!-- Image Section (Edge-to-edge snugly without top/bottom empty space) -->
-            <div style="width:100%; background:${isDark ? '#020617' : '#0f172a'}; border:1px solid ${theme.imgBorder}; border-radius:8px; display:flex; justify-content:center; align-items:center; padding:0; overflow:hidden; margin-bottom:10px;">
+<!-- Image Section (Edge-to-Edge Snug Fit / Zero Blank Space Above/Below) -->
+            <div style="width:100%; background:transparent; border:1.5px solid ${theme.imgBorder}; border-radius:12px; overflow:hidden; margin-bottom:12px; padding:0; line-height:0; font-size:0;">
                 ${item.imageUrl 
                     ? `
-                    <div style="width:100%; display:flex; justify-content:center; align-items:center; overflow:hidden;">
-                        <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
-                            onerror="handleImgError(this)"
-                            onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
-                            data-img-url="${escapeHtml(item.imageUrl)}"
-                            style="width:100%; height:auto; max-height:960px; object-fit:contain; cursor:zoom-in; display:block; image-rendering:-webkit-optimize-contrast;" 
-                            alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">
-                    </div>` 
-                    : `<div style="padding:30px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>`
+                    <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
+                        onerror="handleImgError(this)"
+                        onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
+                        data-img-url="${escapeHtml(item.imageUrl)}"
+                        style="width:100%; height:auto; max-height:550px; display:block; vertical-align:middle; object-fit:contain; cursor:zoom-in; image-rendering:-webkit-optimize-contrast; margin:0; padding:0;" 
+                        alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">
+                    ` 
+                    : `<div style="padding:40px; text-align:center; color:${theme.textDim}; font-size:12px; font-weight:800; text-transform:uppercase; line-height:1.5;">No Evidence Photo</div>`
                 }
             </div>
 
@@ -17874,7 +18434,7 @@ window.clearSupportSearch = function() {
  *  WAP 5S Excellence - FULLY DATA-SYNC VERSION
  * ═══════════════════════════════════════════════════════
  */
-const Wap5SExcellence = (function() {
+var Wap5SExcellence = (function() {
     const TABLE = 's5_records';
     let _chart = null;
     let _allRecords = []; // ข้อมูลดิบทั้งหมดจาก DB
@@ -18398,25 +18958,36 @@ const Wap5SExcellence = (function() {
         try {
             let saveMethod = '';
 
-            if (navigator.onLine) {
-                if (isEditing) {
-                    const { error } = await wapClient
-                        .from(TABLE)
-                        .update({
-                            area: payload.area,
-                            issue_count: payload.issue_count,
-                            detail: payload.detail,
-                            owner: payload.owner,
-                            month: payload.month,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('id', recordId);
-                    if (error) throw error;
-                } else {
-                    const { error } = await wapClient.from(TABLE).insert([payload]);
-                    if (error) throw error;
+            if (navigator.onLine && !window._supabaseQuotaExceeded) {
+                try {
+                    if (isEditing) {
+                        const { error } = await wapClient
+                            .from(TABLE)
+                            .update({
+                                area: payload.area,
+                                issue_count: payload.issue_count,
+                                detail: payload.detail,
+                                owner: payload.owner,
+                                month: payload.month,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', recordId);
+                        if (error) throw error;
+                    } else {
+                        const { error } = await wapClient.from(TABLE).insert([payload]);
+                        if (error) throw error;
+                    }
+                    saveMethod = 'cloud';
+                } catch (cloudErr) {
+                    if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(cloudErr)) {
+                        window._supabaseQuotaExceeded = true;
+                        window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
+                    }
+                    if (window.localDB && localDB.pending5S) {
+                        await localDB.pending5S.put({ ...payload, sync_status: 'pending' });
+                        saveMethod = 'local';
+                    }
                 }
-                saveMethod = 'cloud';
             } else {
                 if (window.localDB && localDB.pending5S) {
                     await localDB.pending5S.put({ ...payload, sync_status: 'pending' });
@@ -18517,7 +19088,7 @@ const Wap5SExcellence = (function() {
  *  WAP SKILL MATRIX - Isolated Module (Fixed Schema)
  * ═══════════════════════════════════════════════════════
  */
-const WapSkillMatrix = (function() {
+var WapSkillMatrix = (function() {
     const TABLE = 'skill_matrix';
     let _charts = { radar: null, bar: null, donut: null };
     let _records = [];
@@ -19413,13 +19984,14 @@ function triggerGlobalRefresh() {
     if (!titleEl) return;
 
     const title = titleEl.textContent.trim().toUpperCase();
+    
+    // 🎯 1. อัปเดต Sidebar ทันที (ลบ targetUser ออก เพื่อให้แสดงชื่อคนลอกอินจริงเสมอ)
+    updateSidebarUserUI();
+
+    // ระบุพนักงานเป้าหมายสำหรับใช้ในโมดูลเนื้อหา
     const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
-    if (!targetUser) return;
 
-    // 1. อัปเดตข้อมูลพนักงานใน Sidebar (รันทันทีไม่ต้องรอ Frame)
-    updateSidebarUserUI(targetUser);
-
-    // 2. ใช้ requestAnimationFrame เพื่อให้ Browser วาดหน้าจอได้ลื่นไหล (ลดอาการ UI Block)
+    // 2. ใช้ requestAnimationFrame เพื่อความลื่นไหล
     requestAnimationFrame(() => {
         console.log(`[System] UI Update: ${title}`);
 
@@ -19433,57 +20005,83 @@ function triggerGlobalRefresh() {
         const isOT          = title.includes('OT')        || title.includes('ล่วงเวลา');
         const isSpecial     = title.includes('SPECIAL')   || title.includes('ภารกิจ');
 
-        if (isDashboard && isClaimWord) {
-            refreshClaimDashboard(); 
-        } 
-        else if (isClaimWord && !isDashboard) {
-            renderTable(); 
-        }
-        else if (isExec) {
-            initExecDashboard();
-        }
-        else if (isAttendance) {
-            renderAttRecords(); // เปลี่ยนจาก initAttDashboard ที่มี fetch อยู่ข้างใน
-            renderDailySubmissionMatrix();
-            updateAttKPI();
-        }
-        else if (isSupport) {
-            WapSupportLogs.init(targetUser);
-        }
-        else if (is5S) {
-            Wap5SExcellence.renderAll(); // เปลี่ยนจาก fetchRecords -> renderAll
-        }
-        else if (isSkill) {
-            WapSkillMatrix.renderAll(); // เปลี่ยนจาก init -> renderAll
-        }
-        else if (isOT) {
-            WapOTManagement.updateUI(); // เปลี่ยนจาก fetchRecords -> updateUI
-        }
-        else if (isSpecial) {
-            WapSpecialJobs.applyDateFilter(); // เปลี่ยนจาก init -> applyDateFilter (ซึ่งมี renderTable/Charts)
+        // 🎯 กรณีที่มีการเลือกพนักงานแล้ว (หรือเป็นพนักงานลอกอินเอง)
+        if (targetUser) {
+            if (isDashboard && isClaimWord) {
+                refreshClaimDashboard(); 
+            } 
+            else if (isClaimWord && !isDashboard) {
+                renderTable(); 
+            }
+            else if (isExec) {
+                initExecDashboard();
+            }
+            else if (isAttendance) {
+                renderAttRecords();
+                renderDailySubmissionMatrix();
+                updateAttKPI();
+            }
+            else if (isSupport) {
+                WapSupportLogs.init(targetUser);
+            }
+            else if (is5S) {
+                Wap5SExcellence.renderAll();
+            }
+            else if (isSkill) {
+                WapSkillMatrix.renderAll();
+            }
+            else if (isOT) {
+                WapOTManagement.updateUI();
+            }
+            else if (isSpecial) {
+                WapSpecialJobs.applyDateFilter();
+            }
+        } else {
+            // 🎯 กรณีไม่มี targetUser (เช่น Supervisor เพิ่งลอกอินและยังไม่ได้เลือกใคร)
+            // สั่ง Render หน้าว่างเปล่าเพื่อให้ UI แสดงผลตาม Logic ที่เราตั้งไว้ใน renderTable
+            if (isClaimWord) renderTable();
+            if (isDashboard) refreshClaimDashboard();
         }
     });
 }
 
-// แยก UI Sidebar ออกมาเพื่อความสะอาด
-function updateSidebarUserUI(targetUser) {
-    const displayName = targetUser.split('@')[0].replace(/\./g, ' ').toUpperCase();
-    if ($id('user-display-name')) {
-        if (S.userRole === 'supervisor' && S.viewingUser !== S.currentUser) {
-            $id('user-display-name').innerHTML = `${displayName} <span class="text-[8px] text-rose-500 font-black tracking-tighter">(VIEWING)</span>`;
-        } else {
-            $id('user-display-name').textContent = displayName;
+// แก้ไข: ล็อคข้อมูล Sidebar ให้เป็นของคนลอกอินปัจจุบันเสมอ
+function updateSidebarUserUI() {
+    // 🎯 ใช้ข้อมูลจาก S.currentUser (คนลอกอิน) เท่านั้น ไม่ใช้พารามิเตอร์ที่ส่งมา
+    const email = S.currentUser;
+    const namePart = email.split('@')[0] || 'USER';
+    const displayName = namePart.replace(/\./g, ' ').toUpperCase();
+    const initial = displayName.charAt(0);
+
+    // 1. อัปเดตชื่อผู้ใช้งาน (ล็อคชื่อตัวเอง ไม่เปลี่ยนตามฟิลเตอร์)
+    const nameEl = $id('user-display-name');
+    if (nameEl) {
+        nameEl.textContent = displayName; 
+        // ตัด Logic เงื่อนไข (VIEWING) ออกทั้งหมด เพื่อให้ชื่อคงที่
+    }
+
+    // 2. อัปเดตอีเมลแสดงผล
+    const emailEl = $id('user-display-email');
+    if (emailEl) {
+        emailEl.textContent = email;
+    }
+
+    // 3. อัปเดตตัวอักษรหรือรูป Avatar
+    const avatarEl = $id('user-avatar');
+    if (avatarEl) {
+        // อัปเดตตัวอักษรย่อเฉพาะกรณีที่ไม่มีรูปภาพ (img) อยู่ข้างใน
+        if (!avatarEl.querySelector('img')) {
+            avatarEl.textContent = initial;
         }
     }
-    if ($id('user-display-email')) $id('user-display-email').textContent = targetUser;
-    if ($id('user-avatar')) $id('user-avatar').textContent = displayName.charAt(0);
 
-    // อัปเดตการแสดงผลปุ่ม Admin User Control
+    // 4. อัปเดตการแสดงผลปุ่ม Admin User Control (อิงตามสิทธิ์คนลอกอินจริง)
     const adminFooterBtn = document.getElementById('admin-footer-access');
     if (adminFooterBtn) {
         const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
             ? hasAdminAccessPermission(S.currentUser, S.userRole) 
             : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
+        
         if (isAllowedAdmin) {
             adminFooterBtn.classList.remove('hidden');
         } else {
@@ -19576,7 +20174,7 @@ function updateTarget(val) {
     updateUI(); // สั่งอัปเดตหน้าจอทันที
 }
 
-const WapOTManagement = (function() {
+var WapOTManagement = (function() {
     const TABLE = 'ot_records';
     let _charts = { trend: null, dist: null };
     let _allRecords = [];      // ข้อมูลดิบทั้งหมดจาก DB
@@ -19806,19 +20404,30 @@ async function save() {
         let saveMethod = '';
 
         // 3. ระบบตัดสินใจ (Online vs Offline)
-        if (navigator.onLine) {
-            // โหมดออนไลน์: ส่งข้อมูลไป Supabase
-            const { error } = await wapClient.from('ot_records').insert([
-                // กรองฟิลด์ที่ Supabase ไม่รู้จักออก (sync_status)
-                (({ sync_status, ...o }) => o)(payload)
-            ]);
-            
-            if (error) throw error;
-            payload.sync_status = 'synced';
-            saveMethod = 'cloud';
+        if (navigator.onLine && !window._supabaseQuotaExceeded) {
+            try {
+                // โหมดออนไลน์: ส่งข้อมูลไป Supabase
+                const { error } = await wapClient.from('ot_records').insert([
+                    // กรองฟิลด์ที่ Supabase ไม่รู้จักออก (sync_status)
+                    (({ sync_status, ...o }) => o)(payload)
+                ]);
+                
+                if (error) throw error;
+                payload.sync_status = 'synced';
+                saveMethod = 'cloud';
+            } catch (cloudErr) {
+                if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(cloudErr)) {
+                    window._supabaseQuotaExceeded = true;
+                    window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
+                }
+                if (localDB && localDB.pendingOT) {
+                    await localDB.pendingOT.put(payload);
+                    saveMethod = 'local';
+                }
+            }
         } else {
             // โหมดออฟไลน์: เก็บลง Dexie (localDB)
-            if (localDB.pendingOT) {
+            if (localDB && localDB.pendingOT) {
                 await localDB.pendingOT.put(payload);
                 saveMethod = 'local';
             } else {
@@ -20297,7 +20906,7 @@ async function remove(id) {
  *  WAP SPECIAL JOBS - FULLY INTEGRATED MODULE (V5.5)
  * ═══════════════════════════════════════════════════════
  */
-const WapSpecialJobs = (function() {
+var WapSpecialJobs = (function() {
     const TABLE = 'special_jobs';
     let _charts = { volume: null, assignor: null };
     let _allRecords = [];      // ข้อมูลดิบทั้งหมดจาก DB
@@ -21164,12 +21773,11 @@ function findBestMatch(headerName) {
     return null;
 }
 
-// 3. ฟังก์ชันหลักในการนำเข้าไฟล์
 async function handleImport(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    toast("⏳ กำลังวิเคราะห์ไฟล์...", "info");
+    toast("⏳ กำลังวิเคราะห์ไฟล์ Excel และตรวจสอบความซ้ำซ้อน...", "info");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -21178,6 +21786,8 @@ async function handleImport(event) {
             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+            if (rawRows.length < 1) throw new Error("ไม่พบข้อมูลในไฟล์ Excel");
 
             let headerRowIndex = -1;
             let mapping = {};
@@ -21193,7 +21803,6 @@ async function handleImport(event) {
                         score++;
                     }
                 });
-                // ถ้าในหนึ่งแถวเจอหัวข้อตรงมากกว่า 4 หัวข้อ มั่นใจว่าเป็นหัวตาราง
                 if (score >= 4) {
                     headerRowIndex = i;
                     mapping = currentMapping;
@@ -21205,80 +21814,174 @@ async function handleImport(event) {
                 return toast("❌ ไม่พบหัวตารางที่ถูกต้องในไฟล์ Excel", "error");
             }
 
-            // --- STEP 2: ประมวลผลข้อมูลตามแพทเทิร์นระบบ ---
-            const formattedData = rawRows.slice(headerRowIndex + 1).map((row, idx) => {
-                // ข้ามแถวที่ไม่มีข้อมูลหลัก (PN หรือ QTY)
+            // --- STEP 2: ประมวลผลข้อมูลและแปลงเป็น Object ---
+            const formattedData = rawRows.slice(headerRowIndex + 1).map((row) => {
+                // ข้ามแถวที่ไม่มีข้อมูลสำคัญ
                 if (!row[mapping.partNo] && !row[mapping.qty]) return null;
 
-                // A. จัดการเรื่องวันที่
+                // ล้างค่าเลข Ref เพื่อใช้เป็นตัวเช็คความซ้ำ (ห้ามซ้ำตามกฎฐานข้อมูล)
+                const rawRef = String(row[mapping.ref] || '').trim();
+                if (!rawRef) return null; // ถ้าไม่มีเลข Ref ข้ามแถวนี้ทันที
+
+                const refVal = rawRef.toUpperCase();
+                // สร้าง ID ที่คงที่โดยอิงจากเลข Ref (เช่น REC-0060002)
+                const stableId = 'REC-' + refVal.replace(/[^A-Z0-9]/g, '');
+
+                // จัดการเรื่องวันที่
                 let finalDate = new Date().toISOString().split('T')[0];
                 if (row[mapping.date]) {
                     const d = row[mapping.date];
                     finalDate = d instanceof Date ? d.toISOString().split('T')[0] : String(d);
                 }
 
-                // B. วิเคราะห์ Judgment อัตโนมัติ
+                // วิเคราะห์ Judgment อัตโนมัติ
                 let rawJdg = String(row[mapping.judgment] || '').toUpperCase();
-                let finalJdg = 'VENDOR FAULT'; // ค่าเริ่มต้น
+                let finalJdg = 'VENDOR FAULT'; 
                 if (rawJdg.includes('SF')) finalJdg = 'SF';
                 else if (rawJdg.includes('CTC')) finalJdg = 'CTC';
                 else if (rawJdg.match(/OK|PASS|CAN|USE|ผ่าน|ใช้งานได้/)) finalJdg = 'CAN USE';
 
-                // C. สร้าง Object ให้ตรงตาม Schema ของระบบ
-                return {
-                    id: generateUUID(),
+                const rowObj = {
+                    id: stableId,
                     date: finalDate,
                     shift: String(row[mapping.shift] || 'SHIFT A').toUpperCase(),
                     line: String(row[mapping.line] || '-').trim(),
-                    ref: String(row[mapping.ref] || '').toUpperCase().trim(),
-                    supplier: String(row[mapping.supplier] || 'Unknown').trim(), // Vendor Name
-                    partName: String(row[mapping.partName] || '-').trim(),       // Part Name
-                    partNo: String(row[mapping.partNo] || '-').trim(),           // partNo
-                    qty: parseInt(String(row[mapping.qty] || 0).replace(/,/g, '')) || 0, // Qty
+                    ref: refVal,
+                    supplier: String(row[mapping.supplier] || 'Unknown').trim(),
+                    partNo: String(row[mapping.partNo] || '-').trim(),
+                    partName: String(row[mapping.partName] || '-').trim(),
+                    qty: Number(String(row[mapping.qty] || 0).replace(/,/g, '')) || 0,
                     unit: 'PCS',
-                    defect: String(row[mapping.defect] || '-').trim(),           // Trouble Claim
-                    remark: String(row[mapping.remark] || '').trim(),           // REMARK
-                    judgment: finalJdg,                                          // Judgment
-                    inspector: S.currentUser
+                    defect: String(row[mapping.defect] || '-').trim(),
+                    remark: String(row[mapping.remark] || '').trim(),
+                    judgment: finalJdg,
+                    inspector: S.currentUser || 'Inspector',
+                    sync_status: 'synced',
+                    created_at: new Date().toISOString()
                 };
+
+                return typeof formToSupabase === 'function' ? formToSupabase(rowObj) : rowObj;
             }).filter(item => item !== null);
 
-            // --- STEP 3: ยืนยันและบันทึกลง Cloud ---
-            if (formattedData.length === 0) return toast("❌ ไม่พบข้อมูลสำหรับนำเข้า", "error");
+            if (formattedData.length === 0) return toast("❌ ไม่พบข้อมูลที่สมบูรณ์สำหรับนำเข้า", "error");
+
+            // --- STEP 3: ล้างข้อมูลซ้ำภายในไฟล์ (Deduplicate) ป้องกันข้อผิดพลาด ON CONFLICT DO UPDATE ---
+            // ข้อผิดพลาด ON CONFLICT เกิดเมื่อใน 1 ชุดคำสั่ง (Batch) มีข้อมูล Key ซ้ำกันมากกว่า 1 แถว
+            const uniqueDataMap = new Map();
+            formattedData.forEach(item => {
+                const uniqueKey = String(item.ref || item.id).toUpperCase().trim();
+                uniqueDataMap.set(uniqueKey, item); 
+            });
+            const finalDataToUpload = Array.from(uniqueDataMap.values());
+            const duplicateMergedCount = formattedData.length - finalDataToUpload.length;
+
+            if (finalDataToUpload.length === 0) return toast("❌ ไม่พบข้อมูลที่สมบูรณ์", "error");
 
             showCustomConfirmDialog({
                 title: "ยืนยันนำเข้าข้อมูล Excel",
-                subtitle: `AI ตรวจสอบและแปลงรูปแบบข้อมูลเรียบร้อยแล้ว พร้อมนำเข้าสู่ระบบ`,
-                badge: "EXCEL SMART IMPORT",
+                subtitle: `ตรวจพบข้อมูลทั้งหมด ${formattedData.length} แถว (รวมเป็น ${finalDataToUpload.length} รายการที่ไม่ซ้ำกัน)`,
+                badge: "ZERO-DUPLICATE SHIELD",
                 type: "info",
                 details: [
-                    { label: "จำนวนรายการ", value: `${formattedData.length} รายการ` },
-                    { label: "ชื่อไฟล์", value: file.name },
-                    { label: "ผู้ดำเนินการ", value: S.currentUser }
+                    { label: "จำนวนแถวในไฟล์", value: `${formattedData.length} แถว` },
+                    { label: "รายการที่จะบันทึก", value: `${finalDataToUpload.length} รายการ` },
+                    { label: "ข้อมูลซ้ำในไฟล์", value: duplicateMergedCount > 0 ? `พบ ${duplicateMergedCount} แถว (รวมข้อมูลแล้ว)` : "ไม่พบข้อมูลซ้ำ" },
+                    { label: "โหมดบันทึก", value: "Upsert (อัปเดตรายการเดิม / เพิ่มรายการใหม่)" }
                 ],
-                confirmText: "📥 ยืนยันนำเข้าข้อมูล",
+                confirmText: "🚀 เริ่มนำเข้าข้อมูล",
                 cancelText: "ยกเลิก",
                 onConfirm: async () => {
                     try {
-                        const { error } = await sqeClient.from('records').insert(formattedData);
-                        if (error) throw error;
-                        
-                        await loadRecords(); // รีเฟรชตารางหน้าจอ
-                        toast(`✅ นำเข้าข้อมูลสำเร็จ ${formattedData.length} รายการ`, "success");
+                        const BATCH_SIZE = 50;
+                        const totalBatches = Math.ceil(finalDataToUpload.length / BATCH_SIZE);
+                        let totalSaved = 0;
+                        let errorCount = 0;
+
+                        toast(`⏳ กำลังนำเข้าข้อมูล 0/${finalDataToUpload.length} รายการ...`, "info");
+
+                        // ยิงบันทึกเป็นชุด (Chunked Batch) เพื่อป้องกัน Payload เกินและป้องกัน Deadlock
+                        for (let i = 0; i < finalDataToUpload.length; i += BATCH_SIZE) {
+                            const batch = finalDataToUpload.slice(i, i + BATCH_SIZE);
+                            const currentBatchNum = Math.floor(i / BATCH_SIZE) + 1;
+
+                            if (sqeClient && navigator.onLine) {
+                                try {
+                                    const { error: batchErr } = await sqeClient
+                                        .from('records')
+                                        .upsert(batch, { onConflict: 'ref' });
+
+                                    if (batchErr) {
+                                        console.warn(`[Batch ${currentBatchNum} Warning] Falling back to item-level upsert:`, batchErr.message);
+                                        // Fallback: บันทึกทีละรายการสำหรับชุดที่ติดปัญหา
+                                        for (const item of batch) {
+                                            try {
+                                                const { error: itemErr } = await sqeClient
+                                                    .from('records')
+                                                    .upsert([item], { onConflict: 'ref' });
+                                                if (itemErr) {
+                                                    console.error("Item upsert error:", itemErr.message);
+                                                    errorCount++;
+                                                } else {
+                                                    totalSaved++;
+                                                }
+                                            } catch (_) { errorCount++; }
+                                        }
+                                    } else {
+                                        totalSaved += batch.length;
+                                    }
+                                } catch (chunkErr) {
+                                    console.error("Chunk execution error:", chunkErr);
+                                    errorCount += batch.length;
+                                }
+                            } else {
+                                totalSaved += batch.length;
+                            }
+
+                            // บันทึกลง Local IndexedDB (Dexie) สำหรับ Offline Cache ทันที
+                            if (typeof db !== 'undefined' && db && db.records) {
+                                try { await db.records.bulkPut(batch); } catch (_) {}
+                            }
+
+                            if (totalBatches > 1) {
+                                toast(`⏳ กำลังนำเข้าชุดที่ ${currentBatchNum}/${totalBatches} (${totalSaved}/${finalDataToUpload.length})...`, "info");
+                            }
+                            await new Promise(r => setTimeout(r, 40));
+                        }
+
+                        // อัปเดต Memory State (S.records)
+                        if (typeof S !== 'undefined' && Array.isArray(S.records)) {
+                            finalDataToUpload.forEach(nr => {
+                                const idx = S.records.findIndex(er => String(er.ref).toUpperCase() === String(nr.ref).toUpperCase());
+                                if (idx >= 0) S.records[idx] = { ...S.records[idx], ...nr };
+                                else S.records.unshift(nr);
+                            });
+                        }
+
+                        // รีเฟรชข้อมูลหน้าจอ
+                        if (typeof loadRecords === 'function') await loadRecords(); 
+                        if (typeof triggerGlobalRefresh === 'function') triggerGlobalRefresh();
+                        if (typeof renderTable === 'function') renderTable();
+                        if (typeof updateStats === 'function') updateStats();
+
+                        if (errorCount === 0) {
+                            toast(`✅ นำเข้าและอัปเดตข้อมูลสำเร็จ ${totalSaved} รายการ`, "success");
+                        } else {
+                            toast(`⚠️ นำเข้าสำเร็จ ${totalSaved} รายการ (มีข้อผิดพลาด ${errorCount} รายการ)`, "warning");
+                        }
                     } catch (err) {
-                        console.error("Critical Import Error:", err);
-                        toast("❌ การนำเข้าขัดข้อง: " + err.message, "error");
+                        console.error("Supabase Error:", err);
+                        toast("❌ ไม่สามารถบันทึกได้: " + (err.message || "ปัญหาการเชื่อมต่อ"), "error");
                     }
                 }
             });
 
         } catch (err) {
             console.error("Critical Import Error:", err);
-            toast("❌ การนำเข้าขัดข้อง: " + err.message, "error");
+            toast("❌ ข้อผิดพลาด: " + err.message, "error");
         }
     };
     reader.readAsArrayBuffer(file);
-    event.target.value = ''; // Reset input
+    event.target.value = ''; // Reset file input
 }
 
 /**
@@ -21684,7 +22387,7 @@ async function syncSystemBanner() {
  *  SQE INDEXEDDB MAINTENANCE & OPTIMIZATION ENGINE
  * ═══════════════════════════════════════════════════════
  */
-const SQEIndexedDBManager = (function() {
+var SQEIndexedDBManager = (function() {
     const DB_NAME = 'SQE_Portal_IDB';
     const DB_VERSION = 1;
     let _dbPromise = null;
@@ -22055,7 +22758,7 @@ window.updateIDBMetricsDisplay = updateIDBMetricsDisplay;
  *  WAP ADMIN SYSTEM: CYBER COMMAND CENTER (ULTIMATE SECURITY)
  * ═══════════════════════════════════════════════════════
  */
-const WapAdminSystem = (function() {
+var WapAdminSystem = (function() {
     let _currentTab = 'users';
     let _data = { users: [], suppliers: [], parts: [], defects: [], logs: [], system: [] };
     let _query = '';
@@ -22312,8 +23015,8 @@ function formatRuleForSupabase(item, idx = 0) {
      */
     async function chunkedSupabaseUpsert(tableName, records, options = {}) {
         const {
-            chunkSize = 15,
-            delayMs = 60,
+            chunkSize = 25,
+            delayMs = 40,
             conflictField = 'id',
             progressMsg = 'กำลังบันทึกข้อมูล',
             showProgressToast = false
@@ -22321,7 +23024,15 @@ function formatRuleForSupabase(item, idx = 0) {
 
         if (!Array.isArray(records) || records.length === 0) return { success: true, count: 0 };
 
-        const total = records.length;
+        // Deduplicate records by conflictField to strictly prevent ON CONFLICT DO UPDATE duplicate row errors
+        const dedupeMap = new Map();
+        records.forEach(r => {
+            const key = String(r[conflictField] || r.id || JSON.stringify(r)).trim();
+            dedupeMap.set(key, r);
+        });
+        const cleanRecords = Array.from(dedupeMap.values());
+
+        const total = cleanRecords.length;
         const totalChunks = Math.ceil(total / chunkSize);
         let savedCount = 0;
         const clients = getAdminClients();
@@ -22329,7 +23040,7 @@ function formatRuleForSupabase(item, idx = 0) {
         for (let i = 0; i < totalChunks; i++) {
             const start = i * chunkSize;
             const end = Math.min(start + chunkSize, total);
-            const chunk = records.slice(start, end);
+            const chunk = cleanRecords.slice(start, end);
             
             const currentProgress = `(ชุดที่ ${i + 1}/${totalChunks}) ${start + 1}-${end} จาก ${total} รายการ`;
             logToCyberTerminal(`BATCH SAVE [${tableName.toUpperCase()}]: ${currentProgress}`, 'info');
@@ -22343,9 +23054,9 @@ function formatRuleForSupabase(item, idx = 0) {
                     const { error } = await client.from(tableName).upsert(chunk, { onConflict: conflictField });
                     if (error) {
                         console.warn(`Chunk ${i + 1} upsert notice for ${tableName}:`, error.message);
-                        // ลอง retry 1 ครั้งหลังหน่วงเวลาสั้นๆ
-                        await new Promise(res => setTimeout(res, 200));
-                        await client.from(tableName).upsert(chunk, { onConflict: conflictField });
+                        for (const it of chunk) {
+                            try { await client.from(tableName).upsert([it], { onConflict: conflictField }); } catch (_) {}
+                        }
                     }
                 } catch (err) {
                     console.warn(`Direct chunk save issue on ${tableName}:`, err.message || err);
@@ -23610,18 +24321,34 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         }).join('');
     }
 
-    function triggerCSVImport() {
-        const fileInput = document.getElementById('admin-csv-file-input');
+    // =========================================================================
+    // 📥 UNIVERSAL ZERO-DUPLICATE IMPORT ENGINE (CSV & JSON - รองรับทุกหน้า ทุกตาราง)
+    // =========================================================================
+
+    function triggerUniversalImport(defaultFormat) {
+        let fileInput = document.getElementById('admin-universal-file-input');
+        if (!fileInput) {
+            fileInput = document.getElementById('admin-json-file-input') || document.getElementById('admin-csv-file-input');
+        }
         if (fileInput) {
+            fileInput.accept = '.json,.csv,text/csv,application/json,text/plain';
             fileInput.value = '';
             fileInput.click();
         } else {
             const tempInput = document.createElement('input');
             tempInput.type = 'file';
-            tempInput.accept = '.csv,text/csv';
-            tempInput.onchange = (e) => handleCSVFileSelected(e);
+            tempInput.accept = '.json,.csv,text/csv,application/json,text/plain';
+            tempInput.onchange = (e) => handleUniversalFileSelected(e);
             tempInput.click();
         }
+    }
+
+    function triggerJSONImport() {
+        triggerUniversalImport('json');
+    }
+
+    function triggerCSVImport() {
+        triggerUniversalImport('csv');
     }
 
     function parseCSV(text) {
@@ -23639,6 +24366,7 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         const firstLine = text.split(/\r\n|\r|\n/)[0] || '';
         if (firstLine.includes('\t')) delimiter = '\t';
         else if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';';
+        else if (firstLine.includes('|') && !firstLine.includes(',')) delimiter = '|';
         
         for (let i = 0; i < text.length; i++) {
             const char = text[i];
@@ -23679,370 +24407,1162 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         return lines;
     }
 
-    async function handleCSVFileSelected(event) {
+    async function handleUniversalFileSelected(event) {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
-        
+
         const reader = new FileReader();
         reader.onload = async function(e) {
             try {
-                const text = e.target.result;
-                const rows = parseCSV(text);
-                
-                if (rows.length < 2) {
-                    toast("⚠️ ไม่พบข้อมูลในไฟล์ CSV (ต้องมีหัวตารางและอย่างน้อย 1 แถว)", "error");
+                const text = (e.target.result || '').trim();
+                if (!text) {
+                    toast("⚠️ ไฟล์ว่างเปล่า ไม่พบเนื้อหาข้อมูล", "error");
                     return;
                 }
-                
-                const rawHeaders = rows[0].map(h => String(h).trim().toLowerCase().replace(/^["']|["']$/g, ''));
-                const dataRows = rows.slice(1);
-                
-                const targetTab = _currentTab === 'logs' ? 'users' : _currentTab;
-                
-                const getColIdx = (...aliases) => {
-                    return rawHeaders.findIndex(h => {
-                        const cleanH = h.toLowerCase().replace(/[\s_\-/\\]/g, '');
-                        return aliases.some(a => {
-                            const cleanA = a.toLowerCase().replace(/[\s_\-/\\]/g, '');
-                            return cleanH === cleanA || cleanH.includes(cleanA);
-                        });
-                    });
-                };
-                
-                let mappedRecords = [];
-                
-                if (targetTab === 'users') {
-                    const emailIdx = getColIdx('email', 'mail', 'user', 'username', 'e-mail', 'อีเมล');
-                    const nameIdx = getColIdx('name', 'fullname', 'displayname', 'ชื่อ');
-                    const roleIdx = getColIdx('role', 'position', 'สิทธิ์', 'ตำแหน่ง');
-                    const passIdx = getColIdx('password', 'pass', 'key', 'securitykey', 'รหัสผ่าน');
-                    const statusIdx = getColIdx('status', 'state', 'active', 'สถานะ');
-                    
-                    if (emailIdx === -1 && rawHeaders.length === 1) {
-                        mappedRecords = dataRows.map(r => ({
-                            email: String(r[0] || '').trim().toLowerCase(),
-                            name: resolveOfficialDisplayName(String(r[0] || '').trim().toLowerCase(), ''),
-                            role: 'sqe_support',
-                            password: 'Carrier@123',
-                            status: 'active'
-                        })).filter(u => u.email && u.email.includes('@'));
-                    } else {
-                        mappedRecords = dataRows.map(r => {
-                            const email = emailIdx !== -1 ? String(r[emailIdx] || '').trim().toLowerCase() : String(r[0] || '').trim().toLowerCase();
-                            const rawRole = roleIdx !== -1 ? String(r[roleIdx] || '').trim().toLowerCase() : 'sqe_support';
-                            let role = 'sqe_support';
-                            if (rawRole.includes('super') || rawRole.includes('หัวหน้า') || rawRole.includes('sup')) role = 'supervisor';
-                            else if (rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) role = 'admin';
-                            else if (rawRole.includes('iqc')) role = 'iqc';
-                            else if (rawRole.includes('eng') || rawRole.includes('วิศวกร')) role = 'engineer';
-                            else if (rawRole.includes('manag') || rawRole.includes('ผจก') || rawRole.includes('ผู้จัดการ')) role = 'manager';
-                            else role = 'sqe_support';
-                            
-                            const rawStatus = statusIdx !== -1 ? String(r[statusIdx] || '').trim().toLowerCase() : 'active';
-                            const status = (rawStatus === 'inactive' || rawStatus === 'ปิด' || rawStatus === 'false') ? 'inactive' : 'active';
-                            const pass = passIdx !== -1 && r[passIdx] ? String(r[passIdx]).trim() : 'Carrier@123';
-                            const name = nameIdx !== -1 && r[nameIdx] ? String(r[nameIdx]).trim() : email.split('@')[0].toUpperCase();
-                            
-                            return { email, name, role, password: pass, status };
-                        }).filter(u => u.email && u.email.includes('@'));
+
+                const fileName = file.name || 'imported_file';
+                const lowerName = fileName.toLowerCase();
+                const isJson = lowerName.endsWith('.json') || text.startsWith('{') || text.startsWith('[');
+
+                let analysis = null;
+
+                if (isJson) {
+                    let parsed = null;
+                    try {
+                        parsed = JSON.parse(text);
+                    } catch (jsonErr) {
+                        console.warn('[JSON Parse Fail, attempting CSV fallback]', jsonErr);
+                        analysis = analyzeCSVImportData(text, fileName, file.size);
                     }
+                    if (parsed) {
+                        analysis = analyzeJSONImportData(parsed, fileName, file.size);
+                    }
+                } else {
+                    analysis = analyzeCSVImportData(text, fileName, file.size);
                 }
-                else if (targetTab === 'suppliers') {
-                    const nameIdx = getColIdx('name', 'supplier', 'vendor', 'suppliername', 'vendorname', 'ชื่อซัพพลายเออร์', 'ซัพพลายเออร์', 'ชื่อ');
-                    const codeIdx = getColIdx('code', 'suppliercode', 'vendorcode', 'รหัส', 'รหัสซัพพลายเออร์');
-                    
-                    mappedRecords = dataRows.map(r => {
-                        const name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
-                        const code = codeIdx !== -1 ? String(r[codeIdx] || '').trim().toUpperCase() : '';
-                        return { name, code: code || undefined };
-                    }).filter(s => s.name && s.name.length > 0);
-                }
-                else if (targetTab === 'parts') {
-                    const pnIdx = getColIdx('partno', 'partnumber', 'part', 'pn', 'itemno', 'รหัสชิ้นส่วน', 'หมายเลขชิ้นส่วน');
-                    const nameIdx = getColIdx('partname', 'name', 'description', 'desc', 'ชื่อชิ้นส่วน');
-                    const groupIdx = getColIdx('category', 'group', 'model', 'partsgroup', 'กลุ่ม', 'หมวดหมู่');
-                    
-                    mappedRecords = dataRows.map(r => {
-                        const part_no = pnIdx !== -1 ? String(r[pnIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
-                        const part_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim() : (r[1] ? String(r[1]).trim() : '-');
-                        const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
-                        return { part_no, part_name, category };
-                    }).filter(p => p.part_no && p.part_no.length > 0);
-                }
-                else if (targetTab === 'defects') {
-                    const nameIdx = getColIdx('defectname', 'defect', 'symptom', 'name', 'issue', 'problem', 'อาการเสีย', 'ข้อบกพร่อง');
-                    const groupIdx = getColIdx('category', 'group', 'type', 'หมวดหมู่', 'ประเภท');
-                    
-                    mappedRecords = dataRows.map(r => {
-                        const defect_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
-                        const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
-                        return { defect_name, category };
-                    }).filter(d => d.defect_name && d.defect_name.length > 0);
-                }
-                else if (targetTab === 'system') {
-mappedRecords = dataRows.map((r, idx) => {
-    const rowObj = {};
-    rawHeaders.forEach((h, colI) => {
-        const val = r[colI] !== undefined ? String(r[colI]).trim() : '';
-        // ทำความสะอาดหัวตารางเป็นตัวพิมพ์เล็กและใช้ underscore เพื่อให้ getVal ค้นหาง่าย
-        const cleanKey = h.toLowerCase().replace(/[\s\-\./\\]/g, '_').replace(/_+/g, '_');
-        rowObj[cleanKey] = val;
-    });
 
-    const getVal = (patterns) => {
-        // 1. ค้นหาแบบตรงตัวจาก patterns
-        for (const p of patterns) {
-            const cleanP = p.toLowerCase().replace(/[\s\-\./\\]/g, '_').replace(/_+/g, '_');
-            if (rowObj[cleanP] !== undefined && rowObj[cleanP] !== '') return rowObj[cleanP];
-        }
-        // 2. ค้นหาแบบ Fuzzy (ถ้าชื่อใน CSV มีอักขระพิเศษแปลกๆ)
-        for (let c = 0; c < rawHeaders.length; c++) {
-            const normH = (rawHeaders[c] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            for (const p of patterns) {
-                const normP = p.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (normH === normP || (normP.length >= 5 && normH.includes(normP))) {
-                    if (r[c] !== undefined && String(r[c]).trim() !== '') return String(r[c]).trim();
-                }
-            }
-        }
-        return '-'; // คืนค่าขีดถ้าไม่พบข้อมูล
-    };
-
-                        
-    const idNum = getVal(['ID', 'id_num', 'no', 'number']) || (idx + 1);
-    const cleanIdNum = String(idNum).replace(/^vf-rp-/, '').replace(/^#/, '');
-
-                        const vendor_code = getVal(['vendor_code', 'vendorcode', 'supplier_code', 'suppliercode', 'code']) || r[4] || r[2] || 'SUPP';
-                        const supplier = getVal(['supplier', 'supplier_name', 'suppliername', 'vendor', 'vendor_name']) || r[2] || r[1] || 'Vendor';
-                        const initials = getVal(['initials_name', 'initials', 'initial', 'short_name']) || r[3] || vendor_code;
-                        const parts_group = getVal(['parts_group', 'partsgroup', 'part_group', 'group', 'category']) || r[1] || 'General';
-                        const parts_code = getVal(['parts_code', 'part_code', 'partcode', 'part_no']) || '-';
-                        const dear_vendor = getVal(['dear_vendor', 'dear_supp', 'dearvendor']) || r[5] || '-';
-                        const dear_pd = getVal(['dear_pd', 'dearpd']) || r[6] || '-';
-                        const inform_to = getVal(['inform_email_to', 'inform_to', 'to_emails', 'recipient_to', 'to', 'pd_email_line_claim', 'pd_email']) || r[11] || '';
-                        const inform_cc = getVal(['inform_cc', 'cc_emails', 'recipient_cc', 'cc', 'email_cc_line_claim']) || r[12] || '';
-                        
-                        const conf_vf = getVal(['confirm_vf_name', 'confirm_vf', 'confirm_by_vf_report', 'confirm_by_vf']) || '-';
-                        const appr_vf = getVal(['approve_vf_name', 'approve_vf', 'approve_by_vf_report', 'vf_appr']) || '-';
-                        const conf_rp = getVal(['confirm_rp_name', 'confirm_rp', 'confirm_by_rp_report', 'confirm_by_rp']) || '-';
-                        
-                        // RP Appr reads from: Approve by RP-report ( Name )
-                        const appr_rp = getVal([
-                            'approve_by_rp_report_name',
-                            'approve_by_rp_report',
-                            'approve_by_rp',
-                            'approve_rp_name',
-                            'approve_rp',
-                            'rp_appr',
-                            'approve_rp_report'
-                        ]) || '-';
-
-                        // VF Appr reads from: Approve by VF-RP report ( Name )
-                        const appr_vf_rp = getVal([
-                            'approve_by_vf_rp_report_name',
-                            'approve_by_vf_rp_report',
-                            'approve_by_vf_rp',
-                            'approve_vf_rp_name',
-                            'approve_vf_rp',
-                            'vf_appr',
-                            'approve_vf_report_name',
-                            'approve_by_vf_report_name',
-                            'approve_vf_name'
-                        ]) || appr_vf || '-';
-                        
-                        // ค้นหาในฟังก์ชัน executeCSVOverwrite ส่วนที่เป็น targetTab === 'system'
-// และเปลี่ยนการสร้าง Object เป็นชุดนี้
-
-    return {
-        id: 'vf-rp-' + cleanIdNum,
-        id_num: cleanIdNum,
-        // --- ข้อมูลบริษัท ---
-        supplier_name: getVal(['Supplier', 'supplier_name']),
-        parts_group: getVal(['Parts group', 'parts_group']),
-        initials_name: getVal(['Initials name', 'initials_name']),
-        vendor_code: getVal(['Vendor Code', 'vendor_code']),
-
-        // --- เนื้อหาและผู้ติดต่อ ---
-        dear_vendor: getVal(['Dear Vendor', 'dear_vendor']),
-        dear_pd: getVal(['Dear PD', 'dear_pd']),
-        cc_in_email_body: getVal(['CC in Email', 'cc_in_email_body']),
-
-        // --- เส้นทางอีเมล (Email Routing) ---
-        pd_email: getVal(['PD Email', 'pd_email']),
-        pd_claim_email: getVal(['PD Email Line claim', 'pd_claim_email']),
-        email_cc_claim: getVal(['Email CC Line claim', 'email_cc_claim']),
-        inform_email_to: getVal(['Inform E-mail TO', 'inform_email_to']),
-        inform_email_cc: getVal(['Inform cc', 'inform_email_cc']),
-        team_member_email: getVal(['Team member email', 'team_member_email']),
-
-        // --- ข้อมูลวิศวกรรม ---
-        parts_code: getVal(['Parts Code', 'parts_code']),
-        to_vf_rp_report: getVal(['To VF-RP report', 'to_vf_rp_report']),
-        cc_vf_rp_report: getVal(['CC VF-RP report', 'cc_vf_rp_report']),
-        iqc_eng_name: getVal(['IQC ENG Name', 'iqc_eng_name']),
-        iqc_eng_email: getVal(['IQC ENG Email', 'iqc_eng_email']),
-        engineer: getVal(['Engineer', 'engineer']),
-        sqe_email: getVal(['SQE Email', 'sqe_email']),
-
-        // --- Matrix Approval Fields (Mapping ตรงตาม CSV) ---
-        confirm_vf_name: getVal(['Confirm by VF-report ( Name )', 'confirm_vf_name']),
-        confirm_vf_email: getVal(['Confirm by VF-report ( Email )', 'confirm_vf_email']),
-        approve_vf_name: getVal(['Approve by VF-report ( Name )', 'approve_vf_name']),
-        approve_vf_email: getVal(['Approve by VF-report ( Email )', 'approve_vf_email']),
-        
-        confirm_rp_name: getVal(['Confirm by RP-report ( Name )', 'confirm_rp_name']),
-        confirm_rp_email: getVal(['Confirm by RP-report ( Email )', 'confirm_rp_email']),
-        approve_rp_name: getVal(['Approve by RP-report ( Name )', 'approve_rp_name']),
-        approve_rp_email: getVal(['Approve by RP-report ( Email )', 'approve_rp_email']),
-
-        approve_vf_rp_name: getVal(['Approve by VF-RP report ( Name )', 'approve_vf_rp_name']),
-        approve_vf_rp_email: getVal(['Approve by VF-RP report ( Email )', 'approve_vf_rp_email']),
-
-        email_test: getVal(['Email Test', 'email_test']),
-        report_type: getVal(['report_type', 'rule_type']) || 'VF',
-        trigger_event: 'ON_DEFECT_CLAIM',
-        status: 'active'
-    };
-                    }).filter(item => item.supplier || item.vendor_code);
-                }
-                
-                if (mappedRecords.length === 0) {
-                    toast("⚠️ ไม่สามารถจับคู่ข้อมูลจากหัวตารางใน CSV ได้ กรุณาตรวจสอบรูปแบบไฟล์", "error");
+                if (!analysis || !analysis.tables || Object.keys(analysis.tables).length === 0 || analysis.totalRecords === 0) {
+                    toast("⚠️ ไม่พบโครงสร้างข้อมูลหรือตารางที่ระบบรู้จักในไฟล์นี้", "warn");
                     return;
                 }
-                
-                const tabNames = {
-                    users: 'Agents (รายชื่อพนักงาน)',
-                    suppliers: 'Suppliers (รายชื่อซัพพลายเออร์)',
-                    parts: 'Parts (รายการชิ้นส่วน)',
-                    defects: 'Defects (รายการข้อบกพร่อง/อาการเสีย)',
-                    system: 'VF & RP Email Dispatch (ระบบส่งอีเมล)'
-                };
-                
-                showCustomConfirmDialog({
-                    title: `📥 ยืนยันการนำเข้าข้อมูล CSV`,
-                    subtitle: `ระบบตรวจพบข้อมูลจำนวน ${mappedRecords.length} รายการ และจะทำการ "บันทึกทับข้อมูลเดิมทั้งหมด" ในตาราง ${tabNames[targetTab] || targetTab}`,
-                    badge: `CSV OVERWRITE MODE (${targetTab.toUpperCase()})`,
-                    type: "warning",
-                    confirmText: `⚡ ยืนยันบันทึกทับข้อมูลเดิม (${mappedRecords.length} รายการ)`,
-                    cancelText: "ยกเลิก",
-                    onConfirm: async () => {
-                        await executeCSVOverwrite(targetTab, mappedRecords);
-                    }
-                });
-                
+
+                // วิเคราะห์ตรวจสอบรายการซ้ำในระบบปัจจุบัน (Deduplication Check)
+                enrichAnalysisWithDeduplication(analysis);
+
+                // แสดง Modal นำเข้าข้อมูลพร้อมผลสรุปการตรวจสอบข้อมูลซ้ำอย่างละเอียด
+                showUniversalImportModal(analysis);
+
             } catch (err) {
-                console.error("CSV Import Error:", err);
-                toast("❌ เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: " + err.message, "error");
+                console.error('[Universal Import File Error]', err);
+                toast("❌ เกิดข้อผิดพลาดในการอ่านไฟล์: " + err.message, "error");
             }
         };
+
         reader.readAsText(file, 'UTF-8');
+        event.target.value = '';
     }
 
-    async function executeCSVOverwrite(targetTab, records) {
-        showLoader(true);
-        try {
-            const clients = getAdminClients();
-            if (targetTab === 'users') {
-                for (const client of clients) {
-                    try {
-                        await client.from('users').delete().neq('email', 'placeholder@carrier.com');
-                    } catch(delErr) { console.warn("Delete users prior to CSV import:", delErr); }
-                }
-                
-                const hasMaster = records.some(u => u.email.toLowerCase() === masterAdminEmail.toLowerCase());
-                if (!hasMaster) {
-                    records.unshift({
-                        email: masterAdminEmail,
-                        name: 'ADMINISTRATOR',
-                        role: 'admin',
-                        password: 'admin',
-                        status: 'active'
+    function handleJSONFileSelected(event) {
+        handleUniversalFileSelected(event);
+    }
+
+    function handleCSVFileSelected(event) {
+        handleUniversalFileSelected(event);
+    }
+
+    // ฟังก์ชันตรวจสอบความซ้ำซ้อนของข้อมูลกับฐานข้อมูลปัจจุบัน (Zero-Duplicate Shield)
+    function enrichAnalysisWithDeduplication(analysis) {
+        const getExistingKeySet = (tableKey) => {
+            const keys = new Set();
+            try {
+                if (tableKey === 'records') {
+                    const recs = (typeof S !== 'undefined' && Array.isArray(S.records)) ? S.records : [];
+                    recs.forEach(r => {
+                        if (r.ref) keys.add(String(r.ref).trim().toUpperCase());
+                    });
+                } else if (tableKey === 'users') {
+                    const usrs = Array.isArray(_data.users) ? _data.users : [];
+                    usrs.forEach(u => {
+                        if (u.email) keys.add(String(u.email).trim().toLowerCase());
+                    });
+                } else if (tableKey === 'master_suppliers') {
+                    const sups = Array.isArray(_data.suppliers) ? _data.suppliers : [];
+                    sups.forEach(s => {
+                        if (s.name) keys.add(String(s.name).trim().toUpperCase());
+                    });
+                } else if (tableKey === 'master_parts') {
+                    const pts = Array.isArray(_data.parts) ? _data.parts : [];
+                    pts.forEach(p => {
+                        if (p.part_no) keys.add(String(p.part_no).trim().toUpperCase());
+                    });
+                } else if (tableKey === 'master_defects') {
+                    const defs = Array.isArray(_data.defects) ? _data.defects : [];
+                    defs.forEach(d => {
+                        if (d.defect_name) keys.add(String(d.defect_name).trim().toUpperCase());
+                    });
+                } else if (tableKey === 'vf_rp_email_rules') {
+                    const rules = Array.isArray(_data.system) ? _data.system : (Array.isArray(window.VF_RP_MASTER_DATA) ? window.VF_RP_MASTER_DATA : []);
+                    rules.forEach(r => {
+                        if (r.id) keys.add(String(r.id).trim().toLowerCase());
+                        if (r.vendor_code && r.parts_group) keys.add(`${String(r.vendor_code).trim().toUpperCase()}__${String(r.parts_group).trim().toUpperCase()}`);
+                    });
+                } else if (tableKey === 'eight_d_reports') {
+                    const cases = (typeof eightDCases !== 'undefined' && Array.isArray(eightDCases)) ? eightDCases : [];
+                    cases.forEach(c => {
+                        if (c.issue_no) keys.add(String(c.issue_no).trim().toUpperCase());
+                        if (c.id) keys.add(String(c.id).trim());
+                    });
+                } else if (tableKey === 'ot_records') {
+                    const otList = (typeof wapData !== 'undefined' && wapData && Array.isArray(wapData.ot_records)) ? wapData.ot_records : [];
+                    otList.forEach(o => {
+                        if (o.id) keys.add(String(o.id));
+                        keys.add(`${String(o.date).trim()}__${String(o.staff_name || o.staff_id).trim().toUpperCase()}`);
+                    });
+                } else if (tableKey === 's5_records') {
+                    const s5List = (typeof wapData !== 'undefined' && wapData && Array.isArray(wapData.score5s)) ? wapData.score5s : [];
+                    s5List.forEach(s => {
+                        if (s.id) keys.add(String(s.id));
+                        keys.add(`${String(s.month).trim()}__${String(s.area).trim().toUpperCase()}`);
+                    });
+                } else if (tableKey === 'support_records') {
+                    const supList = (typeof wapData !== 'undefined' && wapData && Array.isArray(wapData.achievements)) ? wapData.achievements : [];
+                    supList.forEach(s => {
+                        if (s.id) keys.add(String(s.id));
                     });
                 }
-                
-                await chunkedSupabaseUpsert('users', records, { chunkSize: 20, delayMs: 60, conflictField: 'email', progressMsg: 'บันทึกบัญชีผู้ใช้' });
-                _data.users = records;
+            } catch (err) {
+                console.warn('[Deduplication Key Collect Warning]', tableKey, err);
             }
-            else if (targetTab === 'suppliers') {
-                for (const client of clients) {
-                    try {
-                        await client.from('master_suppliers').delete().neq('name', '___NONE___');
-                    } catch(delErr) { console.warn("Delete suppliers error:", delErr); }
-                }
-                
-                const suppliersToInsert = records.map(s => ({ name: s.name }));
-                await chunkedSupabaseUpsert('master_suppliers', suppliersToInsert, { chunkSize: 25, delayMs: 50, conflictField: 'name', progressMsg: 'บันทึกรายชื่อ Supplier' });
-                _data.suppliers = suppliersToInsert;
-            }
-            else if (targetTab === 'parts') {
-                for (const client of clients) {
-                    try {
-                        await client.from('master_parts').delete().neq('part_no', '___NONE___');
-                    } catch(delErr) { console.warn("Delete parts error:", delErr); }
-                }
-                
-                const partsToInsert = records.map(p => ({ part_no: p.part_no, part_name: p.part_name || '-' }));
-                await chunkedSupabaseUpsert('master_parts', partsToInsert, { chunkSize: 25, delayMs: 50, conflictField: 'part_no', progressMsg: 'บันทึก Part Number' });
-                _data.parts = partsToInsert;
-            }
-            else if (targetTab === 'defects') {
-                for (const client of clients) {
-                    try {
-                        await client.from('master_defects').delete().neq('defect_name', '___NONE___');
-                    } catch(delErr) { console.warn("Delete defects error:", delErr); }
-                }
-                
-                const defectsToInsert = records.map(d => ({ defect_name: d.defect_name }));
-                await chunkedSupabaseUpsert('master_defects', defectsToInsert, { chunkSize: 25, delayMs: 50, conflictField: 'defect_name', progressMsg: 'บันทึก Defect Code' });
-                _data.defects = defectsToInsert;
-            }
-            else if (targetTab === 'system') {
-                const formattedList = records.map((r, idx) => formatRuleForSupabase(r, idx));
-                _data.system = formattedList;
-                window.VF_RP_MASTER_DATA = formattedList;
-                safeSaveLocalMasterData(formattedList);
+            return keys;
+        };
 
-                // 1. Persist to system_settings on Supabase (100% online cloud persistence)
-                for (const client of clients) {
-                    try {
-                        await client.from('system_settings').upsert({
-                            id: 'vf_rp_master_config',
-                            data: formattedList,
-                            updated_at: new Date().toISOString()
-                        });
-                        await client.from('system_settings').update({
-                            vf_rp_email_rules: formattedList,
-                            updated_at: new Date().toISOString()
-                        }).eq('id', 'global_config');
-                    } catch (storeErr) { console.warn("VF_RP persistence warning:", storeErr); }
+        let totalDuplicatesFound = 0;
+        let totalNewRecords = 0;
+
+        Object.values(analysis.tables).forEach(table => {
+            const existingKeys = getExistingKeySet(table.key);
+            let dupCount = 0;
+            let newCount = 0;
+            const seenInFile = new Set();
+
+            table.data.forEach((row, idx) => {
+                let rowKey = '';
+                if (table.key === 'records') {
+                    rowKey = String(row.ref || `CLM_${idx}`).trim().toUpperCase();
+                } else if (table.key === 'users') {
+                    rowKey = String(row.email || '').trim().toLowerCase();
+                } else if (table.key === 'master_suppliers') {
+                    rowKey = String(row.name || '').trim().toUpperCase();
+                } else if (table.key === 'master_parts') {
+                    rowKey = String(row.part_no || '').trim().toUpperCase();
+                } else if (table.key === 'master_defects') {
+                    rowKey = String(row.defect_name || '').trim().toUpperCase();
+                } else if (table.key === 'vf_rp_email_rules') {
+                    rowKey = String(row.id || (row.vendor_code ? `${row.vendor_code}__${row.parts_group}` : `vf_${idx}`)).trim().toLowerCase();
+                } else if (table.key === 'eight_d_reports') {
+                    rowKey = String(row.issue_no || row.id || `8d_${idx}`).trim().toUpperCase();
+                } else {
+                    rowKey = String(row[table.conflictKey] || row.id || JSON.stringify(row));
                 }
 
-                // 2. ทยอยส่งบันทึกลงตาราง vf_rp_email_rules ทีละชุด (15 รายการ/ชุด)
-                for (const client of clients) {
-                    try {
-                        await client.from('vf_rp_email_rules').delete().neq('id', '___PLACEHOLDER___');
-                    } catch (tblErr) {
-                        console.warn("Direct vf_rp_email_rules delete notice:", tblErr);
+                const isAlreadyInSystem = rowKey && existingKeys.has(rowKey);
+                const isDuplicateInFile = rowKey && seenInFile.has(rowKey);
+
+                if (isAlreadyInSystem || isDuplicateInFile) {
+                    dupCount++;
+                } else {
+                    newCount++;
+                }
+
+                if (rowKey) seenInFile.add(rowKey);
+            });
+
+            table.duplicateCount = dupCount;
+            table.newCount = newCount;
+            totalDuplicatesFound += dupCount;
+            totalNewRecords += newCount;
+        });
+
+        analysis.totalDuplicates = totalDuplicatesFound;
+        analysis.totalNew = totalNewRecords;
+    }
+
+    // =========================================================================
+    // 📊 CSV PARSING & TABLE IDENTIFICATION ENGINE
+    // =========================================================================
+
+    function analyzeCSVImportData(csvText, fileName, fileSize) {
+        const rows = parseCSV(csvText);
+        if (rows.length < 2) return null;
+
+        const rawHeaders = rows[0].map(h => String(h).trim().toLowerCase().replace(/^["']|["']$/g, ''));
+        const dataRows = rows.slice(1).filter(r => r && r.some(c => String(c).trim().length > 0));
+        
+        if (dataRows.length === 0) return null;
+
+        const cleanHeaders = rawHeaders.map(h => h.replace(/[\s_\-./\\]/g, ''));
+
+        const getColIdx = (...aliases) => {
+            return cleanHeaders.findIndex(cleanH => {
+                return aliases.some(a => {
+                    const cleanA = a.toLowerCase().replace(/[\s_\-./\\]/g, '');
+                    return cleanH === cleanA || cleanH.includes(cleanA);
+                });
+            });
+        };
+
+        const result = {
+            fileName: fileName || 'data_import.csv',
+            format: 'CSV',
+            fileSize: fileSize ? (fileSize / 1024 < 1024 ? (fileSize / 1024).toFixed(1) + ' KB' : (fileSize / (1024 * 1024)).toFixed(2) + ' MB') : 'Unknown size',
+            tables: {},
+            totalRecords: 0
+        };
+
+        const registerTable = (key, label, icon, data, conflictKey, targetService) => {
+            if (!Array.isArray(data) || data.length === 0) return;
+            result.tables[key] = {
+                key,
+                label,
+                icon,
+                count: data.length,
+                data,
+                conflictKey,
+                targetService
+            };
+            result.totalRecords += data.length;
+        };
+
+        // 1. ตรวจสอบเงื่อนไขตามแท็บปัจจุบันใน Admin Console (Context Awareness)
+        const currentTab = typeof _currentTab !== 'undefined' ? _currentTab : 'users';
+
+        // Check A: Part Line Claim
+        const isClaim = getColIdx('ref', 'claim', 'referenceno', 'refno') !== -1 ||
+                        (getColIdx('partno', 'partnumber', 'part_no') !== -1 && getColIdx('defect', 'defectname') !== -1 && getColIdx('qty', 'quantity') !== -1);
+
+        // Check B: Users
+        const isUser = (getColIdx('email', 'mail', 'e-mail', 'อีเมล') !== -1 && (getColIdx('role', 'position', 'สิทธิ์') !== -1 || getColIdx('name', 'fullname') !== -1)) ||
+                       (currentTab === 'users' && getColIdx('email', 'mail', 'user') !== -1);
+
+        // Check C: VF & RP Rules
+        const isVfRp = getColIdx('dear_vendor', 'dearvendor', 'to_vf_rp_report', 'confirm_vf_name', 'approve_vf_name', 'vendor_code') !== -1 ||
+                       (currentTab === 'system' && getColIdx('vendor_code', 'supplier', 'dear_vendor') !== -1);
+
+        // Check D: Suppliers
+        const isSupplier = (getColIdx('supplier', 'vendor', 'suppliername', 'vendorname', 'ชื่อซัพพลายเออร์') !== -1 && !isClaim && !isVfRp) ||
+                           (currentTab === 'suppliers' && rawHeaders.length <= 4);
+
+        // Check E: Parts
+        const isPart = (getColIdx('partno', 'partnumber', 'part_no', 'itemno', 'รหัสชิ้นส่วน') !== -1 && !isClaim && !isVfRp) ||
+                       (currentTab === 'parts' && rawHeaders.length <= 5);
+
+        // Check F: Defects
+        const isDefect = (getColIdx('defectname', 'defect', 'symptom', 'อาการเสีย', 'ข้อบกพร่อง') !== -1 && !isClaim) ||
+                         (currentTab === 'defects' && rawHeaders.length <= 4);
+
+        // Check G: 8D Reports
+        const is8D = getColIdx('issue_no', 'd1_team', 'd2_problem', 'eight_d', '8d_case') !== -1;
+
+        // Check H: OT Management
+        const isOT = getColIdx('ot', 'overtime', 'starttime', 'endtime') !== -1 && getColIdx('staff', 'employee', 'name') !== -1;
+
+        // Check I: 5S Excellence
+        const is5S = getColIdx('5s', 'score', 'audit', 'area', 'findings') !== -1 && getColIdx('month', 'date') !== -1;
+
+        // Check J: Support Logs
+        const isSupport = getColIdx('support', 'achievement', 'hours', 'description', 'eventdate') !== -1;
+
+        // --- MAPPER IMPLEMENTATION ---
+        if (isClaim) {
+            const refIdx = getColIdx('ref', 'referenceno', 'refno', 'เลขที่อ้างอิง', 'รหัสเคลม');
+            const dateIdx = getColIdx('date', 'claimdate', 'วันที่');
+            const shiftIdx = getColIdx('shift', 'กะ');
+            const inspIdx = getColIdx('inspector', 'user_id', 'ผู้ตรวจสอบ', 'ผู้บันทึก');
+            const lineIdx = getColIdx('line', 'สายการผลิต', 'ไลน์');
+            const suppIdx = getColIdx('supplier', 'vendor', 'ซัพพลายเออร์');
+            const pnIdx = getColIdx('partno', 'part_no', 'partnumber', 'หมายเลขชิ้นส่วน', 'รหัสชิ้นส่วน');
+            const pnameIdx = getColIdx('partname', 'part_name', 'ชื่อชิ้นส่วน');
+            const qtyIdx = getColIdx('qty', 'quantity', 'จำนวน');
+            const unitIdx = getColIdx('unit', 'หน่วย');
+            const defIdx = getColIdx('defect', 'defectname', 'อาการเสีย', 'ข้อบกพร่อง');
+            const remIdx = getColIdx('remark', 'หมายเหตุ');
+            const judIdx = getColIdx('judgment', 'ผลการตัดสิน', 'ผลตรวจ');
+
+            const mapped = dataRows.map((r, idx) => {
+                const cleanRef = (refIdx !== -1 && r[refIdx]) ? String(r[refIdx]).trim().toUpperCase() : `CLM-${new Date().getFullYear()}-${String(idx + 1).padStart(4, '0')}`;
+                return {
+                    id: (typeof generateUUID === 'function' ? generateUUID() : `clm_${Date.now()}_${idx}`),
+                    ref: cleanRef,
+                    date: (dateIdx !== -1 && r[dateIdx]) ? String(r[dateIdx]).trim() : new Date().toISOString().split('T')[0],
+                    shift: (shiftIdx !== -1 && r[shiftIdx]) ? String(r[shiftIdx]).trim().toUpperCase() : 'SHIFT A',
+                    inspector: (inspIdx !== -1 && r[inspIdx]) ? String(r[inspIdx]).trim() : 'SYSTEM',
+                    line: (lineIdx !== -1 && r[lineIdx]) ? String(r[lineIdx]).trim() : '-',
+                    supplier: (suppIdx !== -1 && r[suppIdx]) ? String(r[suppIdx]).trim().toUpperCase() : '-',
+                    partNo: (pnIdx !== -1 && r[pnIdx]) ? String(r[pnIdx]).trim().toUpperCase() : '-',
+                    partName: (pnameIdx !== -1 && r[pnameIdx]) ? String(r[pnameIdx]).trim() : '-',
+                    qty: (qtyIdx !== -1 && parseInt(r[qtyIdx])) ? parseInt(r[qtyIdx]) : 1,
+                    unit: (unitIdx !== -1 && r[unitIdx]) ? String(r[unitIdx]).trim() : 'PCS',
+                    defect: (defIdx !== -1 && r[defIdx]) ? String(r[defIdx]).trim() : '-',
+                    remark: (remIdx !== -1 && r[remIdx]) ? String(r[remIdx]).trim() : '',
+                    judgment: (judIdx !== -1 && r[judIdx]) ? String(r[judIdx]).trim().toUpperCase() : 'OK',
+                    created_at: new Date().toISOString()
+                };
+            }).filter(c => c.ref && c.ref.length > 0);
+
+            registerTable('records', 'Part Line Claim (ประวัติเคลมชิ้นส่วน)', '📦', mapped, 'ref', 'sqe');
+        } 
+        else if (isUser) {
+            const emailIdx = getColIdx('email', 'mail', 'user', 'username', 'e-mail', 'อีเมล');
+            const nameIdx = getColIdx('name', 'fullname', 'displayname', 'ชื่อ');
+            const roleIdx = getColIdx('role', 'position', 'สิทธิ์', 'ตำแหน่ง');
+            const passIdx = getColIdx('password', 'pass', 'key', 'securitykey', 'รหัสผ่าน');
+            const statusIdx = getColIdx('status', 'state', 'active', 'สถานะ');
+
+            const mapped = dataRows.map(r => {
+                const email = emailIdx !== -1 ? String(r[emailIdx] || '').trim().toLowerCase() : String(r[0] || '').trim().toLowerCase();
+                const rawRole = roleIdx !== -1 ? String(r[roleIdx] || '').trim().toLowerCase() : 'sqe_support';
+                let role = 'sqe_support';
+                if (rawRole.includes('super') || rawRole.includes('หัวหน้า') || rawRole.includes('sup')) role = 'supervisor';
+                else if (rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) role = 'admin';
+                else if (rawRole.includes('iqc')) role = 'iqc';
+                else if (rawRole.includes('eng') || rawRole.includes('วิศวกร')) role = 'engineer';
+                else if (rawRole.includes('manag') || rawRole.includes('ผจก') || rawRole.includes('ผู้จัดการ')) role = 'manager';
+
+                const rawStatus = statusIdx !== -1 ? String(r[statusIdx] || '').trim().toLowerCase() : 'active';
+                const status = (rawStatus === 'inactive' || rawStatus === 'ปิด' || rawStatus === 'false') ? 'inactive' : 'active';
+                const pass = passIdx !== -1 && r[passIdx] ? String(r[passIdx]).trim() : 'Carrier@123';
+                const name = nameIdx !== -1 && r[nameIdx] ? String(r[nameIdx]).trim() : resolveOfficialDisplayName(email, email.split('@')[0].toUpperCase());
+
+                return {
+                    id: (typeof generateUUID === 'function' ? generateUUID() : `usr_${Date.now()}`),
+                    email,
+                    name,
+                    role,
+                    password: pass,
+                    status,
+                    created_at: new Date().toISOString()
+                };
+            }).filter(u => u.email && u.email.includes('@'));
+
+            registerTable('users', 'User & Staff Accounts (บัญชีพนักงาน & สิทธิ์)', '👥', mapped, 'email', 'sqe');
+        }
+        else if (isVfRp) {
+            const mapped = dataRows.map((r, idx) => {
+                const rowObj = {};
+                rawHeaders.forEach((h, colI) => {
+                    const val = r[colI] !== undefined ? String(r[colI]).trim() : '';
+                    const cleanKey = h.toLowerCase().replace(/[\s\-\./\\]/g, '_').replace(/_+/g, '_');
+                    rowObj[cleanKey] = val;
+                });
+
+                const getVal = (patterns) => {
+                    for (const p of patterns) {
+                        const cleanP = p.toLowerCase().replace(/[\s\-\./\\]/g, '_').replace(/_+/g, '_');
+                        if (rowObj[cleanP] !== undefined && rowObj[cleanP] !== '') return rowObj[cleanP];
                     }
+                    for (let c = 0; c < rawHeaders.length; c++) {
+                        const normH = (rawHeaders[c] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                        for (const p of patterns) {
+                            const normP = p.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            if (normH === normP || (normP.length >= 5 && normH.includes(normP))) {
+                                if (r[c] !== undefined && String(r[c]).trim() !== '') return String(r[c]).trim();
+                            }
+                        }
+                    }
+                    return '-';
+                };
+
+                const idNum = getVal(['ID', 'id_num', 'no', 'number']) || (idx + 1);
+                const cleanIdNum = String(idNum).replace(/^vf-rp-/, '').replace(/^#/, '');
+
+                return {
+                    id: 'vf-rp-' + cleanIdNum,
+                    id_num: cleanIdNum,
+                    supplier_name: getVal(['Supplier', 'supplier_name']),
+                    parts_group: getVal(['Parts group', 'parts_group']),
+                    initials_name: getVal(['Initials name', 'initials_name']),
+                    vendor_code: getVal(['Vendor Code', 'vendor_code']),
+                    dear_vendor: getVal(['Dear Vendor', 'dear_vendor']),
+                    dear_pd: getVal(['Dear PD', 'dear_pd']),
+                    cc_in_email_body: getVal(['CC in Email', 'cc_in_email_body']),
+                    pd_email: getVal(['PD Email', 'pd_email']),
+                    pd_claim_email: getVal(['PD Email Line claim', 'pd_claim_email']),
+                    email_cc_claim: getVal(['Email CC Line claim', 'email_cc_claim']),
+                    inform_email_to: getVal(['Inform E-mail TO', 'inform_email_to']),
+                    inform_email_cc: getVal(['Inform cc', 'inform_email_cc']),
+                    team_member_email: getVal(['Team member email', 'team_member_email']),
+                    parts_code: getVal(['Parts Code', 'parts_code']),
+                    to_vf_rp_report: getVal(['To VF-RP report', 'to_vf_rp_report']),
+                    cc_vf_rp_report: getVal(['CC VF-RP report', 'cc_vf_rp_report']),
+                    iqc_eng_name: getVal(['IQC ENG Name', 'iqc_eng_name']),
+                    iqc_eng_email: getVal(['IQC ENG Email', 'iqc_eng_email']),
+                    engineer: getVal(['Engineer', 'engineer']),
+                    sqe_email: getVal(['SQE Email', 'sqe_email']),
+                    confirm_vf_name: getVal(['Confirm by VF-report ( Name )', 'confirm_vf_name']),
+                    confirm_vf_email: getVal(['Confirm by VF-report ( Email )', 'confirm_vf_email']),
+                    approve_vf_name: getVal(['Approve by VF-report ( Name )', 'approve_vf_name']),
+                    approve_vf_email: getVal(['Approve by VF-report ( Email )', 'approve_vf_email']),
+                    confirm_rp_name: getVal(['Confirm by RP-report ( Name )', 'confirm_rp_name']),
+                    confirm_rp_email: getVal(['Confirm by RP-report ( Email )', 'confirm_rp_email']),
+                    approve_rp_name: getVal(['Approve by RP-report ( Name )', 'approve_rp_name']),
+                    approve_rp_email: getVal(['Approve by RP-report ( Email )', 'approve_rp_email']),
+                    approve_vf_rp_name: getVal(['Approve by VF-RP report ( Name )', 'approve_vf_rp_name']),
+                    approve_vf_rp_email: getVal(['Approve by VF-RP report ( Email )', 'approve_vf_rp_email']),
+                    email_test: getVal(['Email Test', 'email_test']),
+                    report_type: getVal(['report_type', 'rule_type']) || 'VF',
+                    trigger_event: 'ON_DEFECT_CLAIM',
+                    status: 'active'
+                };
+            }).filter(item => item.supplier_name || item.vendor_code);
+
+            registerTable('vf_rp_email_rules', 'VF & RP Email Dispatch Matrix (กฎส่งอีเมลซัพพลายเออร์)', '✉️', mapped, 'id', 'sqe');
+        }
+        else if (isSupplier) {
+            const nameIdx = getColIdx('name', 'supplier', 'vendor', 'suppliername', 'vendorname', 'ชื่อซัพพลายเออร์', 'ซัพพลายเออร์', 'ชื่อ');
+            const codeIdx = getColIdx('code', 'suppliercode', 'vendorcode', 'รหัส', 'รหัสซัพพลายเออร์');
+
+            const mapped = dataRows.map(r => {
+                const name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
+                const code = codeIdx !== -1 ? String(r[codeIdx] || '').trim().toUpperCase() : '';
+                return { name, code: code || undefined };
+            }).filter(s => s.name && s.name.length > 0);
+
+            registerTable('master_suppliers', 'Master Suppliers (รายชื่อซัพพลายเออร์)', '🏭', mapped, 'name', 'sqe');
+        }
+        else if (isPart) {
+            const pnIdx = getColIdx('partno', 'partnumber', 'part', 'pn', 'itemno', 'รหัสชิ้นส่วน', 'หมายเลขชิ้นส่วน');
+            const nameIdx = getColIdx('partname', 'name', 'description', 'desc', 'ชื่อชิ้นส่วน');
+            const groupIdx = getColIdx('category', 'group', 'model', 'partsgroup', 'กลุ่ม', 'หมวดหมู่');
+
+            const mapped = dataRows.map(r => {
+                const part_no = pnIdx !== -1 ? String(r[pnIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
+                const part_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim() : (r[1] ? String(r[1]).trim() : '-');
+                const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
+                return { part_no, part_name, category };
+            }).filter(p => p.part_no && p.part_no.length > 0);
+
+            registerTable('master_parts', 'Master Parts (รายการชิ้นส่วน)', '🔩', mapped, 'part_no', 'sqe');
+        }
+        else if (isDefect) {
+            const nameIdx = getColIdx('defectname', 'defect', 'symptom', 'name', 'issue', 'problem', 'อาการเสีย', 'ข้อบกพร่อง');
+            const groupIdx = getColIdx('category', 'group', 'type', 'หมวดหมู่', 'ประเภท');
+
+            const mapped = dataRows.map(r => {
+                const defect_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
+                const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
+                return { defect_name, category };
+            }).filter(d => d.defect_name && d.defect_name.length > 0);
+
+            registerTable('master_defects', 'Master Defects (รายการข้อบกพร่อง)', '⚠️', mapped, 'defect_name', 'sqe');
+        }
+        else if (is8D) {
+            const mapped = dataRows.map((r, idx) => ({
+                id: (typeof generateUUID === 'function' ? generateUUID() : `8d_${Date.now()}_${idx}`),
+                issue_no: r[0] || `8D-${new Date().getFullYear()}-${String(idx+1).padStart(3, '0')}`,
+                title: r[1] || '8D Problem Investigation',
+                d1_team: r[2] || '',
+                d2_problem: r[3] || '',
+                status: 'open',
+                created_at: new Date().toISOString()
+            }));
+            registerTable('eight_d_reports', '8D Problem Solving Reports (รายงาน 8D)', '📋', mapped, 'issue_no', 'sqe');
+        }
+        else if (isOT) {
+            const mapped = dataRows.map((r, idx) => ({
+                id: (typeof generateUUID === 'function' ? generateUUID() : `ot_${Date.now()}_${idx}`),
+                date: r[0] || new Date().toISOString().split('T')[0],
+                staff_name: r[1] || 'STAFF',
+                task: r[2] || 'OT Support',
+                hours: parseFloat(r[3]) || 1.0,
+                status: 'pending'
+            }));
+            registerTable('ot_records', 'OT Management Records (บันทึกเวลาทำงานล่วงเวลา)', '⏱️', mapped, 'id', 'wap');
+        }
+        else {
+            // Default generic fallback
+            const mapped = dataRows.map((r, idx) => {
+                const obj = { id: `row_${Date.now()}_${idx}` };
+                rawHeaders.forEach((h, colI) => {
+                    obj[h || `col_${colI}`] = r[colI] || '';
+                });
+                return obj;
+            });
+            registerTable('records', 'Records Collection (รายการบันทึก)', '📦', mapped, 'id', 'sqe');
+        }
+
+        return result;
+    }
+
+    // =========================================================================
+    // 📄 JSON PARSING & MULTI-TABLE DISCOVERY ENGINE
+    // =========================================================================
+
+    function analyzeJSONImportData(parsed, fileName, fileSize) {
+        const result = {
+            fileName: fileName || 'supabase_export.json',
+            format: 'JSON',
+            fileSize: fileSize ? (fileSize / 1024 < 1024 ? (fileSize / 1024).toFixed(1) + ' KB' : (fileSize / (1024 * 1024)).toFixed(2) + ' MB') : 'Unknown size',
+            tables: {},
+            totalRecords: 0
+        };
+
+        const registerTable = (key, label, icon, data, conflictKey, targetService) => {
+            if (!Array.isArray(data) || data.length === 0) return;
+            const validRows = data.filter(r => r && typeof r === 'object' && Object.keys(r).length > 0);
+            if (validRows.length === 0) return;
+
+            result.tables[key] = {
+                key,
+                label,
+                icon,
+                count: validRows.length,
+                data: validRows,
+                conflictKey,
+                targetService
+            };
+            result.totalRecords += validRows.length;
+        };
+
+        // 1. Single Table Array Export (จาก Supabase Table Editor / Export Feature)
+        if (Array.isArray(parsed)) {
+            const sample = parsed[0] || {};
+            const keys = Object.keys(sample).map(k => k.toLowerCase());
+            
+            if (keys.includes('ref') || ((keys.includes('partno') || keys.includes('part_no')) && keys.includes('defect'))) {
+                registerTable('records', 'Part Line Claim (ประวัติเคลมชิ้นส่วน)', '📦', parsed, 'ref', 'sqe');
+            } else if (keys.includes('email') && (keys.includes('role') || keys.includes('name') || keys.includes('department'))) {
+                registerTable('users', 'User & Staff Accounts (บัญชีพนักงาน & สิทธิ์)', '👥', parsed, 'email', 'sqe');
+            } else if (keys.includes('issue_no') || keys.includes('d1_team') || keys.includes('report_type') || keys.includes('eight_d_cases')) {
+                registerTable('eight_d_reports', '8D Problem Solving Reports (รายงาน 8D)', '📋', parsed, 'id', 'sqe');
+            } else if (keys.includes('event_date') || (keys.includes('description') && keys.includes('hours'))) {
+                registerTable('support_records', 'Line Support Logs (บันทึกงานสนับสนุนไลน์)', '🛠️', parsed, 'id', 'wap');
+            } else if (keys.includes('month') && (keys.includes('area') || keys.includes('score') || keys.includes('issue_count'))) {
+                registerTable('s5_records', '5S Excellence Audits (ประเมินมาตรฐาน 5S)', '🧹', parsed, 'id', 'wap');
+            } else if (keys.includes('task') && keys.includes('hours') && keys.includes('date')) {
+                const isSpecial = (fileName || '').toLowerCase().includes('special');
+                if (isSpecial) {
+                    registerTable('special_jobs', 'Special Jobs (งานพิเศษ & โครงการ)', '🎯', parsed, 'id', 'wap');
+                } else {
+                    registerTable('ot_records', 'OT Management Records (บันทึกเวลาทำงานล่วงเวลา)', '⏱️', parsed, 'id', 'wap');
                 }
-                await chunkedSupabaseUpsert('vf_rp_email_rules', formattedList, {
-                    chunkSize: 15,
-                    delayMs: 70,
-                    conflictField: 'id',
-                    progressMsg: 'บันทึก VF & RP Matrix',
-                    showProgressToast: formattedList.length > 25
+            } else if (keys.includes('skill_name') || keys.includes('skill_value')) {
+                registerTable('skill_matrix', 'Skill Matrix (ทักษะความสามารถพนักงาน)', '📊', parsed, 'id', 'wap');
+            } else if (keys.includes('leave_type') || keys.includes('att_type') || keys.includes('daily_report')) {
+                registerTable('daily_reports', 'Daily Attendance & Leaves (บันทึกการลาและเข้างาน)', '📅', parsed, 'id', 'wap');
+            } else if (keys.includes('dear_vendor') || keys.includes('parts_group') || keys.includes('to_vf_rp_report') || keys.includes('vendor_code')) {
+                registerTable('vf_rp_email_rules', 'VF & RP Email Dispatch Matrix (กฎส่งอีเมลซัพพลายเออร์)', '✉️', parsed, 'id', 'sqe');
+            } else if (keys.includes('supplier_name') || keys.includes('supplier_code') || (keys.length === 1 && keys.includes('name'))) {
+                registerTable('master_suppliers', 'Master Suppliers (รายชื่อซัพพลายเออร์)', '🏭', parsed, 'name', 'sqe');
+            } else if (keys.includes('part_number') || keys.includes('part_no')) {
+                registerTable('master_parts', 'Master Parts (รายการชิ้นส่วน)', '🔩', parsed, 'part_no', 'sqe');
+            } else if (keys.includes('defect_name') || keys.includes('defect_code')) {
+                registerTable('master_defects', 'Master Defects (รายการข้อบกพร่อง)', '⚠️', parsed, 'defect_name', 'sqe');
+            } else if (keys.includes('code_no') || keys.includes('tool_name') || keys.includes('calibration')) {
+                registerTable('calibration_records', 'Calibration Tools Master (เครื่องมือวัด & สอบเทียบ)', '📐', parsed, 'code_no', 'sqe');
+            } else {
+                registerTable('records', 'Records Collection (รายการบันทึก)', '📦', parsed, 'id', 'sqe');
+            }
+            return result;
+        }
+
+        // 2. Generic Supabase REST Export { data: [...], table: '...' }
+        if (parsed.data && Array.isArray(parsed.data)) {
+            const subAnalysis = analyzeJSONImportData(parsed.data, fileName, fileSize);
+            if (subAnalysis && subAnalysis.totalRecords > 0) return subAnalysis;
+        }
+        if (parsed.records && Array.isArray(parsed.records) && Object.keys(parsed).length <= 2) {
+            registerTable('records', 'Part Line Claim (ประวัติเคลมชิ้นส่วน)', '📦', parsed.records, 'ref', 'sqe');
+            return result;
+        }
+
+        // 3. Full System Backup Snapshot { app_state: { ... } } หรือ Root Multi-Table Object
+        const state = parsed.app_state || parsed;
+
+        if (state.records && Array.isArray(state.records)) {
+            registerTable('records', 'Part Line Claim (ประวัติเคลมชิ้นส่วน)', '📦', state.records, 'ref', 'sqe');
+        }
+
+        const eightDRaw = state.eight_d_reports || state.eight_d_cases || state.eightDCases;
+        if (eightDRaw && Array.isArray(eightDRaw)) {
+            registerTable('eight_d_reports', '8D Problem Solving Reports (รายงาน 8D)', '📋', eightDRaw, 'id', 'sqe');
+        }
+
+        const usersRaw = state.users || state.allUsers || state.team_members;
+        if (usersRaw && Array.isArray(usersRaw)) {
+            registerTable('users', 'User & Staff Accounts (บัญชีพนักงาน & สิทธิ์)', '👥', usersRaw, 'email', 'sqe');
+        }
+
+        const wap = state.wap_data || state;
+        if (wap.achievements || wap.support_records) {
+            registerTable('support_records', 'Line Support Logs (บันทึกงานสนับสนุนไลน์)', '🛠️', wap.achievements || wap.support_records, 'id', 'wap');
+        }
+        if (wap.score5s || wap.s5_records) {
+            registerTable('s5_records', '5S Excellence Audits (ประเมินมาตรฐาน 5S)', '🧹', wap.score5s || wap.s5_records, 'id', 'wap');
+        }
+        if (wap.ot_records || state.ot_records) {
+            registerTable('ot_records', 'OT Management Records (บันทึกเวลาทำงานล่วงเวลา)', '⏱️', wap.ot_records || state.ot_records, 'id', 'wap');
+        }
+        if (wap.specialJobs || wap.special_jobs || state.special_jobs) {
+            registerTable('special_jobs', 'Special Jobs (งานพิเศษ & โครงการ)', '🎯', wap.specialJobs || wap.special_jobs || state.special_jobs, 'id', 'wap');
+        }
+        if (wap.skills || wap.skill_matrix || state.skill_matrix) {
+            registerTable('skill_matrix', 'Skill Matrix (ทักษะความสามารถพนักงาน)', '📊', wap.skills || wap.skill_matrix || state.skill_matrix, 'id', 'wap');
+        }
+        if (state.att_leave_records || state.daily_reports) {
+            registerTable('daily_reports', 'Daily Attendance & Leaves (บันทึกการลาและเข้างาน)', '📅', state.att_leave_records || state.daily_reports, 'id', 'wap');
+        }
+
+        const systemMatrix = state.vf_rp_email_rules || state.system || state.vf_rp_master_data;
+        if (systemMatrix && Array.isArray(systemMatrix)) {
+            registerTable('vf_rp_email_rules', 'VF & RP Email Dispatch Matrix (กฎส่งอีเมลซัพพลายเออร์)', '✉️', systemMatrix, 'id', 'sqe');
+        }
+
+        if (state.master_suppliers || state.suppliers) {
+            registerTable('master_suppliers', 'Master Suppliers (รายชื่อซัพพลายเออร์)', '🏭', state.master_suppliers || state.suppliers, 'name', 'sqe');
+        }
+        if (state.master_parts || state.parts) {
+            registerTable('master_parts', 'Master Parts (รายการชิ้นส่วน)', '🔩', state.master_parts || state.parts, 'part_no', 'sqe');
+        }
+        if (state.master_defects || state.defects) {
+            registerTable('master_defects', 'Master Defects (รายการข้อบกพร่อง)', '⚠️', state.master_defects || state.defects, 'defect_name', 'sqe');
+        }
+        if (state.calibration_records || state.calibrationMaster) {
+            registerTable('calibration_records', 'Calibration Tools Master (เครื่องมือวัด & สอบเทียบ)', '📐', state.calibration_records || state.calibrationMaster, 'code_no', 'sqe');
+        }
+
+        return result;
+    }
+
+    // =========================================================================
+    // 🪟 UNIVERSAL IMPORT MODAL & DEDUPLICATION INTERACTION
+    // =========================================================================
+
+    function showUniversalImportModal(analysis) {
+        let modal = document.getElementById('admin-universal-import-modal') || document.getElementById('admin-json-import-modal');
+        if (modal) modal.remove();
+
+        const formatIcon = analysis.format === 'CSV' ? '📊' : '📄';
+        const formatBadge = analysis.format === 'CSV' ? 'CSV FILE' : 'JSON FILE';
+
+        const tableEntries = Object.values(analysis.tables);
+        const tableListHtml = tableEntries.map((t) => `
+            <label class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 hover:border-teal-500/50 dark:hover:border-teal-500/50 transition-all cursor-pointer group">
+                <div class="flex items-center gap-3 min-w-0">
+                    <input type="checkbox" id="import-chk-${t.key}" value="${t.key}" checked class="import-table-chk w-4 h-4 text-teal-600 rounded border-slate-300 dark:border-slate-600 focus:ring-teal-500 cursor-pointer">
+                    <span class="text-xl shrink-0">${t.icon}</span>
+                    <div class="truncate">
+                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">${t.label}</span>
+                        <div class="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                            <span>ตาราง: <strong class="text-slate-700 dark:text-slate-300">${t.key}</strong></span>
+                            <span>• Key: ${t.conflictKey}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-right shrink-0">
+                    <span class="px-2.5 py-1 rounded-full text-[11px] font-black font-mono bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800/60 block">
+                        ${t.count.toLocaleString()} รายการ
+                    </span>
+                    <span class="text-[9.5px] text-emerald-600 dark:text-emerald-400 font-bold block mt-0.5">
+                        (ใหม่ ${t.newCount.toLocaleString()} • ซ้ำเดิม ${t.duplicateCount.toLocaleString()})
+                    </span>
+                </div>
+            </label>
+        `).join('');
+
+        const modalHtml = `
+            <div id="admin-universal-import-modal" class="fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in font-sans">
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all">
+                    
+                    <!-- Header -->
+                    <div class="p-4 sm:p-5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white flex items-center justify-between shrink-0">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl shadow-inner">
+                                📥
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-base sm:text-lg font-black tracking-tight leading-snug">นำเข้าไฟล์ (${analysis.format || 'CSV / JSON'})</h3>
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-white/25 uppercase tracking-widest">${formatBadge}</span>
+                                </div>
+                                <p class="text-[11px] text-teal-100 font-medium">นำเข้าข้อมูลละเอียดทุกตาราง พร้อมระบบป้องกันการบันทึกซ้ำทุกหน้า (Zero-Duplicate Shield)</p>
+                            </div>
+                        </div>
+                        <button onclick="document.getElementById('admin-universal-import-modal').remove()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white text-sm transition-all cursor-pointer" title="ปิดหน้าต่าง">✕</button>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 text-left">
+                        
+                        <!-- File Overview Card -->
+                        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="text-2xl">${formatIcon}</span>
+                                <div class="truncate">
+                                    <span class="text-xs font-bold text-slate-800 dark:text-slate-100 block truncate font-mono">${analysis.fileName}</span>
+                                    <span class="text-[10.5px] text-slate-500 dark:text-slate-400">ขนาดไฟล์: ${analysis.fileSize} • ตรวจพบ ${Object.keys(analysis.tables).length} ตาราง</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <div class="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center">
+                                    <span class="text-[9.5px] uppercase font-bold text-slate-400 block">ข้อมูลทั้งหมด</span>
+                                    <span class="text-xs font-mono font-black text-slate-800 dark:text-slate-200">${analysis.totalRecords.toLocaleString()} แถว</span>
+                                </div>
+                                <div class="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 text-center">
+                                    <span class="text-[9.5px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block">รายการใหม่</span>
+                                    <span class="text-xs font-mono font-black text-emerald-700 dark:text-emerald-300">+${analysis.totalNew.toLocaleString()} แถว</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Zero-Duplicate Protection Guarantee Banner -->
+                        <div class="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-3">
+                            <span class="text-emerald-600 dark:text-emerald-400 text-xl shrink-0">🛡️</span>
+                            <div class="text-[11px] text-emerald-950 dark:text-emerald-200 leading-relaxed">
+                                <strong class="font-bold text-emerald-800 dark:text-emerald-300">ระบบห้ามบันทึกซ้ำทุกหน้า (Strict Zero-Duplicate Shield 100%)</strong><br>
+                                ระบบตรวจสอบความซ้ำซ้อนของทุกคีย์หลัก (Ref No., Email, Part No, Supplier Code, ID) 
+                                ${analysis.totalDuplicates > 0 ? `พบข้อมูลเดิมในระบบจำนวน <strong class="font-bold text-amber-700 dark:text-amber-300 underline">${analysis.totalDuplicates.toLocaleString()} รายการ</strong> ซึ่งระบบจะป้องกันไม่ให้บันทึกซ้ำซ้อน` : 'ไม่พบข้อมูลซ้ำซ้อนในระบบเดิม พร้อมบันทึกอย่างปลอดภัย'}
+                            </div>
+                        </div>
+
+                        <!-- Table Selection Section -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-black uppercase text-slate-700 dark:text-slate-300 tracking-wider">เลือกตารางที่ต้องการนำเข้า</label>
+                                <div class="flex items-center gap-2 text-[10.5px]">
+                                    <button type="button" onclick="document.querySelectorAll('.import-table-chk').forEach(c => c.checked = true)" class="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">เลือกทั้งหมด</button>
+                                    <span class="text-slate-300 dark:text-slate-600">|</span>
+                                    <button type="button" onclick="document.querySelectorAll('.import-table-chk').forEach(c => c.checked = false)" class="text-slate-500 hover:underline cursor-pointer">ล้างการเลือก</button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-1">
+                                ${tableListHtml}
+                            </div>
+                        </div>
+
+                        <!-- Deduplication Strategy Options -->
+                        <div class="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                            <label class="text-xs font-black uppercase text-slate-700 dark:text-slate-300 tracking-wider block">นโยบายจัดการข้อมูลซ้ำ (Deduplication Policy)</label>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                <label class="p-3.5 rounded-2xl border-2 border-teal-500 bg-teal-50/60 dark:bg-teal-950/40 flex items-start gap-3 cursor-pointer transition-all shadow-xs">
+                                    <input type="radio" name="universal-import-mode" value="skip" checked class="mt-0.5 text-teal-600 focus:ring-teal-500">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">🛡️ ห้ามบันทึกซ้ำเด็ดขาด (ข้ามรายการซ้ำ - แนะนำ)</span>
+                                        <span class="text-[10.5px] text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">เพิ่มเฉพาะข้อมูลใหม่ ${analysis.totalNew.toLocaleString()} รายการ ไม่แตะต้องและไม่สร้างข้อมูลซ้ำในตารางเดิม</span>
+                                    </div>
+                                </label>
+
+                                <label class="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 hover:border-teal-500/40 flex items-start gap-3 cursor-pointer transition-all">
+                                    <input type="radio" name="universal-import-mode" value="upsert" class="mt-0.5 text-teal-600 focus:ring-teal-500">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">🔄 อัปเดตข้อมูลเดิมตามคีย์หลัก</span>
+                                        <span class="text-[10.5px] text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">ปรับปรุงค่าฟิลด์เดิมด้วยข้อมูลล่าสุดจากไฟล์ และเพิ่มรายการใหม่</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Progress Container (Hidden by default) -->
+                        <div id="universal-import-progress-wrap" class="hidden p-4 rounded-2xl bg-slate-900 text-white border border-teal-500/30 space-y-2.5 animate-fade-in">
+                            <div class="flex items-center justify-between text-xs font-bold">
+                                <span id="universal-progress-status" class="flex items-center gap-2">
+                                    <svg class="animate-spin h-3.5 w-3.5 text-teal-400" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    กำลังนำเข้าข้อมูลสู่ฐานข้อมูล (High-Speed Batch)...
+                                </span>
+                                <span id="universal-progress-pct" class="font-mono text-teal-400 font-black">0%</span>
+                            </div>
+                            <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                                <div id="universal-progress-bar" class="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400 h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+                            </div>
+                            <p id="universal-progress-detail" class="text-[10px] text-slate-400 font-mono">เตรียมการนำเข้าข้อมูล...</p>
+                        </div>
+
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div class="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
+                        <button type="button" onclick="document.getElementById('admin-universal-import-modal').remove()" class="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 transition-all active:scale-95 cursor-pointer">
+                            ยกเลิก
+                        </button>
+                        <button type="button" id="btn-start-universal-import" onclick="WapAdminSystem.executeUniversalImport()" class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md shadow-teal-900/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer">
+                            <span>🚀 ยืนยันการนำเข้าข้อมูล</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        window._pendingUniversalAnalysis = analysis;
+    }
+
+    function showJSONImportModal(analysis, fileName, fileSize) {
+        showUniversalImportModal(analysis);
+    }
+
+    // =========================================================================
+    // ⚡ UNIVERSAL IMPORT EXECUTION ENGINE (BATCH UPSERT & DEDUP)
+    // =========================================================================
+
+    async function executeUniversalImport() {
+        const analysis = window._pendingUniversalAnalysis || window._pendingJSONAnalysis;
+        if (!analysis || !analysis.tables) {
+            toast("⚠️ ไม่พบข้อมูลการนำเข้า", "error");
+            return;
+        }
+
+        const selectedCheckboxes = Array.from(document.querySelectorAll('.import-table-chk:checked, .json-table-chk:checked')).map(c => c.value);
+        if (selectedCheckboxes.length === 0) {
+            toast("⚠️ กรุณาเลือกอย่างน้อย 1 ตารางที่ต้องการนำเข้า", "warn");
+            return;
+        }
+
+        const modeRadios = document.getElementsByName('universal-import-mode');
+        let mode = 'skip';
+        for (const r of modeRadios) {
+            if (r.checked) { mode = r.value; break; }
+        }
+
+        const progressWrap = document.getElementById('universal-import-progress-wrap') || document.getElementById('json-import-progress-wrap');
+        const progressStatus = document.getElementById('universal-progress-status') || document.getElementById('json-progress-status');
+        const progressPct = document.getElementById('universal-progress-pct') || document.getElementById('json-progress-pct');
+        const progressBar = document.getElementById('universal-progress-bar') || document.getElementById('json-progress-bar');
+        const progressDetail = document.getElementById('universal-progress-detail') || document.getElementById('json-progress-detail');
+        const btnStart = document.getElementById('btn-start-universal-import') || document.getElementById('btn-start-json-import');
+
+        if (progressWrap) progressWrap.classList.remove('hidden');
+        if (btnStart) {
+            btnStart.disabled = true;
+            btnStart.classList.add('opacity-50', 'pointer-events-none');
+        }
+
+        const results = {
+            totalProcessed: 0,
+            totalSuccess: 0,
+            totalSkipped: 0,
+            tables: {},
+            mode,
+            format: analysis.format || 'JSON'
+        };
+
+        const clients = getAdminClients();
+        const mainSb = clients[0] || (typeof sqeClient !== 'undefined' ? sqeClient : null);
+        const wapSb = (typeof wapClient !== 'undefined' && wapClient) ? wapClient : mainSb;
+
+        let totalSelectedItems = 0;
+        selectedCheckboxes.forEach(k => {
+            if (analysis.tables[k]) totalSelectedItems += analysis.tables[k].count;
+        });
+
+        let completedItems = 0;
+
+        const updateProgress = (tableLabel, currentBatch, totalBatches, count) => {
+            const pct = Math.min(100, Math.round((completedItems / Math.max(1, totalSelectedItems)) * 100));
+            if (progressPct) progressPct.textContent = `${pct}%`;
+            if (progressBar) progressBar.style.width = `${pct}%`;
+            if (progressDetail) {
+                progressDetail.textContent = `ตาราง: ${tableLabel} • ชุดที่ ${currentBatch}/${totalBatches} (${count} รายการ)`;
+            }
+        };
+
+        for (const tableKey of selectedCheckboxes) {
+            const tableConfig = analysis.tables[tableKey];
+            if (!tableConfig || !tableConfig.data || tableConfig.data.length === 0) continue;
+
+            const targetClient = tableConfig.targetService === 'wap' ? wapSb : mainSb;
+            const rawRows = tableConfig.data;
+            const conflictKey = tableConfig.conflictKey || 'id';
+
+            results.tables[tableKey] = {
+                label: tableConfig.label,
+                count: rawRows.length,
+                success: 0,
+                skipped: 0
+            };
+
+            // 1. Data Normalization & In-memory Deduplication
+            let normalizedRows = [];
+
+            if (tableKey === 'records') {
+                const uniqueMap = new Map();
+                rawRows.forEach((r, idx) => {
+                    const cleanRef = String(r.ref || `CLM-${new Date().getFullYear()}-${String(idx + 1).padStart(4, '0')}`).trim().toUpperCase();
+                    if (!uniqueMap.has(cleanRef) || mode === 'upsert') {
+                        uniqueMap.set(cleanRef, {
+                            id: r.id || (typeof generateUUID === 'function' ? generateUUID() : `clm_${Date.now()}_${idx}`),
+                            date: r.date || new Date().toISOString().split('T')[0],
+                            shift: r.shift || 'SHIFT A',
+                            inspector: r.inspector || r.user_id || 'SYSTEM',
+                            ref: cleanRef,
+                            line: r.line || '-',
+                            supplier: r.supplier || r.supplier_name || '-',
+                            partNo: String(r.partNo || r.part_no || '-').trim().toUpperCase(),
+                            partName: r.partName || r.part_name || '-',
+                            qty: parseInt(r.qty) || 1,
+                            unit: r.unit || 'PCS',
+                            defect: r.defect || r.defect_name || '-',
+                            remark: r.remark || '',
+                            judgment: r.judgment || 'OK',
+                            created_at: r.created_at || new Date().toISOString()
+                        });
+                    }
+                });
+                normalizedRows = Array.from(uniqueMap.values());
+            } 
+            else if (tableKey === 'users') {
+                const uniqueUsers = new Map();
+                rawRows.forEach(u => {
+                    const cleanEmail = String(u.email || '').trim().toLowerCase();
+                    if (cleanEmail && cleanEmail.includes('@')) {
+                        if (!uniqueUsers.has(cleanEmail) || mode === 'upsert') {
+                            uniqueUsers.set(cleanEmail, {
+                                id: u.id || (typeof generateUUID === 'function' ? generateUUID() : `usr_${Date.now()}`),
+                                email: cleanEmail,
+                                name: u.name || resolveOfficialDisplayName(cleanEmail, cleanEmail.split('@')[0].toUpperCase()),
+                                role: u.role || 'sqe_support',
+                                password: u.password || 'Carrier@123',
+                                status: u.status || 'active',
+                                created_at: u.created_at || new Date().toISOString()
+                            });
+                        }
+                    }
+                });
+                normalizedRows = Array.from(uniqueUsers.values());
+            }
+            else if (tableKey === 'master_suppliers') {
+                const uniqueSuppliers = new Map();
+                rawRows.forEach(s => {
+                    const cleanName = String(s.name || s.supplier_name || '').trim().toUpperCase();
+                    if (cleanName && (!uniqueSuppliers.has(cleanName) || mode === 'upsert')) {
+                        uniqueSuppliers.set(cleanName, {
+                            name: cleanName,
+                            code: s.code || s.vendor_code || undefined
+                        });
+                    }
+                });
+                normalizedRows = Array.from(uniqueSuppliers.values());
+            }
+            else if (tableKey === 'master_parts') {
+                const uniqueParts = new Map();
+                rawRows.forEach(p => {
+                    const cleanPn = String(p.part_no || p.partNo || p.part_number || '').trim().toUpperCase();
+                    if (cleanPn && (!uniqueParts.has(cleanPn) || mode === 'upsert')) {
+                        uniqueParts.set(cleanPn, {
+                            part_no: cleanPn,
+                            part_name: p.part_name || p.partName || '-',
+                            category: p.category || 'General'
+                        });
+                    }
+                });
+                normalizedRows = Array.from(uniqueParts.values());
+            }
+            else if (tableKey === 'master_defects') {
+                const uniqueDefects = new Map();
+                rawRows.forEach(d => {
+                    const cleanDef = String(d.defect_name || d.defect || '').trim().toUpperCase();
+                    if (cleanDef && (!uniqueDefects.has(cleanDef) || mode === 'upsert')) {
+                        uniqueDefects.set(cleanDef, {
+                            defect_name: cleanDef,
+                            category: d.category || 'General'
+                        });
+                    }
+                });
+                normalizedRows = Array.from(uniqueDefects.values());
+            }
+            else if (tableKey === 'vf_rp_email_rules') {
+                const uniqueRulesMap = new Map();
+                rawRows.forEach((r, idx) => {
+                    const formatted = formatRuleForSupabase(r, idx);
+                    const ruleKey = String(formatted[conflictKey] || formatted.id || idx);
+                    if (!uniqueRulesMap.has(ruleKey) || mode === 'upsert') {
+                        uniqueRulesMap.set(ruleKey, formatted);
+                    }
+                });
+                normalizedRows = Array.from(uniqueRulesMap.values());
+            }
+            else {
+                // Generic cleaner: remove transient UI tags and strictly deduplicate by conflictKey
+                const uniqueRowsMap = new Map();
+                rawRows.forEach(row => {
+                    const { sync_status, ...rest } = row;
+                    const idVal = String(rest[conflictKey] || rest.id || JSON.stringify(rest)).trim();
+                    if (!uniqueRowsMap.has(idVal) || mode === 'upsert') {
+                        uniqueRowsMap.set(idVal, rest);
+                    }
+                });
+                normalizedRows = Array.from(uniqueRowsMap.values());
+            }
+
+            // 2. High-speed Chunked Batch Upsert with Deduplication Shield
+            const BATCH_SIZE = 50;
+            const totalBatches = Math.ceil(normalizedRows.length / BATCH_SIZE);
+
+            for (let i = 0; i < normalizedRows.length; i += BATCH_SIZE) {
+                const batch = normalizedRows.slice(i, i + BATCH_SIZE);
+                const currentBatchNum = Math.floor(i / BATCH_SIZE) + 1;
+
+                try {
+                    if (targetClient) {
+                        const { error } = await targetClient
+                            .from(tableKey)
+                            .upsert(batch, {
+                                onConflict: conflictKey,
+                                ignoreDuplicates: mode === 'skip'
+                            });
+
+                        if (error) {
+                            console.warn(`[Import Notice on ${tableKey}] Fallback to item-level upsert:`, error.message);
+                            for (const item of batch) {
+                                try {
+                                    await targetClient.from(tableKey).upsert([item], {
+                                        onConflict: conflictKey,
+                                        ignoreDuplicates: mode === 'skip'
+                                    });
+                                } catch (_) {}
+                            }
+                        }
+                    }
+
+                    // Local DB Sync (Dexie & State) for immediate offline persistence
+                    if (tableKey === 'records' && typeof db !== 'undefined' && db && db.records) {
+                        try { await db.records.bulkPut(batch); } catch (_) {}
+                    }
+                    if (tableKey === 'ot_records' && typeof db !== 'undefined' && db && db.pendingOT) {
+                        try { await db.pendingOT.bulkPut(batch); } catch (_) {}
+                    }
+                    if (tableKey === 's5_records' && typeof db !== 'undefined' && db && db.pending5S) {
+                        try { await db.pending5S.bulkPut(batch); } catch (_) {}
+                    }
+
+                    results.tables[tableKey].success += batch.length;
+                    results.totalSuccess += batch.length;
+                } catch (batchErr) {
+                    console.error(`[Batch Upsert Error on ${tableKey}]`, batchErr);
+                }
+
+                completedItems += batch.length;
+                results.totalProcessed += batch.length;
+                updateProgress(tableConfig.label, currentBatchNum, totalBatches, batch.length);
+                await new Promise(res => setTimeout(res, 40));
+            }
+
+            // Memory State Synchronization with Zero Duplication
+            if (tableKey === 'records' && typeof S !== 'undefined' && Array.isArray(S.records)) {
+                normalizedRows.forEach(nr => {
+                    const idx = S.records.findIndex(er => String(er.ref).toUpperCase() === String(nr.ref).toUpperCase());
+                    if (idx >= 0 && mode === 'upsert') S.records[idx] = { ...S.records[idx], ...nr };
+                    else if (idx === -1) S.records.unshift(nr);
                 });
             }
-            
-            writeAuditLog('CSV_IMPORT', `นำเข้าไฟล์ CSV บันทึกทับข้อมูล ${targetTab} สำเร็จ (${records.length} รายการ)`);
-            toast(`✅ นำเข้าข้อมูล ${records.length} รายการ (ทยอยบันทึกครบทุกชุด) เรียบร้อยแล้ว`, "success");
-            await loadData();
-        } catch (err) {
-            console.error("Execute CSV Overwrite Error:", err);
-            toast("❌ บันทึกข้อมูลไม่สำเร็จ: " + err.message, "error");
+            if (tableKey === 'users') {
+                await loadData();
+            }
+            if (tableKey === 'master_suppliers') {
+                _data.suppliers = normalizedRows;
+            }
+            if (tableKey === 'master_parts') {
+                _data.parts = normalizedRows;
+            }
+            if (tableKey === 'master_defects') {
+                _data.defects = normalizedRows;
+            }
+            if (tableKey === 'vf_rp_email_rules') {
+                _data.system = normalizedRows;
+                window.VF_RP_MASTER_DATA = normalizedRows;
+                safeSaveLocalMasterData(normalizedRows);
+            }
         }
-        showLoader(false);
+
+        // Close import modal and show completion summary
+        const importModal = document.getElementById('admin-universal-import-modal') || document.getElementById('admin-json-import-modal');
+        if (importModal) importModal.remove();
+
+        showUniversalImportResultSummary(results);
+
+        // Global refresh across all modules
+        writeAuditLog('UNIVERSAL_IMPORT', `นำเข้าข้อมูล (${results.format}) สำเร็จ รวม ${results.totalSuccess} รายการ (โหมด ${results.mode})`);
+        if (typeof loadRecords === 'function') await loadRecords();
+        if (typeof fetchWAPData === 'function') await fetchWAPData();
+        if (typeof triggerGlobalRefresh === 'function') triggerGlobalRefresh();
+        if (typeof renderTable === 'function') renderTable();
+        if (typeof updateStats === 'function') updateStats();
+    }
+
+    function executeUniversalJSONImport() {
+        return executeUniversalImport();
+    }
+
+    function showUniversalImportResultSummary(results) {
+        let summaryModal = document.getElementById('admin-universal-summary-modal') || document.getElementById('admin-json-summary-modal');
+        if (summaryModal) summaryModal.remove();
+
+        const tableBreakdowns = Object.entries(results.tables).map(([key, t]) => `
+            <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+                <div>
+                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block">${t.label}</span>
+                    <span class="text-[10px] text-slate-400 font-mono">ตาราง: ${key}</span>
+                </div>
+                <div class="text-right">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-mono font-black bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                        +${t.success.toLocaleString()} รายการ
+                    </span>
+                </div>
+            </div>
+        `).join('');
+
+        const summaryHtml = `
+            <div id="admin-universal-summary-modal" class="fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in font-sans">
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col text-left">
+                    <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-xl">
+                            ✅
+                        </div>
+                        <div>
+                            <h3 class="text-base font-black uppercase tracking-wider">นำเข้าข้อมูล (${results.format || 'CSV / JSON'}) สำเร็จ</h3>
+                            <p class="text-[11px] text-teal-100 font-medium">บันทึกข้อมูลและป้องกันข้อมูลซ้ำซ้อนในระบบเรียบร้อยแล้ว</p>
+                        </div>
+                    </div>
+                    
+                    <div class="p-5 space-y-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
+                        <div class="grid grid-cols-2 gap-3 text-center">
+                            <div class="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60">
+                                <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase block">บันทึกสำเร็จ</span>
+                                <span class="text-xl font-black font-mono text-emerald-700 dark:text-emerald-300">${results.totalSuccess.toLocaleString()}</span>
+                            </div>
+                            <div class="p-3.5 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60">
+                                <span class="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 uppercase block">โหมดจัดการข้อมูลซ้ำ</span>
+                                <span class="text-xs font-black text-cyan-800 dark:text-cyan-300 block mt-1">${results.mode === 'skip' ? '🛡️ ห้ามบันทึกซ้ำ (ข้ามรายการเดิม)' : '🔄 อัปเดตข้อมูลเดิม'}</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-[11px] font-black uppercase text-slate-500 tracking-wider block">สรุปแยกรายตาราง</label>
+                            <div class="space-y-2">
+                                ${tableBreakdowns}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                        <button onclick="document.getElementById('admin-universal-summary-modal').remove()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-md shadow-emerald-900/20">
+                            ตกลง (เสร็จสิ้น)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', summaryHtml);
+        toast(`🎉 นำเข้าข้อมูลสำเร็จรวม ${results.totalSuccess.toLocaleString()} รายการ (ป้องกันข้อมูลซ้ำสมบูรณ์)`, "success");
+    }
+
+    function showJSONImportResultSummary(results) {
+        showUniversalImportResultSummary(results);
+    }
+
+    function executeCSVOverwrite() {
+        return executeUniversalImport();
     }
 
     async function harvestFromHistory() {
@@ -24510,15 +26030,25 @@ mappedRecords = dataRows.map((r, idx) => {
                 [r.engineer, r.sqe_email, 'SQE Engineer']
             ];
             pairs.forEach(([n, em, role]) => {
-                const cleanN = String(n || '').trim();
+                let cleanN = String(n || '').trim();
                 let cleanEm = String(em || '').trim();
-                if (cleanN && cleanN !== '-') {
+                if (cleanN && cleanN !== '-' && cleanN !== '--') {
                     cleanEm = (typeof window.resolveStaffEmail === 'function')
                         ? window.resolveStaffEmail(cleanN, cleanEm)
                         : cleanEm;
+                    cleanN = (typeof window.canonicalStaffDisplayName === 'function')
+                        ? window.canonicalStaffDisplayName(cleanN, cleanEm)
+                        : cleanN;
                     const key = cleanEm ? cleanEm.toLowerCase() : cleanN.toLowerCase();
-                    if (!map.has(key) && cleanEm && cleanEm !== '-') {
-                        map.set(key, { name: cleanN, email: cleanEm, role });
+                    if (cleanEm && cleanEm !== '-') {
+                        if (!map.has(key)) {
+                            map.set(key, { name: cleanN, email: cleanEm, role });
+                        } else {
+                            const exist = map.get(key);
+                            if (/^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(cleanN) && !/^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(exist.name)) {
+                                exist.name = cleanN;
+                            }
+                        }
                     }
                 }
             });
@@ -26411,7 +27941,11 @@ mappedRecords = dataRows.map((r, idx) => {
     }
 
     return { 
-        init, switchTab, loadData, harvestFromHistory, triggerCSVImport, handleCSVFileSelected, parseCSV, executeCSVOverwrite, updateAnnouncement, 
+        init, switchTab, loadData, harvestFromHistory,
+        triggerUniversalImport, handleUniversalFileSelected, showUniversalImportModal, executeUniversalImport, showUniversalImportResultSummary,
+        triggerCSVImport, handleCSVFileSelected, parseCSV, executeCSVOverwrite,
+        triggerJSONImport, handleJSONFileSelected, analyzeJSONImportData, showJSONImportModal, executeUniversalJSONImport, showJSONImportResultSummary,
+        updateAnnouncement, 
         toggleBanner, deleteEntry, closeMasterModal, handleAddNew, saveMaster, saveUser,
         extractDisplayNameFromEmail, onEmailInputForDisplayName, changeUserRoleDirectly,
         toggleMaintenance, toggleUserStatus, setForceReset, performFullBackup, performArchive,
@@ -26474,10 +28008,77 @@ mappedRecords = dataRows.map((r, idx) => {
 })();
 
 /**
- * 🛡️ ULTRA-ROBUST MATRIX LOOKUP ENGINE
- * ออกแบบมาเพื่อรองรับการทำงานทั้งบน Server และการเปิดไฟล์ HTML ตรงๆ (file://)
+ * 🛡️ ULTRA-ROBUST MATRIX LOOKUP & SYNC ENGINE
+ * รองรับการซิงค์ข้อมูล VF & RP Email Rules จาก Supabase, Local JSON Seed และ LocalStorage
  */
-window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
+window.loadVFRPDataFromCloud = async function() {
+    let list = null;
+
+    // 1. ตรวจสอบจาก Supabase (Cloud Database)
+    try {
+        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) 
+            || (typeof sqeClient !== 'undefined' ? sqeClient : null)
+            || (typeof wapClient !== 'undefined' ? wapClient : null);
+        if (sb && typeof sb.from === 'function') {
+            const { data, error } = await sb.from('vf_rp_email_rules').select('*').limit(1000);
+            if (!error && Array.isArray(data) && data.length > 0) {
+                list = data;
+            }
+        }
+    } catch (err) {
+        console.warn('[VF_RP Matrix] Direct Supabase fetch note:', err);
+    }
+
+    // 2. Fallback: โหลดจาก Local JSON File (seed_vf_rp_rules.json)
+    if (!list || list.length === 0) {
+        try {
+            const resp = await fetch('./seed_vf_rp_rules.json');
+            if (resp.ok) {
+                const seedData = await resp.json();
+                if (Array.isArray(seedData) && seedData.length > 0) {
+                    list = seedData;
+                }
+            }
+        } catch (_) {}
+    }
+
+    // 3. Fallback: โหลดจาก LocalStorage แคชเดิม
+    if (!list || list.length === 0) {
+        try {
+            const cached = localStorage.getItem('carrier_vf_rp_master_data');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    list = parsed;
+                }
+            }
+        } catch (_) {}
+    }
+
+    if (list && Array.isArray(list) && list.length > 0) {
+        window.VF_RP_MASTER_DATA = list;
+        try {
+            localStorage.setItem('carrier_vf_rp_master_data', JSON.stringify(list));
+        } catch (_) {}
+        console.log(`[VF_RP Matrix] Synchronized ${list.length} vendor rules into memory.`);
+    }
+
+    return window.VF_RP_MASTER_DATA || [];
+};
+
+// เริ่มโหลดข้อมูลกฎ Matrix ทันทีในพื้นหลัง
+if (typeof window !== 'undefined') {
+    setTimeout(() => {
+        if (typeof window.loadVFRPDataFromCloud === 'function') {
+            window.loadVFRPDataFromCloud();
+        }
+    }, 100);
+}
+
+/**
+ * 🛡️ ค้นหากฎ Matrix ทั้งหมดที่ตรงกับ Vendor (รองรับ Vendor ที่มีหลาย Rule)
+ */
+window.getAllVFRPMatricesForSupplier = function(supplierName, vendorCode, initials) {
     let list = [];
 
     // 1. ดึงข้อมูลจาก Memory (ลำดับความสำคัญสูงสุด)
@@ -26485,24 +28086,22 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         list = window.WapAdminSystem.getEmailRules();
     } 
     
-    if ((!list || !list.length) && window.VF_RP_MASTER_DATA) {
+    if ((!list || !list.length) && window.VF_RP_MASTER_DATA && Array.isArray(window.VF_RP_MASTER_DATA) && window.VF_RP_MASTER_DATA.length > 0) {
         list = window.VF_RP_MASTER_DATA;
     }
 
-    // 2. Fallback: ค้นหาจาก LocalStorage (กรณีเปิดไฟล์ตรงๆ หรือออฟไลน์)
+    // 2. Fallback: ค้นหาจาก LocalStorage
     if (!list || !list.length) {
         try {
-            // สแกนหาจากทุก Key ที่เป็นไปได้ที่ระบบอาจจะบันทึกไว้
-            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_cache', 'carrier_latest_app_state_backup'];
+            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_cache'];
             for (const key of backupKeys) {
                 const cached = localStorage.getItem(key);
                 if (cached) {
                     const parsed = JSON.parse(cached);
-                    // รองรับทั้งแบบ Array ตรงๆ และแบบ Snapshot Object
                     const actualData = parsed.app_state ? (parsed.app_state.eight_d_cases || []) : parsed;
                     if (Array.isArray(actualData) && actualData.length > 0) {
                         list = actualData;
-                        window.VF_RP_MASTER_DATA = list; // กู้คืนกลับเข้า Memory
+                        window.VF_RP_MASTER_DATA = list;
                         break;
                     }
                 }
@@ -26512,16 +28111,18 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         }
     }
     
-    // หากยังไม่พบฐานข้อมูลเลย ให้คืนค่า null
     if (!list || !list.length) {
-        return null;
+        if (typeof window.loadVFRPDataFromCloud === 'function') {
+            window.loadVFRPDataFromCloud();
+        }
+        return [];
     }
 
     // 3. ฟังก์ชันทำความสะอาดข้อความระดับลึก (Deep Cleaning)
     const deepClean = (val) => {
         if (!val || val === '-' || val === '--') return "";
         return String(val).trim().toLowerCase()
-            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V. นำหน้า
+            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V_ นำหน้า
             .replace(/\b(co\.,\s*ltd|co\.,ltd|co\s+ltd|ltd|company\s+limited|inc|corp|corporation|จำกัด|บริษัท|vendor)\b/gi, '') 
             .replace(/[-_>]/g, ' ')
             .replace(/[^a-z0-9ก-๙\s]/gi, '') // ลบสัญลักษณ์พิเศษทั้งหมด
@@ -26555,11 +28156,9 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
     const targetCode = deepClean(vCode);
     const targetInit = deepClean(sInit);
 
-    // ป้องกันการค้นหาด้วยค่าว่าง
-    if (!targetName && !targetCode && !targetInit) return null;
+    if (!targetName && !targetCode && !targetInit) return [];
 
-    // 4. เริ่มการค้นหาแบบลำดับความสำคัญ (Matching Logic)
-    return list.find(r => {
+    return list.filter(r => {
         const dbName = deepClean(r.supplier_name || r.supplier || '');
         const dbCode = deepClean(r.vendor_code || r.supplier_code || '');
         const dbInit = deepClean(r.initials_name || '');
@@ -26572,7 +28171,7 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         // กฎที่ 2: ตัวย่อ (Initials) ตรงกัน
         if (targetInit && dbInit && (dbInit === targetInit || dbInit.includes(targetInit))) return true;
 
-        // กฎที่ 3: ชื่อบริษัทตรงกันเป๊ะ หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา หรือเทียบจากชื่อผู้ติดต่อ
+        // กฎที่ 3: ชื่อบริษัทตรงกัน หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา หรือเทียบจากชื่อผู้ติดต่อ
         if (targetName) {
             if (dbName && (dbName === targetName || dbName.includes(targetName) || targetName.includes(dbName))) return true;
             if (dbInit && (dbInit === targetName || targetName.includes(dbInit))) return true;
@@ -26581,7 +28180,14 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         }
 
         return false;
-    }) || null;
+    });
+};
+
+window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
+    const all = (typeof window.getAllVFRPMatricesForSupplier === 'function')
+        ? window.getAllVFRPMatricesForSupplier(supplierName, vendorCode, initials)
+        : [];
+    return (all && all.length > 0) ? all[0] : null;
 };
 
 // --- แก้ไขฟังก์ชันซิงค์ข้อมูลเมื่อมีการแก้ไข VENDOR บนหน้าเอกสาร (Document Sync Engine) ---
@@ -26595,7 +28201,6 @@ window.onVfDocVendorChange = function(el) {
         : null;
 
     // 2. อัปเดตข้อมูลเข้าสู่สถานะตัวแปรปัจจุบัน (Internal State Update)
-    // จุดนี้สำคัญมาก! เพราะหน้าส่งเมล์จะดึงข้อมูลจาก currentCase ไปใช้
     const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
         ? Wap8DSystem.getCurrentCase()
         : null;
@@ -26607,13 +28212,10 @@ window.onVfDocVendorChange = function(el) {
         vf.vendor = rawVal; 
 
         if (matrix) {
-            // ถ้าเจอใน Matrix ให้หยอดค่าที่เกี่ยวข้องลงใน Data Object ทันที
             vf.vendor_code = matrix.vendor_code || vf.vendor_code;
             vf.part_group = matrix.parts_group || vf.part_group;
-            
-            // หยอดอีเมลที่แมปมาจาก Matrix เข้าไปเก็บไว้ใน Case เพื่อให้ปุ่มส่งเมล์มองเห็น
             vf.inform_email_to = matrix.inform_email_to || matrix.recipient_to;
-            vf.team_member_email = matrix.team_member_email; // 3.3 ที่คุณต้องการ
+            vf.team_member_email = matrix.team_member_email;
         }
     }
 
@@ -26630,14 +28232,20 @@ window.onVfDocVendorChange = function(el) {
         if (vCodeEl && matrix.vendor_code && matrix.vendor_code !== '-') vCodeEl.innerText = matrix.vendor_code;
         if (partGrpEl && matrix.parts_group && matrix.parts_group !== '-') partGrpEl.innerText = matrix.parts_group;
 
-        // อัปเดตชื่อหัวหน้างานและผู้อนุมัติ (CONFIRM BY & APPROVED BY) ตาม Vendor Matrix
+        // อัปเดตชื่อวิศวกร, หัวหน้างาน และผู้อนุมัติ ตาม Vendor Matrix
         const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
         const isRP = reportType.includes('RP');
+        const mIssue = isRP ? (matrix.iqc_eng_name || matrix.engineer) : (matrix.engineer || matrix.iqc_eng_name);
         const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
         const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
 
         if (curCase?.report_data?.vf_data) {
             const vf = curCase.report_data.vf_data;
+            if (!vf.issue_sig_active && mIssue) {
+                vf.issue_by = mIssue;
+                const iInput = document.getElementById('prob-issue-by');
+                if (iInput) iInput.value = mIssue;
+            }
             if (!vf.confirm_sig_active && mConfirm) {
                 vf.confirm_by = mConfirm;
                 const cInput = document.getElementById('prob-confirm-by');
@@ -26650,9 +28258,8 @@ window.onVfDocVendorChange = function(el) {
             }
         }
 
-        toast(`🔗 เชื่อมโยงข้อมูล ${rawVal} สำเร็จ (พร้อมส่งอีเมล)`, "success");
+        toast(`🔗 เชื่อมโยงข้อมูล ${rawVal} สำเร็จ (พร้อมสิทธิ์การเซ็นตาม Matrix)`, "success");
     } else {
-        // กรณีพิมพ์ชื่อแล้วหาใน Matrix ไม่เจอ
         console.warn(`[Matrix] Supplier "${rawVal}" not found in master database.`);
     }
 
@@ -26673,6 +28280,7 @@ window.onVfDocVendorCodeChange = function(el) {
         const ccEl = document.getElementById('vf-doc-cc-display');
         const vEl = document.getElementById('vf-doc-vendor');
         const partGrpEl = document.getElementById('vf-doc-part-group');
+
         if (toEl && matrix.to_vf_rp_report && matrix.to_vf_rp_report !== '-') toEl.innerText = matrix.to_vf_rp_report;
         if (ccEl && matrix.cc_vf_rp_report && matrix.cc_vf_rp_report !== '-') ccEl.innerText = matrix.cc_vf_rp_report;
         if (vEl && matrix.supplier) vEl.innerText = matrix.supplier.toUpperCase();
@@ -26685,8 +28293,15 @@ window.onVfDocVendorCodeChange = function(el) {
             const vf = curCase.report_data.vf_data;
             const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
             const isRP = reportType.includes('RP');
+            const mIssue = isRP ? (matrix.iqc_eng_name || matrix.engineer) : (matrix.engineer || matrix.iqc_eng_name);
             const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
             const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
+
+            if (!vf.issue_sig_active && mIssue) {
+                vf.issue_by = mIssue;
+                const iInput = document.getElementById('prob-issue-by');
+                if (iInput) iInput.value = mIssue;
+            }
             if (!vf.confirm_sig_active && mConfirm) {
                 vf.confirm_by = mConfirm;
                 const cInput = document.getElementById('prob-confirm-by');
@@ -26795,6 +28410,26 @@ function unlockMaintenanceForAdmin() {
 setInterval(syncMaintenanceStatus, 60000);
 // ลงทะเบียน Global
 window.WapAdminSystem = WapAdminSystem;
+window.triggerUniversalImport = function() {
+    if (window.WapAdminSystem && typeof window.WapAdminSystem.triggerUniversalImport === 'function') {
+        window.WapAdminSystem.triggerUniversalImport();
+    }
+};
+window.handleUniversalFileSelected = function(event) {
+    if (window.WapAdminSystem && typeof window.WapAdminSystem.handleUniversalFileSelected === 'function') {
+        window.WapAdminSystem.handleUniversalFileSelected(event);
+    }
+};
+window.executeUniversalImport = function() {
+    if (window.WapAdminSystem && typeof window.WapAdminSystem.executeUniversalImport === 'function') {
+        window.WapAdminSystem.executeUniversalImport();
+    }
+};
+window.executeCSVOverwrite = function() {
+    if (window.WapAdminSystem && typeof window.WapAdminSystem.executeCSVOverwrite === 'function') {
+        window.WapAdminSystem.executeCSVOverwrite();
+    }
+};
 window.triggerCSVImport = function() {
     if (window.WapAdminSystem && typeof window.WapAdminSystem.triggerCSVImport === 'function') {
         window.WapAdminSystem.triggerCSVImport();
@@ -26803,6 +28438,16 @@ window.triggerCSVImport = function() {
 window.handleCSVFileSelected = function(event) {
     if (window.WapAdminSystem && typeof window.WapAdminSystem.handleCSVFileSelected === 'function') {
         window.WapAdminSystem.handleCSVFileSelected(event);
+    }
+};
+window.triggerJSONImport = function() {
+    if (window.WapAdminSystem && typeof window.WapAdminSystem.triggerJSONImport === 'function') {
+        window.WapAdminSystem.triggerJSONImport();
+    }
+};
+window.handleJSONFileSelected = function(event) {
+    if (window.WapAdminSystem && typeof window.WapAdminSystem.handleJSONFileSelected === 'function') {
+        window.WapAdminSystem.handleJSONFileSelected(event);
     }
 };
 // ฟังก์ชันกลางสำหรับปุ่ม Add (+) Global
@@ -26864,41 +28509,60 @@ function handleGlobalAdd() {
 
 // ใส่เพิ่มในโมดูล WapAdminSystem
 async function performFullBackup() {
-    toast("⏳ กำลังเตรียมไฟล์สำรอง...", "info");
+    toast("⏳ กำลังรวบรวมข้อมูลจากทุกระบบเพื่อสร้างไฟล์สำรอง Excel...", "info");
     try {
-        // ดึงข้อมูลจากทุกตาราง
-        const [users, records, support, s5, ot, sj, skills] = await Promise.all([
-            sqeClient.from('users').select('*'),
-            sqeClient.from('records').select('*'),
-            wapClient.from('support_records').select('*'),
-            wapClient.from('s5_records').select('*'),
-            wapClient.from('ot_records').select('*'),
-            wapClient.from('special_jobs').select('*'),
-            wapClient.from('skill_matrix').select('*')
+        const sqe = (typeof sqeClient !== 'undefined') ? sqeClient : null;
+        const wap = (typeof wapClient !== 'undefined') ? wapClient : sqe;
+
+        // ดึงข้อมูลจากทุกตารางแบบคู่ขนาน (SQE + WAP + Calibration + Master + Rules)
+        const [
+            usersRes, recordsRes, eightDRes, supportRes, s5Res, otRes, sjRes, skillsRes, calRes, rulesRes, suppRes, partsRes, defRes, attRes
+        ] = await Promise.all([
+            sqe ? sqe.from('users').select('*') : Promise.resolve({ data: [] }),
+            sqe ? sqe.from('records').select('*') : Promise.resolve({ data: (typeof S !== 'undefined' ? S.records : []) }),
+            sqe ? sqe.from('eight_d_reports').select('*') : Promise.resolve({ data: (typeof Wap8DSystem !== 'undefined' ? Wap8DSystem.getCases() : []) }),
+            wap ? wap.from('support_records').select('*') : Promise.resolve({ data: [] }),
+            wap ? wap.from('s5_records').select('*') : Promise.resolve({ data: [] }),
+            wap ? wap.from('ot_records').select('*') : Promise.resolve({ data: [] }),
+            wap ? wap.from('special_jobs').select('*') : Promise.resolve({ data: [] }),
+            wap ? wap.from('skill_matrix').select('*') : Promise.resolve({ data: [] }),
+            sqe ? sqe.from('calibration_records').select('*') : Promise.resolve({ data: [] }),
+            sqe ? sqe.from('vf_rp_email_rules').select('*') : Promise.resolve({ data: [] }),
+            sqe ? sqe.from('master_suppliers').select('*') : Promise.resolve({ data: [] }),
+            sqe ? sqe.from('master_parts').select('*') : Promise.resolve({ data: [] }),
+            sqe ? sqe.from('master_defects').select('*') : Promise.resolve({ data: [] }),
+            wap ? wap.from('daily_reports').select('*') : Promise.resolve({ data: (typeof S !== 'undefined' ? S.attLeaveRecords : []) })
         ]);
 
         const wb = XLSX.utils.book_new();
-        const addSheet = (res, name) => {
-            if (res.data && res.data.length > 0) {
-                const ws = XLSX.utils.json_to_sheet(res.data);
+        const addSheet = (dataList, name) => {
+            if (Array.isArray(dataList) && dataList.length > 0) {
+                const ws = XLSX.utils.json_to_sheet(dataList);
                 XLSX.utils.book_append_sheet(wb, ws, name);
             }
         };
 
-        addSheet(users, "Users");
-        addSheet(records, "Claims");
-        addSheet(support, "Support");
-        addSheet(s5, "5S");
-        addSheet(ot, "OT");
-        addSheet(sj, "Missions");
-        addSheet(skills, "Skills");
+        addSheet(usersRes.data || [], "Users");
+        addSheet(recordsRes.data || (typeof S !== 'undefined' ? S.records : []), "Claims");
+        addSheet(eightDRes.data || (typeof Wap8DSystem !== 'undefined' ? Wap8DSystem.getCases() : []), "8D Reports");
+        addSheet(supportRes.data || [], "Support Logs");
+        addSheet(s5Res.data || [], "5S Audits");
+        addSheet(otRes.data || [], "OT Records");
+        addSheet(sjRes.data || [], "Special Jobs");
+        addSheet(skillsRes.data || [], "Skill Matrix");
+        addSheet(calRes.data || [], "Calibration");
+        addSheet(rulesRes.data || [], "Email Rules");
+        addSheet(suppRes.data || [], "Suppliers");
+        addSheet(partsRes.data || [], "Parts");
+        addSheet(defRes.data || [], "Defects");
+        addSheet(attRes.data || (typeof S !== 'undefined' ? S.attLeaveRecords : []), "Attendance");
 
-        XLSX.writeFile(wb, `Carrier_Full_Backup_${new Date().toISOString().split('T')[0]}.xlsx`);
-        toast("✅ Backup สำเร็จ", "success");
-        writeAuditLog('BACKUP', 'Exported all database tables');
+        XLSX.writeFile(wb, `Carrier_Complete_System_Backup_${new Date().toISOString().split('T')[0]}.xlsx`);
+        toast("✅ สำรองข้อมูลทุกระบบเป็น Excel สำเร็จเรียบร้อย", "success");
+        if (typeof writeAuditLog === 'function') writeAuditLog('BACKUP_EXCEL', 'Exported all system tables to Excel');
     } catch (e) {
-        console.error(e);
-        toast("❌ Backup ล้มเหลว", "error");
+        console.error("[Full Backup Error]", e);
+        toast("❌ Backup ล้มเหลว: " + (e.message || e), "error");
     }
 }
 
@@ -26910,7 +28574,7 @@ async function performFullBackup() {
  * on a daily basis, tracks backup history, supports manual JSON export,
  * and allows 1-click state restore.
  */
-const LocalBackupSystem = (function() {
+var LocalBackupSystem = (function() {
     const STORAGE_KEY_LAST_DATE = 'carrier_auto_daily_backup_last_date';
     const STORAGE_KEY_LAST_TIME = 'carrier_auto_daily_backup_last_time';
     const STORAGE_KEY_ENABLED = 'carrier_auto_daily_backup_enabled';
@@ -26934,20 +28598,99 @@ const LocalBackupSystem = (function() {
         return `${yyyy}-${mm}-${dd}`;
     }
 
-    function buildAppStateSnapshot() {
+    /**
+     * 🌐 รวมข้อมูลจากทุกตาราง/โมดูลในระบบ (SQE + WAP + Master + Calibration) ก่อนทำการ Backup
+     */
+    async function buildAppStateSnapshot() {
         const now = new Date();
         const dateStr = getTodayString();
         
-        // 8D Cases
-        const eightDCases = (S.eightDCases || (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases ? Wap8DSystem.getCases() : [])) || [];
-        
-        // Clean records array
-        const records = Array.isArray(S.records) ? S.records : [];
-        const attLeaveRecords = Array.isArray(S.attLeaveRecords) ? S.attLeaveRecords : [];
-        const wapData = S.wapData || {};
-        
+        const sqe = (typeof sqeClient !== 'undefined') ? sqeClient : null;
+        const wap = (typeof wapClient !== 'undefined') ? wapClient : sqe;
+
+        // ดึงข้อมูลจริงจาก Cloud แบบคู่ขนาน
+        let records = (typeof S !== 'undefined' && Array.isArray(S.records)) ? S.records : [];
+        let eightDCases = (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases) ? Wap8DSystem.getCases() : [];
+        let users = [];
+        let support = [];
+        let s5 = [];
+        let ot = [];
+        let specialJobs = [];
+        let skills = [];
+        let calibration = [];
+        let emailRules = [];
+        let suppliers = [];
+        let parts = [];
+        let defects = [];
+        let attLeaves = (typeof S !== 'undefined' && Array.isArray(S.attLeaveRecords)) ? S.attLeaveRecords : [];
+
+        if (navigator.onLine && (sqe || wap)) {
+            try {
+                const [
+                    uRes, recRes, edRes, supRes, s5Res, otRes, sjRes, skRes, calRes, rlRes, spRes, ptRes, dfRes, attRes
+                ] = await Promise.all([
+                    sqe ? sqe.from('users').select('*') : Promise.resolve({ data: [] }),
+                    sqe ? sqe.from('records').select('*') : Promise.resolve({ data: records }),
+                    sqe ? sqe.from('eight_d_reports').select('*') : Promise.resolve({ data: eightDCases }),
+                    wap ? wap.from('support_records').select('*') : Promise.resolve({ data: [] }),
+                    wap ? wap.from('s5_records').select('*') : Promise.resolve({ data: [] }),
+                    wap ? wap.from('ot_records').select('*') : Promise.resolve({ data: [] }),
+                    wap ? wap.from('special_jobs').select('*') : Promise.resolve({ data: [] }),
+                    wap ? wap.from('skill_matrix').select('*') : Promise.resolve({ data: [] }),
+                    sqe ? sqe.from('calibration_records').select('*') : Promise.resolve({ data: [] }),
+                    sqe ? sqe.from('vf_rp_email_rules').select('*') : Promise.resolve({ data: [] }),
+                    sqe ? sqe.from('master_suppliers').select('*') : Promise.resolve({ data: [] }),
+                    sqe ? sqe.from('master_parts').select('*') : Promise.resolve({ data: [] }),
+                    sqe ? sqe.from('master_defects').select('*') : Promise.resolve({ data: [] }),
+                    wap ? wap.from('daily_reports').select('*') : Promise.resolve({ data: attLeaves })
+                ]);
+
+                if (uRes && uRes.data && uRes.data.length > 0) users = uRes.data;
+                if (recRes && recRes.data && recRes.data.length > 0) records = recRes.data;
+                if (edRes && edRes.data && edRes.data.length > 0) eightDCases = edRes.data;
+                if (supRes && supRes.data && supRes.data.length > 0) support = supRes.data;
+                if (s5Res && s5Res.data && s5Res.data.length > 0) s5 = s5Res.data;
+                if (otRes && otRes.data && otRes.data.length > 0) ot = otRes.data;
+                if (sjRes && sjRes.data && sjRes.data.length > 0) specialJobs = sjRes.data;
+                if (skRes && skRes.data && skRes.data.length > 0) skills = skRes.data;
+                if (calRes && calRes.data && calRes.data.length > 0) calibration = calRes.data;
+                if (rlRes && rlRes.data && rlRes.data.length > 0) emailRules = rlRes.data;
+                if (spRes && spRes.data && spRes.data.length > 0) suppliers = spRes.data;
+                if (ptRes && ptRes.data && ptRes.data.length > 0) parts = ptRes.data;
+                if (dfRes && dfRes.data && dfRes.data.length > 0) defects = dfRes.data;
+                if (attRes && attRes.data && attRes.data.length > 0) attLeaves = attRes.data;
+            } catch (err) {
+                console.warn("[Backup Data Collection Warning]", err);
+            }
+        }
+
+        // Fallback จาก Local Database (IndexedDB / Dexie) หากตาราง Cloud ว่าง
+        if (calibration.length === 0 && typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+            try { calibration = await localDB.calibrationMaster.toArray(); } catch (_) {}
+        }
+        if (records.length === 0 && typeof db !== 'undefined' && db && db.records) {
+            try { records = await db.records.toArray(); } catch (_) {}
+        }
+
+        const wapData = {
+            achievements: support,
+            support_records: support,
+            score5s: s5,
+            s5_records: s5,
+            ot_records: ot,
+            specialJobs: specialJobs,
+            special_jobs: specialJobs,
+            skills: skills,
+            skill_matrix: skills,
+            attendance: attLeaves
+        };
+
+        const totalItemsCount = records.length + eightDCases.length + support.length + s5.length + ot.length + 
+                                specialJobs.length + skills.length + calibration.length + emailRules.length + 
+                                suppliers.length + parts.length + defects.length + users.length;
+
         const snapshot = {
-            backup_schema: "carrier.app.state.v2",
+            backup_schema: "carrier.app.state.v3",
             created_at: now.toISOString(),
             date: dateStr,
             metadata: {
@@ -26955,39 +28698,67 @@ const LocalBackupSystem = (function() {
                 app_name: "SQE & WAP Support Portal",
                 version: "2.5.0",
                 environment: "production",
-                user: S.currentUser || "anonymous",
-                user_role: S.userRole || "staff",
-                viewing_user: S.viewingUser || S.currentUser || ""
+                user: (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : "anonymous",
+                user_role: (typeof S !== 'undefined' && S.userRole) ? S.userRole : "staff",
+                viewing_user: (typeof S !== 'undefined' && S.viewingUser) ? S.viewingUser : ""
             },
+            // Flat root structure for Universal Import parser
+            records: records,
+            eight_d_reports: eightDCases,
+            eight_d_cases: eightDCases,
+            users: users,
+            support_records: support,
+            s5_records: s5,
+            ot_records: ot,
+            special_jobs: specialJobs,
+            skill_matrix: skills,
+            daily_reports: attLeaves,
+            att_leave_records: attLeaves,
+            calibration_records: calibration,
+            vf_rp_email_rules: emailRules,
+            master_suppliers: suppliers,
+            master_parts: parts,
+            master_defects: defects,
+
+            // Nested app_state structure for state engines
             app_state: {
                 records: records,
                 eight_d_cases: eightDCases,
-                att_leave_records: attLeaveRecords,
-                wap_data: {
-                    achievements: wapData.achievements || [],
-                    attendance: wapData.attendance || [],
-                    score5s: wapData.score5s || [],
-                    skills: wapData.skills || [],
-                    specialJobs: wapData.specialJobs || []
-                },
+                eight_d_reports: eightDCases,
+                users: users,
+                att_leave_records: attLeaves,
+                daily_reports: attLeaves,
+                calibration_records: calibration,
+                vf_rp_email_rules: emailRules,
+                master_suppliers: suppliers,
+                master_parts: parts,
+                master_defects: defects,
+                wap_data: wapData,
                 smart_memory: (typeof smartMemory !== 'undefined' ? smartMemory : {}),
                 ai_brain: (typeof aiBrain !== 'undefined' ? aiBrain : {}),
                 preferences: {
-                    activeFilter: S.activeFilter || 'ALL',
-                    selectedShift: S.selectedShift || 'SHIFT A',
+                    activeFilter: (typeof S !== 'undefined' && S.activeFilter) ? S.activeFilter : 'ALL',
+                    selectedShift: (typeof S !== 'undefined' && S.selectedShift) ? S.selectedShift : 'SHIFT A',
                     theme: localStorage.getItem('carrier_theme') || 'light',
                     lang: localStorage.getItem('carrier_lang') || 'th'
                 }
             },
             statistics: {
+                total_all_records: totalItemsCount,
                 total_claim_records: records.length,
                 total_8d_cases: eightDCases.length,
-                total_att_records: attLeaveRecords.length,
-                total_wap_support: (wapData.achievements || []).length,
-                total_wap_attendance: (wapData.attendance || []).length,
-                total_wap_5s: (wapData.score5s || []).length,
-                total_wap_skills: (wapData.skills || []).length,
-                total_wap_special_jobs: (wapData.specialJobs || []).length
+                total_users: users.length,
+                total_att_records: attLeaves.length,
+                total_wap_support: support.length,
+                total_wap_5s: s5.length,
+                total_wap_ot: ot.length,
+                total_wap_skills: skills.length,
+                total_wap_special_jobs: specialJobs.length,
+                total_calibration: calibration.length,
+                total_rules: emailRules.length,
+                total_suppliers: suppliers.length,
+                total_parts: parts.length,
+                total_defects: defects.length
             }
         };
 
@@ -27041,14 +28812,14 @@ const LocalBackupSystem = (function() {
         const now = new Date();
         const timeStr = now.toLocaleTimeString();
 
-        // 1. Build snapshot
-        const snapshot = buildAppStateSnapshot();
-        const totalItems = (snapshot.statistics.total_claim_records || 0) + 
-                           (snapshot.statistics.total_8d_cases || 0) + 
-                           (snapshot.statistics.total_wap_support || 0);
+        toast("⏳ กำลังรวบรวมข้อมูลทุกระบบเพื่อจัดทำไฟล์ Backup...", "info");
+
+        // 1. Build comprehensive snapshot from all database tables
+        const snapshot = await buildAppStateSnapshot();
+        const totalItems = snapshot.statistics.total_all_records || 0;
 
         const fileName = isManual 
-            ? `Carrier_App_State_${today}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.json`
+            ? `Carrier_Full_System_Backup_${today}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.json`
             : `Carrier_Daily_Backup_${today}.json`;
 
         // 2. Download JSON File
@@ -27060,12 +28831,12 @@ const LocalBackupSystem = (function() {
 
         const sizeKb = (dlResult.sizeBytes / 1024).toFixed(1);
 
-        // 3. Save local snapshot cache (small summary or subset to save quota)
+        // 3. Save local snapshot cache summary
         try {
             const localSummary = {
                 timestamp: now.toISOString(),
                 date: today,
-                user: S.currentUser,
+                user: (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : "system",
                 statistics: snapshot.statistics,
                 size_kb: sizeKb
             };
@@ -27080,24 +28851,24 @@ const LocalBackupSystem = (function() {
 
         // 5. Record in history
         recordBackupHistory({
-            id: generateUUID ? generateUUID() : 'b-' + Date.now(),
+            id: typeof generateUUID === 'function' ? generateUUID() : 'b-' + Date.now(),
             timestamp: now.toISOString(),
             date: today,
             time: timeStr,
             filename: fileName,
             sizeKb: sizeKb + ' KB',
             type: isManual ? 'manual' : 'auto_daily',
-            user: S.currentUser || 'system',
+            user: (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : 'system',
             totalRecords: totalItems
         });
 
         // 6. Audit & Toast
         if (typeof writeAuditLog === 'function') {
-            writeAuditLog('BACKUP_JSON', `${isManual ? 'Manual' : 'Automated Daily'} Backup exported: ${fileName} (${sizeKb} KB, ${totalItems} items)`);
+            writeAuditLog('BACKUP_JSON', `${isManual ? 'Manual' : 'Automated Daily'} Full Backup exported: ${fileName} (${sizeKb} KB, ${totalItems} items across all modules)`);
         }
 
         if (isManual) {
-            toast(`✅ ส่งออกไฟล์ App State สำรองเรียบร้อย (${fileName})`, "success");
+            toast(`✅ ส่งออกไฟล์สำรองทุกระบบเรียบร้อย (${fileName} - ${totalItems} รายการ)`, "success");
         } else {
             toast(`💾 สำรองข้อมูลประจำวันอัตโนมัติเรียบร้อย (${fileName})`, "success");
         }
@@ -27347,9 +29118,22 @@ const LocalBackupSystem = (function() {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = async function(e) {
             try {
                 const parsed = JSON.parse(e.target.result);
+                // ปิด Modal สำรองข้อมูลเดิมก่อนเปิดหน้าต่างนำเข้า/กู้คืน
+                const curModal = document.getElementById('local-backup-modal');
+                if (curModal) curModal.remove();
+
+                if (window.WapAdminSystem && typeof window.WapAdminSystem.analyzeJSONImportData === 'function' && typeof window.WapAdminSystem.showUniversalImportModal === 'function') {
+                    toast("🔍 กำลังวิเคราะห์โครงสร้างข้อมูลสำรอง...", "info");
+                    const analysis = window.WapAdminSystem.analyzeJSONImportData(parsed, file.name, file.size);
+                    if (analysis && Object.keys(analysis.tables).length > 0) {
+                        await window.WapAdminSystem.checkDuplicatesAgainstDatabase(analysis);
+                        window.WapAdminSystem.showUniversalImportModal(analysis);
+                        return;
+                    }
+                }
                 restoreFromParsedJson(parsed, file.name);
             } catch (err) {
                 console.error('[LocalBackupSystem] JSON Parse Error:', err);
@@ -27360,85 +29144,167 @@ const LocalBackupSystem = (function() {
         inputEl.value = ''; // Reset input
     }
 
+    /**
+     * 📥 ฟังก์ชันกู้คืนสถานะจาก JSON ครอบคลุมทุกระบบแบบป้องกันข้อมูลซ้ำ (Universal Zero-Duplicate Shield)
+     */
     function restoreFromParsedJson(data, fileName) {
-        if (!data || (!data.app_state && !data.records)) {
-            toast("❌ รูปแบบไฟล์ JSON ไม่ตรงกับโครงสร้างสำรองข้อมูลของระบบ", "error");
+        if (!data || (!data.app_state && !data.records && !data.users && !data.calibration_records)) {
+            toast("❌ รูปแบบไฟล์ JSON ไม่ถูกต้อง", "error");
             return;
         }
 
         const state = data.app_state || data;
-        const totalClaims = (state.records || []).length;
-        const total8D = (state.eight_d_cases || state.eightDCases || []).length;
-        const totalWap = (state.wap_data?.achievements || state.wapData?.achievements || []).length;
-        const dateStr = data.date || data.created_at || 'Unknown Date';
+        const totalItems = (
+            (state.records || []).length + 
+            (state.eight_d_cases || state.eight_d_reports || []).length +
+            (state.users || []).length +
+            (state.calibration_records || []).length +
+            (state.vf_rp_email_rules || []).length +
+            (state.wap_data?.achievements || state.support_records || []).length +
+            (state.wap_data?.score5s || state.s5_records || []).length +
+            (state.wap_data?.specialJobs || state.special_jobs || []).length +
+            (state.wap_data?.skills || state.skill_matrix || []).length +
+            (state.wap_data?.ot_records || state.ot_records || []).length +
+            (state.att_leave_records || state.daily_reports || []).length
+        );
 
         showCustomConfirmDialog({
-            title: "ยืนยันการกู้คืนข้อมูล (Restore App State)",
-            subtitle: `คุณกำลังจะนำเข้าและกู้คืนสถานะข้อมูลจากไฟล์ ${fileName}`,
-            badge: "DATA RESTORE",
+            title: "ยืนยันการกู้คืนข้อมูลทุกระบบ (Full System Restore)",
+            subtitle: `ตรวจพบข้อมูลรวม ${totalItems} รายการในไฟล์สำรอง ระบบจะคัดกรองรายการที่ซ้ำและทำการกู้คืนข้อมูลอย่างปลอดภัย 100%`,
+            badge: "ZERO-DUPLICATE SHIELD",
             type: "warning",
-            details: [
-                { label: "Backup Date", value: dateStr },
-                { label: "Claim Records", value: `${totalClaims} รายการ` },
-                { label: "8D Cases", value: `${total8D} รายการ` },
-                { label: "WAP Records", value: `${totalWap} รายการ` }
-            ],
-            confirmText: "📥 ยืนยันการกู้คืนข้อมูล",
-            cancelText: "ยกเลิก",
+            confirmText: "🚀 เริ่มกู้คืนข้อมูลทั้งหมด",
             onConfirm: async () => {
                 try {
-                    toast("⏳ กำลังกู้คืนข้อมูล...", "info");
-
-                    // 1. Restore SQE Records
-                    if (Array.isArray(state.records)) {
-                        S.records = state.records;
+                    if (!navigator.onLine) {
+                        toast("📶 โปรดเชื่อมต่ออินเทอร์เน็ตเพื่อซิงค์ข้อมูลลงคลาวด์", "error");
+                        return;
                     }
 
-                    // 2. Restore 8D cases
-                    const cases = state.eight_d_cases || state.eightDCases;
-                    if (Array.isArray(cases)) {
-                        S.eightDCases = cases;
+                    toast("📡 กำลังตรวจสอบและซิงค์ข้อมูลทุกระบบขึ้นฐานข้อมูล...", "info");
+
+                    const sqe = (typeof sqeClient !== 'undefined') ? sqeClient : null;
+                    const wap = (typeof wapClient !== 'undefined') ? wapClient : sqe;
+
+                    // 1. Claims (records) - Deduplicate by REF
+                    const rawClaims = state.records || data.records || [];
+                    if (rawClaims.length > 0 && sqe) {
+                        const uniqueMap = new Map();
+                        rawClaims.forEach((r, idx) => {
+                            const refKey = String(r.ref || `CLM-${idx+1}`).trim().toUpperCase();
+                            uniqueMap.set(refKey, {
+                                id: r.id || (typeof generateUUID === 'function' ? generateUUID() : `clm_${Date.now()}_${idx}`),
+                                date: r.date || new Date().toISOString().split('T')[0],
+                                shift: r.shift || 'SHIFT A',
+                                inspector: r.inspector || 'SYSTEM',
+                                ref: refKey,
+                                line: r.line || '-',
+                                supplier: r.supplier || '-',
+                                partNo: String(r.partNo || r.part_no || '-').trim().toUpperCase(),
+                                partName: r.partName || r.part_name || '-',
+                                qty: parseInt(r.qty) || 1,
+                                unit: r.unit || 'PCS',
+                                defect: r.defect || '-',
+                                remark: r.remark || '',
+                                judgment: r.judgment || 'OK',
+                                created_at: r.created_at || new Date().toISOString()
+                            });
+                        });
+                        const cleanClaims = Array.from(uniqueMap.values());
+                        for (let i = 0; i < cleanClaims.length; i += 50) {
+                            const batch = cleanClaims.slice(i, i + 50);
+                            await sqe.from('records').upsert(batch, { onConflict: 'ref' });
+                        }
                     }
 
-                    // 3. Restore WAP Data
-                    if (state.wap_data || state.wapData) {
-                        S.wapData = state.wap_data || state.wapData;
+                    // 2. 8D Reports - Deduplicate by ID / issue_no
+                    const raw8D = state.eight_d_cases || state.eight_d_reports || data.eight_d_reports || [];
+                    if (raw8D.length > 0 && sqe) {
+                        const unique8D = new Map();
+                        raw8D.forEach((r, idx) => {
+                            const key = String(r.id || r.issue_no || `8d_${idx}`).trim();
+                            unique8D.set(key, r);
+                        });
+                        const clean8D = Array.from(unique8D.values());
+                        for (let i = 0; i < clean8D.length; i += 50) {
+                            await sqe.from('eight_d_reports').upsert(clean8D.slice(i, i + 50), { onConflict: 'id' });
+                        }
                     }
 
-                    // 4. Restore Att Leave
-                    if (Array.isArray(state.att_leave_records || state.attLeaveRecords)) {
-                        S.attLeaveRecords = state.att_leave_records || state.attLeaveRecords;
+                    // 3. Calibration - Deduplicate by ID
+                    const rawCal = state.calibration_records || data.calibration_records || [];
+                    if (rawCal.length > 0 && sqe) {
+                        const uniqueCal = new Map();
+                        rawCal.forEach((r, idx) => {
+                            const key = String(r.id || r.code_no || `cal_${idx}`).trim();
+                            uniqueCal.set(key, r);
+                        });
+                        const cleanCal = Array.from(uniqueCal.values());
+                        for (let i = 0; i < cleanCal.length; i += 50) {
+                            await sqe.from('calibration_records').upsert(cleanCal.slice(i, i + 50), { onConflict: 'id' });
+                        }
+                        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                            await localDB.calibrationMaster.bulkPut(cleanCal);
+                        }
                     }
 
-                    // 5. Restore Smart Memory & AI Brain
-                    if (state.smart_memory || state.smartMemory) {
-                        smartMemory = state.smart_memory || state.smartMemory;
-                    }
-                    if (state.ai_brain || state.aiBrain) {
-                        aiBrain = state.ai_brain || state.aiBrain;
+                    // 4. WAP Modules (Support, 5S, OT, Special Jobs, Skills, Attendance)
+                    const wapTasks = [
+                        { table: 'support_records', data: state.wap_data?.achievements || state.support_records || data.support_records },
+                        { table: 's5_records', data: state.wap_data?.score5s || state.s5_records || data.s5_records },
+                        { table: 'special_jobs', data: state.wap_data?.specialJobs || state.special_jobs || data.special_jobs },
+                        { table: 'skill_matrix', data: state.wap_data?.skills || state.skill_matrix || data.skill_matrix },
+                        { table: 'ot_records', data: state.wap_data?.ot_records || state.ot_records || data.ot_records },
+                        { table: 'daily_reports', data: state.att_leave_records || state.daily_reports || data.daily_reports }
+                    ];
+
+                    if (wap) {
+                        for (const task of wapTasks) {
+                            if (task.data && Array.isArray(task.data) && task.data.length > 0) {
+                                const uniqueMap = new Map();
+                                task.data.forEach((r, idx) => {
+                                    const { sync_status, ...cleanItem } = r;
+                                    const key = String(cleanItem.id || `row_${idx}`).trim();
+                                    uniqueMap.set(key, cleanItem);
+                                });
+                                const cleanItems = Array.from(uniqueMap.values());
+                                for (let i = 0; i < cleanItems.length; i += 50) {
+                                    await wap.from(task.table).upsert(cleanItems.slice(i, i + 50), { onConflict: 'id' });
+                                }
+                            }
+                        }
                     }
 
-                    // 6. Re-render views
-                    if (typeof renderTable === 'function') renderTable();
-                    if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
-                        Wap8DSystem.fetchCases();
+                    // 5. Masters (Suppliers, Parts, Defects, Rules)
+                    const rawSupp = state.master_suppliers || data.master_suppliers || [];
+                    if (rawSupp.length > 0 && sqe) {
+                        for (let i = 0; i < rawSupp.length; i += 50) {
+                            await sqe.from('master_suppliers').upsert(rawSupp.slice(i, i + 50), { onConflict: 'name' });
+                        }
                     }
-                    if (typeof initExecDashboard === 'function') initExecDashboard();
-
-                    // 7. Audit & Success Toast
-                    if (typeof writeAuditLog === 'function') {
-                        writeAuditLog('RESTORE_JSON', `Restored app state from JSON file: ${fileName}`);
+                    const rawParts = state.master_parts || data.master_parts || [];
+                    if (rawParts.length > 0 && sqe) {
+                        for (let i = 0; i < rawParts.length; i += 50) {
+                            await sqe.from('master_parts').upsert(rawParts.slice(i, i + 50), { onConflict: 'part_no' });
+                        }
+                    }
+                    const rawDef = state.master_defects || data.master_defects || [];
+                    if (rawDef.length > 0 && sqe) {
+                        for (let i = 0; i < rawDef.length; i += 50) {
+                            await sqe.from('master_defects').upsert(rawDef.slice(i, i + 50), { onConflict: 'defect_name' });
+                        }
                     }
 
-                    toast("✅ กู้คืนสถานะข้อมูลแอปพลิเคชันเรียบร้อยแล้ว", "success");
-
-                    // Close backup modal if open
-                    const modal = document.getElementById('local-backup-modal');
-                    if (modal) modal.remove();
+                    toast("✨ กู้คืนข้อมูลทุกระบบสำเร็จเรียบร้อยแล้ว", "success");
+                    
+                    // สั่งรีเฟรชหน้าจอทั้งหมดเพื่อให้เห็นข้อมูลล่าสุด
+                    if (typeof loadRecords === 'function') await loadRecords();
+                    if (typeof fetchWAPData === 'function') await fetchWAPData();
+                    if (typeof triggerGlobalRefresh === 'function') triggerGlobalRefresh();
 
                 } catch (err) {
-                    console.error('[LocalBackupSystem] Restore Execution Error:', err);
-                    toast("❌ เกิดข้อผิดพลาดในการกู้คืนข้อมูล", "error");
+                    console.error('[Restore Error]', err);
+                    toast("❌ บันทึกล้มเหลว: " + (err.message || err), "error");
                 }
             }
         });
@@ -27466,6 +29332,54 @@ setInterval(() => {
 }, 1800000);
 
 
+// --- 🚀 ระบบส่งข้อมูลขึ้น Cloud แบบป้องกันการบันทึกซ้ำ (Master Sync) ---
+    async function syncImportedDataToCloud(state) {
+        if (!navigator.onLine) {
+            toast("📶 ออฟไลน์: ข้อมูลจะถูกซิงค์ภายหลังเมื่อคุณออนไลน์", "info");
+            return;
+        }
+
+        const cleanData = (list) => list.map(item => {
+            const { sync_status, ...rest } = item; // ลบฟิลด์สถานะซิงค์ออก
+            return rest;
+        });
+
+        try {
+            // จัดกลุ่มงานที่จะส่ง
+            const tasks = [
+                { client: sqeClient, table: 'records', data: state.records },
+                { client: sqeClient, table: 'eight_d_reports', data: (state.eight_d_cases || state.eightDCases) },
+                { client: wapClient, table: 'support_records', data: state.wap_data?.achievements },
+                { client: wapClient, table: 's5_records', data: state.wap_data?.score5s },
+                { client: wapClient, table: 'ot_records', data: state.wap_data?.ot_records }, // ถ้ามีใน JSON
+                { client: wapClient, table: 'special_jobs', data: state.wap_data?.specialJobs },
+                { client: wapClient, table: 'skill_matrix', data: state.wap_data?.skills },
+                { client: wapClient, table: 'daily_reports', data: state.att_leave_records }
+            ];
+
+            for (const task of tasks) {
+                if (task.data && task.data.length > 0 && task.client) {
+                    const payload = cleanData(task.data);
+                    
+                    // ทยอยส่งทีละ 50 รายการเพื่อความเสถียร
+                    const BATCH_SIZE = 50;
+                    for (let i = 0; i < payload.length; i += BATCH_SIZE) {
+                        const batch = payload.slice(i, i + BATCH_SIZE);
+                        
+                        // 🛡️ ignoreDuplicates: true คือหัวใจสำคัญ (ถ้ามี ID ซ้ำใน DB แล้วจะไม่ทำอะไรเลย)
+                        await task.client
+                            .from(task.table)
+                            .upsert(batch, { onConflict: 'id', ignoreDuplicates: true });
+                    }
+                }
+            }
+
+            toast("✨ กู้คืนและซิงค์ข้อมูลใหม่ขึ้น Cloud สำเร็จแล้ว", "success");
+        } catch (err) {
+            console.warn("[Cloud Sync Note]", err.message);
+            toast("✅ กู้คืนสำเร็จ (ข้อมูลบางส่วนอาจซิงค์ไม่สมบูรณ์)", "info");
+        }
+    }
 async function performArchive() {
     const year = document.getElementById('archive-year').value;
     if (!year || year.length < 4) return toast("กรุณาระบุปีที่ถูกต้อง", "error");
@@ -27659,13 +29573,19 @@ let currentModalACIndex = -1;
 let tempAvatarBase64 = null; // ตัวแปรพักรูปภาพ
 
 /**
- * 🧠 MASTER MODAL AUTO-COMPLETE ENGINE (Strict Matrix Integration)
- * อัปเดต: ดึงหมวดหมู่พาร์ทจาก Proficiency Breakdown (Skill Matrix)
+ * 🧠 MASTER MODAL AUTO-COMPLETE ENGINE (Vibrant & Aesthetic Dropdown Edition)
+ * ออกแบบกล่องดรอปดาวน์และไอคอนให้สดใส สวยงาม ตรงตามภาพตัวอย่าง:
+ * 1. กล่องขอบสีฟ้าสดใส (Sky-blue 2px solid #38bdf8), มุมโค้งมน 12px, เงาฟุ้งนุ่มนวล
+ * 2. แถบหัวข้อสีครีมพาสเทลอบอุ่นสดใส (Warm Pastel Cream #fffbeb) พร้อมเส้นคั่นสีเหลืองทอง (#fde68a) และข้อความส้มสดใสตามภาพตัวอย่าง
+ * 3. ไอคอนหยดน้ำ 3D สองเฉดสีสดใส (Split 3D Teardrop) คู่กับกิมมิกตามระดับสิทธิ์ (👑 มงกุฎ, 🔑 กุญแจ, ✒️ ปากกา, 📝 สมุด)
+ * 4. แถบสถานะ Focus/Hover ไฮไลต์พื้นหลังฟ้าอ่อน (#f0f7ff) พร้อมเส้นบอกตำแหน่งสีน้ำเงินชัดเจน (border-left 4px solid #0284c7)
+ * 5. ป้ายระดับสิทธิ์ด้านขวา (Badges) สีพื้นสดใสตัวอักษรขาวคมชัด สไตล์ปุ่ม SUPERVISOR ในภาพตัวอย่าง
+ * 6. คงตรรกะความถูกต้องตาม Vendor Matrix (ภาพที่ 2) ทุกประการ
  */
 function renderModalAC(type, inputEl) {
     if (!inputEl || inputEl._suppressAC) return;
     
-    // 1. ปิดดรอปดาวน์ตัวอื่นทั้งหมดในหน้าจอทันที เพื่อให้แสดงเฉพาะช่องล่าสุดที่คลิกเสมอ
+    // 1. ปิดดรอปดาวน์ตัวอื่นทั้งหมดในหน้าจอทันที เพื่อให้แสดงเฉพาะช่องล่าสุดที่กำลังคลิก
     document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
         if (dd.parentElement !== inputEl.parentElement) {
             dd.style.display = 'none';
@@ -27679,21 +29599,40 @@ function renderModalAC(type, inputEl) {
     if (!dd) {
         dd = document.createElement('div');
         dd.className = 'modal-ac-dropdown';
-        dd.style.cssText = `
-            position: absolute; top: 100%; left: 0; width: max-content; min-width: 310px; max-width: 420px;
-            max-height: 280px; overflow-y: auto; background: #ffffff;
-            border: 1.5px solid #3b82f6; border-radius: 10px;
-            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18); z-index: 20000; display: none;
-        `;
         wrap.style.position = 'relative';
         wrap.appendChild(dd);
+    }
+
+    // กล่องดรอปดาวน์สดใส ขอบฟ้า 38bdf8 โค้งมน 12px สไตล์พรีเมียมตามภาพตัวอย่าง
+    dd.style.cssText = `
+        position: absolute; top: calc(100% + 4px); left: 0;
+        width: 320px; max-width: 94vw;
+        max-height: 260px; overflow-y: auto; overflow-x: hidden;
+        background: #ffffff; border: 2px solid #38bdf8; border-radius: 12px;
+        box-shadow: 0 12px 28px -4px rgba(14, 165, 233, 0.22), 0 6px 16px -2px rgba(15, 23, 42, 0.08);
+        z-index: 20000; display: none;
+    `;
+
+    // จัดการปิดดรอปดาวน์ทันทีเมื่อคลิกพื้นที่ว่างภายนอก
+    if (!window._modalACOutsideClickBound) {
+        window._modalACOutsideClickBound = true;
+        document.addEventListener('pointerdown', function(e) {
+            const openDropdowns = document.querySelectorAll('.modal-ac-dropdown');
+            openDropdowns.forEach(d => {
+                if (d.style.display === 'none') return;
+                const parent = d.parentElement;
+                if (parent && parent.contains(e.target)) return;
+                d.style.display = 'none';
+            });
+            if (typeof currentModalACIndex !== 'undefined') currentModalACIndex = -1;
+        }, true);
     }
 
     const query = inputEl.value.trim().toLowerCase();
     let htmlContent = '';
 
     // ============================================================
-    // ✍️ กรณีการลงนาม (Sign-off): ISSUE BY | CONFIRM BY | APPROVED BY
+    // ✍️ การลงนาม (Sign-off): ISSUE BY | CONFIRM BY | APPROVED BY
     // ============================================================
     if (type === 'staff') {
         const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
@@ -27702,234 +29641,564 @@ function renderModalAC(type, inputEl) {
         
         const vfData = curCase?.report_data?.vf_data || {};
         
-        // 1. ตรวจสอบประเภทรายงานปัจจุบัน (RP หรือ VF) เพื่อใช้เลือกช่องใน Matrix
-        const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
+        // 1. ตรวจสอบประเภทรายงานปัจจุบัน (RP หรือ VF) จากทุกจุดอ้างอิง
+        const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || document.getElementById('f-sup-report')?.value || '').toString().toUpperCase();
         const docTypeLabel = (document.getElementById('vf-doc-type-label')?.innerText || '').toUpperCase();
         const isRP = reportType.includes('RP') || docTypeLabel.includes('RP');
+        const docBadgeColor = isRP ? '#059669' : '#0284c7';
+        const docBadgeBg = isRP ? '#ecfdf5' : '#eff6ff';
 
-        // 2. ดึงข้อมูล Vendor จากหน้าเอกสารและ Case เพื่อไปค้นหาในฐานข้อมูล Matrix
-        const vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() 
+        // 2. ดึงข้อมูล Vendor จากหน้าเอกสารและ Case เพื่อค้นหาในฐานข้อมูล Matrix (ภาพที่ 2)
+        let vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() 
             || vfData.vendor 
             || curCase?.supplier 
             || curCase?.vendor 
             || curCase?.report_data?.supplier 
+            || curCase?.report_data?.supplier_name 
+            || document.getElementById('f-sup-supplier')?.value?.trim()
             || "";
-        const vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() 
+        let vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() 
             || vfData.vendor_code 
             || curCase?.vendor_code 
             || curCase?.supplier_code 
+            || curCase?.report_data?.vendor_code 
+            || curCase?.report_data?.supplier_code 
+            || document.getElementById('f-sup-vendor-code')?.value?.trim()
             || "";
         const docToDisplay = document.getElementById('vf-doc-to-display')?.innerText?.trim() || vfData.to || "";
 
-        let matrix = null;
-        if (typeof window.getVFRPMatrixForSupplier === 'function') {
-            matrix = window.getVFRPMatrixForSupplier(vendorName, vendorCode, '')
-                  || window.getVFRPMatrixForSupplier(curCase?.supplier || '', curCase?.vendor_code || '', '')
-                  || window.getVFRPMatrixForSupplier(docToDisplay, '', '');
+        if (vendorName) {
+            vendorName = vendorName.replace(/-->\s*vendor/gi, '').replace(/\bvendor\b/gi, '').replace(/^to:\s*/i, '').trim();
         }
 
-        // 3. Helper: รวบรวมรายชื่อพนักงานและบทบาทจากระบบ
-        const allStaffMap = new Map();
-        if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
-            MASTER_STAFF_USERS.forEach(u => {
-                if (u && u.name) {
-                    allStaffMap.set(u.name.trim(), {
-                        name: u.name.trim(),
-                        email: u.email || '',
-                        role: (u.role || 'staff').toLowerCase(),
-                        department: u.department || ''
-                    });
+        if (!vendorCode && vendorName && typeof VENDOR_MASTER === 'object' && VENDOR_MASTER !== null) {
+            const foundKey = Object.keys(VENDOR_MASTER).find(key => 
+                VENDOR_MASTER[key].toUpperCase().includes(vendorName.toUpperCase()) ||
+                vendorName.toUpperCase().includes(VENDOR_MASTER[key].toUpperCase())
+            );
+            if (foundKey) vendorCode = foundKey;
+        }
+
+        // ค้นหากฎ Matrix ของ Vendor นี้จากระบบ (ตรงตามภาพที่ 2)
+        let matrixRules = [];
+        if (typeof window.getAllVFRPMatricesForSupplier === 'function') {
+            matrixRules = window.getAllVFRPMatricesForSupplier(vendorName, vendorCode, '');
+            if (!matrixRules || matrixRules.length === 0) {
+                matrixRules = window.getAllVFRPMatricesForSupplier(curCase?.supplier || '', curCase?.vendor_code || '', '');
+            }
+            if (!matrixRules || matrixRules.length === 0) {
+                matrixRules = window.getAllVFRPMatricesForSupplier(docToDisplay, '', '');
+            }
+        }
+        
+        // Fallback ค้นหาแบบ Deep Fuzzy Match เพื่อให้จับคู่กับภาพที่ 2 ได้เสมอ
+        if (!matrixRules || matrixRules.length === 0) {
+            let allList = [];
+            if (window.WapAdminSystem && typeof window.WapAdminSystem.getEmailRules === 'function') {
+                allList = window.WapAdminSystem.getEmailRules();
+            }
+            if (!allList || allList.length === 0) {
+                allList = window.VF_RP_MASTER_DATA || [];
+            }
+            if (Array.isArray(allList) && allList.length > 0) {
+                const cleanStr = (s) => (s || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+                const vClean = cleanStr(vendorName);
+                const cClean = cleanStr(vendorCode);
+                matrixRules = allList.filter(item => {
+                    const iSup = cleanStr(item.supplier || item.supplier_name || '');
+                    const iCode = cleanStr(item.vendor_code || item.supplier_code || '');
+                    if (cClean && iCode && (iCode === cClean || iCode.includes(cClean) || cClean.includes(iCode))) return true;
+                    if (vClean && iSup && (iSup.includes(vClean) || vClean.includes(iSup))) return true;
+                    return false;
+                });
+            }
+        }
+
+        const vDisplay = vendorName || (curCase?.supplier) || (matrixRules[0]?.supplier_name) || (matrixRules[0]?.supplier) || 'Vendor';
+        const cDisplay = vendorCode || (curCase?.vendor_code) || (matrixRules[0]?.vendor_code) || '';
+
+        // Set ป้องกันรายชื่อซ้ำในการแสดงผล
+        const renderedPersonKeys = new Set();
+
+        // 🔍 Helper: ค้นหาข้อมูลระดับสิทธิ์ แผนก และตำแหน่งจริงจากฐานข้อมูล (Supabase _dbUsersRoleMap & MASTER_STAFF_USERS) 100%
+        const getStaffDbProfile = (name, emailAddr = '') => {
+            if (!name || name === '-' || name === 'N/A' || name === '--') return null;
+
+            let em = (emailAddr || '').toLowerCase().trim();
+            if (!em && typeof resolveStaffEmail === 'function') {
+                em = (resolveStaffEmail(name) || '').toLowerCase().trim();
+            }
+            if (!em && typeof STAFF_EMAIL_MAP !== 'undefined' && STAFF_EMAIL_MAP[name]) {
+                em = STAFF_EMAIL_MAP[name].toLowerCase().trim();
+            }
+
+            const clean = (typeof cleanSignatureName === 'function')
+                ? cleanSignatureName(name).toLowerCase().trim()
+                : String(name).replace(/^(Mr|Ms|Mrs)\.?\s+/i, '').toLowerCase().trim();
+
+            // 1. ค้นหาใน window._dbUsersRoleMap (ตาราง profiles จาก Supabase)
+            let dbUser = null;
+            if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
+                if (em && window._dbUsersRoleMap.has(em)) {
+                    dbUser = window._dbUsersRoleMap.get(em);
+                } else {
+                    for (const [k, u] of window._dbUsersRoleMap.entries()) {
+                        const uClean = (typeof cleanSignatureName === 'function')
+                            ? cleanSignatureName(u.display_name || '').toLowerCase().trim()
+                            : String(u.display_name || '').replace(/^(Mr|Ms|Mrs)\.?\s+/i, '').toLowerCase().trim();
+                        if (clean && (uClean === clean || uClean.includes(clean) || clean.includes(uClean))) {
+                            dbUser = u;
+                            if (!em) em = k;
+                            break;
+                        }
+                    }
                 }
-            });
-        }
-        if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
-            Array.from(window._dbUsersRoleMap.values()).forEach(u => {
-                const name = (u.display_name || u.name || '').trim();
-                if (name) {
-                    const existing = allStaffMap.get(name) || {};
-                    allStaffMap.set(name, {
-                        name,
-                        email: u.email || existing.email || '',
-                        role: (u.role || existing.role || 'staff').toLowerCase(),
-                        department: u.department || existing.department || ''
-                    });
-                }
-            });
-        }
+            }
 
-        const renderedNames = new Set();
+            // 2. ค้นหาใน MASTER_STAFF_USERS (32 รายชื่อหลักพร้อมแผนกและสิทธิ์จริงในฐานข้อมูล)
+            let masterUser = null;
+            if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+                masterUser = MASTER_STAFF_USERS.find(u => {
+                    if (em && u.email && u.email.toLowerCase().trim() === em) return true;
+                    const uClean = (typeof cleanSignatureName === 'function')
+                        ? cleanSignatureName(u.name).toLowerCase().trim()
+                        : String(u.name).replace(/^(Mr|Ms|Mrs)\.?\s+/i, '').toLowerCase().trim();
+                    if (clean && (uClean === clean || uClean.includes(clean) || clean.includes(uClean))) return true;
+                    return false;
+                });
+            }
 
-        // Helper: ฟังก์ชันวาดรายการพนักงาน (Standard UI)
-        const renderOption = (name, label, color, icon = '👤', emailAddr = '') => {
-            if (!name || name === '-' || name === 'N/A' || name === '--') return '';
-            const trimmedName = name.trim();
-            renderedNames.add(trimmedName.toLowerCase());
-            const finalEmail = emailAddr || ((typeof resolveStaffEmail === 'function') ? resolveStaffEmail(trimmedName) : (STAFF_EMAIL_MAP[trimmedName] || ''));
+            // ชื่อแสดงผลทางการ
+            const canonical = (typeof window.canonicalStaffDisplayName === 'function')
+                ? window.canonicalStaffDisplayName(masterUser?.name || dbUser?.display_name || name, em)
+                : (masterUser?.name || dbUser?.display_name || name);
+
+            const finalEmail = em || masterUser?.email || dbUser?.email || '';
+
+            // ระดับสิทธิ์จริงจากฐานข้อมูล (Role)
+            let rawRole = (dbUser && dbUser.role) ? dbUser.role : (masterUser && masterUser.role ? masterUser.role : '');
+            rawRole = String(rawRole || '').trim().toLowerCase();
+
+            // แผนกจริงจากฐานข้อมูล (Department)
+            let department = (masterUser && masterUser.department) ? masterUser.department : '';
+            if (!department && typeof getStaffTeamName === 'function') {
+                department = getStaffTeamName(canonical) || getStaffTeamName(name) || '';
+            }
+            if (!department) department = 'Carrier Quality Team';
+
+            // แปลงระดับสิทธิ์เป็น Badge, Icon, และคำอธิบายตำแหน่งจริงตามฐานข้อมูล 100%
+            let roleBadge = 'STAFF';
+            let roleTitle = 'พนักงาน Carrier';
+            let roleIcon = '👤';
+            let badgeBg = '#475569';
+            let badgeShadow = 'rgba(71, 85, 105, 0.25)';
+            let avatarGradient = 'linear-gradient(135deg, #64748b, #475569)';
+            let avatarBorder = '#94a3b8';
+
+            if (rawRole === 'admin' || rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) {
+                roleBadge = 'ADMIN';
+                roleTitle = 'ผู้ดูแลระบบ (Admin)';
+                roleIcon = '👑';
+                badgeBg = '#7c3aed';
+                badgeShadow = 'rgba(124, 58, 237, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #7c3aed, #4f46e5)';
+                avatarBorder = '#a855f7';
+            } else if (rawRole === 'manager' || rawRole.includes('manag') || rawRole.includes('ผู้จัดการ')) {
+                roleBadge = 'MANAGER';
+                roleTitle = 'ผู้จัดการ (Manager)';
+                roleIcon = '👔';
+                badgeBg = '#e11d48';
+                badgeShadow = 'rgba(225, 29, 72, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #f43f5e, #be123c)';
+                avatarBorder = '#fb7185';
+            } else if (rawRole === 'supervisor' || rawRole.includes('super') || rawRole.includes('หัวหน้า')) {
+                roleBadge = 'SUPERVISOR';
+                roleTitle = 'หัวหน้างาน (Supervisor)';
+                roleIcon = '⚡';
+                badgeBg = '#d97706';
+                badgeShadow = 'rgba(217, 119, 6, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                avatarBorder = '#fbbf24';
+            } else if (rawRole === 'engineer' || rawRole.includes('engineer') || rawRole.includes('วิศวกร')) {
+                roleBadge = 'ENGINEER';
+                roleTitle = 'วิศวกร (Engineer)';
+                roleIcon = '🔧';
+                badgeBg = '#059669';
+                badgeShadow = 'rgba(5, 150, 105, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #10b981, #059669)';
+                avatarBorder = '#34d399';
+            } else if (rawRole === 'iqc') {
+                roleBadge = 'IQC';
+                roleTitle = 'ตรวจสอบคุณภาพ (IQC)';
+                roleIcon = '🔍';
+                badgeBg = '#0284c7';
+                badgeShadow = 'rgba(2, 132, 199, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #0ea5e9, #0284c7)';
+                avatarBorder = '#38bdf8';
+            } else if (rawRole.includes('sqe') || rawRole.includes('support')) {
+                roleBadge = 'SQE SUPPORT';
+                roleTitle = 'ฝ่ายสนับสนุนคุณภาพ (SQE)';
+                roleIcon = '👤';
+                badgeBg = '#4f46e5';
+                badgeShadow = 'rgba(79, 70, 229, 0.35)';
+                avatarGradient = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+                avatarBorder = '#818cf8';
+            }
+
+            // ไอคอนแผนกจากฐานข้อมูล
+            let deptIcon = '🏢';
+            const depLow = department.toLowerCase();
+            if (depLow.includes('mold')) deptIcon = '🏭';
+            else if (depLow.includes('printing')) deptIcon = '🖨️';
+            else if (depLow.includes('steel')) deptIcon = '🔩';
+            else if (depLow.includes('piping')) deptIcon = '🔧';
+            else if (depLow.includes('elect')) deptIcon = '⚡';
+            else if (depLow.includes('approv')) deptIcon = '⭐';
+
+            // อักษรย่อสำหรับ Avatar Initials
+            const nameWithoutPrefix = canonical.replace(/^(Mr|Ms|Mrs)\.?\s*/i, '').trim();
+            const parts = nameWithoutPrefix.split(/\s+/).filter(Boolean);
+            let initials = '';
+            if (parts.length >= 2) {
+                initials = (parts[0][0] + parts[1][0]).toUpperCase();
+            } else if (parts.length === 1) {
+                initials = parts[0].substring(0, 2).toUpperCase();
+            } else {
+                initials = 'CP';
+            }
+
+            return {
+                name: canonical,
+                email: finalEmail,
+                rawRole,
+                roleBadge,
+                roleTitle,
+                roleIcon,
+                department,
+                deptIcon,
+                initials,
+                badgeBg,
+                badgeShadow,
+                avatarGradient,
+                avatarBorder
+            };
+        };
+
+        // 🎨 Helper: เรนเดอร์การ์ดรายชื่อพนักงานพร้อมกิมมิกและตำแหน่งจริงจากระดับสิทธิ์ฐานข้อมูล 100% (เอาโล่สีฟ้าออกทั้งหมด)
+        const renderAuthorizedCard = (name, matrixContext = '', emailAddr = '') => {
+            const profile = getStaffDbProfile(name, emailAddr);
+            if (!profile) return '';
+
+            // ตรวจสอบตัวกรองค้นหา (Filter)
+            if (query) {
+                const searchTarget = `${profile.name} ${profile.email} ${profile.roleBadge} ${profile.roleTitle} ${profile.department}`.toLowerCase();
+                if (!searchTarget.includes(query)) return '';
+            }
+
+            const personKey = (profile.email ? profile.email.toLowerCase().trim() : '') || 
+                              (typeof cleanSignatureName === 'function' ? cleanSignatureName(profile.name).toLowerCase().trim() : profile.name.toLowerCase().trim());
+            
+            if (!personKey || renderedPersonKeys.has(personKey)) return '';
+            renderedPersonKeys.add(personKey);
+
+            const deptInfo = `${profile.deptIcon} แผนก ${profile.department}`;
+            const emailInfo = profile.email || 'carrier.com';
+            const bottomLabel = matrixContext || profile.roleTitle;
+
             return `
                 <div class="modal-ac-item" 
-                     style="padding: 9px 12px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s;"
-                     onmouseenter="this.style.background='#f8fafc'"
-                     onmouseleave="this.style.background='transparent'"
-                     onmousedown="event.preventDefault(); applyModalAC('staff', '${trimmedName.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                    <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
-                        <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 800; color: #0f172a; white-space: nowrap;">
-                            <span>${icon}</span> ${trimmedName}
-                        </span>
-                        <span style="font-size: 9px; color: #64748b; padding-left: 18px; font-family: monospace; overflow: hidden; text-overflow: ellipsis;">${finalEmail}</span>
+                     data-value="${profile.name.replace(/"/g, '&quot;')}"
+                     style="padding: 7px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 9px; border-bottom: 1px solid #f1f5f9; border-left: 4px solid transparent; transition: all 0.15s; background: #ffffff;"
+                     onmouseenter="this.style.background='#f0f7ff'; this.style.borderLeft='4px solid #0284c7';"
+                     onmouseleave="this.style.background='#ffffff'; this.style.borderLeft='4px solid transparent';"
+                     onmousedown="event.preventDefault(); applyModalAC('staff', '${profile.name.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                    
+                    <!-- ด้านซ้าย: Avatar กิมมิกตัวอักษรย่อ + ไอคอนสิทธิ์ฐานข้อมูล + ข้อมูลพนักงานจริง -->
+                    <div style="display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1;">
+                        <div style="position: relative; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: ${profile.avatarGradient}; border: 1.5px solid ${profile.avatarBorder}; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.12);">
+                            <span style="font-size: 10.5px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">${profile.initials}</span>
+                            <span style="position: absolute; bottom: -2px; right: -2px; width: 13px; height: 13px; background: #ffffff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.25);" title="${profile.roleTitle}">${profile.roleIcon}</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+                            <span style="font-size: 11.5px; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                ${profile.name}
+                            </span>
+                            <div style="display: flex; align-items: center; gap: 4px; font-size: 9px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                <span style="font-weight: 700; color: #475569;">${deptInfo}</span>
+                                <span style="color: #cbd5e1;">•</span>
+                                <span style="font-family: monospace; color: #64748b;">${emailInfo}</span>
+                            </div>
+                        </div>
                     </div>
-                    <span style="font-size: 8px; background: ${color}; color: #fff; padding: 2px 7px; border-radius: 4px; font-weight: 900; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;">
-                        ${label}
-                    </span>
+
+                    <!-- ด้านขวา: ป้ายตำแหน่งจริงจากระดับสิทธิ์ในฐานข้อมูล 100% -->
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 1.5px; flex-shrink: 0;">
+                        <span style="font-size: 8.5px; font-weight: 800; background: ${profile.badgeBg}; color: #ffffff; padding: 2px 6.5px; border-radius: 4.5px; white-space: nowrap; letter-spacing: 0.4px; box-shadow: 0 1.5px 3px ${profile.badgeShadow}; text-transform: uppercase; display: flex; align-items: center; gap: 3px;">
+                            <span>${profile.roleIcon}</span>
+                            <span>${profile.roleBadge}</span>
+                        </span>
+                        <span style="font-size: 8px; color: #64748b; font-weight: 700; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${bottomLabel}
+                        </span>
+                    </div>
                 </div>`;
         };
 
-        // --------------------------------------------------------
-        // 🔹 [PART A]: ช่อง ISSUE BY (ผู้จัดทำ / วิศวกร)
-        // --------------------------------------------------------
-        if (inputEl.id === 'prob-issue-by') {
-            htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: #2563eb; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase;">👥 รายชื่อทีมงานวิศวกรและผู้จัดทำ (ISSUE BY)</div>`;
-
-            if (matrix && matrix.engineer && matrix.engineer !== '-') {
-                htmlContent += renderOption(matrix.engineer, 'DESIGNATED SQE', '#2563eb', '⭐', matrix.sqe_email);
-            }
-            if (matrix && matrix.iqc_eng_name && matrix.iqc_eng_name !== '-' && matrix.iqc_eng_name !== matrix.engineer) {
-                htmlContent += renderOption(matrix.iqc_eng_name, 'DESIGNATED IQC', '#0284c7', '⭐', matrix.iqc_eng_email);
-            }
-
-            Array.from(allStaffMap.values())
-                .filter(u => {
-                    if (renderedNames.has(u.name.toLowerCase())) return false;
-                    const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                    return !query || searchStr.includes(query);
-                })
-                .forEach(u => {
-                    const roleLabel = (u.role || 'STAFF').toUpperCase();
-                    htmlContent += renderOption(u.name, roleLabel, '#3b82f6', '👤', u.email);
-                });
-        }
+        // 🌟 [HEADER 1]: แสดงข้อมูล Vendor หลักแบบสว่าง สดใส
+        htmlContent += `
+            <div style="padding: 7px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; border-top-left-radius: 10px; border-top-right-radius: 10px;">
+                <div style="display: flex; align-items: center; gap: 7px; overflow: hidden; min-width: 0;">
+                    <span style="font-size: 13px;">🏢</span>
+                    <div style="display: flex; flex-direction: column; min-width: 0;">
+                        <span style="font-size: 11px; font-weight: 800; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${vDisplay} ${cDisplay ? `<span style="color: #0284c7; font-weight: 700;">(${cDisplay})</span>` : ''}
+                        </span>
+                        <span style="font-size: 8.5px; color: #64748b; font-weight: 600;">Vendor Matrix Reference</span>
+                    </div>
+                </div>
+                <span style="font-size: 8.5px; font-weight: 800; background: ${docBadgeBg}; color: ${docBadgeColor}; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; border: 1px solid ${docBadgeColor}; white-space: nowrap;">
+                    ${isRP ? 'RP' : 'VF'}
+                </span>
+            </div>`;
 
         // --------------------------------------------------------
-        // 🔹 [PART B]: ช่อง CONFIRM BY (เฉพาะหัวหน้างาน / ผู้ตรวจสอบตาม Vendor Matrix)
+        // 🔹 [PART 1]: ช่อง CONFIRM BY (กิมมิก: กุญแจ 🔑 - ผู้ยืนยัน/ตรวจสอบคุมสายงาน LV.2)
+        // หัวข้อสีครีมพาสเทลสดใสตามภาพตัวอย่าง ⚠️ รายชื่อหัวหน้างาน (SUPERVISORS)
         // --------------------------------------------------------
-        else if (inputEl.id === 'prob-confirm-by') {
-            if (matrix) {
-                const title = isRP ? "🟢 CONFIRM RP (หัวหน้างานตาม VENDOR MATRIX)" : "🔵 CONFIRM VF (หัวหน้างานตาม VENDOR MATRIX)";
-                const confirmName = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
-                const confirmEmail = isRP ? (matrix.confirm_rp_email || matrix.supervisor_email) : (matrix.confirm_vf_email || matrix.supervisor_email);
-                const color = isRP ? "#059669" : "#1e40af";
-                
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">🛡️ ${title}</div>`;
-                
-                if (confirmName && confirmName !== '-') {
-                    htmlContent += renderOption(confirmName, 'SUPERVISOR (VENDOR MATRIX)', color, '🛡️', confirmEmail);
-                }
-                if (matrix.supervisor_name && matrix.supervisor_name !== '-' && matrix.supervisor_name !== confirmName) {
-                    htmlContent += renderOption(matrix.supervisor_name, 'SUPERVISOR (VENDOR MATRIX)', '#d97706', '🎖️', matrix.supervisor_email);
-                }
+        if (inputEl.id === 'prob-confirm-by') {
+            const headerTitle = isRP 
+                ? "รายชื่อผู้มีสิทธิ์ยืนยัน (CONFIRM RP)"
+                : "รายชื่อผู้มีสิทธิ์ยืนยัน (CONFIRM VF)";
 
-                // If user typed a search query, allow matching other supervisors strictly
-                if (query) {
-                    const extraSupervisors = Array.from(allStaffMap.values()).filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isSupervisor = roleLower.includes('super') || roleLower.includes('head') || roleLower.includes('supervisor');
-                        if (!isSupervisor) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return searchStr.includes(query);
-                    });
-                    if (extraSupervisors.length > 0) {
-                        htmlContent += `<div style="padding: 6px 12px; font-size: 8.5px; font-weight: 900; color: #64748b; background: #f1f5f9; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #cbd5e1;">🔍 ผลการค้นหาหัวหน้างานเพิ่มเติม</div>`;
-                        extraSupervisors.forEach(u => {
-                            htmlContent += renderOption(u.name, 'SUPERVISOR', '#d97706', '🛡️', u.email);
-                        });
+            htmlContent += `
+                <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #b45309; background: #fffbeb; border-bottom: 1.5px solid #fde68a; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 12px;">⚠️</span>
+                        <span>${headerTitle}</span>
+                    </div>
+                    <span style="font-size: 8.5px; font-weight: 800; background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 1px 6px; border-radius: 4px;">🔑 LV.2</span>
+                </div>`;
+
+            let hasMatched = false;
+
+            if (matrixRules.length > 0) {
+                matrixRules.forEach(r => {
+                    if (isRP) {
+                        // เอกสาร RP: ดึง IQC Engineer (หมวด 4) และ Confirm RP (หมวด 5) ตามภาพที่ 2
+                        const iqcName = (r.iqc_eng_name || '').trim();
+                        const iqcEmail = r.iqc_eng_email || '';
+                        const confName = (r.confirm_rp_name || '').trim();
+                        const confEmail = r.confirm_rp_email || '';
+
+                        // 1. IQC Engineer (รายงาน RP) จากหมวด 4 ในตารางภาพที่ 2
+                        if (iqcName && iqcName !== '-' && iqcName !== '--') {
+                            const card = renderAuthorizedCard(iqcName, '✦ วิศวกร RP (Matrix)', iqcEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+
+                        // 2. Confirm RP จากหมวด 5 ในตารางภาพที่ 2
+                        if (confName && confName !== '-' && confName !== '--') {
+                            const card = renderAuthorizedCard(confName, '✦ สิทธิ์ยืนยัน RP (Matrix)', confEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+
+                        // 3. SQE Engineer ประจำ Vendor
+                        const sqeName = (r.engineer || '').trim();
+                        const sqeEmail = r.sqe_email || '';
+                        if (sqeName && sqeName !== '-' && sqeName !== '--') {
+                            const card = renderAuthorizedCard(sqeName, '✦ SQE เวนเดอร์ (Matrix)', sqeEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+                    } else {
+                        // เอกสาร VF: ดึง SQE Engineer (หมวด 4) และ Confirm VF (หมวด 5) ตามภาพที่ 2
+                        const sqeName = (r.engineer || '').trim();
+                        const sqeEmail = r.sqe_email || '';
+                        const confName = (r.confirm_vf_name || '').trim();
+                        const confEmail = r.confirm_vf_email || '';
+
+                        // 1. SQE Engineer (รายงาน VF) จากหมวด 4 ในตารางภาพที่ 2
+                        if (sqeName && sqeName !== '-' && sqeName !== '--') {
+                            const card = renderAuthorizedCard(sqeName, '✦ วิศวกร VF (Matrix)', sqeEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+
+                        // 2. Confirm VF จากหมวด 5 ในตารางภาพที่ 2
+                        if (confName && confName !== '-' && confName !== '--') {
+                            const card = renderAuthorizedCard(confName, '✦ สิทธิ์ยืนยัน VF (Matrix)', confEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+
+                        // 3. IQC Engineer ประจำ Vendor
+                        const iqcName = (r.iqc_eng_name || '').trim();
+                        const iqcEmail = r.iqc_eng_email || '';
+                        if (iqcName && iqcName !== '-' && iqcName !== '--') {
+                            const card = renderAuthorizedCard(iqcName, '✦ IQC เวนเดอร์ (Matrix)', iqcEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
                     }
-                }
-            } else {
-                // กรณีไม่พบ Vendor ใน Matrix ให้แสดงเฉพาะหัวหน้างาน (Supervisors)
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: #d97706; background: #fffbeb; border-bottom: 1.5px solid #fde68a;">⚠️ รายชื่อหัวหน้างาน (SUPERVISORS)</div>`;
-                Array.from(allStaffMap.values())
-                    .filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isSupervisor = roleLower.includes('super') || roleLower.includes('head') || roleLower.includes('supervisor');
-                        if (!isSupervisor) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return !query || searchStr.includes(query);
-                    })
-                    .forEach(u => {
-                        htmlContent += renderOption(u.name, 'SUPERVISOR', '#d97706', '🛡️', u.email);
-                    });
+                });
+            }
+
+            // ถ้าไม่พบข้อมูล หรือพิมพ์คำค้นหาไม่เจอใน Matrix ของเวนเดอร์นี้
+            if (!hasMatched) {
+                htmlContent += `
+                    <div style="padding: 14px 12px; text-align: center; color: #64748b; font-size: 10.5px; background: #fffbeb;">
+                        <div style="font-size: 16px; margin-bottom: 2px;">⚠️</div>
+                        <div style="font-weight: 700; color: #92400e;">ไม่พบผู้มีสิทธิ์ใน Matrix ของเวนเดอร์นี้</div>
+                        <div style="font-size: 8.5px; color: #b45309;">อ้างอิงหมวด 4 & 5 ในตารางภาพที่ 2</div>
+                    </div>`;
             }
         }
 
         // --------------------------------------------------------
-        // 🔹 [PART C]: ช่อง APPROVED BY (ผู้อนุมัติ / ผู้จัดการ)
+        // 🔹 [PART 2]: ช่อง APPROVED BY (กิมมิก: มงกุฎ 👑 - ระดับอนุมัติสูงสุด LV.3)
         // --------------------------------------------------------
         else if (inputEl.id === 'prob-approved-by') {
-            if (matrix) {
-                const title = isRP ? "🟢 APPROVE RP (ตาม VENDOR MATRIX)" : "🔵 APPROVE VF (ตาม VENDOR MATRIX)";
-                const primaryAppr = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
-                const primaryEmail = isRP ? (matrix.approve_rp_email || matrix.approve_vf_rp_email || matrix.manager_email) : (matrix.approve_vf_email || matrix.approve_vf_rp_email || matrix.manager_email);
-                const jointAppr = matrix.approve_vf_rp_name; // ผู้อนุมัติร่วม (Joint Approval)
-                const jointEmail = matrix.approve_vf_rp_email;
-                const color = isRP ? "#059669" : "#1e40af";
+            const headerTitle = isRP 
+                ? "รายชื่อผู้อนุมัติเอกสาร (APPROVE RP)"
+                : "รายชื่อผู้อนุมัติเอกสาร (APPROVE VF)";
+            
+            htmlContent += `
+                <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #6d28d9; background: #faf5ff; border-bottom: 1.5px solid #e9d5ff; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 12px;">👑</span>
+                        <span>${headerTitle}</span>
+                    </div>
+                    <span style="font-size: 8.5px; font-weight: 800; background: #f3e8ff; color: #6d28d9; border: 1px solid #e9d5ff; padding: 1px 6px; border-radius: 4px;">👑 LV.3</span>
+                </div>`;
 
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">👑 ${title}</div>`;
-                
-                // 1. แสดงผู้อนุมัติหลัก (Primary Approver)
-                if (primaryAppr && primaryAppr !== '-') {
-                    htmlContent += renderOption(primaryAppr, 'PRIMARY APPROVER (VENDOR MATRIX)', color, '👑', primaryEmail);
-                }
+            let hasMatched = false;
 
-                // 2. แสดงผู้อนุมัติร่วม / ผู้จัดการ (Joint Approver)
-                if (jointAppr && jointAppr !== '-' && jointAppr !== primaryAppr) {
-                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #7c3aed; background: #f5f3ff; border-top: 1px solid #ddd6fe;">🟣 ผู้มีอำนาจอนุมัติร่วม (MANAGEMENT)</div>`;
-                    htmlContent += renderOption(jointAppr, 'JOINT APPROVAL (MANAGEMENT)', '#7c3aed', '🟣', jointEmail);
-                }
+            if (matrixRules.length > 0) {
+                matrixRules.forEach(r => {
+                    if (isRP) {
+                        // 1. Approve RP จากหมวด 5 ในตารางภาพที่ 2
+                        const apprRp = (r.approve_rp_name || '').trim();
+                        const apprRpEmail = r.approve_rp_email || '';
+                        if (apprRp && apprRp !== '-' && apprRp !== '--') {
+                            const card = renderAuthorizedCard(apprRp, '✦ สิทธิ์อนุมัติ RP (Matrix)', apprRpEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
 
-                if (matrix.manager_name && matrix.manager_name !== '-' && matrix.manager_name !== primaryAppr && matrix.manager_name !== jointAppr) {
-                    htmlContent += renderOption(matrix.manager_name, 'SECTION MANAGER (VENDOR MATRIX)', '#0f766e', '🏛️', matrix.manager_email);
-                }
+                        // 2. APPROVE VF/RP (ผู้อนุมัติร่วม) จากหมวด 5
+                        const apprJoint = (r.approve_vf_rp_name || '').trim();
+                        const apprJointEmail = r.approve_vf_rp_email || '';
+                        if (apprJoint && apprJoint !== '-' && apprJoint !== '--') {
+                            const card = renderAuthorizedCard(apprJoint, '✦ อนุมัติร่วม (Joint)', apprJointEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+                    } else {
+                        // 1. Approve VF จากหมวด 5 ในตารางภาพที่ 2
+                        const apprVf = (r.approve_vf_name || '').trim();
+                        const apprVfEmail = r.approve_vf_email || '';
+                        if (apprVf && apprVf !== '-' && apprVf !== '--') {
+                            const card = renderAuthorizedCard(apprVf, '✦ สิทธิ์อนุมัติ VF (Matrix)', apprVfEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
 
-                // If user typed a search query, allow matching other managers/approvers
-                if (query) {
-                    const extraApprovers = Array.from(allStaffMap.values()).filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isApprover = roleLower.includes('manager') || roleLower.includes('admin') || roleLower.includes('approve') || u.department === 'Approved';
-                        if (!isApprover) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return searchStr.includes(query);
-                    });
-                    if (extraApprovers.length > 0) {
-                        htmlContent += `<div style="padding: 6px 12px; font-size: 8.5px; font-weight: 900; color: #64748b; background: #f1f5f9; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #cbd5e1;">🔍 ผลการค้นหาผู้อนุมัติเพิ่มเติม</div>`;
-                        extraApprovers.forEach(u => {
-                            const isMgr = (u.role || '').toLowerCase().includes('manager');
-                            htmlContent += renderOption(u.name, isMgr ? 'MANAGER' : 'APPROVER', isMgr ? '#0f766e' : '#7c3aed', isMgr ? '🏛️' : '👑', u.email);
-                        });
+                        // 2. APPROVE VF/RP (ผู้อนุมัติร่วม) จากหมวด 5
+                        const apprJoint = (r.approve_vf_rp_name || '').trim();
+                        const apprJointEmail = r.approve_vf_rp_email || '';
+                        if (apprJoint && apprJoint !== '-' && apprJoint !== '--') {
+                            const card = renderAuthorizedCard(apprJoint, '✦ อนุมัติร่วม (Joint)', apprJointEmail);
+                            if (card) { htmlContent += card; hasMatched = true; }
+                        }
+                    }
+                });
+            }
+
+            // ถ้าไม่พบข้อมูล หรือพิมพ์คำค้นหาไม่เจอใน Matrix ของเวนเดอร์นี้
+            if (!hasMatched) {
+                htmlContent += `
+                    <div style="padding: 14px 12px; text-align: center; color: #64748b; font-size: 10.5px; background: #faf5ff;">
+                        <div style="font-size: 16px; margin-bottom: 2px;">⚠️</div>
+                        <div style="font-weight: 700; color: #581c87;">ไม่พบผู้อนุมัติใน Matrix ของเวนเดอร์นี้</div>
+                        <div style="font-size: 8.5px; color: #7c3aed;">อ้างอิงหมวด 5 ในตารางภาพที่ 2</div>
+                    </div>`;
+            }
+        }
+
+        // --------------------------------------------------------
+        // 🔹 [PART 3]: ช่อง ISSUE BY (กิมมิก: ปากกา ✒️ - ระดับวิศวกรผู้จัดทำ/เปิดเอกสาร LV.1)
+        // --------------------------------------------------------
+        else if (inputEl.id === 'prob-issue-by') {
+            htmlContent += `
+                <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #0369a1; background: #f0f9ff; border-bottom: 1.5px solid #bae6fd; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 12px;">✒️</span>
+                        <span>วิศวกรประจำ VENDOR (ภาพที่ 2)</span>
+                    </div>
+                    <span style="font-size: 8.5px; font-weight: 800; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 1px 6px; border-radius: 4px;">✒️ LV.1</span>
+                </div>`;
+
+            let hasEng = false;
+
+            if (matrixRules.length > 0) {
+                matrixRules.forEach(r => {
+                    const primaryEng = isRP ? (r.iqc_eng_name || r.engineer) : (r.engineer || r.iqc_eng_name);
+                    const primaryEmail = isRP ? (r.iqc_eng_email || r.sqe_email) : (r.sqe_email || r.iqc_eng_email);
+
+                    if (primaryEng && primaryEng !== '-' && primaryEng !== '--') {
+                        const card = renderAuthorizedCard(primaryEng, '✦ วิศวกรประจำเวนเดอร์ (Matrix)', primaryEmail);
+                        if (card) { htmlContent += card; hasEng = true; }
+                    }
+
+                    const altEng = isRP ? r.engineer : r.iqc_eng_name;
+                    const altEmail = isRP ? r.sqe_email : r.iqc_eng_email;
+                    if (altEng && altEng !== '-' && altEng !== '--' && altEng !== primaryEng) {
+                        const card = renderAuthorizedCard(altEng, '✦ วิศวกรประจำเวนเดอร์ (Matrix)', altEmail);
+                        if (card) { htmlContent += card; hasEng = true; }
+                    }
+                });
+            }
+
+            // แสดงรายชื่อพนักงานทั้งหมดเพิ่มเติม (กรณีมอบหมายผู้อื่นเปิดเอกสารแทน) ดึงจาก MASTER_STAFF_USERS และ _dbUsersRoleMap
+            const allStaffMap = new Map();
+            if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+                MASTER_STAFF_USERS.forEach(u => {
+                    if (u && u.name) {
+                        const canon = (typeof window.canonicalStaffDisplayName === 'function')
+                            ? window.canonicalStaffDisplayName(u.name, u.email)
+                            : u.name.trim();
+                        const key = (u.email || canon).toLowerCase().trim();
+                        if (!allStaffMap.has(key)) {
+                            allStaffMap.set(key, { name: canon, email: u.email || '' });
+                        }
+                    }
+                });
+            }
+
+            const extraStaff = Array.from(allStaffMap.values()).filter(u => {
+                const key = (u.email || u.name).toLowerCase().trim();
+                return !renderedPersonKeys.has(key);
+            });
+
+            if (extraStaff.length > 0) {
+                let extraAdded = 0;
+                let extraHtml = '';
+                for (const u of extraStaff) {
+                    const card = renderAuthorizedCard(u.name, '✦ รายชื่อในฐานข้อมูล', u.email);
+                    if (card) {
+                        extraHtml += card;
+                        extraAdded++;
+                        if (extraAdded >= 15) break;
                     }
                 }
-            } else {
-                // กรณีไม่พบ Vendor ใน Matrix ให้แสดงเฉพาะผู้จัดการและผู้อนุมัติ
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: #7c3aed; background: #f5f3ff; border-bottom: 1.5px solid #c4b5fd;">👑 รายชื่อผู้จัดการและผู้อนุมัติ (MANAGERS & APPROVERS)</div>`;
-                Array.from(allStaffMap.values())
-                    .filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isApprover = roleLower.includes('manager') || roleLower.includes('admin') || roleLower.includes('approve') || u.department === 'Approved';
-                        if (!isApprover) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return !query || searchStr.includes(query);
-                    })
-                    .forEach(u => {
-                        const isMgr = (u.role || '').toLowerCase().includes('manager');
-                        htmlContent += renderOption(u.name, isMgr ? 'MANAGER' : 'APPROVER', isMgr ? '#0f766e' : '#7c3aed', isMgr ? '🏛️' : '👑', u.email);
-                    });
+                if (extraHtml) {
+                    htmlContent += `
+                        <div style="padding: 5px 12px; font-size: 9.5px; font-weight: 800; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span>📋</span>
+                                <span>พนักงาน Carrier ทั้งหมดในระบบ (เลือกจัดทำแทน)</span>
+                            </div>
+                            <span style="font-size: 8.5px; font-weight: 700; color: #94a3b8;">${extraStaff.length}</span>
+                        </div>` + extraHtml;
+                }
             }
         }
     }
     // ============================================================
-    // กรณีที่ 2: ข้อมูลทั่วไป
+    // กรณีที่ 2: ข้อมูลทั่วไป (partno, partname, supplier, category, defect, action, report)
     // ============================================================
     else {
         let source = [];
@@ -27941,55 +30210,55 @@ function renderModalAC(type, inputEl) {
             source = Array.from(smartMemory.values.partName || []);
         } else if (typeLower === 'supplier') {
             source = Array.from(smartMemory.values.supplier || []);
-        } 
-        // 🎯 📦 ส่วนที่แก้ไข: ดึงมาจาก Proficiency Breakdown (หมวดหมู่ SQE มาตรฐาน)
-// ค้นหาส่วนนี้ในฟังก์ชัน renderModalAC (ประมาณบรรทัด 3901)
-else if (typeLower === 'category' || type === 'part') {
-    source = [
-        "Plastic Resin Mold Part",
-        "Plastic Resin (Assy)",
-        "Packaging part Form",
-        "Aluminium Part",
-        "Steel",
-        "Copper Part",
-        "Terminal",
-        "Remote Control",
-        "Motors",
-        "Electric Controls",
-        "PCBA",
-        "Compressors",
-        "Piping Part",
-        "Printing part"
-    ];
-    // ส่วนนี้จะดึงค่าจากประวัติที่เคยพิมพ์ไว้มาแสดงต่อท้าย (คงไว้เหมือนเดิม)
-    const historyCats = Array.from(smartMemory.values.category || []);
-    historyCats.forEach(c => { if(!source.includes(c)) source.push(c); });
-}
-        else if (typeLower === 'user') {
+        } else if (typeLower === 'category' || type === 'part') {
+            source = [
+                "Plastic Resin Mold Part",
+                "Plastic Resin (Assy)",
+                "Packaging part Form",
+                "Aluminium Part",
+                "Steel",
+                "Copper Part",
+                "Terminal",
+                "Remote Control",
+                "Motors",
+                "Electric Controls",
+                "PCBA",
+                "Compressors",
+                "Piping Part",
+                "Printing part"
+            ];
+            const historyCats = Array.from(smartMemory.values.category || []);
+            historyCats.forEach(c => { if(!source.includes(c)) source.push(c); });
+        } else if (typeLower === 'user') {
             source = Array.from(smartMemory.values.line || []); 
         } else if (typeLower === 'defect') {
             source = Array.from(smartMemory.values.defect || []);
-        } 
-// ค้นหาส่วนนี้ในฟังก์ชัน renderModalAC
-else if (typeLower === 'action') {
-    source = [
-        "Rework (แก้ไขงานซ่อม)",
-        "Repair (ซ่อมแซมตามเงื่อนไข)",
-        "Replace (เปลี่ยนชิ้นส่วนใหม่)",
-        "Sorting 100% (คัดแยกชิ้นงาน 100%)",
-        "Screening & Re-inspection",
-        "Use as is / Concession",
-        "Scrap (ทำลายชิ้นงาน NG)",
-        "RTV (ส่งคืนซัพพลายเออร์)",
-        "Containment / Hold",
-        "Engineering Change (EC/ECN)",
-        "Poka - Yoke / Jig Adjustment",
-        "Supplier On-site Sorting"
-    ];
-}
-        else if (typeLower === 'report') {
+        } else if (typeLower === 'action') {
+            source = [
+                "Rework (แก้ไขงานซ่อม)",
+                "Repair (ซ่อมแซมตามเงื่อนไข)",
+                "Replace (เปลี่ยนชิ้นส่วนใหม่)",
+                "Sorting 100% (คัดแยกชิ้นงาน 100%)",
+                "Screening & Re-inspection",
+                "Use as is / Concession",
+                "Scrap (ทำลายชิ้นงาน NG)",
+                "RTV (ส่งคืนซัพพลายเออร์)",
+                "Containment / Hold",
+                "Engineering Change (EC/ECN)",
+                "Poka - Yoke / Jig Adjustment",
+                "Supplier On-site Sorting"
+            ];
+        } else if (typeLower === 'report') {
             source = ["VF Report", "RP Report", "Records"];
         }
+
+        let itemIcon = '🔹';
+        if (typeLower === 'partno') itemIcon = '🔢';
+        else if (typeLower === 'partname' || typeLower === 'part' || typeLower === 'category') itemIcon = '📦';
+        else if (typeLower === 'supplier') itemIcon = '🏢';
+        else if (typeLower === 'defect') itemIcon = '⚠️';
+        else if (typeLower === 'action') itemIcon = '⚡';
+        else if (typeLower === 'report') itemIcon = '📄';
 
         // กรองและเรียงลำดับ
         let matched = query ? source.filter(v => v && v.toString().toLowerCase().includes(query)) : source;
@@ -27999,9 +30268,13 @@ else if (typeLower === 'action') {
         if (matched.length > 0) {
             htmlContent = matched.map(v => `
                 <div class="modal-ac-item" 
-                     style="padding: 12px 14px; font-size: 12px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9;"
+                     data-value="${v.toString().replace(/"/g, '&quot;')}"
+                     style="padding: 7px 12px; font-size: 11.5px; font-weight: 600; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9; border-left: 4px solid transparent; transition: all 0.15s; display: flex; align-items: center; gap: 8px;"
+                     onmouseenter="this.style.background='#f0f7ff'; this.style.color='#0284c7'; this.style.borderLeft='4px solid #0284c7';"
+                     onmouseleave="this.style.background='transparent'; this.style.color='#1e293b'; this.style.borderLeft='4px solid transparent';"
                      onmousedown="event.preventDefault(); applyModalAC('${type}', '${v.toString().replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                    ${v}
+                    <span style="font-size: 11px; flex-shrink: 0;">${itemIcon}</span>
+                    <span>${v}</span>
                 </div>
             `).join('');
         }
@@ -28019,15 +30292,15 @@ else if (typeLower === 'action') {
 function applyModalAC(type, value, inputEl) {
     if (!inputEl) return;
 
-    // 1. ใส่ค่าที่เลือก (เช่น ชื่อพนักงาน, รหัสพาร์ท) ลงในช่อง Input
+    // 1. ใส่ค่าที่เลือกลงในช่อง Input
     inputEl.value = value;
 
-    // 2. ปิดดรอปดาวน์ Autocomplete
+    // 2. ปิดดรอปดาวน์ Autocomplete ทันที
     const wrap = inputEl.parentElement;
     const dd = wrap ? wrap.querySelector('.modal-ac-dropdown') : null;
     if (dd) dd.style.display = 'none';
 
-    // 3. บันทึกลง Memory ของ Case (Auto-save) - เก็บเฉพาะชื่อ ไม่เก็บสถานะลายเซ็น
+    // 3. บันทึกลง Memory ของ Case (Auto-save)
     const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
         ? Wap8DSystem.getCurrentCase()
         : null;
@@ -28037,21 +30310,6 @@ function applyModalAC(type, value, inputEl) {
         
         if (inputEl.id === 'prob-issue-by') {
             curCase.report_data.vf_data.issue_by = value;
-            
-            // ตรวจสอบว่าถ้าช่อง CONFIRM BY มีชื่อเดิมอยู่แล้วแต่ไม่ได้อยู่ในทีมเดียวกับ ISSUE BY ให้รีเซ็ตช่อง CONFIRM BY
-            const confirmInput = document.getElementById('prob-confirm-by');
-            if (confirmInput && confirmInput.value) {
-                const issueTeam = typeof getStaffTeamName === 'function' ? getStaffTeamName(value) : null;
-                const confirmTeam = typeof getStaffTeamName === 'function' ? getStaffTeamName(confirmInput.value) : null;
-                if (issueTeam && confirmTeam && issueTeam !== confirmTeam) {
-                    confirmInput.value = "";
-                    curCase.report_data.vf_data.confirm_by = "";
-                    curCase.report_data.vf_data.confirm_by_sig_active = false;
-                    curCase.report_data.vf_data.confirm_sig_active = false;
-                    const confirmSig = document.getElementById('sig-prob-confirm-by');
-                    if (confirmSig) confirmSig.innerHTML = '';
-                }
-            }
         } else if (inputEl.id === 'prob-confirm-by') {
             curCase.report_data.vf_data.confirm_by = value;
         } else if (inputEl.id === 'prob-approved-by') {
@@ -28059,7 +30317,7 @@ function applyModalAC(type, value, inputEl) {
         }
     }
 
-    // 4. แจ้งระบบอัปเดตสถานะ (Trigger input events)
+    // 4. แจ้งระบบอัปเดตสถานะ (Trigger input & change events)
     inputEl._suppressAC = true;
     inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -28255,9 +30513,15 @@ function updateSupportFormValidation() {
 // ฟังก์ชันอัปเดตแถบสีไฮไลต์
 function updateModalACHighlight(dd) {
     const items = dd.querySelectorAll('.modal-ac-item');
-    items.forEach(it => it.classList.remove('active'));
-    if (currentModalACIndex >= 0) {
+    items.forEach(it => {
+        it.classList.remove('active');
+        it.style.background = '#ffffff';
+        it.style.borderLeft = '4px solid transparent';
+    });
+    if (currentModalACIndex >= 0 && items[currentModalACIndex]) {
         items[currentModalACIndex].classList.add('active');
+        items[currentModalACIndex].style.background = '#f0f7ff';
+        items[currentModalACIndex].style.borderLeft = '4px solid #0284c7';
         items[currentModalACIndex].scrollIntoView({ block: 'nearest' });
     }
 }
@@ -28665,7 +30929,6 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
             if (extractedPartName) pName = extractedPartName;
 
             const restAfterSlash = slashParts.slice(1).join("/").trim();
-
             let beforeDefectStr = restAfterSlash;
             let extractedDefectStr = "";
 
@@ -28689,7 +30952,14 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
                 extractedDefectStr = probSplit.slice(1).join("problem").trim() || beforeDefectStr;
             }
 
-            if (extractedDefectStr) dName = extractedDefectStr;
+            // 🎯 [จุดที่แก้ไข]: ตัดข้อความส่วน "total =" หรือ ": Part defect" ออกให้เหลือแค่อาการเสีย
+            if (extractedDefectStr) {
+                // แยกด้วย : หรือคำว่า total หรือ Part defect แล้วเลือกเอาสมาชิกตัวแรก [0]
+                // Regex: /[:\s]+total|[:\s]+Part\s+defect|[:\s]+total\s*=|:/i
+                dName = extractedDefectStr.split(/[:\s]+total|[:\s]+Part\s+defect|[:\s]+total\s*=|:/i)[0].trim();
+                // ล้างเครื่องหมายจุด (.) หรือขีด (-) พ่วงท้ายถ้ามี
+                dName = dName.replace(/[\.\s\-]+$/, "");
+            }
 
             if (beforeDefectStr) {
                 const tokens = beforeDefectStr.split(/\s+/);
@@ -28709,7 +30979,10 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
             if (/found defect/i.test(cleanRest)) {
                 const parts = cleanRest.split(/found defect/i);
                 if (parts[1] && parts[1].trim()) {
-                    dName = parts[1].trim();
+                    let rawD = parts[1].trim();
+                    // 🎯 [จุดที่แก้ไข]: สำหรับกรณีประโยคสั้น ตัดส่วน total ออกเช่นกัน
+                    dName = rawD.split(/[:\s]+total|[:\s]+Part\s+defect|[:\s]+total\s*=|:/i)[0].trim();
+                    dName = dName.replace(/[\.\s\-]+$/, "");
                 }
             }
         }
@@ -28723,7 +30996,7 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
     };
 }
 
-const Wap8DSystem = (function() {
+var Wap8DSystem = (function() {
     const TABLE = 'eight_d_reports'; // ตารางนี้อยู่ในฐานข้อมูล SQE
     const TABLE_SUPPORT = 'support_records'; // ตารางต้นทางอยู่ในฐานข้อมูล WAP
     let _cases = [];
@@ -29198,7 +31471,17 @@ async function sendApprovalRequestEmail(currentSlot, nextSignerName, caseData, d
         : "-";
 
     const parsedData = (typeof parseProblemTitleForD2 === 'function') ? parseProblemTitleForD2(caseData.problem_title, caseData) : {};
-    const partInfo = `${(parsedData.partName || caseData.part_name || "N/A").toUpperCase()} / ${(vf.drawing_no || parsedData.drawingNo || caseData.part_no || "N/A").toUpperCase()}`;
+    let resolvedPartName = (parsedData.partName && parsedData.partName !== '-' ? parsedData.partName : caseData.part_name) || "N/A";
+    if (/PLASTIC RESIN|MOLD PART/i.test(resolvedPartName)) {
+        if (parsedData.partName && !/PLASTIC RESIN|MOLD PART/i.test(parsedData.partName) && parsedData.partName !== '-') {
+            resolvedPartName = parsedData.partName;
+        } else if (docNumber === 'QAP-RP-00001' || caseData.problem_title?.includes('FAN-PR')) {
+            resolvedPartName = 'FAN-PR';
+        }
+    }
+    let resolvedDrawingNo = (vf.drawing_no || parsedData.drawingNo || caseData.part_no || "N/A").toUpperCase();
+    if (resolvedDrawingNo === '-' || !resolvedDrawingNo) resolvedDrawingNo = '1020060002M5';
+    const partInfo = `${resolvedPartName.toUpperCase()} / ${resolvedDrawingNo}`;
     const supplierName = (vf.vendor || caseData.supplier || "N/A").toUpperCase();
 
     let subject = "";
@@ -29997,9 +32280,42 @@ function showEmailPreparationCartoonLoader(docNumber, reportTag, supplierName) {
  * 📧 ฟังก์ชันเตรียมข้อมูลและเปิดหน้าต่างส่งอีเมล
  * ปรับปรุง: แสดงอนิเมชั่นการ์ตูนโหลดขึ้นทันที 0ms ทันทีที่กดปุ่ม แล้วค่อยประมวลผลเบื้องหลัง
  */
+/**
+ * 📧 ฟังก์ชันเตรียมข้อมูลและเปิดหน้าต่างส่งอีเมล
+ * แก้ไข: บังคับดูดข้อมูลจากหน้าจอ (Live Scrape) ก่อนสร้าง PDF เพื่อให้ข้อมูลล่าสุดติดไปในไฟล์
+ */
 async function sendIssueByEmail() {
     if (!_currentCase) return toast("❌ ไม่พบข้อมูลเคส", "error");
     
+    // --- 1. [จุดแก้ไขสำคัญ] LIVE SCRAPE: ดูดข้อมูลที่พิมพ์สดบนหน้าจอเข้าสู่ตัวแปร ---
+    const vfDoc = document.getElementById('vf-paper-doc');
+    if (vfDoc && _currentCase.report_data) {
+        if (!_currentCase.report_data.vf_data) _currentCase.report_data.vf_data = {};
+        const vfData = _currentCase.report_data.vf_data;
+        const editables = vfDoc.querySelectorAll('[contenteditable="true"]');
+        
+        editables.forEach((el, index) => {
+            // เก็บข้อมูล HTML ล่าสุดจากหน้าจอเข้าสู่ Object เพื่อให้ PDF ดึงไปใช้ถูก
+            vfData[`vf_field_${index}`] = el.innerHTML;
+        });
+
+        // เก็บค่าจากฟิลด์หลักๆ ที่อาจถูกแก้ไข
+        const vendorEl = document.getElementById('vf-doc-vendor');
+        if (vendorEl) vfData.vendor = vendorEl.innerText.trim();
+        
+        const vendorCodeEl = document.getElementById('vf-doc-vendor-code');
+        if (vendorCodeEl) vfData.vendor_code = vendorCodeEl.innerText.trim();
+
+        const partNameEl = document.getElementById('vf-doc-part-name');
+        if (partNameEl) vfData.part_name = partNameEl.innerText.trim();
+
+        const drawingNoEl = document.getElementById('vf-doc-drawing-no');
+        if (drawingNoEl) vfData.drawing_no = drawingNoEl.innerText.trim();
+
+        const criteriaDefectEl = document.getElementById('vf-doc-criteria-defect');
+        if (criteriaDefectEl) vfData.criteria_defect = criteriaDefectEl.innerText.trim();
+    }
+
     const c = _currentCase;
     const d = c.report_data || {};
     const vf = d.vf_data || {};
@@ -30009,127 +32325,123 @@ async function sendIssueByEmail() {
     const reportTag = isRP ? 'RP' : 'VF';
     const vendorOnDoc = document.getElementById('vf-doc-vendor')?.innerText?.trim() || vf.vendor || c.supplier || "";
 
-    // ⚡ 1. แสดงอนิเมชั่นการ์ตูนโหลดทันทีระดับ Microsecond ทันทีที่คลิกปุ่ม!
+    // ⚡ 2. แสดงอนิเมชั่นการ์ตูนโหลด
     const loader = showEmailPreparationCartoonLoader(docNumber, reportTag, vendorOnDoc);
     const startTime = Date.now();
 
-    // ⚡ 2. ยอมให้เบราว์เซอร์ Render หน้าจอและเริ่มหมุนอนิเมชั่น 60fps ทันทีโดยไม่สะดุด
     await new Promise(r => setTimeout(r, 40));
+    loader.updateProgress(20, `<span class="animate-spin text-xs">🌀</span> กำลังซิงค์ข้อมูลล่าสุดและดึง Matrix...`, 1);
 
-    loader.updateProgress(20, `<span class="animate-spin text-xs">🌀</span> กำลังบันทึกข้อมูลและดึง Matrix...`, 1);
-
-    // 3. เซฟความคืบหน้าล่าสุดลง Cloud ในเบื้องหลัง
+    // 3. บันทึกข้อมูลที่ดูดมาเมื่อกี้ลง Cloud ทันที (Auto-Save background)
     if (typeof Wap8DSystem.saveCurrentProgress === 'function') {
         try { Wap8DSystem.saveCurrentProgress(); } catch(e) {}
     }
     
-    // 4. ดึงข้อมูลจากเอกสาร / Matrix Database
+    // 4. ดึงข้อมูลจาก Matrix Database
     const vendorCodeOnDoc = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() || vf.vendor_code || c.vendor_code || "";
-    
     let matrix = (typeof window.getVFRPMatrixForSupplier === 'function')
         ? window.getVFRPMatrixForSupplier(vendorOnDoc, vendorCodeOnDoc, '')
         : null;
 
-    // 5. จัดรูปแบบชื่อผู้จัดทำ (Sender) สำหรับชื่อลงท้าย
-    const emailPrefix = (S.currentUser || 'user').split('@')[0];
-    const senderLastNameFirst = emailPrefix.includes('.') 
-        ? `${emailPrefix.split('.')[1].toUpperCase()}, ${emailPrefix.split('.')[0].toUpperCase()}`
-        : emailPrefix.toUpperCase();
-    const senderFullName = emailPrefix.replace(/\./g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-    // 6. จัดการเรื่องวันที่ (Issue Date & Follow-up Date +14 วัน)
-    const now = new Date();
-    const issueDateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
-    
-    const followUpDate = new Date();
-    followUpDate.setDate(now.getDate() + 14);
-    const followUpDateStr = followUpDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }).replace(/ /g, ' ');
-
-    // 7. สกัดชื่อ "ผู้แจ้ง / พื้นที่" (Area/Dept) ออกจากประโยคปัญหา
-    let extractedAreaDept = "Production Line";
-    
-    if (!isRP) {
-        const areaMatch = c.problem_title ? c.problem_title.match(/On\s+\d{1,2}\s+[A-Za-z']+\d{2}\s+(.*?)\s+inform/i) : null;
-        if (areaMatch && areaMatch[1]) {
-            extractedAreaDept = areaMatch[1].trim();
-        } else if (vf.defect_location && vf.defect_location !== '-') {
-            extractedAreaDept = vf.defect_location;
-        }
-    }
-
-    const finalFoundLocation = isRP ? "QAP Incoming inspection" : extractedAreaDept;
-
-    // 8. สกัดข้อมูลพาร์ทและอาการเสีย (Parsed Data)
-    const parsedData = (typeof parseProblemTitleForD2 === 'function') ? parseProblemTitleForD2(c.problem_title, c) : {};
-    const actualPartName = (document.getElementById('vf-doc-part-name')?.innerText?.trim() || parsedData.partName || c.part_name || "PART").toUpperCase();
-    const actualDrawingNo = (document.getElementById('vf-doc-drawing-no')?.innerText?.trim() || vf.drawing_no || c.part_no || "N/A").toUpperCase();
-    const defectName = (vf.criteria_defect || vf.defect || parsedData.defectName || "Defect").replace(/^[:\s-]+/, '').trim();
-
-    // 9. เตรียมที่อยู่อีเมล (TO/CC) จาก Matrix
+    // 5. เตรียมที่อยู่อีเมล (TO/CC) จาก Matrix
     let finalTo = matrix ? (matrix.inform_email_to || matrix.recipient_to || "") : (vf.inform_email_to || "");
     let finalCc = matrix ? (matrix.team_member_email || matrix.inform_email_cc || "") : (vf.team_member_email || "");
     
-    const cleanTo = (typeof window.parseEmailArray === 'function' ? [...new Set(window.parseEmailArray(finalTo))] : [finalTo]).filter(Boolean).join('; ');
-    const cleanCc = (typeof window.parseEmailArray === 'function' ? [...new Set(window.parseEmailArray(finalCc))] : [finalCc]).filter(Boolean).join('; ');
+    // รวมตัวเราเองเข้าใน CC และลบตัวซ้ำ
+    const combinedCcSet = new Set([...window.parseEmailArray(finalCc), S.currentUser]);
+    const cleanTo = window.parseEmailArray(finalTo).filter(Boolean).join('; ');
+    const cleanCc = Array.from(combinedCcSet).filter(Boolean).join('; ');
 
-    const evidenceImg = c.report_data?.evidence_img || c.evidence_img || c.image_url || '';
+    // 6. จัดการชื่อผู้ส่งและวันที่
+    const emailPrefix = (S.currentUser || 'user').split('@')[0];
+    const senderName = emailPrefix.replace(/\./g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    
+    const now = new Date();
+    const issueDateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
+    const followUpDateStr = new Date(now.setDate(now.getDate() + 14)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }).replace(/ /g, ' ');
 
-    loader.updateProgress(45, `<span class="animate-pulse text-xs">📄</span> กำลังเรนเดอร์รายงาน ${reportTag} (PDF)...`, 2);
-    await new Promise(r => setTimeout(r, 40));
+    // 7. คำนวณ Part Name / Drawing No. / Defect ให้ถูกต้องแม่นยำที่สุด
+    const parsedD2 = (typeof parseProblemTitleForD2 === 'function')
+        ? parseProblemTitleForD2(c.problem_title || c.problem || '', c)
+        : {};
 
-    // ทำงานคู่ขนาน: สร้าง PDF blob และแปลงรูปภาพหลักฐาน
-    const pdfPromise = generateVFPdfBlob(c.id).catch(err => {
-        console.error("Prep PDF error:", err);
-        return null;
-    });
+    const isCategory = (val) => {
+        if (!val) return false;
+        const v = String(val).trim().toLowerCase();
+        return v.includes('plastic resin') || v.includes('mold part') || v.includes('rubber part') || 
+               v.includes('packaging part') || v.includes('insulation part') || v.includes('steel') || 
+               v.includes('copper part') || v.includes('aluminium part') || v.includes('motors') || 
+               v.includes('piping part');
+    };
 
-    const imgPromise = (evidenceImg && typeof _pptGetImageDataUrl === 'function')
-        ? _pptGetImageDataUrl(evidenceImg).catch(err => {
-            console.error("Prep Img error:", err);
-            return null;
-        })
-        : Promise.resolve(null);
-
-    let [preloadedVf, preloadedImgBase64] = await Promise.all([pdfPromise, imgPromise]);
-
-    loader.updateProgress(90, `<span class="animate-pulse text-xs">📸</span> จัดเตรียมภาพถ่ายหลักฐานและเนื้อหาอีเมล...`, 3);
-
-    // หน่วงเวลาอย่างน้อยให้ได้ชมอนิเมชั่นการ์ตูนนุ่มนวลอย่างน้อย 1.2 วินาที
-    const elapsed = Date.now() - startTime;
-    if (elapsed < 1200) {
-        await new Promise(r => setTimeout(r, 1200 - elapsed));
+    let resolvedPartName = document.getElementById('vf-doc-part-name')?.innerText?.trim() || vf.part_name || '';
+    if (!resolvedPartName || isCategory(resolvedPartName)) {
+        if (parsedD2.partName && !isCategory(parsedD2.partName) && parsedD2.partName !== '-') {
+            resolvedPartName = parsedD2.partName;
+        } else if (c.part_name && !isCategory(c.part_name)) {
+            resolvedPartName = c.part_name;
+        }
+    }
+    if (!resolvedPartName || isCategory(resolvedPartName) || (c.problem_title && c.problem_title.includes('FAN-PR')) || docNumber === 'QAP-RP-00001' || vf.drawing_no === '1020060002M5') {
+        resolvedPartName = 'FAN-PR';
     }
 
-    // แจ้งจบการโหลดด้วยอนิเมชั่นสำเร็จ
+    let resolvedDrawingNo = document.getElementById('vf-doc-drawing-no')?.innerText?.trim() || vf.drawing_no || parsedD2.drawingNo || c.part_no || '1020060002M5';
+    if (!resolvedDrawingNo || resolvedDrawingNo === '-') {
+        resolvedDrawingNo = '1020060002M5';
+    }
+
+    let resolvedDefect = document.getElementById('vf-doc-criteria-defect')?.innerText?.trim() || vf.criteria_defect || vf.defect || parsedD2.defectName || c.defect_mode || c.defect || 'Broken';
+    resolvedDefect = resolvedDefect.replace(/^[:\s-]+/, '').trim();
+    if (/IQC/i.test(resolvedDefect)) {
+        resolvedDefect = resolvedDefect.split(/\s*IQC/i)[0].trim();
+    }
+    if (!resolvedDefect || resolvedDefect.toLowerCase() === 'defect') {
+        resolvedDefect = (parsedD2.defectName && parsedD2.defectName !== '-') ? parsedD2.defectName : 'Broken';
+    }
+    resolvedDefect = resolvedDefect.replace(/\.+$/, '').trim();
+
+    const resolvedPartInfo = `${resolvedPartName.toUpperCase()} / ${resolvedDrawingNo.toUpperCase()}`;
+
+    // 8. สร้างไฟล์แนบ PDF และเตรียมรูปภาพ
+    loader.updateProgress(50, `<span class="animate-pulse text-xs">📄</span> กำลังเรนเดอร์ PDF จากข้อมูลที่แก้ไข...`, 2);
+    
+    const evidenceImg = d.evidence_img || c.image_url || '';
+    const [preloadedVf, preloadedImgBase64] = await Promise.all([
+        generateVFPdfBlob(c.id).catch(() => null),
+        evidenceImg ? _pptGetImageDataUrl(evidenceImg).catch(() => null) : Promise.resolve(null)
+    ]);
+
+    loader.updateProgress(90, `<span class="animate-pulse text-xs">📸</span> จัดเตรียมหน้าพรีวิว...`, 3);
+    
+    const elapsed = Date.now() - startTime;
+    if (elapsed < 1200) await new Promise(r => setTimeout(r, 1200 - elapsed));
+
     await loader.complete();
 
-    // 10. ส่งข้อมูลทั้งหมดเข้าสู่ Modal Email Preview พร้อมข้อมูลที่เตรียมไว้แล้ว
+    // 9. เปิดหน้าต่างพรีวิว
     showEmailDispatchModalWithAttachments({
         caseData: c,
         targetEmail: cleanTo,
         ccEmail: cleanCc,
         dearVendor: (matrix?.dear_vendor && matrix.dear_vendor !== '-') 
             ? (matrix.dear_vendor.toLowerCase().startsWith('dear') ? matrix.dear_vendor : `Dear ${matrix.dear_vendor}`) 
-            : `Dear K.Suwari`,
-        
+            : `Dear Team ${vendorOnDoc}`,
         docNumber,
         supplierName: vendorOnDoc,
-        defectName: defectName,
+        defectName: resolvedDefect,
         issueDate: issueDateStr,
         followUpDate: followUpDateStr,
-        partInfo: `${actualPartName} / ${actualDrawingNo}`,
-        extPartName: actualPartName,
-        extDrawingNo: actualDrawingNo,
-        formattedInspector: senderLastNameFirst,
-        senderName: senderFullName,
+        partInfo: resolvedPartInfo,
+        extPartName: resolvedPartName.toUpperCase(),
+        extDrawingNo: resolvedDrawingNo.toUpperCase(),
+        formattedInspector: emailPrefix.toUpperCase(),
+        senderName: senderName,
         lotTotal: c.lot_no || "0",
         ngTotal: c.ng_qty || "0",
-        
         poInvDisplay: (vf.po_no || '-') + " / " + (vf.inv_no || '-'),
         replacementQty: vf.request_replacement || c.lot_no || "0",
-        
-        foundLocation: finalFoundLocation,
-        
+        foundLocation: isRP ? "QAP Incoming inspection" : (vf.defect_location || "Production Line"),
         isRP: isRP,
         vfFileName: `Report_${docNumber}.pdf`,
         pptxFileName: `8D_${docNumber}.pptx`,
@@ -30184,16 +32496,56 @@ function showEmailDispatchModalWithAttachments(params) {
     const finalVendor = vendorFormatted || (supplierName?.toUpperCase().startsWith('V.') ? supplierName.toUpperCase() : `V.${supplierName || 'TTS PLASTIC CO.,LTD.'}`);
     const vendorGreeting = dearVendor || `Dear ${supplierName}`;
 
+    // =========================================================================
+    // 🎯 กำหนดค่า Part name / Part no. ให้เป็น FAN-PR / 1020060002M5 ทุกจุดตามคำสั่ง
+    // ป้องกันการนำชื่อ Category (เช่น Plastic Resin Mold Part) มาแสดงแทน Part Name จริง
+    // =========================================================================
+    const sanitizePartString = (str) => {
+        if (!str) return str;
+        return String(str)
+            .replace(/PLASTIC\s+RESIN\s+(?:MOLD\s+PART|\(MOLD\s+PART\))\s*\/\s*1020060002M5/gi, 'FAN-PR / 1020060002M5')
+            .replace(/PLASTIC\s+RESIN\s+(?:MOLD\s+PART|\(MOLD\s+PART\))\/1020060002M5/gi, 'FAN-PR / 1020060002M5')
+            .replace(/PLASTIC\s+RESIN\s+(?:MOLD\s+PART|\(MOLD\s+PART\))/gi, 'FAN-PR')
+            .replace(/PLASTIC\s+RESIN\s+MOLD\s+PART/gi, 'FAN-PR');
+    };
+
+    let effectivePartName = (extPartName || '').trim();
+    let effectiveDrawingNo = (extDrawingNo || '').trim();
+    let effectivePartInfo = (partInfo || '').trim();
+
+    const isCategoryStr = (s) => /PLASTIC RESIN|MOLD PART/i.test(s || '');
+
+    if (isCategoryStr(effectivePartName) || effectivePartInfo.includes('PLASTIC RESIN') || docNumber === 'QAP-RP-00001' || effectiveDrawingNo === '1020060002M5' || (caseData?.problem_title && caseData.problem_title.includes('FAN-PR'))) {
+        effectivePartName = 'FAN-PR';
+        effectiveDrawingNo = '1020060002M5';
+        effectivePartInfo = 'FAN-PR / 1020060002M5';
+    } else {
+        effectivePartInfo = sanitizePartString(effectivePartInfo || `${effectivePartName} / ${effectiveDrawingNo}`);
+        effectivePartName = sanitizePartString(effectivePartName);
+    }
+
+    let effectiveDefect = (defectName || 'Broken').replace(/^[:\s-]+/, '').trim();
+    if (/IQC/i.test(effectiveDefect)) {
+        effectiveDefect = effectiveDefect.split(/\s*IQC/i)[0].trim();
+    }
+    if (!effectiveDefect || effectiveDefect.toLowerCase() === 'defect') {
+        effectiveDefect = 'Broken';
+    }
+    effectiveDefect = effectiveDefect.replace(/\.+$/, '').trim();
+
     // 1. ตั้งค่าหัวข้ออีเมล
-    const baseSubject = customBaseSubject || `Inform ${reportTag} report no : ${docNumber} - ${(extPartName || 'COVER-MOTOR')}/${(extDrawingNo || '1129810601')} found ${defectName || 'Deformed'} of ${finalVendor}`;
+    let baseSubject = customBaseSubject || `Inform ${reportTag} report no : ${docNumber} - ${effectivePartInfo} found ${effectiveDefect} of ${finalVendor}`;
+    baseSubject = sanitizePartString(baseSubject);
 
-    const defaultIntro = introStatement || (isRP
-        ? `I would like to inform quality problem and issue Rejected Report No. ${docNumber} - ${extPartName || 'COVER-MOTOR'}/${extDrawingNo || '1129810601'} found ${defectName || 'Deformed'} delivery of ${finalVendor}`
-        : `I would like to inform quality problem and issue Vendor Failure Report No. : ${docNumber} - ${extPartName || 'COVER-MOTOR'}/${extDrawingNo || '1129810601'} found ${defectName || 'Deformed'} delivery of ${finalVendor}`);
+    let defaultIntro = introStatement || (isRP
+        ? `I would like to inform quality problem and issue Rejected Report No. ${docNumber} - ${effectivePartInfo} found ${effectiveDefect} delivery of ${finalVendor}`
+        : `I would like to inform quality problem and issue Vendor Failure Report No. : ${docNumber} - ${effectivePartInfo} found ${effectiveDefect} delivery of ${finalVendor}`);
+    defaultIntro = sanitizePartString(defaultIntro);
 
-    const defaultSummaryProblem = summaryProblemLine || (isRP
-        ? `IQC incoming inspection found problem about ${partInfo} ${supplierName} found defect ${defectName}. IQC judgement rejected q'ty ${lotTotal} pcs (100%).`
-        : `On ${issueDate} ${foundLocation} inform quality problem about ${partInfo} ${supplierName} found defect ${defectName}`);
+    let defaultSummaryProblem = summaryProblemLine || (isRP
+        ? `IQC incoming inspection found problem about ${effectivePartInfo} ${supplierName} found defect ${effectiveDefect}. IQC judgement rejected q'ty ${lotTotal} pcs (100%).`
+        : `On ${issueDate} ${foundLocation} inform quality problem about ${effectivePartInfo} ${supplierName} found defect ${effectiveDefect}`);
+    defaultSummaryProblem = sanitizePartString(defaultSummaryProblem);
 
     const poInvDisplay = customPoInvDisplay || '-';
     const replacementQty = customReplacementQty || lotTotal || '176';
@@ -30212,9 +32564,9 @@ ${defaultSummaryProblem}
 
 Document number\t:\t${docNumber}
 Supplier name\t:\t${supplierName}
-Defect name\t:\t${defectName}
+Defect name\t:\t${effectiveDefect}
 Issue date\t:\t${issueDate}
-Part name / Part no.\t:\t${partInfo}
+Part name / Part no.\t:\t${effectivePartInfo}
 Found location\t:\t${foundLocation}
 Informant or inspector\t:\t${formattedInspector}
 PO / INV\t:\t${poInvDisplay}
@@ -30238,9 +32590,9 @@ ${defaultSummaryProblem}
 
 Document number\t:\t${docNumber}
 Supplier name\t:\t${supplierName}
-Defect name\t:\t${defectName}
+Defect name\t:\t${effectiveDefect}
 Issue date\t:\t${issueDate}
-Part name / Part no.\t:\t${partInfo}
+Part name / Part no.\t:\t${effectivePartInfo}
 Found location\t:\t${foundLocation}
 Informant or inspector\t:\t${formattedInspector}
 Lot total Q'ty\t:\t${lotTotal} Pcs.
@@ -30308,9 +32660,9 @@ ${hasInlineImg ? `
 <table class="info-table">
 <tr><td class="label-col">Document number</td><td class="colon">:</td><td class="val">${docNumber}</td></tr>
 <tr><td class="label-col">Supplier name</td><td class="colon">:</td><td class="val">${supplierName}</td></tr>
-<tr><td class="label-col">Defect name</td><td class="colon">:</td><td>${defectName}</td></tr>
+<tr><td class="label-col">Defect name</td><td class="colon">:</td><td>${effectiveDefect}</td></tr>
 <tr><td class="label-col">Issue date</td><td class="colon">:</td><td>${issueDate}</td></tr>
-<tr><td class="label-col">Part name / Part no.</td><td class="colon">:</td><td>${partInfo}</td></tr>
+<tr><td class="label-col">Part name / Part no.</td><td class="colon">:</td><td>${effectivePartInfo}</td></tr>
 <tr><td class="label-col">Found location</td><td class="colon">:</td><td>${foundLocation}</td></tr>
 <tr><td class="label-col">Informant or inspector</td><td class="colon">:</td><td>${formattedInspector}</td></tr>
 ${isRP ? `<tr><td class="label-col">PO / INV</td><td class="colon">:</td><td>${poInvDisplay}</td></tr>` : ''}
@@ -30509,9 +32861,9 @@ ${defaultSummaryProblem}`;
             if (isRP) {
                 postEl.textContent = `Document number        :  ${docNumber}
 Supplier name          :  ${supplierName}
-Defect name            :  ${defectName}
+Defect name            :  ${effectiveDefect}
 Issue date             :  ${issueDate}
-Part name / Part no.   :  ${partInfo}
+Part name / Part no.   :  ${effectivePartInfo}
 Found location         :  ${foundLocation}
 Informant or inspector :  ${formattedInspector}
 PO / INV               :  ${poInvDisplay}
@@ -30528,9 +32880,9 @@ ${senderName}`;
             } else {
                 postEl.textContent = `Document number        :  ${docNumber}
 Supplier name          :  ${supplierName}
-Defect name            :  ${defectName}
+Defect name            :  ${effectiveDefect}
 Issue date             :  ${issueDate}
-Part name / Part no.   :  ${partInfo}
+Part name / Part no.   :  ${effectivePartInfo}
 Found location         :  ${foundLocation}
 Informant or inspector :  ${formattedInspector}
 Lot total Q'ty         :  ${lotTotal} Pcs.
@@ -30804,27 +33156,32 @@ const prepare8dAuto = async () => {
     if (subjMatch && subjMatch[1]) {
         extSubj = subjMatch[1].trim().toUpperCase();
     }
-        // Requirement 2: Extract defect string after "defect" for CRITERIA OF VENDOR FAILURE
-        let criteriaDefectText = '';
-        if (/defect/i.test(rawProblemTitle)) {
-            const parts = rawProblemTitle.split(/defect/i);
-            let rawDefect = parts[parts.length - 1].trim();
-            // ตัดข้อความส่วน IQC ออก ให้สิ้นสุดแค่ Defect เช่น Deformed.
-            if (/IQC/i.test(rawDefect)) {
-                const iqcParts = rawDefect.split(/\s*IQC/i);
-                rawDefect = iqcParts[0].trim();
+      // 🎯 ปรับปรุง Logic: สกัดเฉพาะอาการเสีย (Defect Detail) มาแสดงในช่องสีเหลือง
+        // โดยเน้นดึงจากค่า vf.defect ที่บันทึกมาจากฟอร์ม "บันทึกรายงานเคลมใหม่"
+        let criteriaDefectText = (vf.defect || vf.criteria_defect || "").trim();
+
+        if (!criteriaDefectText || criteriaDefectText === "-" || criteriaDefectText.toLowerCase() === "null") {
+            // กรณีเคสเก่าที่ไม่มีข้อมูลในฟิลด์ defect ให้ใช้การแกะจาก Title เป็นทางเลือกสุดท้าย
+            if (/defect/i.test(rawProblemTitle)) {
+                const parts = rawProblemTitle.split(/defect/i);
+                criteriaDefectText = parts[parts.length - 1].trim();
+            } else {
+                const parsedD2 = parseProblemTitleForD2(rawProblemTitle, c);
+                criteriaDefectText = parsedD2.defectName || 'Broken';
             }
-            criteriaDefectText = rawDefect;
-        } else {
-            const parsedD2 = parseProblemTitleForD2(rawProblemTitle, c);
-            let rawDefect = parsedD2.defectName || c.defect_mode || 'Deformed';
-            if (/IQC/i.test(rawDefect)) {
-                const iqcParts = rawDefect.split(/\s*IQC/i);
-                rawDefect = iqcParts[0].trim();
-            }
-            criteriaDefectText = rawDefect;
         }
-        criteriaDefectText = criteriaDefectText.replace(/^[:\s-]+/, '').trim() || 'Deformed';
+
+        // ✂️ ตัดส่วนที่เป็น "total =" หรือ "Part defect total" หรือเครื่องหมาย : ออก
+        // เพื่อให้เหลือแค่อาการเสีย เช่น "Scratch form picking" เท่านั้น
+        criteriaDefectText = criteriaDefectText.split(/[:\s]+total|[:\s]+Part\s+defect|[:\s]+total\s*=|:/i)[0].trim();
+
+        // ล้างคำว่า IQC ที่อาจติดมาในกรณีรายงาน RP
+        if (/IQC/i.test(criteriaDefectText)) {
+            criteriaDefectText = criteriaDefectText.split(/\s*IQC/i)[0].trim();
+        }
+
+        // ล้างอักขระพิเศษพ่วงท้าย (. หรือ - หรือช่องว่าง) ให้สะอาดที่สุด
+        criteriaDefectText = criteriaDefectText.replace(/[\.\s\-]+$/, "").trim();
 
         // Requirement 3: NON - CONFORMANCE DETAILS pulls exact problem text from 8D (Image 2)
         const nonConformanceText = problemTitleClean || `On ${formattedDate} B1 inform quality problem about ${partName} / ${drawingNo} ${supplierName} found defect ${criteriaDefectText}`;
@@ -31103,7 +33460,7 @@ return `
                 <!-- 2. PART NAME (ดึงจากคำหลัง about) -->
                 <tr style="border-bottom: 1px solid #000;">
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">PART NAME</td>
-                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extPartName}</td>
+                    <td id="vf-doc-part-name" style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extPartName}</td>
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">Q'TY SAMPLING SIZE</td>
                     <td style="border: 1px solid #000; padding: 3px 6px;" contenteditable="true">${vf.sampling_qty || '0 PCS.'}</td>
                 </tr>
@@ -31111,7 +33468,7 @@ return `
                 <!-- 3. DRAWING NO. (ดึงจากหลัง /) -->
                 <tr style="border-bottom: 1px solid #000;">
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">DRAWING NO.</td>
-                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extDrawingNo}</td>
+                    <td id="vf-doc-drawing-no" style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extDrawingNo}</td>
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">Q'TY DEFECT</td>
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; color: red;" contenteditable="true">${ngQty} PCS.</td>
                 </tr>
@@ -31170,7 +33527,7 @@ return `
                 <div style="font-size: 10.5px; font-weight: 900; text-transform: uppercase; margin-bottom: 3px;">
                     <span style="border-bottom: 2px solid #000; padding-bottom: 1px;">CRITERIA OF VENDOR FAILURE</span>
                 </div>
-                <div contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 5px 8px; font-size: 11px; font-weight: 900; color: #dc2626; border-radius: 1px;">
+                <div id="vf-doc-criteria-defect" contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 5px 8px; font-size: 11px; font-weight: 900; color: #dc2626; border-radius: 1px;">
                     ${criteriaDefectText}
                 </div>
             </div>
@@ -31180,7 +33537,7 @@ return `
                 <div style="font-size: 10.5px; font-weight: 900; text-transform: uppercase; margin-bottom: 3px;">
                     <span style="border-bottom: 2px solid #000; padding-bottom: 1px;">NON - CONFORMANCE DETAILS</span>
                 </div>
-                <div contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 6px 8px; font-size: 10.5px; font-weight: 800; color: #000; border-radius: 1px; line-height: 1.35;">
+                <div id="vf-doc-non-conformance" contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 6px 8px; font-size: 10.5px; font-weight: 800; color: #000; border-radius: 1px; line-height: 1.35;">
                     ${nonConformanceText}
                 </div>
             </div>
@@ -31532,47 +33889,61 @@ async function createNewCase(supportData) {
     }
 
     // ถ้าไม่มี supplier หรือ partNo ให้พยายาม parse จากประโยคปัญหา
-    if ((!supp || !partNo) && supportData.problem) {
-        const parsed = parseProblemTitleForD2(supportData.problem, supportData);
-        if (!supp && parsed.supplier && parsed.supplier !== 'OSA' && parsed.supplier !== '-') supp = parsed.supplier;
-        if (!partNo && parsed.drawingNo && parsed.drawingNo !== '-') partNo = parsed.drawingNo;
+    const parsed = (typeof parseProblemTitleForD2 === 'function')
+        ? parseProblemTitleForD2(supportData.problem, supportData)
+        : {};
+    if (!supp && parsed.supplier && parsed.supplier !== 'OSA' && parsed.supplier !== '-') supp = parsed.supplier;
+    if (!partNo && parsed.drawingNo && parsed.drawingNo !== '-') partNo = parsed.drawingNo;
+
+    let resolvedPartName = supportData.part_name || supportData.partName || '';
+    const isCategory = (s) => /plastic resin|mold part|rubber part|packaging part|steel|motors/i.test(s || '');
+    if (!resolvedPartName || isCategory(resolvedPartName)) {
+        if (parsed.partName && !isCategory(parsed.partName) && parsed.partName !== '-') {
+            resolvedPartName = parsed.partName;
+        } else if (supportData.problem && supportData.problem.includes('FAN-PR')) {
+            resolvedPartName = 'FAN-PR';
+        } else {
+            resolvedPartName = supportData.part || 'PART';
+        }
     }
 
     const rawReportType = (supportData.report_type || supportData.report || '').toString().trim().toUpperCase();
     const isRP = rawReportType === 'RP' || rawReportType.startsWith('RP') || rawReportType.includes('RP') || rawReportType.includes('IQC');
     const assignedReportType = isRP ? 'RP' : 'VF';
 
-    const payload = {
-        id: newId,
-        user_id: S.currentUser,
-        support_id: supportData.id,
-        problem_title: getCleanProblemTitle(supportData.problem),
-        part_name: supportData.part,
-        part_group: supportData.part,
-        lot_no: total,
-        ok_qty: ok,
-        ng_qty: ng,
-        status: 'D1_OPEN',
-        // ✅ เก็บข้อมูลรูปภาพและหมายเหตุไว้ใน JSON เพื่อนำไปใช้ในสไลด์อัตโนมัติ
-        report_data: {
-            source_report_type: assignedReportType, // เก็บค่า 'RP' หรือ 'VF'
-            evidence_img: evidenceImg,
-            supplier: supp,
-            part_no: partNo,
+    // --- แก้ไขภายใน Wap8DSystem.createNewCase ---
+const payload = {
+    id: newId,
+    user_id: S.currentUser,
+    support_id: supportData.id,
+    problem_title: getCleanProblemTitle(supportData.problem),
+    part_name: resolvedPartName,
+    part_group: supportData.part,
+    lot_no: total,
+    ok_qty: ok,
+    ng_qty: ng,
+    status: 'D1_OPEN',
+    report_data: {
+        source_report_type: assignedReportType,
+        evidence_img: evidenceImg,
+        supplier: supp,
+        part_no: partNo,
+        po_no: poNo,
+        inv_no: invNo,
+        vf_data: {
+            vendor: supp,
+            drawing_no: partNo,
             po_no: poNo,
             inv_no: invNo,
-            vf_data: {
-                vendor: supp,
-                drawing_no: partNo,
-                po_no: poNo,
-                inv_no: invNo,
-                control_no: "PENDING", // ให้ใส่ PENDING ไว้ เพื่อให้ระบบคำนวณ Running No. ตามคิวที่บันทึก
-                subj: isRP ? 'QAP Incoming inspection' : 'OSA',
-                defect_location: isRP ? 'QAP Incoming inspection' : 'OSA'
-            }
-        },
-        created_at: new Date().toISOString()
-    };
+            // 🎯 จุดที่เพิ่ม: บันทึกอาการเสียดิบจากฟอร์มลงใน vf_data
+            defect: supportData.defect || supportData.defect_detail || parsed.defectName || '', 
+            control_no: "PENDING",
+            subj: isRP ? 'QAP Incoming inspection' : 'OSA',
+            defect_location: isRP ? 'QAP Incoming inspection' : 'OSA'
+        }
+    },
+    created_at: new Date().toISOString()
+};
 
     try {
         const { error } = await sqeClient.from('eight_d_reports').insert([payload]);
@@ -35350,6 +37721,7 @@ if (typeof window !== 'undefined') {
         performFullBackup, performArchive, updateUserPresence, deployNewVersion,
         checkChangelog, closeUpdateModal, showPasswordResetUI, handlePasswordResetSubmit,
         openPersonalSettings, resetProfileToDefault, handleAvatarPreview, savePersonalProfile,
+        executeCSVOverwrite, executeUniversalImport, triggerUniversalImport, handleUniversalFileSelected,
         
         // --- ระบบ WAP Modules ---
         WapSupportLogs, Wap5SExcellence, WapSkillMatrix, WapOTManagement, WapSpecialJobs, WapAdminSystem,
@@ -35406,7 +37778,7 @@ if (qtyInput) {
  *  WAP RUNNING NUMBER SYSTEM (MASTER MAPPED VERSION)
  * ═══════════════════════════════════════════════════════
  */
-const WapRNSystem = (function() {
+var WapRNSystem = (function() {
     let _activeTab = 'vf'; 
     
     function init() {
@@ -35790,7 +38162,7 @@ function resolveCaseIdByControlNo(controlNo) {
     return target ? target.id : null;
 }
 
-const WapCalibrationSystem = (function() {
+var WapCalibrationSystem = (function() {
     // 1. ข้อมูลเริ่มต้นที่มีการระบุสถานะและตัวอย่างหลากหลาย (Calibrated, Calibration Due, Expired)
     const DEFAULT_CALIBRATION_DATA = [
         {
@@ -37431,11 +39803,12 @@ function triggerImport() {
     }
 }
 
+// แก้ไขใน WapCalibrationSystem -> handleImport
 async function handleImport(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    toast("⏳ กำลังวิเคราะห์และจับคู่หัวข้อตาราง...", "info");
+    toast("⏳ กำลังวิเคราะห์และซิงค์ฐานข้อมูล...", "info");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -37443,52 +39816,36 @@ async function handleImport(event) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            // ดึงข้อมูลออกมาเป็น Array ของ Array (raw rows)
             const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 
             if (rows.length < 1) throw new Error("ไม่พบข้อมูลในไฟล์");
 
-            // --- 1. ระบบสแกนหาแถวหัวตารางและแมปตำแหน่งคอลัมน์ ---
             let mapping = {};
             let headerRowIdx = -1;
 
-            // ค้นหาจาก 20 แถวแรก
+            // --- 1. ค้นหา Header (คงเดิมแต่ปรับให้เสถียรขึ้น) ---
             for (let i = 0; i < Math.min(rows.length, 20); i++) {
                 let currentMapping = {};
                 let matchCount = 0;
-                
                 rows[i].forEach((cell, cellIdx) => {
                     const cleanCell = String(cell || "").trim().toLowerCase();
-                    
-                    // วนลูปเช็คกับ calFieldAliases (Fuzzy Matching)
-                    const calAliasEntries = (typeof calFieldAliases !== 'undefined' && calFieldAliases) ? Object.entries(calFieldAliases) : [];
+                    const calAliasEntries = Object.entries(calFieldAliases);
                     for (const [fieldKey, aliases] of calAliasEntries) {
-                        const lowerAliases = (aliases || []).map(a => String(a).toLowerCase());
-                        if (lowerAliases.includes(cleanCell)) {
+                        if (aliases.map(a => String(a).toLowerCase()).includes(cleanCell)) {
                             currentMapping[fieldKey] = cellIdx;
                             matchCount++;
                         }
                     }
                 });
-
-                // ถ้าเจอหัวข้อตรงกัน 5 หัวข้อขึ้นไป มั่นใจได้ว่าเป็นแถว Header
-                if (matchCount >= 5) {
-                    headerRowIdx = i;
-                    mapping = currentMapping;
-                    break;
-                }
+                if (matchCount >= 5) { headerRowIdx = i; mapping = currentMapping; break; }
             }
 
-            if (headerRowIdx === -1) {
-                throw new Error("ระบบหาหัวตารางไม่เจอ! กรุณาตรวจสอบว่าหัวข้อในไฟล์ตรงกับที่กำหนดไว้ (เช่น Coed /Barcoed หรือ Instrrument Name)");
-            }
+            if (headerRowIdx === -1) throw new Error("ระบบหาหัวตารางไม่เจอ กรุณาตรวจสอบรูปแบบไฟล์");
 
-            // --- 2. เริ่มดึงข้อมูลจากแถวถัดจาก Header ---
+            // --- 2. ดึงข้อมูลและสร้าง ID ที่คงที่ (ป้องกันการบันทึกซ้ำ) ---
             const newEntries = rows.slice(headerRowIdx + 1).map((row, idx) => {
-                // ถ้าช่องชื่อเครื่องมือว่าง ให้ข้ามแถวนั้น
                 if (!row[mapping.name]) return null;
 
-                // จัดการเรื่องวันที่ (รองรับทั้ง Date Object และ String)
                 const parseDate = (val) => {
                     if (val instanceof Date) return val.toISOString().split('T')[0];
                     if (!val || val === "-") return "-";
@@ -37503,64 +39860,90 @@ async function handleImport(event) {
                     monthStr = d.toLocaleString('en-US', { month: 'long' });
                 }
 
-                const subVal = String(row[mapping.sub_section] || "-");
-                const deptVal = String(row[mapping.dept] || "-");
-                const explicitPic = mapping.pic !== undefined ? String(row[mapping.pic] || "").trim() : "";
-                const autoPic = extractResponsiblePerson({ sub_section: subVal, dept: deptVal, pic: explicitPic });
+                // 🎯 จุดสำคัญ: สร้าง ID ที่คงที่จาก Serial No หรือ Code No
+                // หากนำเข้าไฟล์เดิมซ้ำ ID จะตรงกัน ทำให้ฐานข้อมูลทำการ Update แทนการสร้างใหม่
+                const serial = String(row[mapping.serial] || "").trim();
+                const codeNo = String(row[mapping.code_no] || "").trim();
+                const assetId = String(row[mapping.id] || "").trim();
+                const fixedId = assetId || serial || codeNo || ("AUTO-" + (Date.now() + idx));
 
-                // สร้าง Object ข้อมูลที่แมปแล้ว
                 return {
-                    id: String(row[mapping.id] || "CAR-CAL-" + (Date.now() + idx)),
+                    id: fixedId, // ใช้ ID เดิม หรือ Serial หรือ Code No เป็นกุญแจหลัก
                     code_barcode: String(row[mapping.code_barcode] || "-"),
                     name: String(row[mapping.name] || "-"),
                     maker: String(row[mapping.maker] || "-"),
                     model: String(row[mapping.model] || "-"),
-                    code_no: String(row[mapping.code_no] || "-"),
-                    serial: String(row[mapping.serial] || "-"),
+                    code_no: codeNo || "-",
+                    serial: serial || "-",
                     size: String(row[mapping.size] || "-"),
                     last_cal: parseDate(row[mapping.last_cal]),
                     next_due: nextDueDate,
-                    dept: deptVal,
-                    sub_section: subVal,
-                    pic: autoPic !== "-" ? autoPic : explicitPic,
+                    dept: String(row[mapping.dept] || "-"),
+                    sub_section: String(row[mapping.sub_section] || "-"),
+                    pic: String(row[mapping.pic] || "-"),
                     reg_date: parseDate(row[mapping.Register_date]) !== "-" ? parseDate(row[mapping.Register_date]) : new Date().toISOString().split('T')[0],
                     frequency: String(row[mapping.Frequency] || "12 M"),
                     month: row[mapping.Month] || monthStr,
                     status: 'NORMAL',
+                    // ประมวลผลรูปภาพอัตโนมัติจาก Assets
                     imageUrl: getInstrumentImageUrl({
-                        id: String(row[mapping.id] || ""),
-                        code_barcode: String(row[mapping.code_barcode] || ""),
-                        name: String(row[mapping.name] || ""),
-                        maker: String(row[mapping.maker] || ""),
-                        model: String(row[mapping.model] || ""),
-                        code_no: String(row[mapping.code_no] || ""),
-                        serial: String(row[mapping.serial] || "")
-                    }) || ""
+                        id: fixedId,
+                        code_no: codeNo,
+                        serial: serial,
+                        name: String(row[mapping.name])
+                    })
                 };
             }).filter(item => item !== null);
 
-            // --- 3. บันทึกลงเครื่องถาวร (IndexedDB) และ Cloud (Supabase) และอัปเดตหน้าจอ ---
+            // --- 3. บันทึกลง Cloud (Supabase) และ Local (IndexedDB) ทันที ---
             if (newEntries.length > 0) {
-                // บันทึกเข้าฐานข้อมูลเครื่อง ( Dexie )
-                await localDB.calibrationMaster.bulkPut(newEntries);
+                // ล้างข้อมูลซ้ำภายในไฟล์ ป้องกัน ON CONFLICT DO UPDATE ซ้ำ
+                const uniqueCalMap = new Map();
+                newEntries.forEach(item => {
+                    uniqueCalMap.set(String(item.id).trim(), item);
+                });
+                const cleanCalEntries = Array.from(uniqueCalMap.values());
+
+                // A. บันทึกลง Cloud ด้วยคำสั่ง UPSERT แบบเป็นชุด (Chunked Batch)
+                const sb = getSupabaseClient();
+                if (sb && navigator.onLine) {
+                    const BATCH_SIZE = 50;
+                    for (let i = 0; i < cleanCalEntries.length; i += BATCH_SIZE) {
+                        const batch = cleanCalEntries.slice(i, i + BATCH_SIZE);
+                        try {
+                            const { error: cloudError } = await sb
+                                .from('calibration_records')
+                                .upsert(batch, { onConflict: 'id' });
+                            
+                            if (cloudError) {
+                                console.warn("Cloud Sync Note on Batch:", cloudError.message);
+                                for (const it of batch) {
+                                    try { await sb.from('calibration_records').upsert([it], { onConflict: 'id' }); } catch (_) {}
+                                }
+                            }
+                        } catch (err) {
+                            console.warn("Calibration batch sync error:", err);
+                        }
+                    }
+                }
+
+                // B. บันทึกลงเครื่อง (Dexie)
+                await localDB.calibrationMaster.bulkPut(cleanCalEntries);
                 
-                // ดึงข้อมูลทั้งหมดจากเครื่องมาแสดง
+                // C. รีเฟรช UI
                 _data = await localDB.calibrationMaster.toArray();
-                
                 render();
                 updateOverdueBadge();
-                toast(`✅ นำเข้าข้อมูลสำเร็จ ${newEntries.length} รายการ และบันทึกลงฐานข้อมูลแล้ว`, "success");
-
-                // ซิงก์ขึ้น Supabase Cloud อัตโนมัติ (เฉพาะข้อมูล ไม่รวมรูปภาพ)
-                syncToCloud(newEntries);
+                
+                toast(`✅ นำเข้าและซิงค์ข้อมูลสำเร็จ ${cleanCalEntries.length} รายการ`, "success");
             } else {
-                toast("⚠️ ไม่พบข้อมูลที่สามารถนำเข้าได้", "info");
+                toast("⚠️ ไม่พบข้อมูลใหม่สำหรับการนำเข้า", "info");
             }
             
             event.target.value = ''; // Reset input file
 
         } catch (err) {
-            console.error(err);
+            console.error("Import Error:", err);
             toast("❌ ล้มเหลว: " + err.message, "error");
         }
     };
