@@ -7190,9 +7190,6 @@ function finalizeLogin(email, role) {
     startNeuralBootSequence(email, role);
 }
 
-/**
- * 2. กระบวนการโหลดข้อมูล (Hard Sync) และตรวจเช็ค Update
- */
 async function startNeuralBootSequence(email, role) {
     const overlay = document.getElementById('neural-boot-overlay');
     const statusText = document.getElementById('boot-status');
@@ -7211,26 +7208,44 @@ async function startNeuralBootSequence(email, role) {
     };
 
     try {
-        // --- STEP 1: SERVICE WORKER UPDATE ---
+        // --- STEP 1: SERVICE WORKER UPDATE (FIXED VERSION) ---
         updateStatus(15, "Verifying Build...", "comparing local vs server version");
-        if ('serviceWorker' in navigator) {
+        
+        // ตรวจสอบว่าพึ่งมีการรีโหลดเพื่ออัปเดตไปหรือไม่ (ป้องกัน Loop)
+        const hasJustUpdated = sessionStorage.getItem('sw_update_performed');
+
+        if ('serviceWorker' in navigator && !hasJustUpdated) {
             try {
                 const reg = await navigator.serviceWorker.getRegistration();
-                if (reg && reg.update) {
+                if (reg) {
+                    // ตรวจสอบการอัปเดตจาก Server
                     await reg.update();
-                    if (reg.installing || reg.waiting) {
+
+                    // ตรวจสอบสถานะ waiting (มีตัวใหม่โหลดเสร็จแล้วแต่ยังไม่ทำงาน)
+                    if (reg.waiting) {
                         updateStatus(35, "Update Detected!", "installing latest system core...");
+                        
+                        // บันทึกข้อมูลลง Session ก่อน Reload
                         sessionStorage.setItem('reboot_login_email', email);
                         sessionStorage.setItem('reboot_login_role', role);
+                        sessionStorage.setItem('sw_update_performed', 'true'); // ตั้ง Flag กัน Loop
+
+                        // ส่งข้อความไปบอก Service Worker ให้ทำงานทันที (Skip Waiting)
+                        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+
                         await new Promise(r => setTimeout(r, 1000));
-                        window.location.reload(true);
-                        return;
+                        window.location.reload(); 
+                        return; // หยุดการทำงานส่วนที่เหลือเพื่อรอโหลดหน้าใหม่
                     }
                 }
             } catch (swErr) {
-                console.warn("ServiceWorker update skipped:", swErr);
+                console.warn("ServiceWorker update check skipped:", swErr);
             }
         }
+
+        // หากทำงานมาถึงตรงนี้ แสดงว่าไม่มีอัปเดต หรืออัปเดตเสร็จแล้ว ให้ล้าง Flag ออก
+        sessionStorage.removeItem('sw_update_performed');
+
 
         // --- STEP 2: HARD DATA REFRESH ---
         updateStatus(45, "Purging Cache...", "resetting data buffers");
