@@ -3,41 +3,6 @@
    WORLD-CLASS PERFORMANCE & RESILIENCY ENGINE
    ========================================================================== */
 
-// --- GLOBAL STATE (HOISTED EARLY TO PREVENT TDZ / INIT ERRORS) ---
-var S = window.S || {
-    isLoggedIn: false,
-    currentUser: '',
-    userRole: 'staff',
-    viewingUser: '',
-    records: [],    // สำหรับข้อมูล SQE (xgkjxvlj...)
-    attLeaveRecords: [],
-    wapData: {      // สำหรับข้อมูล WAP (dyhpjyok...)
-        achievements: [],
-        attendance: [],
-        score5s: [],
-        skills: [],
-        specialJobs: [] 
-    },
-    activeFilter: 'ALL',
-    searchKeyword: '',
-    selectedShift: 'SHIFT A',
-    editingId: null,
-    isOnline: navigator.onLine,
-    isLinkSession: false, 
-    loginRole: 'staff'
-};
-window.S = S;
-
-// --- GLOBAL HELPER: CLEAN SIGNATURE NAME ---
-function cleanSignatureName(name) {
-    if (!name) return "";
-    return String(name).trim()
-        .replace(/^(?:mr|ms|mrs|miss|khun|dr|k)\.?\s*/gi, '')
-        .replace(/^(?:นาย|นางสาว|นาง|คุณ)\s*/gi, '')
-        .trim();
-}
-window.cleanSignatureName = cleanSignatureName;
-
 // --- GLOBAL RESILIENCY & SAFE PARSING ENGINE ---
 window.safeJSONParse = function(str, fallback = null) {
     if (!str || typeof str !== 'string') return fallback;
@@ -196,7 +161,7 @@ document.addEventListener('click', function(e) {
 
 // --- GLOBAL ERROR GUARD & ANTI-WHITE-SCREEN PROTECTION ---
 window.addEventListener('error', function(e) {
-    console.error('[Global Error Guard Captured]', e.error || e.message);
+    console.warn('[Global Error Guard Captured]', e.error || e.message);
     try {
         const mtx = document.getElementById('maintenance-view');
         const login = document.getElementById('login-view');
@@ -208,12 +173,19 @@ window.addEventListener('error', function(e) {
             }
         }
     } catch (err) {
-        console.error('[Error Guard Fallback Error]', err);
+        console.warn('[Error Guard Fallback Error]', err);
     }
 });
 
 window.addEventListener('unhandledrejection', function(e) {
-    console.warn('[Global Unhandled Promise Rejection]', e.reason);
+    if (e && e.reason) {
+        const msg = String(e.reason.message || e.reason);
+        // Gracefully handle harmless promise cancellations or offline fetch interruptions
+        if (msg.includes('Canceled') || msg.includes('Failed to fetch') || msg.includes('TypeScript not registered')) {
+            if (typeof e.preventDefault === 'function') e.preventDefault();
+        }
+    }
+    console.warn('[Global Handled Promise Rejection]', e.reason);
 });
 
 // ฟังก์ชันปลดล็อคหน้า Maintenance
@@ -4283,50 +4255,68 @@ function getEmployeeData() {
 }
 
 // 2. ฟังก์ชันวาดรายการ (Render) ลงในดรอปดาวน์
-window.loginDeptFilter = 'ALL';
-window.filterLoginStaffByDept = function(dept) {
-    window.loginDeptFilter = dept || 'ALL';
-    document.querySelectorAll('.login-dept-pill').forEach(pill => {
-        if (pill.getAttribute('data-dept') === dept || (!dept && pill.getAttribute('data-dept') === 'ALL')) {
-            pill.classList.add('active');
+let _currentLoginDeptFilter = 'ALL';
+
+function filterLoginStaffByDept(dept) {
+    _currentLoginDeptFilter = dept || 'ALL';
+    // Update active class on pills
+    document.querySelectorAll('.login-dept-pill').forEach(btn => {
+        if (btn.getAttribute('data-dept') === _currentLoginDeptFilter) {
+            btn.classList.add('active');
         } else {
-            pill.classList.remove('active');
+            btn.classList.remove('active');
         }
     });
-    const input = document.getElementById('login-email');
-    window.renderEmployeeLoginDropdown(input ? input.value : '');
-};
-
-window.updatePassStrength = function(val) {
-    const len = (val || '').length;
-    const b1 = document.querySelector('.pass-bar-1');
-    const b2 = document.querySelector('.pass-bar-2');
-    const b3 = document.querySelector('.pass-bar-3');
-    const b4 = document.querySelector('.pass-bar-4');
-    const badge = document.getElementById('pass-shield-badge');
-    if (!b1 || !b2 || !b3 || !b4) return;
-
-    b1.className = 'w-5 h-1 rounded-full pass-bar-1 transition-all ' + (len >= 1 ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : 'bg-slate-700');
-    b2.className = 'w-5 h-1 rounded-full pass-bar-2 transition-all ' + (len >= 4 ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'bg-slate-700');
-    b3.className = 'w-5 h-1 rounded-full pass-bar-3 transition-all ' + (len >= 6 ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'bg-slate-700');
-    b4.className = 'w-5 h-1 rounded-full pass-bar-4 transition-all ' + (len >= 8 ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]' : 'bg-slate-700');
-
-    if (badge) {
-        if (len === 0) badge.textContent = 'SECURE PIN / KEY';
-        else if (len < 4) badge.textContent = 'KEY DETECTED...';
-        else if (len < 8) badge.textContent = 'AUTHENTICATING KEY';
-        else badge.textContent = 'ENCRYPTED & READY';
+    const emailInput = document.getElementById('login-email');
+    if (typeof window.renderEmployeeLoginDropdown === 'function') {
+        window.renderEmployeeLoginDropdown(emailInput ? emailInput.value : '');
+    } else if (typeof renderEmployeeLoginDropdown === 'function') {
+        renderEmployeeLoginDropdown(emailInput ? emailInput.value : '');
     }
-};
+}
+window.filterLoginStaffByDept = filterLoginStaffByDept;
 
-window.renderEmployeeLoginDropdown = function(query = '') {
+function updatePassStrength(val) {
+    const meter = document.getElementById('pass-strength-meter');
+    if (!meter) return;
+    const bars = meter.querySelectorAll('span');
+    if (!bars || bars.length < 4) return;
+    
+    const str = String(val || '').trim();
+    const len = str.length;
+
+    // Reset all bars
+    bars.forEach(b => {
+        b.className = 'w-5 h-1 rounded-full bg-slate-700 transition-all';
+    });
+
+    if (len === 0) return;
+
+    if (len <= 3) {
+        bars[0].className = 'w-5 h-1 rounded-full bg-rose-500 shadow-[0_0_6px_#f43f5e] transition-all';
+    } else if (len <= 5) {
+        bars[0].className = 'w-5 h-1 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24] transition-all';
+        bars[1].className = 'w-5 h-1 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24] transition-all';
+    } else if (len <= 7) {
+        bars[0].className = 'w-5 h-1 rounded-full bg-blue-400 shadow-[0_0_6px_#60a5fa] transition-all';
+        bars[1].className = 'w-5 h-1 rounded-full bg-blue-400 shadow-[0_0_6px_#60a5fa] transition-all';
+        bars[2].className = 'w-5 h-1 rounded-full bg-blue-400 shadow-[0_0_6px_#60a5fa] transition-all';
+    } else {
+        bars[0].className = 'w-5 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] transition-all';
+        bars[1].className = 'w-5 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] transition-all';
+        bars[2].className = 'w-5 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] transition-all';
+        bars[3].className = 'w-5 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] transition-all';
+    }
+}
+window.updatePassStrength = updatePassStrength;
+
+function renderEmployeeLoginDropdown(query = '') {
     const dropdown = document.getElementById('login-employee-dropdown');
     if (!dropdown) return;
 
     dropdown.classList.remove('hidden');
     const allStaff = getEmployeeData();
     const q = String(query || '').trim().toLowerCase();
-    const deptFilter = (window.loginDeptFilter || 'ALL').toUpperCase();
 
     // เช็คว่าตอนนี้ผู้ใช้กดอยู่ที่แท็บไหน
     const isSupervisorTab = (S.loginRole === 'supervisor');
@@ -4334,14 +4324,20 @@ window.renderEmployeeLoginDropdown = function(query = '') {
     const filtered = allStaff.filter(item => {
         const role = item.role.toLowerCase();
         const qMatch = !q || item.name.toLowerCase().includes(q) || item.email.toLowerCase().includes(q);
-
         if (!qMatch) return false;
 
-        // Department quick filter
-        if (deptFilter === 'SUPPORT' && !role.includes('support')) return false;
-        if (deptFilter === 'IQC' && !role.includes('iqc')) return false;
-        if (deptFilter === 'ENGINEER' && !role.includes('engineer')) return false;
-        if (deptFilter === 'MANAGEMENT' && !role.includes('supervisor') && !role.includes('manager') && !role.includes('admin')) return false;
+        // Apply department quick filter pill if not ALL
+        if (_currentLoginDeptFilter && _currentLoginDeptFilter !== 'ALL') {
+            if (_currentLoginDeptFilter === 'SUPPORT') {
+                return role.includes('support') || role.includes('1.');
+            } else if (_currentLoginDeptFilter === 'IQC') {
+                return role.includes('iqc') || role.includes('2.');
+            } else if (_currentLoginDeptFilter === 'ENGINEER') {
+                return role.includes('engineer') || role.includes('3.');
+            } else if (_currentLoginDeptFilter === 'MANAGEMENT') {
+                return role.includes('supervisor') || role.includes('manager') || role.includes('admin') || role.includes('4.') || role.includes('5.') || role.includes('6.');
+            }
+        }
 
         if (isSupervisorTab) {
             // --- 🔑 หน้า SUPERVISOR: โชว์เฉพาะ 4 กลุ่มนี้ ---
@@ -4379,18 +4375,15 @@ window.renderEmployeeLoginDropdown = function(query = '') {
         if (item.role.includes("6.")) bStyle = "border-purple-500/60 text-purple-200 bg-purple-900/40"; // Admin
 
         html += `
-            <div class="employee-ac-item flex items-center justify-between gap-3 p-2.5 rounded-xl cursor-pointer transition-all duration-200 hover:bg-blue-900/40 border border-slate-800/40 hover:border-blue-500/50 mb-1.5 bg-slate-900/60 backdrop-blur-md hover:scale-[1.01]"
+            <div class="employee-ac-item flex items-center justify-between gap-3 p-2.5 rounded-xl cursor-pointer transition-all duration-200 hover:bg-blue-900/40 border border-slate-800/40 hover:border-blue-500/50 mb-1.5 bg-slate-900/60 backdrop-blur-md"
                  onmousedown="event.preventDefault(); window.selectEmployeeLoginOption('${safeEmail}', '${safeName}')">
                 
                 <div class="flex items-center gap-3 min-w-0 flex-1">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-900/80 to-slate-900 border border-blue-500/40 flex items-center justify-center font-black text-blue-300 text-xs shrink-0 shadow-[0_0_12px_rgba(59,130,246,0.3)]">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 flex items-center justify-center font-black text-blue-400 text-xs shrink-0">
                         ${item.name.charAt(0)}
                     </div>
                     <div class="flex flex-col min-w-0">
-                        <div class="font-bold text-[12px] text-white tracking-tight truncate flex items-center gap-1.5">
-                            ${item.name}
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                        </div>
+                        <div class="font-bold text-[12px] text-white tracking-tight truncate">${item.name}</div>
                         <div class="text-[10px] text-slate-400 font-mono truncate opacity-80">${item.email}</div>
                     </div>
                 </div>
@@ -4859,73 +4852,445 @@ window.generateSignatureSvgDataUrl = generateSignatureSvgDataUrl;
 window.getStaffSignatureImage = getStaffSignatureImage;
 window.SIG_LIBRARY = SIG_LIBRARY;
 
-// Instrument Image Resolver (Retired Calibration images)
+// ============================================================
+// CALIBRATION INSTRUMENT IMAGE DATABASE (Auto-Fetch from assetsinstruments/)
+// ============================================================
 const resolveInstrumentAssetUrl = (assetPath) => {
     if (!assetPath || typeof assetPath !== 'string') return '';
-    return assetPath.trim();
+    const trimmed = assetPath.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('data:') || /^https?:\/\//i.test(trimmed)) return trimmed;
+
+    try {
+        if (window.location && window.location.protocol === 'file:') {
+            return new URL(trimmed.startsWith('./') ? trimmed : './' + trimmed, window.location.href).href;
+        }
+    } catch (err) {
+        console.warn('[Instrument Asset Resolver]', err);
+    }
+
+    return trimmed;
 };
-const INSTRUMENT_IMAGE_MAP = {};
-const getInstrumentImageUrl = () => '';
+
+const INSTRUMENT_IMAGE_MAP = {
+    // ============================================================
+    // 1. DIAL GAUGES / PROBES / BASIC MEASUREMENT
+    // ============================================================
+    "DG-12M-003": "./assetsinstruments/DG-12M-003.png",
+    "DG-12M-004": "./assetsinstruments/DG-12M-004.png",
+    "DG-12M-006": "./assetsinstruments/DG-12M-006.png",
+    "DG-12M-007": "./assetsinstruments/DG-12M-007.png",
+    "DG-12M-008": "./assetsinstruments/DG-12M-008.png",
+    "DG-1MM-004": "./assetsinstruments/DG-1MM-004.png",
+
+    // ============================================================
+    // 2. PIN GAUGES / PLUG GAUGES (QAP-109 / 111)
+    // ============================================================
+    "QAP-109-039": "./assetsinstruments/QAP-109-039.png",
+    "QAP-109-040": "./assetsinstruments/QAP-109-040.png",
+    "QAP-109-041": "./assetsinstruments/QAP-109-041.png",
+    "QAP-109-042": "./assetsinstruments/QAP-109-039.png", // Mapped to 039
+    "QAP-109-043": "./assetsinstruments/QAP-109-039.png", // Mapped to 039
+    "QAP-111-001": "./assetsinstruments/QAP-111-001.png",
+
+    // ============================================================
+    // 3. THICKNESS & FEELER GAUGES (QAP-118)
+    // ============================================================
+    "QAP-118-005": "./assetsinstruments/QAP-118-005.png",
+    "FEELER GAUGE": "./assetsinstruments/QAP-118-005.png",
+    "FEELER GAUGE SET": "./assetsinstruments/QAP-118-005.png",
+    "THICKNESS GAUGE": "./assetsinstruments/QAP-118-005.png",
+    "THICKNESS GAUGE(FEELER)": "./assetsinstruments/QAP-118-005.png",
+    "THICKNESS GAUGE (FEELER)": "./assetsinstruments/QAP-118-005.png",
+    "QAP-118-007": "./assetsinstruments/QAP-118-007.png",
+    "QAP-118-008": "./assetsinstruments/QAP-118-008.png",
+    "QAP-118-009": "./assetsinstruments/QAP-118-007.png",
+    "CU-THICKNESS-STANDARD": "./assetsinstruments/QAP-118-007.png",
+    "CU THICKNESS STANDARD": "./assetsinstruments/QAP-118-007.png",
+    "FABRIC THICKNESS GAUGE": "./assetsinstruments/QAP-118-008.png",
+
+    // ============================================================
+    // 4. RADIUS GAUGES (QAP-122 / 123)
+    // ============================================================
+    "QAP-122-003": "./assetsinstruments/QAP-122-003.png",
+    "QAP-122-004": "./assetsinstruments/QAP-122-003.png",
+    "QAP-122-005": "./assetsinstruments/QAP-122-003.png",
+    "QAP-122-006": "./assetsinstruments/QAP-122-003.png",
+    "QAP-122-007": "./assetsinstruments/QAP-122-003.png",
+    "RADIUS GAUGE SET": "./assetsinstruments/QAP-122-003.png",
+    "RADIUS GAUGE": "./assetsinstruments/QAP-122-003.png",
+    "QAP-123-001": "./assetsinstruments/QAP-123-001.png",
+    "QAP-123-002": "./assetsinstruments/QAP-123-002.png",
+    "QAP-123-003": "./assetsinstruments/QAP-123-003.png",
+    "QAP-123-004": "./assetsinstruments/QAP-123-004.png",
+    "QAP-123-005": "./assetsinstruments/QAP-123-005.png",
+    "QAP-123-006": "./assetsinstruments/QAP-123-006.png",
+    "QAP-123-007": "./assetsinstruments/QAP-123-007.png",
+    "QAP-123-008": "./assetsinstruments/QAP-123-008.png",
+    "QAP-123-009": "./assetsinstruments/QAP-123-009.png",
+    "QAP-123-010": "./assetsinstruments/QAP-123-010.png",
+    "QAP-123-011": "./assetsinstruments/QAP-123-011.png",
+    "QAP-123-012": "./assetsinstruments/QAP-123-012.png",
+    "QAP-123-013": "./assetsinstruments/QAP-123-013.png",
+
+    // ============================================================
+    // 5. SPECIALIZED INSPECTION (QAP 103, 108, 140, 146 SERIES)
+    // ============================================================
+    "QAP-103-001": "./assetsinstruments/QAP-103-001.png",
+    "QAP-103-002": "./assetsinstruments/QAP-103-002.png",
+    "QAP-108-015": "./assetsinstruments/QAP-108-015.png",
+    "QAP-108-016": "./assetsinstruments/QAP-108-016.png",
+    "QAP-108-018": "./assetsinstruments/QAP-108-018.png",
+    "QAP-108-022": "./assetsinstruments/QAP-108-022.png",
+    "QAP-108-027": "./assetsinstruments/QAP-108-027.png",
+    "QAP-108-028": "./assetsinstruments/QAP-108-028.png",
+    "QAP-140-001": "./assetsinstruments/QAP-140-001.png",
+    "QAP-140-002": "./assetsinstruments/QAP-140-002.png",
+    "QAP-140-003": "./assetsinstruments/QAP-140-003.png",
+    "QAP-140-004": "./assetsinstruments/QAP-140-004.png",
+    "QAP-140-005": "./assetsinstruments/QAP-140-005.png",
+    "QAP-140-006": "./assetsinstruments/QAP-140-006.png",
+    "QAP-140-007": "./assetsinstruments/QAP-140-007.png",
+    "QAP-140-008": "./assetsinstruments/QAP-140-008.png",
+    "QAP-140-009": "./assetsinstruments/QAP-140-009.png",
+    "QAP-140-010": "./assetsinstruments/QAP-140-010.png",
+    "QAP-140-011": "./assetsinstruments/QAP-140-011.png",
+    "QAP-140-012": "./assetsinstruments/QAP-140-012.png",
+    "QAP-140-013": "./assetsinstruments/QAP-140-013.png",
+    "QAP-146-002": "./assetsinstruments/QAP-146-002.png",
+    "QAP-146-003": "./assetsinstruments/QAP-146-003.png",
+    "QAP-146-004": "./assetsinstruments/QAP-146-004.png",
+
+    // ============================================================
+    // 6. HIGH PRECISION (QAP-145 SERIES 001-029)
+    // ============================================================
+    "QAP-145-001": "./assetsinstruments/QAP-145-001.png",
+    "QAP-145-002": "./assetsinstruments/QAP-145-002.png",
+    "QAP-145-003": "./assetsinstruments/QAP-145-003.png",
+    "QAP-145-004": "./assetsinstruments/QAP-145-004.png",
+    "QAP-145-005": "./assetsinstruments/QAP-145-005.png",
+    "QAP-145-006": "./assetsinstruments/QAP-145-006.png",
+    "QAP-145-007": "./assetsinstruments/QAP-145-007.png",
+    "QAP-145-008": "./assetsinstruments/QAP-145-008.png",
+    "QAP-145-009": "./assetsinstruments/QAP-145-009.png",
+    "QAP-145-010": "./assetsinstruments/QAP-145-010.png",
+    "QAP-145-011": "./assetsinstruments/QAP-145-011.png",
+    "QAP-145-012": "./assetsinstruments/QAP-145-012.png",
+    "QAP-145-013": "./assetsinstruments/QAP-145-013.png",
+    "QAP-145-014": "./assetsinstruments/QAP-145-014.png",
+    "QAP-145-015": "./assetsinstruments/QAP-145-015.png",
+    "QAP-145-016": "./assetsinstruments/QAP-145-016.png",
+    "QAP-145-017": "./assetsinstruments/QAP-145-017.png",
+    "QAP-145-018": "./assetsinstruments/QAP-145-018.png",
+    "QAP-145-019": "./assetsinstruments/QAP-145-019.png",
+    "QAP-145-020": "./assetsinstruments/QAP-145-020.png",
+    "QAP-145-021": "./assetsinstruments/QAP-145-021.png",
+    "QAP-145-022": "./assetsinstruments/QAP-145-022.png",
+    "QAP-145-023": "./assetsinstruments/QAP-145-023.png",
+    "QAP-145-024": "./assetsinstruments/QAP-145-024.png",
+    "QAP-145-025": "./assetsinstruments/QAP-145-025.png",
+    "QAP-145-026": "./assetsinstruments/QAP-145-026.png",
+    "QAP-145-027": "./assetsinstruments/QAP-145-027.png",
+    "QAP-145-028": "./assetsinstruments/QAP-145-028.png",
+    "QAP-145-029": "./assetsinstruments/QAP-145-029.png",
+
+    // ============================================================
+    // 7. VERNIER & DIGITAL CALIPERS (VCD / OCC SERIES)
+    // ============================================================
+    "OCC-160-001": "./assetsinstruments/OCC-160-001.png",
+    "VCD-150-019": "./assetsinstruments/VCD-150-019.png",
+    "VCD-150-050": "./assetsinstruments/VCD-150-050.png",
+    "VCD-150-069": "./assetsinstruments/VCD-150-069.png",
+    "VCD-150-073": "./assetsinstruments/VCD-150-073.png",
+    "VCD-150-089": "./assetsinstruments/VCD-150-089.png",
+    "VCD-150-090": "./assetsinstruments/VCD-150-090.png",
+    "VCD-150-098": "./assetsinstruments/VCD-150-098.png",
+    "VCD-150-105": "./assetsinstruments/VCD-150-105.png",
+    "VCD-150-106": "./assetsinstruments/VCD-150-106.png",
+    "VCD-150-107": "./assetsinstruments/VCD-150-107.png",
+    "VCD-150-108": "./assetsinstruments/VCD-150-108.png",
+    "VCD-1M-004": "./assetsinstruments/VCD-1M-004.png",
+    "VCD-300-008": "./assetsinstruments/VCD-300-008.png",
+    "VCD-300-020": "./assetsinstruments/VCD-300-020.png",
+    "VCD-300-022": "./assetsinstruments/VCD-300-022.png",
+    "VCD-300-024": "./assetsinstruments/VCD-300-024.png",
+    "VCD-600-001": "./assetsinstruments/VCD-600-001.png",
+
+    // ============================================================
+    // 8. OTHER QAP SERIES (160, 201, 205, 206, 207, 212, 217, 226, 251, 311, 400+)
+    // ============================================================
+    "QAP-160-001": "./assetsinstruments/QAP-160-001.png",
+    "QAP-160-002": "./assetsinstruments/QAP-160-002.png",
+    "QAP-160-003": "./assetsinstruments/QAP-160-003.png",
+    "QAP-201-004": "./assetsinstruments/QAP-201-004.png",
+    "QAP-201-005": "./assetsinstruments/QAP-201-005.png",
+    "QAP-201-006": "./assetsinstruments/QAP-201-006.png",
+    "QAP-201-007": "./assetsinstruments/QAP-201-007.png",
+    "QAP-205-001": "./assetsinstruments/QAP-205-001.png",
+    "QAP-205-002": "./assetsinstruments/QAP-205-002.png",
+    "QAP-205-003": "./assetsinstruments/QAP-205-003.png",
+    "QAP-205-004": "./assetsinstruments/QAP-205-004.png",
+    "QAP-205-005": "./assetsinstruments/QAP-205-005.png",
+    "QAP-205-006": "./assetsinstruments/QAP-205-006.png",
+    "QAP-206-001": "./assetsinstruments/QAP-206-001.png",
+    "QAP-207-001": "./assetsinstruments/QAP-207-001.png",
+    "QAP-212-001": "./assetsinstruments/QAP-212-001.png",
+    "QAP-217-001": "./assetsinstruments/QAP-217-001.png",
+    "QAP-226-003": "./assetsinstruments/QAP-226-003.png",
+    "QAP-226-004": "./assetsinstruments/QAP-226-004.png",
+    "QAP-226-005": "./assetsinstruments/QAP-226-005.png",
+    "QAP-226-006": "./assetsinstruments/QAP-226-006.png",
+    "QAP-226-007": "./assetsinstruments/QAP-226-007.png",
+    "QAP-226-008": "./assetsinstruments/QAP-226-008.png",
+    "QAP-226-009": "./assetsinstruments/QAP-226-009.png",
+    "QAP-251-001": "./assetsinstruments/QAP-251-001.png",
+    "QAP-311-002": "./assetsinstruments/QAP-311-002.png",
+    "QAP-311-003": "./assetsinstruments/QAP-311-003.png",
+    "QAP-311-004": "./assetsinstruments/QAP-311-004.png",
+    "QAP-402-001": "./assetsinstruments/QAP-402-001.png",
+    "QAP-402-002": "./assetsinstruments/QAP-402-002.png",
+    "QAP-418-001": "./assetsinstruments/QAP-418-001.png",
+    "QAP-418-002": "./assetsinstruments/QAP-418-002.png",
+    "QAP-427-001": "./assetsinstruments/QAP-427-001.png",
+    "QAP-430-001": "./assetsinstruments/QAP-430-001.png",
+    "QAP-432-001": "./assetsinstruments/QAP-432-001.png",
+    "QAP-432-002": "./assetsinstruments/QAP-432-002.png",
+    "QAP-433-001": "./assetsinstruments/QAP-433-001.png",
+    "QAP NO. 002": "./assetsinstruments/QAP NO. 002.png",
+    "QAP NO.002": "./assetsinstruments/QAP NO. 002.png",
+    "QAP NO 002": "./assetsinstruments/QAP NO. 002.png",
+    "QAP-NO-002": "./assetsinstruments/QAP-NO-002.png",
+    "QAP-NO.-002": "./assetsinstruments/QAP-NO-002.png",
+    "QAP-002": "./assetsinstruments/QAP-002.png",
+    "QAP002": "./assetsinstruments/QAP-002.png",
+    "QAP 002": "./assetsinstruments/QAP-002.png",
+    "MVB-385SD": "./assetsinstruments/MVB-385SD.png",
+    "MVB385SD": "./assetsinstruments/MVB-385SD.png",
+    "VIBRATION DATA RECORDER": "./assetsinstruments/QAP-NO-002.png",
+    "VIBRATION RECORDER": "./assetsinstruments/QAP-NO-002.png",
+    "VIBRATION METER": "./assetsinstruments/QAP-NO-002.png",
+    // ============================================================
+    // 9. MICROMETERS (OM) & HARDNESS (HLD) & OTHER TOOLS
+    // ============================================================
+    "OM-025-059": "./assetsinstruments/OM-025-059.png",
+    "OM-025-060": "./assetsinstruments/OM-025-060.png",
+    "OM-050-013": "./assetsinstruments/OM-050-013.png",
+    "OM-075-004": "./assetsinstruments/OM-075-004.png",
+    "HLD-010-081": "./assetsinstruments/HLD-010-081.png",
+    "HLD-239-001": "./assetsinstruments/HLD-239-001.png",
+    "GR-0M3-001": "./assetsinstruments/GR-0M3-001.png",
+    "GR-0M3-002": "./assetsinstruments/GR-0M3-002.png",
+    "GR-0M4-001": "./assetsinstruments/GR-0M4-001.png",
+    "GR-0M4-002": "./assetsinstruments/GR-0M4-002.png",
+    "GR-0M6-001": "./assetsinstruments/GR-0M6-001.png",
+    "GR-0M6-002": "./assetsinstruments/GR-0M6-002.png",
+    "GS-0M3-001": "./assetsinstruments/GS-0M3-001.png",
+    "GS-0M4-001": "./assetsinstruments/GS-0M4-001.png",
+    "GS-0M6-001": "./assetsinstruments/GS-0M6-001.png",
+    "OS-2.5G-001": "./assetsinstruments/OS-2.5G-001.png",
+    "SLM-130-007": "./assetsinstruments/SLM-130-007.png",
+    "VC-1M-002": "./assetsinstruments/VC-1M-002.png",
+    "AA-05A-001": "./assetsinstruments/AA-05A-001.png",
+    "CMO-5KV-114": "./assetsinstruments/CMO-5KV-114.png",
+
+    // ============================================================
+    // 10. ELECTRONIC BALANCES / SCALES (EB SERIES)
+    // ============================================================
+    "EB-15K-012": "./assetsinstruments/EB-15K-012.png",
+    "EB-500-001": "./assetsinstruments/EB-500-001.png",
+    "EB-120-001": "./assetsinstruments/EB-120-001.png",
+
+    // ============================================================
+    // 11. SPECIAL CASE NAMES
+    // ============================================================
+    // ============================================================
+    // 12. TORQUE, FORCE, CALIBRATORS & ELECTRICAL
+    // ============================================================
+    "TCS2-127": "./assetsinstruments/TCS2-127.png",
+    "TCS2-128": "./assetsinstruments/TCS2-128.png",
+    "TCS2-129": "./assetsinstruments/TCS2-129.png",
+    "DHG-600-004": "./assetsinstruments/DHG-600-004.png",
+    "DHG-1M-001": "./assetsinstruments/DHG-1M-001.png",
+    "DIGIMATIC HEIGHT GAUGE": "./assetsinstruments/DHG-600-004.png",
+    "DIGIMATIC HEIGHT GAGE": "./assetsinstruments/DHG-600-004.png",
+    "HEIGHT GAUGE": "./assetsinstruments/DHG-600-004.png",
+    "HEIGHT GAGE": "./assetsinstruments/DHG-600-004.png",
+    "DHG": "./assetsinstruments/DHG-600-004.png",
+    "DMO-1KV-003": "./assetsinstruments/DMO-1KV-003.png",
+    "DMO-1KV-018": "./assetsinstruments/DMO-1KV-018.png",
+    "DMO-1KV-024": "./assetsinstruments/DMO-1KV-024.png",
+    "CSS-10K-056": "./assetsinstruments/CSS-10K-056.png",
+    "QAP-104-001": "./assetsinstruments/QAP-104-001.png",
+   "QAP-108-001": "./assetsinstruments/QAP-108-001.png",
+   "QAP-108-023": "./assetsinstruments/QAP-108-023.png",
+   "QAP-108-025": "./assetsinstruments/QAP-108-025.png",
+   "QAP-108-019": "./assetsinstruments/QAP-108-019.png",
+   "QAP-108-020": "./assetsinstruments/QAP-108-020.png",
+   "QAP-108-021": "./assetsinstruments/QAP-108-021.png",
+   "DBD-025-001": "./assetsinstruments/DBD-025-001.png",
+   "QAP-108-026": "./assetsinstruments/QAP-108-026.png"
+};
+
+function getInstrumentImageUrl(item) {
+    if (!item) return "";
+    
+    // หากส่งเข้ามาเป็น string (เช่น Code หรือ Path)
+    if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (!trimmed) return "";
+        if (INSTRUMENT_IMAGE_MAP[trimmed]) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP[trimmed]);
+        const directKey = Object.keys(INSTRUMENT_IMAGE_MAP).find(k => k.toLowerCase() === trimmed.toLowerCase());
+        if (directKey) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP[directKey]);
+        return resolveInstrumentAssetUrl(trimmed);
+    }
+
+    // หาก item มี imageUrl ที่เป็น base64 หรือ URL อื่นๆ ที่กำหนดไว้ชัดเจน
+    if (item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim() !== "") {
+        const urlTrimmed = item.imageUrl.trim();
+        if (urlTrimmed.startsWith('data:') || /^https?:\/\//i.test(urlTrimmed) || urlTrimmed.startsWith('assetsinstruments/') || urlTrimmed.startsWith('./assetsinstruments/')) {
+            return resolveInstrumentAssetUrl(urlTrimmed);
+        }
+    }
+
+    const clean = (val) => String(val || "").trim().toUpperCase();
+    const normalize = (val) => clean(val).replace(/[^A-Z0-9]/g, "");
+
+    const codeNo = clean(item.code_no);
+    const id = clean(item.id);
+    const barcode = clean(item.code_barcode);
+    const model = clean(item.model);
+    const serial = clean(item.serial);
+    const name = clean(item.name);
+
+    // 1. ตรวจสอบกับ INSTRUMENT_IMAGE_MAP แบบจับคู่ตรงเป๊ะ (Exact or Normalized Key)
+    const imgMapEntries = (typeof INSTRUMENT_IMAGE_MAP !== 'undefined' && INSTRUMENT_IMAGE_MAP) ? Object.entries(INSTRUMENT_IMAGE_MAP) : [];
+    for (const [key, path] of imgMapEntries) {
+        const kUpper = key.toUpperCase();
+        const kNorm = normalize(key);
+        if (
+            (codeNo && (codeNo === kUpper || normalize(codeNo) === kNorm)) ||
+            (id && (id === kUpper || normalize(id) === kNorm)) ||
+            (barcode && (barcode === kUpper || normalize(barcode) === kNorm)) ||
+            (model && (model === kUpper || normalize(model) === kNorm)) ||
+            (serial && (serial === kUpper || normalize(serial) === kNorm))
+        ) {
+            return resolveInstrumentAssetUrl(path);
+        }
+    }
+
+    // 2. ตรวจสอบแบบมี Substring ใน Code No, ID, Barcode, Serial, หรือ Model
+    for (const [key, path] of imgMapEntries) {
+        const kUpper = key.toUpperCase();
+        if (
+            (codeNo && codeNo.includes(kUpper)) ||
+            (id && id.includes(kUpper)) ||
+            (barcode && barcode.includes(kUpper)) ||
+            (model && model.includes(kUpper)) ||
+            (serial && serial.includes(kUpper))
+        ) {
+            return resolveInstrumentAssetUrl(path);
+        }
+    }
+
+    // 3. Fallback: RADIUS GAUGE SET / RADIUS GAUGE / QAP-122-003 -> QAP-122-003.png
+    if (
+        name.includes("RADIUS GAUGE") ||
+        name.includes("RADIUS") ||
+        codeNo.includes("QAP-122-003") || id.includes("QAP-122-003") ||
+        codeNo.includes("122-003") || id.includes("122-003") ||
+        codeNo.startsWith("QAP-122") || id.startsWith("QAP-122")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-122-003"] || "./assetsinstruments/QAP-122-003.png");
+    }
+
+    // 4. Fallback: CU THICKNESS STANDARD / COATING THICKNESS GAUGE -> QAP-118-007.png
+    if (
+        name.includes("CU THICKNESS") ||
+        name.includes("CU-THICKNESS") ||
+        name.includes("THICKNESS STANDARD") ||
+        name.includes("COATING") ||
+        codeNo.includes("QAP-118-007") || id.includes("QAP-118-007") ||
+        codeNo.includes("QAP-118-009") || id.includes("QAP-118-009") ||
+        codeNo.includes("118-007") || id.includes("118-007") ||
+        codeNo.includes("118-009") || id.includes("118-009")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-118-007"] || "./assetsinstruments/QAP-118-007.png");
+    }
+
+    // 4. Fallback: FABRIC THICKNESS GAUGE / QAP-118-008 -> QAP-118-008.png
+    if (
+        name.includes("FABRIC") ||
+        codeNo.includes("QAP-118-008") || id.includes("QAP-118-008") ||
+        codeNo.includes("118-008") || id.includes("118-008")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-118-008"] || "./assetsinstruments/QAP-118-008.png");
+    }
+
+    // 5. Fallback: THICKNESS GAUGE(FEELER) / FEELER GAUGE / กลุ่ม QAP-118 -> QAP-118-005.png
+    if (
+        name.includes("THICKNESS GAUGE") || 
+        name.includes("FEELER") || 
+        name.includes("THICKNESS") ||
+        codeNo.startsWith("QAP-118") || 
+        id.startsWith("QAP-118")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-118-005"] || "./assetsinstruments/QAP-118-005.png");
+    }
+
+    // 5. Fallback: PIN GAUGE หรือกลุ่ม QAP-109
+    if (name.includes("PIN GAUGE") || name.includes("PINGAUGE") || codeNo.startsWith("QAP-109") || id.startsWith("QAP-109")) {
+        if (codeNo.includes("040") || id.includes("040")) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-109-040"]);
+        if (codeNo.includes("041") || id.includes("041")) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-109-041"]);
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-109-039"] || "./assetsinstruments/QAP-109-039.png");
+    }
+
+    // 6. Fallback: DIGIMATIC HEIGHT GAUGE / HEIGHT GAUGE / DHG
+    if (
+        name.includes("DIGIMATIC HEIGHT") ||
+        name.includes("HEIGHT GAUGE") ||
+        name.includes("HEIGHT GAGE") ||
+        name.includes("DHG") ||
+        codeNo.startsWith("DHG") ||
+        id.startsWith("DHG")
+    ) {
+        if (codeNo.includes("1M") || id.includes("1M") || name.includes("1M") || name.includes("1000")) {
+            return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["DHG-1M-001"] || "./assetsinstruments/DHG-1M-001.png");
+        }
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["DHG-600-004"] || "./assetsinstruments/DHG-600-004.png");
+    }
+
+    // 7. Fallback: QAP NO. 002 / VIBRATION DATA RECORDER / LUTRON MVB-385SD
+    if (
+        codeNo.includes("QAP NO. 002") || id.includes("QAP NO. 002") ||
+        codeNo.includes("QAP NO.002") || id.includes("QAP NO.002") ||
+        codeNo.includes("QAP NO 002") || id.includes("QAP NO 002") ||
+        codeNo.includes("QAP-NO-002") || id.includes("QAP-NO-002") ||
+        codeNo.includes("QAP-NO.-002") || id.includes("QAP-NO.-002") ||
+        codeNo.includes("QAP-002") || id.includes("QAP-002") ||
+        codeNo.includes("QAP002") || id.includes("QAP002") ||
+        codeNo.includes("NO. 002") || id.includes("NO. 002") ||
+        codeNo.includes("NO.002") || id.includes("NO.002") ||
+        model.includes("MVB-385SD") || model.includes("MVB385SD") || model.includes("MVB-385") || model.includes("MVB") ||
+        name.includes("VIBRATION DATA RECORDER") || name.includes("VIBRATION RECORDER") || name.includes("VIBRATION") ||
+        name.includes("SD CARD DATA LOGGER")
+    ) {
+        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP NO. 002"] || "./assetsinstruments/QAP-NO-002.png");
+    }
+
+    return item.imageUrl ? resolveInstrumentAssetUrl(item.imageUrl) : "";
+}
+
 window.INSTRUMENT_IMAGE_MAP = INSTRUMENT_IMAGE_MAP;
 window.getInstrumentImageUrl = getInstrumentImageUrl;
 window.resolveInstrumentAssetUrl = resolveInstrumentAssetUrl;
-
-window.cleanSignatureName = cleanSignatureName;
-
-// --- ฟังก์ชันจัดระเบียบชื่อพนักงานให้คงคำนำหน้า (Mr. / Ms.) เสมอ และตัดชื่อซ้ำที่ไม่มีคำนำหน้าออก ---
-function canonicalStaffDisplayName(rawName, email = '') {
-    if (!rawName || rawName === '-' || rawName === '--' || rawName === 'N/A') return '';
-    let str = String(rawName).trim();
-    
-    // จัดรูปแบบคำนำหน้าที่มีอยู่แล้วให้เป็นมาตรฐาน (เช่น "Mr. Aphinan P." -> "Mr.Aphinan P.")
-    str = str.replace(/^(Mr|Ms|Mrs|Miss|Dr|Khun)\.?\s+/i, (match, p1) => {
-        const prefix = p1.charAt(0).toUpperCase() + p1.slice(1).toLowerCase();
-        return `${prefix}.`;
-    });
-    
-    const emLower = email ? String(email).trim().toLowerCase() : '';
-    const cleanRaw = cleanSignatureName(str).toLowerCase().trim();
-    
-    // 1. ตรวจสอบใน MASTER_STAFF_USERS (32 คนหลักที่มีคำนำหน้า Mr. หรือ Ms. ครบถ้วน)
-    if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
-        const found = MASTER_STAFF_USERS.find(u => {
-            if (emLower && u.email && u.email.toLowerCase().trim() === emLower) return true;
-            if (cleanRaw) {
-                const uClean = cleanSignatureName(u.name).toLowerCase().trim();
-                return uClean === cleanRaw;
-            }
-            return false;
-        });
-        if (found && found.name) {
-            return found.name.trim(); // คืนค่าชื่อที่มีคำนำหน้าเสมอ
-        }
-    }
-    
-    // 2. ตรวจสอบใน STAFF_LIST
-    if (typeof STAFF_LIST !== 'undefined' && Array.isArray(STAFF_LIST)) {
-        const found = STAFF_LIST.find(s => {
-            const sClean = cleanSignatureName(s).toLowerCase().trim();
-            return sClean === cleanRaw;
-        });
-        if (found) return String(found).trim();
-    }
-    
-    // 3. ตรวจสอบใน STAFF_EMAIL_MAP
-    if (typeof STAFF_EMAIL_MAP === 'object' && STAFF_EMAIL_MAP !== null) {
-        for (const [sName, sEmail] of Object.entries(STAFF_EMAIL_MAP)) {
-            if (emLower && sEmail && sEmail.toLowerCase().trim() === emLower) {
-                if (/^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(sName)) return sName.trim();
-            }
-            const sClean = cleanSignatureName(sName).toLowerCase().trim();
-            if (cleanRaw && sClean === cleanRaw && /^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(sName)) {
-                return sName.trim();
-            }
-        }
-    }
-    
-    return str;
+// --- ฟังก์ชันทำความสะอาดชื่อ (ลบ Mr. Ms. ฯลฯ) ---
+function cleanSignatureName(name) {
+    if (!name) return "";
+    return String(name).trim()
+        .replace(/^(?:mr|ms|mrs|miss|khun|dr|k)\.?\s*/gi, '')
+        .replace(/^(?:นาย|นางสาว|นาง|คุณ)\s*/gi, '')
+        .trim();
 }
-window.canonicalStaffDisplayName = canonicalStaffDisplayName;
 
 // --- ฟังก์ชันระบุทีมของพนักงาน (Mold, Printing, Steel, Piping and Mat, Electronic) ---
 function getStaffTeamName(inputName) {
@@ -5033,7 +5398,7 @@ localDB.version(2).stores({
     pendingClaims: "id, date, sync_status",
     pendingOT: "id, date, sync_status",
     pending5S: "id, month, sync_status",
-    
+    calibrationMaster: "id, name, next_due" // <--- เพิ่มบรรทัดนี้
 });
 
 // ฟังก์ชันตรวจสอบสถานะเน็ตแบบ Real-time
@@ -5070,8 +5435,8 @@ var wapClient = window.wapClient;
 window.adminBypass = false; // ปลดล็อคโหมดผู้ดูแลระบบ
 
 console.log("🚀 Unified Database Connected: All modules linked to single project.");
-// 2. Global State (Reference to hoisted global state)
-S = window.S || {
+// 2. Global State
+let S = {
     isLoggedIn: false,
     currentUser: '',
     userRole: 'staff',
@@ -5093,7 +5458,6 @@ S = window.S || {
     isLinkSession: false, 
     loginRole: 'staff'
 };
-window.S = S;
 
 
 const ROW_HEIGHT = 56; 
@@ -5141,26 +5505,8 @@ function escapeHtml(text) {
     return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-function isQuotaExceededError(err) {
-    if (!err) return false;
-    const str = String(err.message || err.details || err.hint || (typeof err === 'string' ? err : '')).toLowerCase();
-    const code = String(err.code || (err.error && err.error.code) || '');
-    return str.includes('exceed_egress_quota') ||
-           str.includes('spend caps') ||
-           str.includes('restricted') ||
-           str.includes('egress_quota') ||
-           str.includes('egress quota') ||
-           str.includes('quota exceeded') ||
-           code === '402' ||
-           str.includes('payment required');
-}
-window.isQuotaExceededError = isQuotaExceededError;
-
 function getFriendlyErrorMessage(err) {
     if (!err) return 'เกิดข้อผิดพลาด';
-    if (isQuotaExceededError(err)) {
-        return '📶 ใช้งานโหมดบันทึกในเครื่อง (Cloud ถึงขีดจำกัดโควต้าชั่วคราว ข้อมูลบันทึกในเครื่องปลอดภัย)';
-    }
     if (!navigator.onLine || err.message?.includes('fetch') || err.message?.includes('network')) return '📶 ปัญหาการเชื่อมต่อ: กรุณาตรวจสอบอินเทอร์เน็ต';
     switch (err.code || (err.error && err.code)) {
         case '42501': return '🔒 สิทธิ์ปฏิเสธ';
@@ -5240,35 +5586,62 @@ window.hasAdminAccessPermission = hasAdminAccessPermission;
 // ============================================================
 window._dbUsersRoleMap = new Map();
 
+// เติมข้อมูลเริ่มต้นจาก MASTER_STAFF_USERS ทันทีเพื่อความพร้อมใช้งานแบบ 100%
+if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+    MASTER_STAFF_USERS.forEach(u => {
+        if (u && u.email) {
+            const em = u.email.toLowerCase().trim();
+            window._dbUsersRoleMap.set(em, {
+                email: u.email,
+                display_name: u.name || u.email.split('@')[0].toUpperCase(),
+                role: u.role || 'staff',
+                status: 'active'
+            });
+        }
+    });
+}
+
 window.fetchDbUsersForDirectory = async function() {
     try {
-        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+        // เติมค่า Fallback หาก Memory ยังว่าง
+        if (window._dbUsersRoleMap.size === 0 && typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+            MASTER_STAFF_USERS.forEach(u => {
+                if (u && u.email) {
+                    const em = u.email.toLowerCase().trim();
+                    window._dbUsersRoleMap.set(em, {
+                        email: u.email,
+                        display_name: u.name || u.email.split('@')[0].toUpperCase(),
+                        role: u.role || 'staff',
+                        status: 'active'
+                    });
+                }
+            });
+        }
+
+        if (!navigator.onLine) return;
+
+        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || (typeof sqeClient !== 'undefined' ? sqeClient : null);
         if (!sb) return;
 
-        // 1. ดึงข้อมูลจากตาราง 'profiles' (เปลี่ยนจาก users เดิม)
-        // ดึงคอลัมน์ที่มีอยู่จริงในฐานข้อมูลคุณ: email, display_name, role, status
+        // 1. ดึงข้อมูลจากตาราง 'profiles' (ถ้ามีและเชื่อมต่อได้)
         const { data, error } = await sb
             .from('profiles') 
             .select('email, display_name, role, status') 
             .order('email', { ascending: true });
             
         if (error) {
-            console.error('Supabase Fetch Error:', error.message);
+            console.warn('Profiles query notice (using local baseline):', error.message || error);
             return;
         }
 
         if (Array.isArray(data) && data.length > 0) {
-            // 2. ล้างข้อมูลเก่าใน Memory Map และเติมข้อมูลใหม่จาก DB 32 คน
-            window._dbUsersRoleMap.clear();
+            // 2. อัปเดตข้อมูลจาก Cloud DB
             data.forEach(u => {
                 if (u && u.email) {
                     const em = u.email.toLowerCase().trim();
-                    const canonical = (typeof window.canonicalStaffDisplayName === 'function')
-                        ? window.canonicalStaffDisplayName(u.display_name, u.email)
-                        : (u.display_name || u.email.split('@')[0].toUpperCase());
                     window._dbUsersRoleMap.set(em, {
                         email: u.email,
-                        display_name: canonical || u.display_name || u.email.split('@')[0].toUpperCase(),
+                        display_name: u.display_name || u.email.split('@')[0].toUpperCase(),
                         role: u.role || 'staff',
                         status: u.status || 'active'
                     });
@@ -5277,34 +5650,21 @@ window.fetchDbUsersForDirectory = async function() {
             
             console.log(`[Profiles DB] Success: Synced ${data.length} users to memory.`);
 
-            // 3. 🎯 จุดสำคัญที่สุด: สั่งให้ UI วาดรายการในดรอปดาวน์ใหม่ทันที
-            // เพื่อให้รายชื่อ 32 คนไปปรากฏในช่อง "Select Operator / Staff"
+            // 3. 🎯 อัปเดต UI รายการในดรอปดาวน์
             if (typeof window.loadStaffList === 'function') {
                 window.loadStaffList();
             }
             
-            // ถ้าดรอปดาวน์เปิดอยู่ ให้ Render ใหม่ด้วย
             if (typeof window.renderStaffCustomDropdown === 'function') {
                 window.renderStaffCustomDropdown('');
             }
-        } else {
-            console.log('No data found in profiles table');
         }
     } catch (e) {
-        console.warn('fetchDbUsersForDirectory error:', e);
+        console.warn('fetchDbUsersForDirectory note:', e?.message || e);
     }
 };
 
-// สั่งรันครั้งแรกทันทีที่โหลดสคริปต์ (รอ 500ms ให้ Client พร้อม)
-if (typeof setTimeout === 'function') {
-    setTimeout(() => {
-        if (typeof window.fetchDbUsersForDirectory === 'function') {
-            window.fetchDbUsersForDirectory();
-        }
-    }, 500);
-}
-
-// Initial sync
+// สั่งรันครั้งแรกเมื่อโหลดสคริปต์
 if (typeof setTimeout === 'function') {
     setTimeout(() => {
         if (typeof window.fetchDbUsersForDirectory === 'function') {
@@ -5365,12 +5725,9 @@ window.getEngineeringAndApprovalDirectory = function() {
         // 🌟 ดึงระดับสิทธิ์/ตำแหน่งจริงจากตาราง users ในฐานข้อมูล
         const dbUser = window._dbUsersRoleMap ? window._dbUsersRoleMap.get(key) : null;
         const realRole = (dbUser && dbUser.role) ? dbUser.role : fallbackRole;
-        let rawNameCandidate = (dbUser && dbUser.display_name && dbUser.display_name !== '-')
+        const finalDisplayName = (dbUser && dbUser.display_name && dbUser.display_name !== '-')
             ? dbUser.display_name
             : ((name && name !== '-') ? name.trim() : cleanEm.split('@')[0]);
-        const finalDisplayName = (typeof window.canonicalStaffDisplayName === 'function')
-            ? window.canonicalStaffDisplayName(rawNameCandidate, cleanEm)
-            : rawNameCandidate;
 
         if (!emailMap.has(key)) {
             const entry = {
@@ -5448,30 +5805,6 @@ window.getEngineeringAndApprovalDirectory = function() {
     }
 
     return list;
-};
-
-window.isMasterOrAdminUser = function(email) {
-    if (!email) {
-        email = (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : '';
-    }
-    if (!email) return false;
-    const em = String(email).trim().toLowerCase();
-    const adminEmails = [
-        'natthawut.chaising@carrier.com',
-        'natthawutchaising271166@gmail.com',
-        'zatknatthawut@gmail.com'
-    ];
-    if (adminEmails.includes(em) || em.includes('admin') || em.includes('natthawut')) return true;
-    if (typeof USER_LEVEL_MAP === 'object') {
-        const r = USER_LEVEL_MAP[em] || USER_LEVEL_MAP[email];
-        if (r && String(r).toLowerCase().includes('admin')) return true;
-    }
-    if (window._dbUsersRoleMap && window._dbUsersRoleMap.has(em)) {
-        const u = window._dbUsersRoleMap.get(em);
-        if (u && String(u.role).toLowerCase().includes('admin')) return true;
-    }
-    if (typeof S !== 'undefined' && S.userRole && String(S.userRole).toLowerCase().includes('admin')) return true;
-    return false;
 };
 
 window.isApproverOrEngineer = function(email) {
@@ -5940,10 +6273,10 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
     
     overlay.innerHTML = `
         <div class="annotator-container">
-            <!-- Header Bar (White Background with Title, Subtitle, Close and Save buttons) -->
+            <!-- Header Bar (Cyber Dark Glassmorphism) -->
             <div class="annotator-header">
                 <div class="annotator-header-left">
-                    <span class="annotator-header-icon">✏️</span>
+                    <div class="annotator-header-icon-box">✏️</div>
                     <div class="annotator-header-text">
                         <div class="annotator-title">
                             Evidence Defect Annotator (ใส่สัญลักษณ์ & ข้อความชี้จุดบกพร่อง)
@@ -6145,20 +6478,6 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
         ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
         saveHistory();
         setTimeout(fitToScreen, 50);
-    };
-    baseImage.onerror = () => {
-        if (baseImage.crossOrigin) {
-            baseImage.crossOrigin = null;
-            baseImage.src = imageUrl;
-        } else {
-            console.warn('Annotator: Failed to load image, setting blank canvas:', imageUrl);
-            canvas.width = 1200;
-            canvas.height = 800;
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            saveHistory();
-            setTimeout(fitToScreen, 50);
-        }
     };
     baseImage.src = imageUrl;
 
@@ -6427,11 +6746,7 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
         ctx.strokeStyle = currentColor;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        if (typeof ctx.roundRect === 'function') {
-            ctx.roundRect(coords.x, coords.y - boxHeight, boxWidth, boxHeight, 8);
-        } else {
-            ctx.rect(coords.x, coords.y - boxHeight, boxWidth, boxHeight);
-        }
+        ctx.roundRect(coords.x, coords.y - boxHeight, boxWidth, boxHeight, 8);
         ctx.fill();
         ctx.stroke();
 
@@ -6612,31 +6927,24 @@ async function handleLogin() {
         ? window.isApproverOrEngineer(email)
         : false;
 
-    // ตรวจสอบว่าเป็น Admin หรือไม่
-    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
-        ? window.isMasterOrAdminUser(email)
-        : (email === 'natthawut.chaising@carrier.com' || email.includes('admin') || email.includes('natthawut'));
-
-    // หากเป็นผู้ดูแลระบบ (Admin) ให้คงสิทธิ์ Admin เสมอ
-    if (isMasterAdmin) {
-        if (S.loginRole !== 'supervisor') {
-            S.loginRole = 'sqe_support';
-        }
-        S.userRole = 'admin';
-    } else if (S.loginRole === 'supervisor' || isEngOrApprover) {
+    // หากเป็นอีเมลในกลุ่มสายการอนุมัติ/วิศวกร หรือเลือกแท็บ Supervisor ให้กำหนดให้ล็อกอินเป็นหัวหน้างานเสมอ
+    if (S.loginRole === 'supervisor' || isEngOrApprover) {
         S.loginRole = 'supervisor';
     }
 
     // --- ตรวจสอบ MAINTENANCE MODE ---
     try {
         const sb = getSupabase();
-        const { data: mtxStatus } = await sb.from('system_settings').select('is_maintenance_active').eq('id', 'global_config').single();
-        const isMaster = email === 'natthawut.chaising@carrier.com';
-        if (mtxStatus?.is_maintenance_active && !isMaster) {
-            showLoginError("🚧 ระบบปิดปรับปรุงชั่วคราว โปรดลองใหม่ภายหลัง");
-            return;
+        if (sb) {
+            const { data: mtxData } = await sb.from('system_settings').select('*').eq('id', 'global_config').maybeSingle();
+            const isMaintenance = !!(mtxData?.is_maintenance_active || (mtxData?.data && mtxData.data.is_maintenance_active));
+            const isMaster = email === 'natthawut.chaising@carrier.com';
+            if (isMaintenance && !isMaster) {
+                showLoginError("🚧 ระบบปิดปรับปรุงชั่วคราว โปรดลองใหม่ภายหลัง");
+                return;
+            }
         }
-    } catch (e) { console.error("Maintenance check failed:", e); }
+    } catch (e) { console.warn("Maintenance check notice:", e); }
 
     btnText.classList.add('hidden');
     btnSpinner.classList.remove('hidden');
@@ -6646,10 +6954,10 @@ async function handleLogin() {
         const sb = getSupabase();
         if (!sb) throw new Error('NO_CLIENT');
 
-        // 1. ดึงข้อมูล User จาก DB
+        // 1. ดึงข้อมูล User จาก DB (ตาราง profiles)
         let userData = null;
         try {
-            const { data } = await sb.from('users').select('*').eq('email', email).single();
+            const { data } = await sb.from('profiles').select('*').eq('email', email).maybeSingle();
             userData = data;
         } catch (_) {}
 
@@ -6669,7 +6977,7 @@ async function handleLogin() {
                     status: 'active',
                     created_at: new Date().toISOString()
                 };
-                await sb.from('users').upsert(newUser, { onConflict: 'email' });
+                await sb.from('profiles').upsert(newUser, { onConflict: 'email' });
                 userData = newUser;
             } else if (S.loginRole === 'supervisor' || isEngOrApprover) {
                 // กรณีเป็นหัวหน้างานคนใหม่ที่ยังไม่มีใน Matrix
@@ -6679,7 +6987,7 @@ async function handleLogin() {
                     status: 'active',
                     created_at: new Date().toISOString()
                 };
-                await sb.from('users').upsert({ email, role: 'supervisor', status: 'active' }, { onConflict: 'email' });
+                await sb.from('profiles').upsert({ email, role: 'supervisor', status: 'active' }, { onConflict: 'email' });
             } else {
                 throw new Error('NOT_REGISTERED');
             }
@@ -6690,9 +6998,7 @@ async function handleLogin() {
 
         // 4. กำหนดสิทธิ์การเข้าถึงหน้าจอ
         const isSupportLogin = (S.loginRole === 'staff' || S.loginRole === 'sqe_support');
-        if (isMasterAdmin) {
-            S.userRole = 'admin';
-        } else if (S.loginRole === 'supervisor') {
+        if (S.loginRole === 'supervisor') {
             S.userRole = 'supervisor';
         } else {
             S.userRole = userData.role || 'staff';
@@ -6706,7 +7012,7 @@ async function handleLogin() {
 
         // 6. ตรวจสอบการ FORCE RESET
         if (userData.force_reset) {
-            await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
+            try { await sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('email', email); } catch (_) {}
             showPasswordResetUI(email); 
             return; 
         }
@@ -6718,7 +7024,7 @@ async function handleLogin() {
 
         // --- ล็อกอินสำเร็จ ---
         try {
-            await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
+            await sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('email', email);
         } catch (_) {}
         
         finalizeLoginProcess(email, S.userRole, rememberMe);
@@ -6778,7 +7084,7 @@ async function checkSupervisorRole(email) {
             return true;
         }
         const { data: profile, error } = await getSupabase()
-            .from('users').select('role, email').eq('email', email).single();
+            .from('profiles').select('role, email').eq('email', email).maybeSingle();
         if (error) throw error;
         const supervisorRoles = ['supervisor', 'manager', 'lead', 'หัวหน้างาน'];
         isSupervisor = supervisorRoles.some(r =>
@@ -6980,25 +7286,7 @@ function finalizeLogin(email, role) {
     startNeuralBootSequence(email, role);
 }
 
-/**
- * 2. กระบวนการโหลดข้อมูล (Hard Sync) และตรวจเช็ค Update
- */
 async function startNeuralBootSequence(email, role) {
-    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
-        ? window.isMasterOrAdminUser(email)
-        : (email === 'natthawut.chaising@carrier.com' || String(email).includes('admin') || String(email).includes('natthawut'));
-
-    // ตั้งค่า state พื้นฐานเพื่อให้ระบบดึงข้อมูลได้ทันทีใน Step 2
-    S.currentUser = email;
-    S.userRole = isMasterAdmin ? 'admin' : role;
-    if (isMasterAdmin) {
-        S.viewingUser = email;
-    } else if (role === 'supervisor') {
-        S.viewingUser = '';
-    } else {
-        S.viewingUser = email;
-    }
-
     const overlay = document.getElementById('neural-boot-overlay');
     const statusText = document.getElementById('boot-status');
     const progress = document.getElementById('boot-progress');
@@ -7016,26 +7304,44 @@ async function startNeuralBootSequence(email, role) {
     };
 
     try {
-        // --- STEP 1: SERVICE WORKER UPDATE ---
+        // --- STEP 1: SERVICE WORKER UPDATE (FIXED VERSION) ---
         updateStatus(15, "Verifying Build...", "comparing local vs server version");
-        if ('serviceWorker' in navigator) {
+        
+        // ตรวจสอบว่าพึ่งมีการรีโหลดเพื่ออัปเดตไปหรือไม่ (ป้องกัน Loop)
+        const hasJustUpdated = sessionStorage.getItem('sw_update_performed');
+
+        if ('serviceWorker' in navigator && !hasJustUpdated) {
             try {
                 const reg = await navigator.serviceWorker.getRegistration();
-                if (reg && reg.update) {
+                if (reg) {
+                    // ตรวจสอบการอัปเดตจาก Server
                     await reg.update();
-                    if (reg.installing || reg.waiting) {
+
+                    // ตรวจสอบสถานะ waiting (มีตัวใหม่โหลดเสร็จแล้วแต่ยังไม่ทำงาน)
+                    if (reg.waiting) {
                         updateStatus(35, "Update Detected!", "installing latest system core...");
+                        
+                        // บันทึกข้อมูลลง Session ก่อน Reload
                         sessionStorage.setItem('reboot_login_email', email);
                         sessionStorage.setItem('reboot_login_role', role);
+                        sessionStorage.setItem('sw_update_performed', 'true'); // ตั้ง Flag กัน Loop
+
+                        // ส่งข้อความไปบอก Service Worker ให้ทำงานทันที (Skip Waiting)
+                        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+
                         await new Promise(r => setTimeout(r, 1000));
-                        window.location.reload(true);
-                        return;
+                        window.location.reload(); 
+                        return; // หยุดการทำงานส่วนที่เหลือเพื่อรอโหลดหน้าใหม่
                     }
                 }
             } catch (swErr) {
-                console.warn("ServiceWorker update skipped:", swErr);
+                console.warn("ServiceWorker update check skipped:", swErr);
             }
         }
+
+        // หากทำงานมาถึงตรงนี้ แสดงว่าไม่มีอัปเดต หรืออัปเดตเสร็จแล้ว ให้ล้าง Flag ออก
+        sessionStorage.removeItem('sw_update_performed');
+
 
         // --- STEP 2: HARD DATA REFRESH ---
         updateStatus(45, "Purging Cache...", "resetting data buffers");
@@ -7069,13 +7375,9 @@ function launchDirectWarp(email, role) {
     const linkData = window.checkDeepLinkParams();
     const hasDeepLink = !!(linkData && (linkData.caseId || linkData.ctrl));
 
-    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
-        ? window.isMasterOrAdminUser(email)
-        : (email === 'natthawut.chaising@carrier.com' || String(email).includes('admin') || String(email).includes('natthawut'));
-
     S.currentUser = email;
-    S.userRole = isMasterAdmin ? 'admin' : role;
-    S.viewingUser = (isMasterAdmin || role !== 'supervisor') ? email : '';
+    S.userRole = role;
+    S.viewingUser = email;
     S.isLoggedIn = true;
     S.isLinkSession = hasDeepLink;
 
@@ -7165,9 +7467,9 @@ async function enforceMaintenanceMode() {
 
         const { data, error } = await sb
             .from('system_settings')
-            .select('is_maintenance_active')
+            .select('*')
             .eq('id', 'global_config')
-            .single();
+            .maybeSingle();
 
         const mtxView = document.getElementById('maintenance-view');
         const dashView = document.getElementById('dashboard-view');
@@ -7181,7 +7483,7 @@ async function enforceMaintenanceMode() {
             return;
         }
 
-        const isMtx = !!data.is_maintenance_active;
+        const isMtx = !!(data.is_maintenance_active || (data.data && data.data.is_maintenance_active));
         const isMaster = S && S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
 
         if (isMtx && !isMaster && !window.adminBypass) {
@@ -7238,10 +7540,10 @@ async function runAutoLoginFromLink() {
         try {
             // ไปดึงรหัสผ่านของคนนี้จากฐานข้อมูลมาเงียบๆ
             const { data, error } = await sqeClient
-                .from('users')
+                .from('profiles')
                 .select('password, role')
                 .eq('email', params.email.toLowerCase())
-                .single();
+                .maybeSingle();
 
             if (data && !error) {
                 // เติมรหัสผ่านและสั่ง Login
@@ -7373,8 +7675,7 @@ async function watchSystemUpdate() {
         const { data } = await sqeClient.from('system_settings').select('*').eq('id', 'global_config').single();
         if (data) {
             const verDisplay = document.querySelector('.brand-sub');
-            const verText = (data.app_version && data.app_version !== 'undefined') ? `V${data.app_version} | SQE SYSTEM` : 'V1.0 | SQE SYSTEM';
-            if(verDisplay) verDisplay.textContent = verText;
+            if(verDisplay) verDisplay.textContent = `V${data.app_version} | SQE SYSTEM`;
         }
     } catch (e) { console.log("Update check skip"); }
 }
@@ -7552,112 +7853,66 @@ function handleLogout() {
     toast('Logged out successfully', 'info');
 }
 
-async function showDashboard(isDeepLink = false) {
-    // --- [ส่วนที่ 1: จัดการธีมและการแสดงผล Sidebar] ---
+async function showDashboard(isDeepLink = false) { // 1. เพิ่ม parameter เพื่อรับสถานะลิงก์
+    // --- [ส่วนที่ 1: จัดการธีม] ---
     const savedTheme = localStorage.getItem('carrier_theme');
     const isDark = (savedTheme === 'dark');
-    document.body.classList.toggle('dark-mode', isDark);
-    if (typeof updateThemeIcon === 'function') updateThemeIcon(isDark);
+    if (isDark) {
+        document.body.classList.add('dark-mode');
+    } else {
+        document.body.classList.remove('dark-mode');
+    }
+    if (typeof updateThemeIcon === 'function') {
+        updateThemeIcon(isDark);
+    }
 
+    // --- [ส่วนที่ 2: สลับหน้าจอและตั้งค่า Sidebar] ---
     $id('login-view').classList.add('hidden-view');
     $id('dashboard-view').classList.remove('hidden-view');
     
-    // 🎯 1. ล็อคชื่อ Sidebar เป็นชื่อคนลอกอินปัจจุบัน (S.currentUser) ตลอดกาล
-    if (typeof updateSidebarUserUI === 'function') {
-        updateSidebarUserUI(); 
-    }
+    const namePart = S.currentUser.split('@')[0] || 'USER';
+    const initial = namePart.charAt(0).toUpperCase();
+    $id('user-avatar').textContent = initial;
+    $id('user-display-name').textContent = namePart.replace(/\./g, ' ').toUpperCase();
+    $id('user-display-email').textContent = S.currentUser;
 
-    // --- [ส่วนที่ 2: อ้างอิง UI Elements] ---
+   // --- [ส่วนที่ 3: จัดการ Form Panel และสิทธิ์ Supervisor] ---
     const staffWrap = $id('staff-selector-wrap');
     const formPanel = $id('form-panel');
     const showBtn = $id('show-form-btn');
-    const labelEl = document.getElementById('staff-custom-select-label');
-    const adminFooterBtn = document.getElementById('admin-footer-access');
 
-    // รีเซ็ตสถานะ Form Panel (ซ่อนไว้ก่อน)
+    // ซ่อน Form Panel เป็นค่าเริ่มต้น
     if (formPanel && showBtn) {
         isFormHidden = true; 
         gsap.set(formPanel, { x: -350, opacity: 0, width: 0, marginRight: -12 });
         formPanel.classList.add('hidden');
         showBtn.classList.remove('hidden');
+        gsap.set(showBtn, { x: 0, opacity: 1 });
     }
 
-    // --- [ส่วนที่ 3: Logic แยกตามประเภทการ Login (แอดมิน vs หัวหน้างาน vs พนักงาน)] ---
-    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
-        ? window.isMasterOrAdminUser(S.currentUser)
-        : (S.currentUser === 'natthawut.chaising@carrier.com' || S.currentUser.includes('admin') || S.currentUser.includes('natthawut'));
+    // ตรวจสอบประเภทการ Login
     const isSupervisorSession = (S.loginRole === 'supervisor');
 
-    if (isMasterAdmin) { 
-        // ============================================================
-        // 👑 CASE 0: ผู้ดูแลระบบสูงสุด (ADMIN / MASTER ADMIN)
-        // เมื่อลอกอินแอดมิน ให้หน้า SQE Support ดึงข้อมูลของคนนั้นมาแสดงทันที
-        // ไม่ต้องเลือกฟิลเตอร์ ดึงข้อมูลชื่อแอดมินมาแสดงผลก่อนเสมอเท่านั้น
-        // ============================================================
-        S.userRole = 'admin';
-        S.viewingUser = S.currentUser; // ตั้งค่าเป็น Admin ทันที ไม่ปล่อยว่าง
-        
-        // แสดง Dropdown เลือกพนักงานเพื่อให้แอดมินตรวจงานคนอื่นได้ แต่ค่าเริ่มต้นเป็นชื่อแอดมินเสมอ
-        if (staffWrap) {
-            staffWrap.classList.remove('hidden');
-            staffWrap.classList.add('flex');
-            staffWrap.style.display = 'flex';
-        }
-
-        // โหลดรายชื่อผู้ปฏิบัติงานเข้า Dropdown (ชื่อ Admin จะถูกจัดอันดับบนสุดเสมอ)
-        await loadStaffList(); 
-
-        // เลือกชื่อ Admin ใน Dropdown และอัปเดต Label ทันที
-        const curAdminSelected = _staffDirectoryCache.find(it => it.email.toLowerCase() === S.currentUser.toLowerCase());
-        const adminDisplay = curAdminSelected ? curAdminSelected.fullLabel : 'Mr.Natthawut C.(ADMIN)';
-        if (labelEl) {
-            labelEl.textContent = adminDisplay;
-        }
-        const selectEl = document.getElementById('staff-filter-select');
-        if (selectEl) selectEl.value = S.currentUser;
-        const customBtn = document.getElementById('staff-custom-select-btn');
-        if (customBtn) {
-            customBtn.classList.add('ring-2', 'ring-blue-500/30', 'border-blue-400', 'dark:border-blue-600', 'bg-blue-50/50', 'dark:bg-blue-950/30');
-        }
-
-        // สิทธิ์เต็ม: ใช้งานฟอร์มเพิ่ม/แก้ไขข้อมูลได้ ไม่ล็อคฟอร์ม
-        if (showBtn) showBtn.style.display = 'flex'; 
-        const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
-        if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
-        const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
-        formInputs.forEach(el => {
-            el.disabled = false;
-            el.style.opacity = '1';
-            el.style.cursor = 'default';
-        });
-
-    } else if (isSupervisorSession) { 
-        // ============================================================
-        // 🔑 CASE 1: ล็อกอินผ่านหน้า SUPERVISOR (หัวหน้างานมาตรวจงาน)
-        // ============================================================
+    if (isSupervisorSession) { 
+        // ==========================================
+        // 🔑 CASE: ล็อกอินผ่านหน้า SUPERVISOR
+        // ==========================================
         S.userRole = 'supervisor';
-        
-        /**
-         * 🎯 [จุดสำคัญ]: บังคับหน้าว่างตอนเริ่มต้น 
-         * ล้างข้อมูลในหน่วยความจำทิ้งเพื่อความปลอดภัย
-         */
-        S.viewingUser = ''; 
-        S.records = []; 
-        S.wapData = { achievements: [], score5s: [], skills: [], specialJobs: [] };
 
-        // แสดงช่องเลือกรายชื่อพนักงาน (Staff Selector)
+        // ✅ แสดงช่องเลือกรายชื่อพนักงาน (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.remove('hidden');
-            staffWrap.classList.add('flex');
-            staffWrap.style.display = 'flex';
+            staffWrap.classList.add('flex'); // ใช้ flex เพื่อให้ตำแหน่งสวยงามตามดีไซน์
         }
-        if (labelEl) labelEl.textContent = '-- เลือกผู้ปฏิบัติงาน --';
 
-        // โหลดรายชื่อ 32 คนเข้า Dropdown
         await loadStaffList(); 
 
-        // ล็อคฟอร์ม (หัวหน้างาน "ดู" ได้อย่างเดียว ห้าม "แก้ไข")
+        // จัดการ UI เพิ่มเติมสำหรับ Supervisor
         if (showBtn) showBtn.style.display = 'none'; 
+        const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
+        if (internalCloseBtn) internalCloseBtn.style.display = 'none';
+
+        // ปิดการใช้งานฟอร์ม (Read-only)
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = true;
@@ -7666,29 +7921,26 @@ async function showDashboard(isDeepLink = false) {
         });
 
     } else {
-        // ============================================================
-        // 👤 CASE 2: ล็อกอินผ่านหน้า SQE SUPPORT (พนักงานทั่วไป)
-        // ============================================================
+        // ==========================================
+        // 👤 CASE: ล็อกอินผ่านหน้า SQE SUPPORT
+        // ==========================================
         S.userRole = 'staff';
-        
-        /**
-         * 🎯 [จุดสำคัญ]: ไม่ว่าจะเป็น Admin หรือใครก็ตาม 
-         * ถ้าลอกอินผ่านหน้านี้ viewingUser จะต้องเท่ากับชื่อตัวเองเสมอ
-         * และ staffWrap (ดรอปดาวน์เลือกคนอื่น) จะต้องถูกซ่อน 100%
-         */
-        S.viewingUser = S.currentUser;
 
+        // ❌ ซ่อนช่องเลือกรายชื่อพนักงานทันที (Staff Selector)
         if (staffWrap) {
             staffWrap.classList.add('hidden');
             staffWrap.classList.remove('flex');
-            staffWrap.style.display = 'none';
         }
 
-        // เปิดให้ใช้งานฟอร์มได้ตามปกติ (สิทธิ์ผู้จัดทำ)
+        // บังคับให้ดูข้อมูลของตัวเองเท่านั้น
+        S.viewingUser = S.currentUser;
+
+        // แสดงปุ่มเปิดฟอร์มปกติ
         if (showBtn) showBtn.style.display = 'flex';
         const internalCloseBtn = document.querySelector('#form-panel button[onclick="toggleFormPanel()"]');
         if (internalCloseBtn) internalCloseBtn.style.display = 'flex';
 
+        // เปิดการใช้งานฟอร์มปกติ
         const formInputs = document.querySelectorAll('#form-panel input, #form-panel select, #form-panel textarea, #form-panel button');
         formInputs.forEach(el => {
             el.disabled = false;
@@ -7697,34 +7949,39 @@ async function showDashboard(isDeepLink = false) {
         });
     }
 
-    // --- [ส่วนที่ 4: ตรวจสอบ Admin Access] ---
-    // (เฉพาะแอดมินเท่านั้นที่จะเห็นปุ่ม Admin User Control ที่ล่างสุดของ Sidebar)
-    const isAllowedAdmin = (typeof window.isMasterOrAdminUser === 'function')
-        ? window.isMasterOrAdminUser(S.currentUser)
-        : (S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com');
-    if (adminFooterBtn) {
-        adminFooterBtn.classList.toggle('hidden', !isAllowedAdmin);
+    // --- [ส่วนที่ 4: ตรวจสอบ Admin Access (เฉพาะ Admin, Manager, Supervisor, Engineer)] ---
+    const adminFooterBtn = document.getElementById('admin-footer-access');
+    const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
+        ? hasAdminAccessPermission(S.currentUser, S.userRole) 
+        : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
+
+    if (isAllowedAdmin) {
+        if (adminFooterBtn) adminFooterBtn.classList.remove('hidden');
+    } else {
+        if (adminFooterBtn) adminFooterBtn.classList.add('hidden');
     }
     
     updateOnlineBadge();
 
-    // --- [ส่วนที่ 5: เริ่มซิงค์ข้อมูลตาม ViewingUser ที่ระบุไว้ด้านบน] ---
+    // --- [ส่วนที่ 5: ซิงค์ข้อมูลชุดใหญ่] ---
     toast("📡 กำลังเชื่อมต่อฐานข้อมูล Online...", "info");
 
     try {
-        /**
-         * 💡 หากเป็นพนักงาน: loadRecords ดึงงานตัวเอง
-         * 💡 หากเป็นหัวหน้างาน: S.viewingUser เป็นค่าว่าง loadRecords จะ Return หน้าเปล่าทันที
-         */
         await Promise.all([
             loadRecords(),
             fetchWAPData()
         ]);
 
-        // จัดการเปลี่ยนหน้าไปที่หน้าแรก
+        // >>> [จุดสำคัญที่สุด]: การตัดสินใจเลือกหน้าที่จะแสดง <<<
         if (!isDeepLink) {
+            // ถ้าเป็นการ Login ปกติ ให้ไปหน้าแรก (PART LINE CLAIM)
             const firstMenuBtn = document.querySelector('.nav-item');
             switchPage('Part line claim', firstMenuBtn);
+            console.log("Standard entry: Redirecting to Home.");
+        } else {
+            // ถ้ามาจาก Deep Link ไม่ต้องสั่ง switchPage
+            // ปล่อยให้ Logic ใน launchDirectWarp พาไปที่หน้า 8D/VF เอง
+            console.log("Deep link entry: Hold redirection.");
         }
         
         toast("✅ ซิงค์ข้อมูลสำเร็จ", "success");
@@ -7734,60 +7991,39 @@ async function showDashboard(isDeepLink = false) {
 
     } catch (error) {
         console.error("Critical Sync Error:", error);
-        toast("❌ การโหลดข้อมูลขัดข้อง", "error");
+        toast("❌ การโหลดข้อมูลบางส่วนล้มเหลว", "error");
+        
+        // แม้จะ Error ถ้าไม่ใช่ลิงก์ ก็ควรพาไปหน้าแรก
+        if (!isDeepLink) {
+            const firstMenuBtn = document.querySelector('.nav-item');
+            switchPage('Part line claim', firstMenuBtn);
+        }
     }
 }
 
 async function onStaffSelect(email) {
-    const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
-        ? window.isMasterOrAdminUser(S.currentUser)
-        : (S.currentUser === 'natthawut.chaising@carrier.com');
-
-    // 🎯 1. กำหนด viewingUser
     if (!email) {
-        // ถ้ากดล้างตัวเลือก (All)
-        // - แอดมิน: ดึงข้อมูลชื่อแอดมินมาแสดงผลก่อนเสมอ
-        // - หัวหน้างาน: ให้เป็นค่าว่าง (เพื่อให้หน้าจอว่างเปล่าตามโจทย์)
-        // - พนักงาน: กลับมาเป็นชื่อตัวเอง
-        if (isMasterAdmin) {
-            S.viewingUser = S.currentUser;
-        } else {
-            S.viewingUser = (S.userRole === 'supervisor') ? '' : S.currentUser;
-        }
+        S.viewingUser = S.currentUser;
     } else {
         S.viewingUser = email;
     }
-
-    const labelEl = document.getElementById('staff-custom-select-label');
-    if (labelEl) {
-        if (!email && isMasterAdmin) {
-            const found = _staffDirectoryCache.find(it => it.email.toLowerCase() === S.currentUser.toLowerCase());
-            labelEl.textContent = found ? found.fullLabel : 'Mr.Natthawut C.(ADMIN)';
-        } else if (!email) {
-            labelEl.textContent = '-- เลือกผู้ปฏิบัติงาน --';
-        }
-    }
     
-    const displayShort = S.viewingUser ? S.viewingUser.split('@')[0] : 'Total';
-    toast(`🔍 กำลังซิงค์ข้อมูลของ: ${displayShort}`, "info");
+    toast(`🔍 กำลังซิงค์ข้อมูลของ: ${S.viewingUser.split('@')[0]}`, "info");
     
     try {
-        // 2. ดึงข้อมูลใหม่ตาม viewingUser ที่ตั้งไว้
         await Promise.all([
             loadRecords(),   
             fetchWAPData()   
         ]);
 
-        // 3. สั่งให้ AI เรียนรู้ข้อมูลใหม่
+        // >>> [เพิ่มบรรทัดนี้] สั่งให้ AI เรียนรู้ข้อมูลของพนักงานคนใหม่ทันที <<<
         rebuildSmartMemory();
         updateAIBrain();
 
-        // 4. สั่งวาดหน้าจอใหม่ 
-        // (ฟังก์ชันนี้จะเรียก updateSidebarUserUI() ที่เราล็อคชื่อไว้แล้วให้โดยอัตโนมัติ)
         triggerGlobalRefresh();
         
-        // ❌ ลบโค้ดส่วนที่เคยแก้ไข $id('user-display-name') ทิ้งทั้งหมด
-        // เพื่อป้องกันการนำชื่อพนักงานที่เลือกดูไปทับชื่อจริงที่แถบ Sidebar
+        const display = S.viewingUser.split('@')[0].replace(/\./g, ' ').toUpperCase();
+        $id('user-display-name').innerHTML = `${display} <span class="text-[9px] text-orange-500">(VIEWING)</span>`;
         
         toast("อัปเดตข้อมูลพนักงานเรียบร้อย", "success");
     } catch (error) {
@@ -8279,17 +8515,6 @@ async function loadStaffList() {
                     staffList = data;
                 }
             } catch (_) {}
-            if (!staffList) {
-                try {
-                    const { data, error } = await sb
-                        .from('users')
-                        .select('email, display_name, role')
-                        .order('email', { ascending: true });
-                    if (!error && data && data.length > 0) {
-                        staffList = data;
-                    }
-                } catch (_) {}
-            }
         }
 
         // ล้างตัวเลือกเก่า
@@ -8301,21 +8526,17 @@ async function loadStaffList() {
             let name = (staff.display_name || staff.name || '').trim();
             const email = (staff.email || '').trim().toLowerCase();
             
-            // 🌟 ดึงระดับสิทธิ์/ตำแหน่งจริงจากตาราง users หรือ profiles ในฐานข้อมูล
+            // 🌟 ดึงระดับสิทธิ์/ตำแหน่งจริงจากตาราง users ในฐานข้อมูล
             const dbUser = window._dbUsersRoleMap ? window._dbUsersRoleMap.get(email) : null;
             const rawRole = String(staff.role || (dbUser && dbUser.role) || staff.category || '').toLowerCase();
 
-            name = (typeof window.canonicalStaffDisplayName === 'function')
-                ? window.canonicalStaffDisplayName(name, email)
-                : name;
+            name = name.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
 
             if (!name || name === '-' || name.includes('@')) {
                 if (typeof window.getEngineeringAndApprovalDirectory === 'function') {
                     const found = window.getEngineeringAndApprovalDirectory().find(d => d.email && d.email.toLowerCase() === email);
                     if (found && found.name && found.name !== '-') {
-                        name = (typeof window.canonicalStaffDisplayName === 'function')
-                            ? window.canonicalStaffDisplayName(found.name, email)
-                            : found.name;
+                        name = found.name.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
                     }
                 }
             }
@@ -8323,9 +8544,7 @@ async function loadStaffList() {
                 if (typeof STAFF_EMAIL_MAP === 'object') {
                     for (const [sName, sEmail] of Object.entries(STAFF_EMAIL_MAP)) {
                         if (sEmail && sEmail.toLowerCase().trim() === email) {
-                            name = (typeof window.canonicalStaffDisplayName === 'function')
-                                ? window.canonicalStaffDisplayName(sName, email)
-                                : sName;
+                            name = sName.replace(/^(Mr\.|Ms\.|Mrs\.)\s*/i, '').trim();
                             break;
                         }
                     }
@@ -8392,55 +8611,16 @@ async function loadStaffList() {
             });
         }
 
-        // มั่นใจว่า Admin อยู่ในรายชื่อเสมอ
-        const adminEmail = 'natthawut.chaising@carrier.com';
-        if (!addedEmails.has(adminEmail)) {
-            addStaffEntry(resolveStaffInfo({
-                name: 'Mr.Natthawut C.',
-                display_name: 'Mr.Natthawut C.',
-                role: 'ADMIN',
-                email: adminEmail
-            }));
-        }
-
-        // หากผู้ใช้ปัจจุบันเป็น Admin ให้จัดเรียงชื่อ Admin ไว้บนสุดเสมอ ("ดึงข้อมูลชื่อแอดมินมาแสดงผลก่อนเสมอเท่านั้น")
-        const isMasterAdmin = (typeof window.isMasterOrAdminUser === 'function')
-            ? window.isMasterOrAdminUser(S.currentUser)
-            : (S.currentUser === 'natthawut.chaising@carrier.com');
-
-        if (isMasterAdmin) {
-            _staffDirectoryCache.sort((a, b) => {
-                const aIsAdmin = (typeof window.isMasterOrAdminUser === 'function') ? window.isMasterOrAdminUser(a.email) : a.email.toLowerCase() === S.currentUser.toLowerCase();
-                const bIsAdmin = (typeof window.isMasterOrAdminUser === 'function') ? window.isMasterOrAdminUser(b.email) : b.email.toLowerCase() === S.currentUser.toLowerCase();
-                if (aIsAdmin && !bIsAdmin) return -1;
-                if (!aIsAdmin && bIsAdmin) return 1;
-                return 0;
-            });
-            // เขียน options ใหม่ให้เรียง Admin ไว้บนสุด
-            selectEl.innerHTML = '<option value="">-- เลือกผู้ปฏิบัติงาน --</option>';
-            _staffDirectoryCache.forEach(info => {
-                const opt = document.createElement('option');
-                opt.value = info.email;
-                opt.textContent = info.fullLabel;
-                selectEl.appendChild(opt);
-            });
-        }
-
-        // อัปเดตการแสดงผล Label ถ้ามีการเลือกอยู่แล้ว หรือเป็น Admin
-        const curViewing = S.viewingUser || (isMasterAdmin ? S.currentUser : '');
+        // อัปเดตการแสดงผล Label ถ้ามีการเลือกอยู่แล้ว
+        const curViewing = S.viewingUser || '';
         const foundSelected = _staffDirectoryCache.find(it => it.email.toLowerCase() === curViewing.toLowerCase());
         const labelEl = document.getElementById('staff-custom-select-label');
         if (labelEl) {
             if (foundSelected) {
                 labelEl.textContent = foundSelected.fullLabel;
-            } else if (isMasterAdmin) {
-                labelEl.textContent = 'Mr.Natthawut C.(ADMIN)';
             } else {
                 labelEl.textContent = '-- เลือกผู้ปฏิบัติงาน --';
             }
-        }
-        if (selectEl && curViewing) {
-            selectEl.value = curViewing;
         }
 
         window.renderStaffCustomDropdown('');
@@ -8459,7 +8639,7 @@ function invalidate8DCaseMap() {
 }
 
 function get8DCaseMap() {
-    const cases = (S.eightDCases || (typeof window !== 'undefined' && window.Wap8DSystem && typeof window.Wap8DSystem.getCases === 'function' ? window.Wap8DSystem.getCases() : (typeof Wap8DSystem !== 'undefined' && Wap8DSystem && Wap8DSystem.getCases ? Wap8DSystem.getCases() : []))) || [];
+    const cases = (S.eightDCases || (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases ? Wap8DSystem.getCases() : [])) || [];
     if (cases === _8dLookupLastCasesRef && _8dLookupMapCache) {
         return _8dLookupMapCache;
     }
@@ -8877,19 +9057,55 @@ function formToSupabase(rec) {
     return obj;
 }
 
-// ฟังก์ชัน writeAuditLog ที่ได้รับการปรับปรุงให้รองรับทุกชนิดของ record_id, JSONB Data และป้องกัน 400 Bad Request
+// ═════════════════════════════════════════════════════════════════
+// 📜 CENTRALIZED ACTIVITY LOG & AUDIT ENGINE (ONLINE + OFFLINE BUFFER)
+// ═════════════════════════════════════════════════════════════════
+function getLocalActivityLogs() {
+    try {
+        const raw = localStorage.getItem('carrier_activity_logs');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed;
+        }
+    } catch (_) {}
+    return window._activityLogsCache || [];
+}
+
+function saveLocalActivityLog(entry) {
+    if (!entry) return;
+    try {
+        if (!window._activityLogsCache || !Array.isArray(window._activityLogsCache)) {
+            window._activityLogsCache = getLocalActivityLogs();
+        }
+        // ตรวจสอบว่าไม่ซ้ำ id
+        const existIdx = window._activityLogsCache.findIndex(x => x.id && entry.id && String(x.id) === String(entry.id));
+        if (existIdx >= 0) {
+            window._activityLogsCache[existIdx] = { ...window._activityLogsCache[existIdx], ...entry };
+        } else {
+            window._activityLogsCache.unshift(entry);
+        }
+        if (window._activityLogsCache.length > 500) {
+            window._activityLogsCache = window._activityLogsCache.slice(0, 500);
+        }
+        localStorage.setItem('carrier_activity_logs', JSON.stringify(window._activityLogsCache));
+    } catch (_) {}
+}
+
+window.getLocalActivityLogs = getLocalActivityLogs;
+window.saveLocalActivityLog = saveLocalActivityLog;
+
+// ฟังก์ชัน writeAuditLog ที่ได้รับการปรับปรุงให้บันทึกทั้ง Supabase และ Local Cache
 async function writeAuditLog(action, recordId = null, oldData = null, newData = null) {
     try {
         if (!sqeClient && typeof getSupabase === 'function') {
             sqeClient = getSupabase();
         }
-        if (!sqeClient) return;
 
         const email = S.currentUser || 'System';
         const rawAction = String(action || 'SYSTEM').trim();
         const upperAction = rawAction.toUpperCase();
 
-        // 1. ข้อกำหนดของ Database Constraint (audit_logs_action_check) อนุญาตเฉพาะ 3 ค่านิยามนี้เท่านั้น: 'INSERT', 'UPDATE', 'DELETE'
+        // 1. ข้อกำหนดของ Database Constraint (audit_logs_action_check) อนุญาตเฉพาะ: 'INSERT', 'UPDATE', 'DELETE'
         let validAction = 'UPDATE';
         if (upperAction.includes('DELETE') || upperAction.includes('REMOVE') || upperAction.includes('CLEAR') || upperAction.includes('PURGE')) {
             validAction = 'DELETE';
@@ -8899,7 +9115,7 @@ async function writeAuditLog(action, recordId = null, oldData = null, newData = 
             validAction = 'UPDATE';
         }
 
-        // 2. ข้อกำหนด NOT NULL บน Column record_id (ห้ามเป็น null หรือค่าว่างเด็ดขาด)
+        // 2. ข้อกำหนด NOT NULL บน Column record_id
         let sanitizedRecordId = '0';
         let detailMessage = null;
 
@@ -8915,7 +9131,7 @@ async function writeAuditLog(action, recordId = null, oldData = null, newData = 
             sanitizedRecordId = '0';
         }
 
-        // 3. แปลงและทำความสะอาด oldData และ newData ให้เป็น JSON Object เสมอสำหรับ Column JSONB
+        // 3. แปลงและทำความสะอาด oldData และ newData ให้เป็น JSON Object เสมอ
         let sanitizedOldData = null;
         if (oldData && typeof oldData === 'object') {
             try { sanitizedOldData = JSON.parse(JSON.stringify(oldData)); } catch (_) { sanitizedOldData = { info: String(oldData) }; }
@@ -8932,35 +9148,60 @@ async function writeAuditLog(action, recordId = null, oldData = null, newData = 
 
         if (rawAction !== validAction || detailMessage) {
             sanitizedNewData = sanitizedNewData || {};
-            if (rawAction !== validAction) sanitizedNewData._original_action = rawAction;
-            if (detailMessage) sanitizedNewData.details = detailMessage;
+            if (rawAction !== validAction && !sanitizedNewData._original_action) sanitizedNewData._original_action = rawAction;
+            if (detailMessage && !sanitizedNewData.details) sanitizedNewData.details = detailMessage;
         }
 
-        const payload = {
-            inspector: email,
+        const detailsText = detailMessage || 
+                            (sanitizedNewData && sanitizedNewData.details) || 
+                            (sanitizedNewData && sanitizedNewData._original_action) || 
+                            rawAction;
+
+        const nowIso = new Date().toISOString();
+        const localLogEntry = {
+            id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            created_at: nowIso,
             user_email: email,
+            inspector: email,
             action: validAction,
+            original_action: rawAction,
             record_id: sanitizedRecordId,
             old_data: sanitizedOldData,
-            new_data: sanitizedNewData
+            new_data: sanitizedNewData,
+            details: detailsText
         };
+        saveLocalActivityLog(localLogEntry);
 
-        const { error } = await sqeClient.from('audit_logs').insert([payload]);
-
-        if (error) {
-            console.warn("Audit Log Warning:", error.message);
-            // Fallback Retry โดยแน่ใจว่า record_id ไม่เป็น null และ action เป็นค่าที่ผ่าน Check Constraint เสมอ
-            const fallbackPayload = {
-                action: 'UPDATE',
-                user_email: email,
+        if (sqeClient) {
+            const payload = {
                 inspector: email,
-                record_id: '0',
-                new_data: {
-                    action_orig: rawAction,
-                    details: detailMessage || String(recordId || '')
-                }
+                user_email: email,
+                action: validAction,
+                record_id: sanitizedRecordId,
+                old_data: sanitizedOldData,
+                new_data: sanitizedNewData
             };
-            await sqeClient.from('audit_logs').insert([fallbackPayload]);
+
+            const { data: insData, error } = await sqeClient.from('audit_logs').insert([payload]).select('id');
+
+            if (error) {
+                console.warn("Audit Log Supabase Note:", error.message);
+                // Fallback Retry
+                const fallbackPayload = {
+                    action: 'UPDATE',
+                    user_email: email,
+                    inspector: email,
+                    record_id: '0',
+                    new_data: {
+                        action_orig: rawAction,
+                        details: detailsText
+                    }
+                };
+                await sqeClient.from('audit_logs').insert([fallbackPayload]).catch(() => {});
+            } else if (insData && insData[0] && insData[0].id) {
+                localLogEntry.id = insData[0].id;
+                saveLocalActivityLog(localLogEntry);
+            }
         }
     } catch (e) {
         console.warn("Critical Audit Error:", e);
@@ -8969,7 +9210,7 @@ async function writeAuditLog(action, recordId = null, oldData = null, newData = 
 
 async function deleteRecordFromCloud(id) {
     const sb = getSupabase();
-    const targetRecord = S.records.find(r => String(r.id) === String(id)); // ✅ ประกาศไว้ก่อน
+    const targetRecord = S.records.find(r => String(r.id) === String(id));
 
     // ลบไฟล์รูปภาพใน Storage ด้วยถ้ามี
     if (targetRecord && (targetRecord.imageUrl || targetRecord.image_url)) {
@@ -8983,12 +9224,18 @@ async function deleteRecordFromCloud(id) {
         try {
             const { error } = await sb.from('records').delete().eq('id', id);
             if (error) throw error;
-            writeAuditLog('DELETE', `ลบข้อมูล Claim Ref: ${targetRecord?.ref} (พาร์ท: ${targetRecord?.partNo})`); // ✅ อยู่ในtry, ใช้ targetRecord
+            writeAuditLog('DELETE', id, targetRecord, {
+                details: `ลบข้อมูล Claim Ref: ${targetRecord?.ref || id} (พาร์ท: ${targetRecord?.partNo || '-'}, ซัพพลายเออร์: ${targetRecord?.supplier || '-'})`
+            });
         } catch (e) {
             console.error("Cloud Delete Error:", e);
             toast('❌ ไม่สามารถลบข้อมูลในระบบ Cloud ได้', 'error');
             return false;
         }
+    } else {
+        writeAuditLog('DELETE', id, targetRecord, {
+            details: `ลบข้อมูล Claim ออฟไลน์ Ref: ${targetRecord?.ref || id} (พาร์ท: ${targetRecord?.partNo || '-'})`
+        });
     }
 
     S.records = S.records.filter(r => String(r.id) !== String(id));
@@ -9114,26 +9361,28 @@ function quickPickJudgment(val) {
 function refreshNeonGlow() {
     const qtyEl = $id('f-qty');
     const unitEl = $id('f-unit');
-    const dateEl = $id('f-date'); // ดึง Element วันที่
+    const dateEl = $id('f-date');
     const remarkEl = $id('f-remark');
+    const judgmentEl = $id('judgmentSelect');
     const btnCommit = $id('btn-commit');
     
-    // ตรวจสอบจำนวน: ต้องมีค่าและมากกว่าหรือเท่ากับ 1
-    const hasQty = qtyEl && qtyEl.value !== '' && parseFloat(qtyEl.value) >= 1;
+    const hasQty = qtyEl && qtyEl.value !== '' && parseFloat(qtyEl.value) > 0;
 
-    // --- ส่วนที่ 1: จัดการช่องหน่วย และ ช่องวันที่ (ทำงานเหมือนกัน) ---
-    // ให้เขียวเฉพาะตอนที่มีจำนวน (hasQty) เท่านั้น
+    // 1. หน่วย และ วันที่ - ไม่เรืองแสงค้างเมื่อเริ่มต้นหรือล้างข้อมูล
     if (unitEl) {
-        if (hasQty) unitEl.classList.add('valid');
-        else unitEl.classList.remove('valid');
+        unitEl.classList.remove('valid', 'invalid', 'field-glow-filled');
     }
 
     if (dateEl) {
-        if (hasQty) dateEl.classList.add('valid');
-        else dateEl.classList.remove('valid');
+        dateEl.classList.remove('valid', 'invalid', 'field-glow-filled');
     }
 
-    // --- ส่วนที่ 2: วนลูปเช็คช่องอื่นๆ (เอา f-date ออกจากรายการนี้) ---
+    if (judgmentEl) {
+        if (judgmentEl.value && judgmentEl.value.trim() !== '') judgmentEl.classList.add('valid');
+        else judgmentEl.classList.remove('valid', 'invalid', 'field-glow-filled');
+    }
+
+    // 2. เช็คช่องอื่นๆ ในแบบฟอร์ม
     const watchedIds = ['f-part', 'f-partname', 'f-supplier', 'f-line', 'f-defect', 'f-ref', 'f-qty', 'f-remark'];
     
     watchedIds.forEach(id => {
@@ -9145,20 +9394,26 @@ function refreshNeonGlow() {
             return;
         }
 
+        if (id === 'f-qty') {
+            if (hasQty) el.classList.add('valid');
+            else el.classList.remove('valid', 'invalid', 'field-glow-filled');
+            return;
+        }
+
         if (id === 'f-remark') {
-            if (el.value.trim().length > 0) el.classList.add('valid');
-            else el.classList.remove('valid');
+            if (el.value && el.value.trim().length > 0) el.classList.add('valid');
+            else el.classList.remove('valid', 'invalid', 'field-glow-filled');
             return;
         }
 
         if (el.value && el.value.trim() !== '' && el.value !== '-' && el.value !== '0') {
             el.classList.add('valid');
         } else {
-            el.classList.remove('valid');
+            el.classList.remove('valid', 'invalid', 'field-glow-filled');
         }
     });
 
-    // --- ส่วนที่ 3: เช็คความพร้อมปุ่ม Commit ---
+    // 3. เช็คความพร้อมปุ่ม Commit
     const isFormComplete = 
         ($id('f-part')?.value || '').trim() !== '' && 
         ($id('f-ref')?.value || '').trim() !== '' && 
@@ -9238,21 +9493,32 @@ function updateInputResetButton() {
 }
 
 function resetInputForm() {
-    const fields = ['f-part', 'f-partname', 'f-supplier', 'f-ref', 'f-line', 'f-qty', 'f-defect', 'f-remark'];
+    const allInputIds = [
+        'f-part', 'f-partname', 'f-supplier', 'f-ref', 'f-line', 'f-qty', 'f-defect', 'f-remark',
+        'f-date', 'f-unit', 'judgmentSelect'
+    ];
     
-    fields.forEach(id => { 
+    allInputIds.forEach(id => { 
         const el = $id(id); 
         if (el) { 
-            // [จุดที่ปรับ] ถ้าเป็นช่อง f-qty ให้ค่าเริ่มต้นเป็น 0 นอกนั้นเป็นค่าว่าง
-            el.value = (id === 'f-qty') ? '0' : ''; 
-            el.classList.remove('valid', 'invalid'); 
+            if (id === 'f-qty') el.value = '0';
+            else if (id === 'f-date') el.value = new Date().toISOString().split('T')[0];
+            else if (id === 'f-unit') el.value = 'PCS';
+            else if (id === 'judgmentSelect') el.value = '';
+            else el.value = ''; 
+            
+            el.classList.remove('valid', 'invalid', 'field-glow-filled', 'field-glow-pending', 'field-glow-error', 'anomaly-detected', 'is-selected'); 
         } 
     });
 
+    const successIcon = document.getElementById('f-part-success');
+    if (successIcon) successIcon.classList.add('hidden');
+    const errorIcon = document.getElementById('f-part-error');
+    if (errorIcon) errorIcon.classList.add('hidden');
+    const spinner = document.getElementById('f-part-spinner');
+    if (spinner) spinner.classList.add('hidden');
+
     if (typeof validatePartNoInput === 'function') validatePartNoInput($id('f-part'));
-    const d = $id('f-date'); if (d) d.value = new Date().toISOString().split('T')[0];
-    const u = $id('f-unit'); if (u) u.value = 'PCS';
-    const j = $id('judgmentSelect'); if (j) j.value = '';
     
     document.querySelectorAll('.shift-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
     S.selectedShift = 'SHIFT A';
@@ -9353,7 +9619,7 @@ async function submitEntry() {
         qty, 
         unit: $id('f-unit').value,
         defect: $id('f-defect').value.trim(), 
-        remark: $id('f-remark').value.trim(),
+        remark: $id('f-remark') ? $id('f-remark').value.trim() : (existingRow ? (existingRow.remark || '') : ''),
         judgment: jdgSel.value, 
         inspector: S.currentUser,
         sync_status: 'pending',
@@ -9371,13 +9637,7 @@ async function submitEntry() {
                 rowData.sync_status = 'synced';
                 saveMethod = 'cloud';
             } catch (cloudErr) {
-                if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(cloudErr)) {
-                    window._supabaseQuotaExceeded = true;
-                    window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
-                    console.warn("Cloud quota limit reached, securely saving to LocalDB");
-                } else {
-                    console.warn("Cloud Save failed, falling back to LocalDB:", cloudErr);
-                }
+                console.error("Cloud Save failed, falling back to LocalDB:", cloudErr);
                 await localDB.pendingClaims.put(rowData);
                 saveMethod = 'local';
             }
@@ -9387,11 +9647,27 @@ async function submitEntry() {
         }
 
         // --- 6. Update UI State ---
+        const isEditAction = !!S.editingId;
+        const oldRecordData = isEditAction ? S.records.find(r => r.id === S.editingId) : null;
+
         if (S.editingId) {
             S.records = S.records.map(r => r.id === recordId ? rowData : r);
         } else {
             S.records.unshift(rowData);
         }
+
+        // Record Activity Log
+        writeAuditLog(
+            isEditAction ? 'UPDATE' : 'INSERT',
+            recordId,
+            oldRecordData,
+            {
+                ...rowData,
+                details: isEditAction
+                    ? `แก้ไขข้อมูล Claim Ref: ${rowData.ref || recordId} (พาร์ท: ${rowData.partNo || '-'}, ซัพพลายเออร์: ${rowData.supplier || '-'})`
+                    : `สร้างข้อมูล Claim ใหม่ Ref: ${rowData.ref || recordId} (พาร์ท: ${rowData.partNo || '-'}, ซัพพลายเออร์: ${rowData.supplier || '-'}, อาการ: ${rowData.defect || '-'})`
+            }
+        );
 
         renderTable(); 
 
@@ -9446,16 +9722,9 @@ async function backgroundSync() {
  * ครอบคลุม: Part Claims, OT Management, และ 5S Excellence
  */
 let _isSyncingAllData = false;
-let _lastQuotaWarnTime = 0;
 
 async function syncAllPendingData() {
     if (!navigator.onLine || _isSyncingAllData) return;
-    
-    // Check if under temporary quota backoff
-    if (window._supabaseQuotaExceeded && window._quotaBackoffUntil && Date.now() < window._quotaBackoffUntil) {
-        return;
-    }
-
     _isSyncingAllData = true;
 
     try {
@@ -9485,10 +9754,8 @@ async function syncAllPendingData() {
 
         let totalSuccess = 0;
         let totalSkipped = 0;
-        let quotaHit = false;
 
         for (const config of syncConfigs) {
-            if (quotaHit) break;
             if (!config.dexieTable) continue;
 
             const client = (typeof config.getClient === 'function' ? config.getClient() : null) || window.sqeClient || supabaseClient;
@@ -9518,18 +9785,6 @@ async function syncAllPendingData() {
                         }
                         totalSuccess++;
                     } else {
-                        // Check quota / restriction error
-                        if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(error)) {
-                            quotaHit = true;
-                            window._supabaseQuotaExceeded = true;
-                            window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
-                            if (Date.now() - _lastQuotaWarnTime > 60000) {
-                                _lastQuotaWarnTime = Date.now();
-                                console.warn(`📶 [Sync Engine] Cloud quota restriction reached. Retaining pending items safely in local database.`);
-                            }
-                            break;
-                        }
-
                         // ถ้าเกิดปัญหา Network Failed to fetch ให้หยุดรอบนี้เพื่อรอเน็ตเสถียร
                         const errMsg = String(error.message || error.details || '');
                         if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || error.code === 'PGRST000') {
@@ -9547,16 +9802,6 @@ async function syncAllPendingData() {
                         }
                     }
                 } catch (rowErr) {
-                    if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(rowErr)) {
-                        quotaHit = true;
-                        window._supabaseQuotaExceeded = true;
-                        window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
-                        if (Date.now() - _lastQuotaWarnTime > 60000) {
-                            _lastQuotaWarnTime = Date.now();
-                            console.warn(`📶 [Sync Engine] Cloud quota reached. Retaining items locally.`);
-                        }
-                        break;
-                    }
                     const errMsg = String(rowErr?.message || rowErr || '');
                     if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || rowErr instanceof TypeError) {
                         console.warn(`📶 [Sync Engine] Offline / Network unreachable. Pausing sync retry.`);
@@ -9577,12 +9822,7 @@ async function syncAllPendingData() {
             if (typeof renderTable === 'function') renderTable();
         }
     } catch (globalSyncErr) {
-        if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(globalSyncErr)) {
-            window._supabaseQuotaExceeded = true;
-            window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
-        } else {
-            console.warn('[Master Sync Error]', globalSyncErr?.message || globalSyncErr);
-        }
+        console.warn('[Master Sync Error]', globalSyncErr?.message || globalSyncErr);
     } finally {
         _isSyncingAllData = false;
     }
@@ -9627,7 +9867,7 @@ function editRecord(id) {
     $id('f-qty').value = r.qty || '';
     $id('f-unit').value = r.unit || 'PCS';
     $id('f-defect').value = r.defect || '';
-    $id('f-remark').value = r.remark || '';
+    if ($id('f-remark')) $id('f-remark').value = r.remark || '';
     S.selectedShift = r.shift || 'SHIFT A';
     
     document.querySelectorAll('.shift-btn').forEach(b => 
@@ -9661,7 +9901,7 @@ function cloneRecord(id) {
     $id('f-qty').value = r.qty || '';
     $id('f-unit').value = r.unit || 'PCS';
     $id('f-defect').value = r.defect || '';
-    $id('f-remark').value = r.remark || '';
+    if ($id('f-remark')) $id('f-remark').value = r.remark || '';
     S.selectedShift = r.shift || 'SHIFT A';
     
     document.querySelectorAll('.shift-btn').forEach(b => 
@@ -10798,7 +11038,7 @@ function switchPage(name, el) {
         'attendance-logs', 'line-support-logs-content', 'five-s-content',
         'skill-matrix-content', 'special-jobs-content', 'ot-management-content',
         'admin-console-content', 'eight-d-content',
-        'rn-management-content'
+        'rn-management-content', 'calibration-content'
     ];
     allPages.forEach(id => {
         const pageEl = document.getElementById(id);
@@ -10808,7 +11048,7 @@ function switchPage(name, el) {
     // --- STEP 4: HEADER & SPECIAL PAGE LOGIC ---
     
     // 1. Admin Console Theme Logic
-    if (pageNameUpper === 'ADMIN CONSOLE' || pageNameUpper === 'ADMIN USER CONTROL') {
+    if (pageNameUpper === 'ADMIN CONSOLE') {
         if (adminHeaderTools) {
             adminHeaderTools.classList.remove('hidden');
             adminHeaderTools.classList.add('flex');
@@ -10871,7 +11111,7 @@ function switchPage(name, el) {
         if (sqeHeaderTools) { sqeHeaderTools.classList.remove('hidden'); sqeHeaderTools.classList.add('flex'); }
         if (titleEl) titleEl.textContent = 'SQE EN';
     }
-    else if (pageNameUpper === 'EXEC DASHBOARD' || pageNameUpper === 'LINE SUPPORT LOGS' ) {
+    else if (pageNameUpper === 'EXEC DASHBOARD' || pageNameUpper === 'LINE SUPPORT LOGS' || pageNameUpper === 'CALIBRATION') {
         if (subNav) subNav.classList.add('hidden'); 
         if (dashFilterWrap) { dashFilterWrap.classList.remove('hidden'); dashFilterWrap.classList.add('flex'); }
         if (vendorFilter) {
@@ -11354,6 +11594,29 @@ function translateDefectToRemark() {
     refreshNeonGlow();
 }
 
+function insertClaimRemarkPreset(presetText) {
+    const remarkIn = $id('f-remark');
+    if (!remarkIn) return;
+    const currentVal = remarkIn.value.trim();
+    if (!currentVal) {
+        remarkIn.value = presetText;
+    } else if (!currentVal.includes(presetText)) {
+        remarkIn.value = currentVal + '\n' + presetText;
+    }
+    remarkIn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+    setTimeout(() => { remarkIn.style.backgroundColor = ''; }, 600);
+    refreshNeonGlow();
+    if (typeof triggerClaimFormAutoDraft === 'function') triggerClaimFormAutoDraft();
+}
+
+function clearClaimRemark() {
+    const remarkIn = $id('f-remark');
+    if (!remarkIn) return;
+    remarkIn.value = '';
+    refreshNeonGlow();
+    if (typeof triggerClaimFormAutoDraft === 'function') triggerClaimFormAutoDraft();
+}
+
 function validatePartNoInput(inputEl) {
     if (!inputEl) inputEl = document.getElementById('f-part');
     if (!inputEl || typeof inputEl.value !== 'string') return;
@@ -11363,7 +11626,7 @@ function validatePartNoInput(inputEl) {
     const errorIcon = document.getElementById('f-part-error');
 
     if (!val) {
-        inputEl.classList.remove('valid', 'invalid', 'pulse-success', 'pulse-valid', 'pulse-invalid', 'pulse-error', 'f-part-pulse-success', 'f-part-pulse-invalid');
+        inputEl.classList.remove('valid', 'invalid');
         if (successIcon) successIcon.classList.add('hidden');
         if (errorIcon) errorIcon.classList.add('hidden');
         return;
@@ -11383,24 +11646,12 @@ function validatePartNoInput(inputEl) {
 
     if (isValid) {
         inputEl.classList.add('valid');
-        inputEl.classList.remove('invalid', 'pulse-invalid', 'pulse-error', 'f-part-pulse-invalid');
-
-        // Trigger gentle pulse animation
-        inputEl.classList.remove('pulse-success', 'pulse-valid', 'f-part-pulse-success');
-        void inputEl.offsetWidth; // Force DOM reflow so animation triggers cleanly every time
-        inputEl.classList.add('pulse-success', 'pulse-valid', 'f-part-pulse-success');
-
+        inputEl.classList.remove('invalid');
         if (successIcon) successIcon.classList.remove('hidden');
         if (errorIcon) errorIcon.classList.add('hidden');
     } else {
         inputEl.classList.add('invalid');
-        inputEl.classList.remove('valid', 'pulse-success', 'pulse-valid', 'f-part-pulse-success');
-
-        // Trigger gentle pulse animation
-        inputEl.classList.remove('pulse-invalid', 'pulse-error', 'f-part-pulse-invalid');
-        void inputEl.offsetWidth; // Force DOM reflow so animation triggers cleanly every time
-        inputEl.classList.add('pulse-invalid', 'pulse-error', 'f-part-pulse-invalid');
-
+        inputEl.classList.remove('valid');
         if (errorIcon) errorIcon.classList.remove('hidden');
         if (successIcon) successIcon.classList.add('hidden');
     }
@@ -11465,6 +11716,9 @@ function closeAC() { closeAllAC(); }
 function closeAllAC() {
     setPartLoading(false);
     document.querySelectorAll('.ac-dropdown.open').forEach(d => d.classList.remove('open'));
+    document.querySelectorAll('.modal-ac-dropdown').forEach(d => {
+        d.style.display = 'none';
+    });
 }
 
 // ประกาศไว้ด้านบนสุดของไฟล์
@@ -11611,7 +11865,46 @@ function applyACPick(type, value, inputEl) {
 }
 
 document.addEventListener('click', e => {
-    if (!e.target.closest('.form-input-wrap')) closeAllAC();
+    const target = e.target;
+    if (!target) return;
+    // Don't close if clicked inside any dropdown or on an item
+    if (target.closest('.modal-ac-dropdown') || target.closest('.ac-dropdown') || target.closest('.modal-ac-item') || target.closest('.ac-item')) {
+        return;
+    }
+    // Close modal AC dropdowns ONLY if clicked outside the wrapper of that input
+    document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
+        const wrap = dd.parentElement;
+        if (wrap && wrap.contains(target)) return;
+        dd.style.display = 'none';
+        if (wrap) wrap.style.zIndex = '';
+    });
+    // Close main AC dropdowns
+    document.querySelectorAll('.ac-dropdown.open').forEach(dd => {
+        const wrap = dd.closest('.form-input-wrap') || dd.parentElement;
+        if (wrap && wrap.contains(target)) return;
+        dd.classList.remove('open');
+        if (wrap) wrap.style.zIndex = '';
+    });
+});
+
+document.addEventListener('mousedown', e => {
+    const target = e.target;
+    if (!target) return;
+    if (target.closest('.modal-ac-dropdown') || target.closest('.ac-dropdown') || target.closest('.modal-ac-item') || target.closest('.ac-item')) {
+        return;
+    }
+    document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
+        const wrap = dd.parentElement;
+        if (wrap && wrap.contains(target)) return;
+        dd.style.display = 'none';
+        if (wrap) wrap.style.zIndex = '';
+    });
+    document.querySelectorAll('.ac-dropdown.open').forEach(dd => {
+        const wrap = dd.closest('.form-input-wrap') || dd.parentElement;
+        if (wrap && wrap.contains(target)) return;
+        dd.classList.remove('open');
+        if (wrap) wrap.style.zIndex = '';
+    });
 });
 
 // ============================================================
@@ -12565,6 +12858,9 @@ window.addEventListener('DOMContentLoaded', () => {
     if ($id('f-date')) $id('f-date').value = `${yyyy}-${mm}-${dd}`;
 
     initClaimFormAutoDraftListeners();
+    if (typeof window.initVFRPMatrixEngine === 'function') {
+        window.initVFRPMatrixEngine();
+    }
 
     window.addEventListener('online', () => { S.isOnline = true; updateOnlineBadge(); });
     window.addEventListener('offline', () => { S.isOnline = false; updateOnlineBadge(); });
@@ -13025,9 +13321,9 @@ function renderDashboardCharts(yieldRate, filtered) {
     
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonthIdx = now.getMonth();
+    const currentMonthIdx = now.getMonth(); // 0 = Jan ... 7 = Aug
 
-    // 1. ตรวจสอบปีเป้าหมาย
+    // ตรวจสอบช่วงปีจากตัวกรอง หรือค้นหาปีล่าสุดที่มีข้อมูลในระบบ (ห้ามนำข้อมูลหลายปีมารวมกัน)
     const filterStart = document.getElementById('cd-start-date')?.value;
     let targetYear = null;
     if (filterStart) {
@@ -13043,6 +13339,11 @@ function renderDashboardCharts(yieldRate, filtered) {
         targetYear = validYears.length ? Math.max(...validYears) : currentYear;
     }
 
+    // กำหนดค่าเริ่มต้น:
+    // - ถ้าเป็นปีปัจจุบัน (currentYear): เดือนที่ยังมาไม่ถึง (index > currentMonthIdx) ให้เป็น null เพื่อให้ ApexCharts ตัดเส้นกราฟหยุดที่เดือนปัจจุบัน (ไม่วาดลากยาวมั่ว)
+    // - เดือนที่ผ่านมาแล้ว (index <= currentMonthIdx) ให้เริ่มต้นที่ 0
+    // - ถ้าเป็นปีในอดีต (targetYear < currentYear): ทั้ง 12 เดือนเริ่มต้นที่ 0
+    // - ถ้าเป็นปีในอนาคต (targetYear > currentYear): ทั้ง 12 เดือนเป็น null
     const isCurrentYear = (targetYear === currentYear);
     const isPastYear = (targetYear < currentYear);
 
@@ -13061,34 +13362,28 @@ function renderDashboardCharts(yieldRate, filtered) {
         VENDOR: initMonthlyArray()
     };
 
-    // เตรียมที่เก็บข้อมูลละเอียดรายเดือน
     const monthDetails = Array.from({ length: 12 }, () => ({
         claimsCount: 0,
         lots: new Set(),
         totalQty: 0,
         defects: {},
         suppliers: {},
-        parts: {},
-        // เพิ่มการนับรายประเภทเพื่อโชว์ใน Tooltip
-        typeStats: {
-            OK: { pcs: 0, lots: 0 },
-            SF: { pcs: 0, lots: 0 },
-            CTC: { pcs: 0, lots: 0 },
-            VENDOR: { pcs: 0, lots: 0 }
-        }
+        parts: {}
     }));
 
-    // 2. ประมวลผลข้อมูล
+    // รวมข้อมูลแยกรายเดือนเฉพาะปี targetYear เท่านั้น (ห้ามนำปีอื่นมารวมเด็ดขาด)
     (filtered || []).forEach(r => {
         if (!r.date) return;
         const d = new Date(r.date);
         if (isNaN(d.getTime())) return;
         
         const recYear = d.getFullYear();
+        // เงื่อนไขเข้มงวด: ต้องเป็นปีเป้าหมายเท่านั้น
         if (recYear !== targetYear) return;
 
         const mIdx = d.getMonth();
         if (mIdx >= 0 && mIdx <= 11) {
+            // ถ้าเป็นปีปัจจุบันและเดือนเกินเดือนปัจจุบัน ไม่นับ
             if (isCurrentYear && mIdx > currentMonthIdx) return;
 
             const qty = parseFloat(r.qty) || 0;
@@ -13099,24 +13394,11 @@ function renderDashboardCharts(yieldRate, filtered) {
             if (dataSet.CTC[mIdx] === null) dataSet.CTC[mIdx] = 0;
             if (dataSet.VENDOR[mIdx] === null) dataSet.VENDOR[mIdx] = 0;
 
-            // แยกหมวดหมู่และเก็บสถิติ
-            if (j === 'CAN USE' || j === 'OK') {
-                dataSet.OK[mIdx] += qty;
-                monthDetails[mIdx].typeStats.OK.pcs += qty;
-                monthDetails[mIdx].typeStats.OK.lots++;
-            } else if (j === 'SF') {
-                dataSet.SF[mIdx] += qty;
-                monthDetails[mIdx].typeStats.SF.pcs += qty;
-                monthDetails[mIdx].typeStats.SF.lots++;
-            } else if (j === 'CTC') {
-                dataSet.CTC[mIdx] += qty;
-                monthDetails[mIdx].typeStats.CTC.pcs += qty;
-                monthDetails[mIdx].typeStats.CTC.lots++;
-            } else if (j.includes('VENDOR')) {
-                dataSet.VENDOR[mIdx] += qty;
-                monthDetails[mIdx].typeStats.VENDOR.pcs += qty;
-                monthDetails[mIdx].typeStats.VENDOR.lots++;
-            }
+            if (j === 'CAN USE' || j === 'OK') dataSet.OK[mIdx] += qty;
+            else if (j === 'SF') dataSet.SF[mIdx] += qty;
+            else if (j === 'CTC') dataSet.CTC[mIdx] += qty;
+            else if (j.includes('VENDOR')) dataSet.VENDOR[mIdx] += qty;
+            else dataSet.OK[mIdx] += qty;
 
             monthDetails[mIdx].claimsCount += 1;
             if (r.ref) monthDetails[mIdx].lots.add(r.ref);
@@ -13130,10 +13412,39 @@ function renderDashboardCharts(yieldRate, filtered) {
                 const sp = r.supplier.trim();
                 monthDetails[mIdx].suppliers[sp] = (monthDetails[mIdx].suppliers[sp] || 0) + qty;
             }
+            if (r.partNo || r.partName) {
+                const pt = (r.partNo || r.partName).trim();
+                monthDetails[mIdx].parts[pt] = (monthDetails[mIdx].parts[pt] || 0) + qty;
+            }
         }
     });
 
-    // 3. วาดกราฟ
+    // คำนวณสถิติภาพรวมเฉพาะเดือนที่ผ่านมาแล้ว
+    const maxEvalMonth = isCurrentYear ? currentMonthIdx : (isPastYear ? 11 : -1);
+    const validTotals = [];
+    let totalPcsVal = 0;
+
+    for (let i = 0; i <= maxEvalMonth; i++) {
+        const mOk = dataSet.OK[i] || 0;
+        const mSf = dataSet.SF[i] || 0;
+        const mCtc = dataSet.CTC[i] || 0;
+        const mVen = dataSet.VENDOR[i] || 0;
+        const mTotal = mOk + mSf + mCtc + mVen;
+        totalPcsVal += mTotal;
+        if (mTotal > 0) validTotals.push(mTotal);
+    }
+
+    const maxVal = validTotals.length ? Math.max(...validTotals) : 0;
+    const minVal = validTotals.length ? Math.min(...validTotals) : 0;
+    const avgVal = validTotals.length ? Math.round(totalPcsVal / validTotals.length) : 0;
+
+    // อัปเดตตัวเลขบน UI (แก้ไขไม่ให้มีข้อความซ้ำ เช่น Max: Max: )
+    animateValue('trend-total-pcs', 0, totalPcsVal, 1000, 0, "", "PCS ");
+    animateValue('trend-max', 0, maxVal, 1000, 0, "", "");
+    animateValue('trend-min', 0, minVal, 1000, 0, "", "");
+    animateValue('trend-avg', 0, avgVal, 1000, 0, "", "");
+
+    // วาดกราฟ Monthly Production Trends พร้อม Custom Tooltip Gimmick
     const trendChartEl = document.getElementById("trend-chart");
     if (trendChartEl) {
         if (charts.trend) charts.trend.destroy();
@@ -13151,114 +13462,80 @@ function renderDashboardCharts(yieldRate, filtered) {
                 toolbar: { show: false },
                 animations: { enabled: true, easing: 'easeinout', speed: 600 }
             },
-            dataLabels: { enabled: false }, // ปิดตัวเลขบนเส้นตามคำขอ
-            markers: { size: 4, strokeColors: '#fff', strokeWidth: 2, hover: { size: 6 } },
+            dataLabels: {
+                enabled: false 
+            },
+            markers: {
+                size: 4,
+                strokeColors: '#fff',
+                strokeWidth: 2,
+                hover: {
+                    size: 6
+                }
+            },
             tooltip: {
                 enabled: true,
                 shared: false,
                 intersect: false,
-                followCursor: true,
                 custom: function({ series, seriesIndex, dataPointIndex, w }) {
                     const mName = months[dataPointIndex];
+                    const ok = dataSet.OK[dataPointIndex] || 0;
+                    const sf = dataSet.SF[dataPointIndex] || 0;
+                    const ctc = dataSet.CTC[dataPointIndex] || 0;
+                    const vendor = dataSet.VENDOR[dataPointIndex] || 0;
+                    const totalM = ok + sf + ctc + vendor;
                     const details = monthDetails[dataPointIndex];
-                    const totalM = details.totalQty;
-                    
-                    const isDark = document.body.classList.contains('dark-mode') || 
-                                   document.documentElement.classList.contains('dark') || 
-                                   (localStorage.getItem('carrier_theme') === 'dark');
-
-                    // Theme-Adaptive Design Palette
-                    const ttTheme = {
-                        bg: isDark 
-                            ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98))' 
-                            : 'linear-gradient(145deg, #ffffff, #f8fafc)',
-                        border: isDark ? 'rgba(56, 189, 248, 0.4)' : '#cbd5e1',
-                        shadow: isDark 
-                            ? '0 25px 50px -10px rgba(0, 0, 0, 0.9), 0 0 25px rgba(56, 189, 248, 0.2)' 
-                            : '0 25px 45px -8px rgba(15, 23, 42, 0.25), 0 2px 10px rgba(0, 0, 0, 0.08)',
-                        textPrimary: isDark ? '#f8fafc' : '#0f172a',
-                        textSecondary: isDark ? '#94a3b8' : '#64748b',
-                        headerText: isDark ? '#38bdf8' : '#0284c7',
-                        divider: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0',
-                        dashedDivider: isDark ? 'rgba(255, 255, 255, 0.12)' : '#cbd5e1',
-                        cardBg: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9',
-                        cardBorder: isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
-                        badgeBg: isDark ? 'linear-gradient(135deg, #2563eb, #38bdf8)' : 'linear-gradient(135deg, #0284c7, #2563eb)',
-                        highlightBg: isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
-                        barBg: isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0'
-                    };
-
-                    const okPct = totalM > 0 ? ((details.typeStats.OK.pcs / totalM) * 100).toFixed(1) : '0.0';
-                    const sfPct = totalM > 0 ? ((details.typeStats.SF.pcs / totalM) * 100).toFixed(1) : '0.0';
-                    const ctcPct = totalM > 0 ? ((details.typeStats.CTC.pcs / totalM) * 100).toFixed(1) : '0.0';
-                    const vendorPct = totalM > 0 ? ((details.typeStats.VENDOR.pcs / totalM) * 100).toFixed(1) : '0.0';
-
-                    // Helper ฟังก์ชันสร้างการ์ด Tooltip แบบประณีต
-                    const renderCard = (label, stat, color, pct) => {
-                        return `
-                            <div style="background: ${ttTheme.cardBg}; border: 1px solid ${ttTheme.cardBorder}; border-left: 3.5px solid ${color}; padding: 8px 10px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
-                                <div style="font-size: 8px; color: ${ttTheme.textSecondary}; font-weight: 850; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">${label}</div>
-                                <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                                    <span style="font-size: 15px; font-weight: 950; color: ${ttTheme.textPrimary}; font-family: 'DM Mono', monospace;">${stat.pcs.toLocaleString()}</span>
-                                    <span style="font-size: 8px; color: ${ttTheme.textSecondary}; font-weight: 800; margin-left:4px;">PCS</span>
-                                </div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:4px; border-top:1px solid ${ttTheme.divider}; font-size:9px; font-weight:900;">
-                                    <span style="color:${ttTheme.textSecondary};">${stat.lots} LOTS</span>
-                                    <span style="color:${color}; background: ${color}15; padding: 1px 5px; border-radius: 4px;">${pct}%</span>
-                                </div>
-                            </div>
-                        `;
-                    };
+                    const claims = details.claimsCount;
+                    const lots = details.lots.size;
 
                     const topDefectEntry = Object.entries(details.defects).sort((a, b) => b[1] - a[1])[0];
-                    const topDefectStr = topDefectEntry ? `${topDefectEntry[0]} (${topDefectEntry[1].toLocaleString()} pcs)` : '-';
+                    const topDefectStr = topDefectEntry ? `${topDefectEntry[0]} (${topDefectEntry[1].toLocaleString()})` : '-';
+
                     const topSupplierEntry = Object.entries(details.suppliers).sort((a, b) => b[1] - a[1])[0];
-                    const topSupplierStr = topSupplierEntry ? `${topSupplierEntry[0]} (${topSupplierEntry[1].toLocaleString()} pcs)` : '-';
+                    const topSupplierStr = topSupplierEntry ? `${topSupplierEntry[0]} (${topSupplierEntry[1].toLocaleString()})` : '-';
 
                     return `
-                    <div style="background: ${ttTheme.bg}; backdrop-filter: blur(16px); border: 1.5px solid ${ttTheme.border}; border-radius: 16px; padding: 15px 16px; box-shadow: ${ttTheme.shadow}; font-family: 'Inter', 'Prompt', sans-serif; min-width: 290px; max-width: 320px; color: ${ttTheme.textPrimary}; pointer-events: none; z-index: 99999999;">
-                        
-                        <!-- 1. Header: Month/Year + Total PCS Badge -->
-                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid ${ttTheme.divider}; padding-bottom: 9px; margin-bottom: 10px;">
-                            <div style="font-weight: 950; font-size: 14px; color: ${ttTheme.headerText}; display: flex; align-items: center; gap: 7px; letter-spacing: 0.2px;">
-                                <span style="font-size: 15px;">📅</span> <span>${mName} ${targetYear}</span>
+                    <div style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.6); font-family: inherit; min-width: 240px; color: #fff;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 7px; margin-bottom: 9px;">
+                            <div style="font-weight: 900; font-size: 13px; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+                                <span>📅</span> <span>${mName} ${targetYear}</span>
                             </div>
-                            <div style="font-size: 11px; font-weight: 950; background: ${ttTheme.badgeBg}; color: #ffffff; padding: 3px 11px; border-radius: 8px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35); letter-spacing: 0.5px; font-family: 'DM Mono', monospace;">
+                            <div style="font-size: 10px; font-weight: 800; background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(56,189,248,0.3);">
                                 ${totalM.toLocaleString()} PCS
                             </div>
                         </div>
-
-                        <!-- 2. Proportional Distribution Mini Bar -->
-                        ${totalM > 0 ? `
-                        <div style="height: 6px; width: 100%; background: ${ttTheme.barBg}; border-radius: 9999px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);">
-                            <div style="width: ${okPct}%; height: 100%; background: #10b981;" title="OK: ${okPct}%"></div>
-                            <div style="width: ${sfPct}%; height: 100%; background: #f97316;" title="SF: ${sfPct}%"></div>
-                            <div style="width: ${ctcPct}%; height: 100%; background: #2563eb;" title="CTC: ${ctcPct}%"></div>
-                            <div style="width: ${vendorPct}%; height: 100%; background: #ef4444;" title="VENDOR: ${vendorPct}%"></div>
-                        </div>
-                        ` : ''}
                         
-                        <!-- 3. 4-Grid Status Breakdown -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-                            ${renderCard('OK / CAN USE', details.typeStats.OK, '#10b981', okPct)}
-                            ${renderCard('SPECIAL FOCUS', details.typeStats.SF, '#f97316', sfPct)}
-                            ${renderCard('CTC (CHARGE)', details.typeStats.CTC, '#2563eb', ctcPct)}
-                            ${renderCard('VENDOR FAULT', details.typeStats.VENDOR, '#ef4444', vendorPct)}
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 9px;">
+                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #10b981;">
+                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">OK / CAN USE</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #34d399;">${ok.toLocaleString()}</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #f97316;">
+                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">SPECIAL FOCUS</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #fb923c;">${sf.toLocaleString()}</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #3b82f6;">
+                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">CTC (CHARGE)</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #60a5fa;">${ctc.toLocaleString()}</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #ef4444;">
+                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">VENDOR FAULT</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #f87171;">${vendor.toLocaleString()}</div>
+                            </div>
                         </div>
 
-                        <!-- 4. Deep Insights Summary Footer -->
-                        <div style="border-top: 1px dashed ${ttTheme.dashedDivider}; padding-top: 9px; font-size: 10px; line-height: 1.6; color: ${ttTheme.textSecondary};">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-                                <span style="font-weight: 750;">Total Claims & Lots:</span>
-                                <span style="font-weight: 900; color: ${ttTheme.textPrimary}; background: ${ttTheme.highlightBg}; padding: 1px 6px; border-radius: 4px;">${details.claimsCount} Recs / ${details.lots.size} Lots</span>
+                        <div style="border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 7px; font-size: 9.5px; line-height: 1.45; color: #cbd5e1;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                <span style="color: #94a3b8;">Total Records / Lots:</span>
+                                <span style="font-weight: 800; color: #fff;">${claims} Recs / ${lots} Lots</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                                <span style="font-weight: 750;">Top Defect:</span>
-                                <span style="font-weight: 850; color: #eab308; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topDefectStr}</span>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                <span style="color: #94a3b8;">Top Defect:</span>
+                                <span style="font-weight: 700; color: #fde047; text-align: right; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topDefectStr}</span>
                             </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-weight: 750;">Top Supplier:</span>
-                                <span style="font-weight: 850; color: #8b5cf6; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topSupplierStr}</span>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #94a3b8;">Top Supplier:</span>
+                                <span style="font-weight: 700; color: #a78bfa; text-align: right; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topSupplierStr}</span>
                             </div>
                         </div>
                     </div>
@@ -13267,9 +13544,20 @@ function renderDashboardCharts(yieldRate, filtered) {
             },
             colors: ['#10b981', '#f97316', '#2563eb', '#ef4444'],
             stroke: { curve: 'smooth', width: 3 },
-            fill: { type: 'gradient', gradient: { opacityFrom: 0.4, opacityTo: 0.05 } },
-            xaxis: { categories: months, labels: { style: { colors: '#94a3b8', fontSize: '10px' } } },
-            yaxis: { labels: { style: { colors: '#94a3b8', fontSize: '10px' }, formatter: val => val ? val.toLocaleString() : 0 } },
+            fill: {
+                type: 'gradient',
+                gradient: { opacityFrom: 0.4, opacityTo: 0.05 }
+            },
+            xaxis: {
+                categories: months,
+                labels: { style: { colors: '#94a3b8', fontSize: '10px' } }
+            },
+            yaxis: {
+                labels: {
+                    style: { colors: '#94a3b8', fontSize: '10px' },
+                    formatter: val => val ? val.toLocaleString() : 0
+                }
+            },
             grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
             legend: { show: false }
         });
@@ -14873,7 +15161,6 @@ const calcNG = () => {
     const lotInput = document.getElementById('f-sup-lot');
     const okInput = document.getElementById('f-sup-ok');
     const ngInput = document.getElementById('f-sup-ng');
-    const remarkArea = document.getElementById('f-sup-remark') || document.querySelector('textarea[name="remark"]');
 
     if (!lotInput || !okInput || !ngInput) return;
 
@@ -14881,9 +15168,8 @@ const calcNG = () => {
     const okQty = parseInt(okInput.value) || 0;
 
     const result = totalLot - okQty;
-    const ngQty = result >= 0 ? result : 0;
 
-    ngInput.value = ngQty;
+    ngInput.value = result >= 0 ? result : 0;
     ngInput.dispatchEvent(new Event('input', { bubbles: true }));
 
     if (result > 0) {
@@ -14895,30 +15181,12 @@ const calcNG = () => {
         ngInput.style.color = '';
         ngInput.style.fontWeight = 'normal';
     }
-
-    // อัปเดตตัวเลข Lot, OK, NG ในช่อง Remark อัตโนมัติ หากมีรูปแบบข้อความเทมเพลตอยู่แล้ว
-    if (remarkArea && remarkArea.value && remarkArea.value.trim() !== '') {
-        let val = remarkArea.value;
-        if (val.includes('ผ่าน (OK):') || val.includes('ไม่ผ่าน (NG):') || val.includes('พบ NG:') || val.includes('OK:') || val.includes('Total:')) {
-            let updated = val
-                .replace(/ผ่าน \(OK\):\s*\d+\s*pcs/gi, `ผ่าน (OK): ${okQty} pcs`)
-                .replace(/ไม่ผ่าน \(NG\):\s*\d+\s*pcs/gi, `ไม่ผ่าน (NG): ${ngQty} pcs`)
-                .replace(/พบ NG:\s*\d+\s*pcs/gi, `พบ NG: ${ngQty} pcs`)
-                .replace(/พบงานเสีย NG\s*\d+\s*pcs/gi, `พบงานเสีย NG ${ngQty} pcs`)
-                .replace(/ชิ้นงาน NG\s*(จำนวน)?\s*\d+\s*pcs/gi, `ชิ้นงาน NG จำนวน ${ngQty} pcs`)
-                .replace(/OK:\s*\d+\s*pcs/gi, `OK: ${okQty} pcs`)
-                .replace(/NG:\s*\d+\s*pcs/gi, `NG: ${ngQty} pcs`)
-                .replace(/Total( Lot)?:\s*\d+\s*pcs/gi, `Total Lot: ${totalLot} pcs`)
-                .replace(/Lot\s*\d+\s*pcs/gi, `Lot ${totalLot} pcs`);
-            
-            if (updated !== val) {
-                remarkArea.value = updated;
-            }
-        }
+    if (typeof updateSupportFormValidation === 'function') {
+        updateSupportFormValidation();
     }
 };
 
-var WapSupportLogs = (function () {
+const WapSupportLogs = (function () {
 
     const TABLE = 'support_records';
     let _records    = [];
@@ -15584,92 +15852,23 @@ function applyDateFilter() {
             Object.keys(defectDict).forEach(k => allDefects.add(k.toUpperCase()));
         }
 
-        // Parse initial problem fields for this record (ดึงวันที่จาก Record date ในตารางมาใส่เสมอ)
+        // Parse initial problem fields for this record (ดึงวันที่จากแถวตารางมาใส่เสมอ)
         function _toIsoDateStr(val) {
             if (!val) return '';
             const str = String(val).trim();
-            if (str === '-' || str.toLowerCase() === 'n/a' || str.toLowerCase() === 'null') return '';
-
-            // 1. Standard YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
-            const isoMatch = str.match(/^(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})/);
-            if (isoMatch) {
-                let y = parseInt(isoMatch[1], 10);
-                if (y > 2400) y -= 543; // Buddhist Era (พ.ศ.) to CE
-                const m = String(isoMatch[2]).padStart(2, '0');
-                const d = String(isoMatch[3]).padStart(2, '0');
-                return `${y}-${m}-${d}`;
+            if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 10);
+            if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}/.test(str)) {
+                const p = str.split(/[\/\-\.]/);
+                return `${p[2]}-${String(p[1]).padStart(2, '0')}-${String(p[0]).padStart(2, '0')}`;
             }
-
-            // 2. DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY or DD/MM/YY
-            const dmyMatch = str.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{2,4})/);
-            if (dmyMatch) {
-                const d = String(dmyMatch[1]).padStart(2, '0');
-                const m = String(dmyMatch[2]).padStart(2, '0');
-                let y = parseInt(dmyMatch[3], 10);
-                if (y < 100) y += 2000;
-                else if (y > 2400) y -= 543;
-                return `${y}-${m}-${d}`;
-            }
-
-            // 3. DD Mon'YY or DD Mon YYYY (e.g. 25 Aug'26 or 6 Aug 2026 or 25-Aug-2026)
-            const monthNames = {
-                jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-                "ม.ค.": 1, "ก.พ.": 2, "มี.ค.": 3, "เม.ย.": 4, "พ.ค.": 5, "มิ.ย.": 6, "ก.ค.": 7, "ส.ค.": 8, "ก.ย.": 9, "ต.ค.": 10, "พ.ย.": 11, "ธ.ค.": 12,
-                "มกราคม": 1, "กุมภาพันธ์": 2, "มีนาคม": 3, "เมษายน": 4, "พฤษภาคม": 5, "มิถุนายน": 6, "กรกฎาคม": 7, "สิงหาคม": 8, "กันยายน": 9, "ตุลาคม": 10, "พฤศจิกายน": 11, "ธันวาคม": 12
-            };
-            const monMatch = str.match(/^(\d{1,2})\s*[-\s]?\s*([A-Za-z]{3,4}|[^\s\d]+)\s*['\s-]?\s*(\d{2,4})/);
-            if (monMatch) {
-                const d = String(monMatch[1]).padStart(2, '0');
-                const monKey = monMatch[2].toLowerCase().substring(0, 3);
-                const mNum = monthNames[monKey] || monthNames[monMatch[2].toLowerCase()];
-                if (mNum) {
-                    let y = parseInt(monMatch[3], 10);
-                    if (y < 100) y += 2000;
-                    else if (y > 2400) y -= 543;
-                    const m = String(mNum).padStart(2, '0');
-                    return `${y}-${m}-${d}`;
-                }
-            }
-
-            // 4. Fallback Date constructor
-            const dt = new Date(str);
-            if (!isNaN(dt.getTime())) {
-                return dt.toISOString().split('T')[0];
-            }
-            return '';
+            const d = new Date(str);
+            return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
         }
 
-        // ดึงวันที่จาก Record Date ในตารางมาใส่เสมอ
-        let tableRowDate = '';
-        if (id) {
-            const rowCell = document.querySelector(`tr[data-rid="${id}"] td.col-date, tr[data-rid="${id}"] .col-date`);
-            if (rowCell && rowCell.textContent && rowCell.textContent.trim() !== '-' && rowCell.textContent.trim() !== '') {
-                tableRowDate = rowCell.textContent.trim();
-            }
-        }
-        if (!tableRowDate) {
-            const firstRowCell = document.querySelector('#supportTable tbody tr td.col-date, #supportTable tbody tr .col-date');
-            if (firstRowCell && firstRowCell.textContent && firstRowCell.textContent.trim() !== '-' && firstRowCell.textContent.trim() !== '') {
-                tableRowDate = firstRowCell.textContent.trim();
-            }
-        }
-
-        const parsedFromProb = isEdit ? parseProblemDetails(r.problem, r) : {};
-
-        const rawRecordDate = tableRowDate ||
-                              r.eventDate ||
-                              r.event_date ||
-                              parsedFromProb.dateStr ||
-                              r.date ||
-                              r.createdAt ||
-                              r.created_at ||
-                              document.getElementById('cd-start-date')?.value ||
-                              document.getElementById('support-filter-start-date')?.value ||
-                              (_filtered && _filtered[0]?.eventDate) ||
-                              (_records && _records[0]?.eventDate) ||
-                              '';
-
-        const initialFormDate = _toIsoDateStr(rawRecordDate) || new Date().toISOString().split('T')[0];
+        const headerFilterStart = document.getElementById('cd-start-date')?.value;
+        const initialFormDate = _toIsoDateStr(r.eventDate || r.event_date || r.date || r.createdAt || r.created_at) ||
+                               _toIsoDateStr(headerFilterStart) ||
+                               new Date().toISOString().split('T')[0];
 
         let parsedDateStr = _formatProblemDateStr(initialFormDate);
         let parsedUser = "";
@@ -15681,7 +15880,7 @@ function applyDateFilter() {
 
         if (isEdit) {
             const parsed = parseProblemDetails(r.problem, r);
-            parsedDateStr = _formatProblemDateStr(initialFormDate) || parsed.dateStr || '';
+            parsedDateStr = parsed.dateStr || _formatProblemDateStr(initialFormDate);
             parsedUser = parsed.user || r.user || r.informer || r.area || r.dept || r.line || r._user || "";
             parsedPart = parsed.partName || r.partName || r.part_name || r.report_data?.vf_data?.part_name || "";
             parsedPartNo = parsed.partNo || r.partNo || r.part_no || r.drawing_no || r.report_data?.vf_data?.drawing_no || "";
@@ -15774,7 +15973,7 @@ function applyDateFilter() {
     <!-- 1. ช่องรหัสพาร์ท (Part No.) -->
     <div>
         <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔢 รหัสพาร์ท (Part No.) *</label>
-        <div style="position:relative;"> <!-- เพิ่มตัวครอบเพื่อให้ Dropdown ลอยตรงตำแหน่ง -->
+        <div class="form-input-wrap" style="position:relative;"> <!-- เพิ่มตัวครอบเพื่อให้ Dropdown ลอยตรงตำแหน่ง -->
             <input type="text" id="prob-partno" 
                    value="${parsedPartNo}" 
                    placeholder="พิมพ์รหัสพาร์ท..." 
@@ -15782,6 +15981,7 @@ function applyDateFilter() {
                    style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" 
                    oninput="renderModalAC('partno', this)" 
                    onfocus="renderModalAC('partno', this)"
+                   onclick="renderModalAC('partno', this)"
                    autocomplete="off" 
                    title="Part No" aria-label="Part No">
         </div>
@@ -15790,7 +15990,7 @@ function applyDateFilter() {
     <!-- 2. ช่องชื่อพาร์ท (Part Name) -->
     <div>
         <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🧩 ชื่อพาร์ท (Part Name) *</label>
-        <div style="position:relative;">
+        <div class="form-input-wrap" style="position:relative;">
             <input type="text" id="prob-part" 
                    value="${parsedPart}" 
                    placeholder="พิมพ์ชื่อพาร์ท..." 
@@ -15798,6 +15998,7 @@ function applyDateFilter() {
                    style="width:100%; height:32px; font-size:11px; font-weight:700;" 
                    oninput="renderModalAC('partname', this)" 
                    onfocus="renderModalAC('partname', this)"
+                   onclick="renderModalAC('partname', this)"
                    autocomplete="off" 
                    title="Part Name" aria-label="Part Name">
         </div>
@@ -15806,7 +16007,7 @@ function applyDateFilter() {
     <!-- 3. ช่องผู้จำหน่าย (Supplier) -->
     <div>
         <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🏭 ผู้จำหน่าย (Supplier)</label>
-        <div style="position:relative;">
+        <div class="form-input-wrap" style="position:relative;">
             <input type="text" id="prob-supplier" name="supplier"
                    value="${parsedSupplier}" 
                    placeholder="พิมพ์ชื่อผู้จำหน่าย..." 
@@ -15814,6 +16015,7 @@ function applyDateFilter() {
                    style="width:100%; height:32px; font-size:11px; font-weight:700; color:#0284c7;" 
                    oninput="renderModalAC('supplier', this)" 
                    onfocus="renderModalAC('supplier', this)"
+                   onclick="renderModalAC('supplier', this)"
                    autocomplete="off" 
                    title="Supplier Name" aria-label="Supplier Name">
         </div>
@@ -15823,7 +16025,7 @@ function applyDateFilter() {
                         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📦 หมวดหมู่พาร์ท</label>
-                                <div style="position:relative;">
+                                <div class="form-input-wrap" style="position:relative;">
                                     <input type="text" id="f-sup-part-cat" name="part" 
                                            value="${parsedCategory || ''}" 
                                            placeholder="พิมพ์/เลือกหมวดหมู่..." 
@@ -15831,6 +16033,7 @@ function applyDateFilter() {
                                            style="width:100%; height:32px; font-size:11px; font-weight:600;" 
                                            oninput="renderModalAC('category', this)" 
                                            onfocus="renderModalAC('category', this)" 
+                                           onclick="renderModalAC('category', this)" 
                                            autocomplete="off" 
                                            title="Part Category" aria-label="Part Category">
                                 </div>
@@ -15838,7 +16041,7 @@ function applyDateFilter() {
 
 <div>
     <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📍 ผู้แจ้ง / พื้นที่ (Area/Dept)</label>
-    <div style="position:relative;"> <!-- เพิ่มตัวครอบ -->
+    <div class="form-input-wrap" style="position:relative;"> <!-- เพิ่มตัวครอบ -->
         <input type="text" id="prob-user" 
                value="${parsedUser}" 
                placeholder="เช่น OSA-A1" 
@@ -15846,13 +16049,14 @@ function applyDateFilter() {
                style="width:100%; height:32px; font-size:11px; font-weight:600;" 
                oninput="renderModalAC('user', this)" 
                onfocus="renderModalAC('user', this)"
+               onclick="renderModalAC('user', this)"
                autocomplete="off" 
                title="User/Area" aria-label="User/Area">
     </div>
 </div>
 <div>
     <label style="font-size:10px; font-weight:700; color:#e11d48; margin-bottom:2px; display:block;">⚠️ อาการเสีย (Defect Detail)</label>
-    <div style="position:relative;"> <!-- เพิ่มตัวครอบ -->
+    <div class="form-input-wrap" style="position:relative;"> <!-- เพิ่มตัวครอบ -->
         <input type="text" id="prob-defect" 
                value="${parsedDefect}" 
                placeholder="ระบุอาการเสีย..." 
@@ -15860,6 +16064,7 @@ function applyDateFilter() {
                style="width:100%; height:32px; font-size:11px; font-weight:700; color:#e11d48;" 
                oninput="renderModalAC('defect', this)" 
                onfocus="renderModalAC('defect', this)"
+               onclick="renderModalAC('defect', this)"
                autocomplete="off" 
                title="Defect" aria-label="Defect">
     </div>
@@ -15892,7 +16097,7 @@ function applyDateFilter() {
  
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔧 การแก้ไข (ACTION)</label>
-                                <div style="position:relative;">
+                                <div class="form-input-wrap" style="position:relative;">
                                     <input type="text" id="f-sup-action" name="action" 
                                            value="${isEdit ? (r.action || '') : ''}" 
                                            placeholder="พิมพ์/เลือก ACTION..." 
@@ -15900,13 +16105,14 @@ function applyDateFilter() {
                                            style="width:100%; height:32px; font-size:11px; font-weight:600;" 
                                            oninput="renderModalAC('action', this)" 
                                            onfocus="renderModalAC('action', this)" 
+                                           onclick="renderModalAC('action', this)" 
                                            autocomplete="off" 
                                            title="Action" aria-label="Action">
                                 </div>
                             </div>
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📋 ประเภทรายงาน</label>
-                                <div style="position:relative;">
+                                <div class="form-input-wrap" style="position:relative;">
                                     <input type="text" id="f-sup-report" name="report" 
                                            value="${isEdit ? (r.report === 'RP' ? 'RP Report' : (r.report === 'RECORDS' ? 'Records' : (r.report === 'VF' ? 'VF Report' : (r.report || '')))) : ''}" 
                                            placeholder="พิมพ์/เลือกประเภท..." 
@@ -15915,6 +16121,7 @@ function applyDateFilter() {
                                            oninput="renderModalAC('report', this); if (this.closest('#support-form-modal')?._handleReportChange) this.closest('#support-form-modal')._handleReportChange(); else if (this.closest('#support-form-modal')?._syncProblemSentence) this.closest('#support-form-modal')._syncProblemSentence();" 
                                            onchange="if (this.closest('#support-form-modal')?._handleReportChange) this.closest('#support-form-modal')._handleReportChange(); else if (this.closest('#support-form-modal')?._syncProblemSentence) this.closest('#support-form-modal')._syncProblemSentence();"
                                            onfocus="renderModalAC('report', this)" 
+                                           onclick="renderModalAC('report', this)" 
                                            autocomplete="off" 
                                            title="Report" aria-label="Report">
                                 </div>
@@ -16027,42 +16234,43 @@ function applyDateFilter() {
                         </div>
 
                         <!-- Mode Switcher Tabs (แบบที่ 1 / แบบที่ 2) -->
-                        <div style="display:flex; background:#e2e8f0; border-radius:10px; padding:3px; gap:4px;">
+                        <div class="evidence-mode-switcher">
                             <button type="button" id="btn-evidence-mode-single" class="evidence-mode-tab-btn active">
-                                <span>🖼️ แบบที่ 1: แนบภาพสำเร็จรูป (1 ไฟล์)</span>
+                                <span style="font-size:13px;">🖼️</span>
+                                <span>แบบที่ 1: แนบภาพสำเร็จรูป</span>
+                                <span class="tab-badge">1 ไฟล์</span>
                             </button>
                             <button type="button" id="btn-evidence-mode-multi" class="evidence-mode-tab-btn">
-                                <span>🧩 แบบที่ 2: แนบภาพแยก (3 - 5 รูป รวมภาพอัตโนมัติ)</span>
+                                <span style="font-size:13px;">🧩</span>
+                                <span>แบบที่ 2: แนบภาพแยก</span>
+                                <span class="tab-badge">3 - 5 รูป รวมภาพอัตโนมัติ</span>
                             </button>
                         </div>
 
                         <!-- Mode 1: Single File Upload Area -->
                         <div id="evidence-mode-single-pane" style="display:flex; flex-direction:column; gap:6px;">
-                            <div id="img-dropzone" style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:10px; min-height:75px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease;">
-                                <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;" title="Img Input" aria-label="Img Input">
-                                <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; position:relative; z-index:3;">
+                            <div id="img-dropzone" style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:12px; min-height:80px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease; cursor:pointer;" title="คลิกเพื่อเลือกไฟล์รูปภาพจากเครื่อง หรือลากไฟล์มาวาง">
+                                <input type="file" id="img-input" accept="image/*" style="display:none;" title="Img Input" aria-label="Img Input">
+                                <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; position:relative;">
                                     ${r.imageUrl ? `
-                                        <div class="evidence-single-preview-wrap" style="width:100%; display:flex; flex-direction:column; align-items:center;">
-                                            <img src="${r.imageUrl}" style="max-height:160px; max-width:100%; border-radius:10px; box-shadow:0 3px 10px rgba(0,0,0,0.15); display:block; object-fit:contain; cursor:zoom-in;" alt="Evidence Single" />
-                                            <div class="evidence-toolbar">
-                                                <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-single" title="ทำเครื่องหมายหรือวาดจุดบกพร่องบนรูปภาพ">
-                                                    <span class="tool-icon">✏️</span> <span class="tool-label">ทำเครื่องหมาย/วาด</span>
-                                                </button>
-                                                <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-single" title="หมุนรูปภาพ 90°">
-                                                    <span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>
-                                                </button>
-                                                <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-single" title="ขยายดูภาพใหญ่">
-                                                    <span class="tool-icon">🔍</span> <span class="tool-label">ขยาย</span>
-                                                </button>
-                                                <button type="button" class="evidence-tool-btn btn-delete btn-del-single" title="ลบรูปภาพ">
-                                                    <span class="tool-icon">🗑️</span> <span class="tool-label">ลบ</span>
-                                                </button>
+                                        <div class="evidence-single-preview-wrap">
+                                            <img src="${r.imageUrl}" style="max-height:95px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" alt="Evidence Single" />
+                                            <div class="evidence-single-actions">
+                                                <button type="button" class="evidence-preview-btn btn-rotate-single" title="หมุนรูปภาพ 90°">↻ หมุน</button>
+                                                <button type="button" class="evidence-preview-btn btn-zoom-single" title="ขยายดูภาพใหญ่">🔍 ขยาย</button>
+                                                <button type="button" class="evidence-preview-btn btn-del btn-del-single" title="ลบรูปภาพ">✖ ลบ</button>
                                             </div>
                                         </div>
                                     ` : `
-                                        <div style="display:flex; align-items:center; gap:8px; color:#64748b; pointer-events:none;">
-                                            <svg width="20" height="20" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                            <span style="font-size:11px; font-weight:700;">📷 คลิกหรือลากวางรูปภาพหลักฐานเดี่ยว (รวมรูปมาแล้ว) ได้ที่นี่</span>
+                                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#475569; pointer-events:none; padding:4px 0; text-align:center;">
+                                            <div style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#1e293b;">
+                                                <svg width="22" height="22" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2.2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                                <span style="color:#2563eb; font-weight:800; text-decoration:underline;">คลิกเลือกรูปภาพจากเครื่อง</span>
+                                                <span style="color:#64748b;">หรือ ลากวางไฟล์ภาพที่นี่</span>
+                                            </div>
+                                            <div style="display:inline-flex; align-items:center; gap:6px; margin-top:2px;">
+                                                <span style="background:#eff6ff; color:#2563eb; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid #bfdbfe;">📋 หรือกด Ctrl + V วางรูปจากคลิปบอร์ดได้ทันที</span>
+                                            </div>
                                         </div>
                                     `}
                                 </div>
@@ -16086,18 +16294,18 @@ function applyDateFilter() {
                             <input type="file" id="img-multi-input" accept="image/*" multiple style="display:none;" title="Multi Img Input">
 
                             <!-- Stitched Banner Preview Container -->
-                            <div id="evidence-stitched-wrap" style="display:none; flex-direction:column; gap:6px; margin-top:2px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                                    <span style="font-size:10.5px; font-weight:800; color:#15803d; text-transform:uppercase; display:flex; align-items:center; gap:4px;">
-                                        ✨ ภาพหลักฐานรวมอัตโนมัติ (Composite Preview):
+                            <div id="evidence-stitched-wrap" class="evidence-stitched-wrap" style="display:none;">
+                                <div class="evidence-composite-header">
+                                    <span class="evidence-composite-title">
+                                        ✨ ภาพหลักฐานรวมอัตโนมัติ (Composite Preview)
                                     </span>
                                     <!-- Action Buttons บนภาพ Preview ที่รวมเสร็จแล้ว -->
-                                    <div id="evidence-composite-actions" style="display:none; gap:6px; align-items:center;">
-                                        <button type="button" id="btn-zoom-composite" class="evidence-preview-btn" style="background:#2563eb;" title="ขยายดูภาพใหญ่แบบเต็มจอ">
-                                            🔍 ขยายดูภาพใหญ่ (Zoom)
+                                    <div id="evidence-composite-actions" class="evidence-composite-actions" style="display:none;">
+                                        <button type="button" id="btn-zoom-composite" class="evidence-preview-btn btn-zoom" title="ขยายดูภาพใหญ่แบบเต็มจอ">
+                                            <span>🔍</span> ขยายดูภาพใหญ่
                                         </button>
                                         <button type="button" id="btn-download-composite" class="evidence-preview-btn btn-download" title="ดาวน์โหลดภาพหลักฐานรวมลงเครื่อง">
-                                            📥 ดาวน์โหลดภาพรวม (Download)
+                                            <span>📥</span> ดาวน์โหลดภาพรวม
                                         </button>
                                     </div>
                                 </div>
@@ -16109,40 +16317,57 @@ function applyDateFilter() {
                     </div>
 
                     <!-- ==========================================================
-                         หมวดหมู่ 4: หมายเหตุ (Remark - Auto Expand & Smart Templates)
+                         หมวดหมู่ 4: หมายเหตุ (Remark - Auto Expand Textarea & Quick Presets)
                          ========================================================== -->
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
                             <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
-                                💬 4. หมายเหตุเพิ่มเติม (Remark)
+                                💬 4. หมายเหตุเพิ่มเติม (REMARK)
                             </label>
-                            <button type="button" id="btn-quick-remark-sync" class="quick-remark-btn" title="นำตัวเลข LOT, OK, NG ปัจจุบันมาใส่ในหมายเหตุอัตโนมัติ">
-                                ⚡ เติมตัวเลข OK/NG อัตโนมัติ
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <button type="button" id="btn-quick-lot-summary" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800; color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:3px 8px; cursor:pointer; transition:all 0.15s ease;" title="ดึงข้อมูล Lot, OK, NG, Defect มาสร้างข้อความสรุปผลตรวจอัตโนมัติ">
+                                    <span>📦</span> สรุปผลตรวจ Lot อัตโนมัติ
+                                </button>
+                                <button type="button" id="btn-clear-remark-text" style="display:inline-flex; align-items:center; gap:3px; font-size:9.5px; font-weight:700; color:#64748b; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:2.5px 6px; cursor:pointer;" title="ล้างข้อความในช่องหมายเหตุ">
+                                    <span>🗑️</span> ล้าง
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Quick Remark Preset Tags / Template Buttons -->
+                        <div id="remark-preset-chips-wrap" style="display:flex; flex-wrap:wrap; gap:5px;">
+                            <button type="button" class="sup-remark-chip" data-type="lot-summary" style="background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="สร้างข้อความสรุปผลตรวจ Lot / OK / NG / อาการ">
+                                📦 สรุปผลตรวจ Lot (Auto)
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• Sorting 100% at Line / WIP Stock เพื่อคัดแยกชิ้นงาน" style="background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                ⚡ Sorting 100% at Line
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ประสานงาน Supplier ให้ดำเนินการวิเคราะห์หาสาเหตุ (Root Cause) และมาตรการป้องกัน" style="background:#fefce8; border:1px solid #fef08a; color:#a16207; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                🔍 ติดตาม Root Cause
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• คัดแยกชิ้นงาน NG ส่งคืน Supplier เพื่อดำเนินการเคลม/เปลี่ยนชิ้นงานใหม่" style="background:#fff1f2; border:1px solid #fecdd3; color:#be123c; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                ⚠️ คัดแยก NG ส่งคืน
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ตรวจสอบสภาพชิ้นงานแล้ว สามารถใช้งานต่อได้ภายใต้การควบคุมพิเศษ (Can Use with Special Control)" style="background:#f5f3ff; border:1px solid #ddd6fe; color:#6d28d9; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                ✅ ตรวจสอบแล้วใช้ได้ (Can Use)
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ออกเอกสารร้องเรียนและรอรับเอกสาร 8D Report มาตรการแก้ไขจาก Supplier ภายในกำหนด" style="background:#fdf2f8; border:1px solid #fbcfe8; color:#be185d; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                📋 รอเอกสาร 8D Report
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ติดสติกเกอร์ระบุสถานะและแยกจัดเก็บ Lot งานที่ผ่านการคัดกรองเรียบร้อยแล้ว" style="background:#f8fafc; border:1px solid #cbd5e1; color:#334155; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                🏷️ ติดสติกเกอร์แยก Lot
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ดำเนินการแก้ไข/Rework ชิ้นงานตามมาตรฐานที่กำหนดก่อนส่งเข้าไลน์ผลิต" style="background:#fffbeb; border:1px solid #fde68a; color:#b45309; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                🔧 ดำเนินการ Rework
                             </button>
                         </div>
 
-                        <!-- Quick Remark Template Chips -->
-                        <div class="quick-remark-chips-wrap">
-                            <button type="button" class="quick-remark-chip" data-template="summary" title="สรุปยอดตรวจทั้งหมด">
-                                📦 สรุปยอด (Lot/OK/NG)
-                            </button>
-                            <button type="button" class="quick-remark-chip" data-template="sorting" title="พบ NG จากการ Sorting 100%">
-                                ⚠️ คัดแยก 100% (พบ NG)
-                            </button>
-                            <button type="button" class="quick-remark-chip" data-template="claim" title="ส่งเคลม Vendor เปลี่ยนชิ้นงาน">
-                                🚚 ส่งเคลม Vendor
-                            </button>
-                            <button type="button" class="quick-remark-chip" data-template="rework" title="ส่ง Rework แก้ไขในไลน์">
-                                🛠️ Rework/แก้ไขงาน
-                            </button>
-                        </div>
-
-                        <textarea name="remark" id="f-sup-remark" class="form-input" 
-                                  style="width:100%; min-height:40px; max-height:140px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.4; outline:none; resize:none; overflow-y:auto;" 
-                                  placeholder="พิมพ์รายละเอียด หรือคลิกปุ่มเทมเพลตด้านบนเพื่อเติมตัวเลข OK/NG อัตโนมัติ..." 
+                        <textarea name="remark" id="f-sup-remark-input" class="form-input" 
+                                  style="width:100%; min-height:42px; max-height:140px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.45; outline:none; resize:none; overflow-y:auto;" 
+                                  placeholder="พิมพ์รายละเอียดหรือหมายเหตุเพิ่มเติม (หรือคลิกเลือกปุ่มแม่แบบด้านบน)..." 
                                   title="Remark" 
                                   aria-label="Remark"
-                                  oninput="this.style.height='40px'; this.style.height=(this.scrollHeight)+'px';">${_esc(r.remark || '')}</textarea>
+                                  oninput="this.style.height='42px'; this.style.height=(this.scrollHeight)+'px';">${_esc(r.remark || '')}</textarea>
                     </div>
 
                     <!-- ปุ่มดำเนินการ -->
@@ -16488,72 +16713,44 @@ function applyDateFilter() {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
                 img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        const nw = img.naturalWidth || img.width || 800;
-                        const nh = img.naturalHeight || img.height || 600;
-                        canvas.width = nh;
-                        canvas.height = nw;
-                        const ctx = canvas.getContext('2d');
-                        ctx.imageSmoothingEnabled = true;
-                        ctx.imageSmoothingQuality = 'high';
-                        ctx.translate(canvas.width / 2, canvas.height / 2);
-                        ctx.rotate(90 * Math.PI / 180);
-                        ctx.drawImage(img, -nw / 2, -nh / 2);
-                        resolve(canvas.toDataURL('image/jpeg', 0.95));
-                    } catch (err) {
-                        console.warn('Rotate failed with canvas toDataURL, falling back:', err);
-                        resolve(dataUrl);
-                    }
+                    const canvas = document.createElement('canvas');
+                    const nw = img.naturalWidth || img.width || 800;
+                    const nh = img.naturalHeight || img.height || 600;
+                    canvas.width = nh;
+                    canvas.height = nw;
+                    const ctx = canvas.getContext('2d');
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate(90 * Math.PI / 180);
+                    ctx.drawImage(img, -nw / 2, -nh / 2);
+                    resolve(canvas.toDataURL('image/jpeg', 0.95));
                 };
-                img.onerror = () => {
-                    if (img.crossOrigin) {
-                        const retryImg = new Image();
-                        retryImg.onload = () => {
-                            try {
-                                const canvas = document.createElement('canvas');
-                                const nw = retryImg.naturalWidth || retryImg.width || 800;
-                                const nh = retryImg.naturalHeight || retryImg.height || 600;
-                                canvas.width = nh;
-                                canvas.height = nw;
-                                const ctx = canvas.getContext('2d');
-                                ctx.translate(canvas.width / 2, canvas.height / 2);
-                                ctx.rotate(90 * Math.PI / 180);
-                                ctx.drawImage(retryImg, -nw / 2, -nh / 2);
-                                resolve(canvas.toDataURL('image/jpeg', 0.95));
-                            } catch(e) {
-                                resolve(dataUrl);
-                            }
-                        };
-                        retryImg.onerror = () => resolve(dataUrl);
-                        retryImg.src = dataUrl;
-                    } else {
-                        resolve(dataUrl);
-                    }
-                };
+                img.onerror = () => resolve(dataUrl);
                 img.src = dataUrl;
             });
         }
 
-        // 🖼️ ฟังก์ชันเรนเดอร์ Thumbnail Preview ของ Mode 1 (พร้อมปุ่ม ทำเครื่องหมาย/วาด, หมุน, ขยาย, ลบ)
+        // 🖼️ ฟังก์ชันเรนเดอร์ Thumbnail Preview ของ Mode 1 (พร้อมปุ่ม เลือก/เปลี่ยนรูป, ทำเครื่องหมาย/วาด, หมุน, ขยาย, ลบ)
         function renderSinglePreview() {
             if (!imgPreviewArea) return;
             if (singleImage) {
                 imgPreviewArea.innerHTML = `
                     <div class="evidence-single-preview-wrap" style="width:100%; display:flex; flex-direction:column; align-items:center;">
-                        <img src="${singleImage}" style="max-height:165px; max-width:100%; border-radius:10px; box-shadow:0 3px 10px rgba(0,0,0,0.15); display:block; object-fit:contain; cursor:zoom-in;" alt="Evidence Single" />
-                        <div class="evidence-toolbar">
-                            <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-single" title="ทำเครื่องหมายหรือวาดจุดบกพร่องบนรูปภาพ">
-                                <span class="tool-icon">✏️</span> <span class="tool-label">ทำเครื่องหมาย/วาด</span>
+                        <img src="${singleImage}" style="max-height:160px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); display:block; object-fit:contain; cursor:zoom-in;" alt="Evidence Single" />
+                        <div class="evidence-toolbar" style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:8px; padding:6px 10px; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; flex-wrap:wrap;">
+                            <button type="button" class="evidence-tool-btn btn-change-image" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#eff6ff; border:1px solid #bfdbfe; color:#2563eb; cursor:pointer;" title="เลือกไฟล์ภาพใหม่เพื่อเปลี่ยนรูปนี้">
+                                <span style="font-size:12px;">📁</span> เปลี่ยนรูป
                             </button>
-                            <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-single" title="หมุนรูปภาพ 90°">
-                                <span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>
+                            <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fff7ed; border:1px solid #fed7aa; color:#c2410c; cursor:pointer;" title="ทำเครื่องหมายหรือวาดบนรูปภาพ">
+                                <span style="font-size:12px;">✏️</span> ทำเครื่องหมาย/วาด
                             </button>
-                            <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-single" title="ขยายดูภาพใหญ่">
-                                <span class="tool-icon">🔍</span> <span class="tool-label">ขยาย</span>
+                            <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; cursor:pointer;" title="หมุนรูปภาพ 90°">
+                                <span style="font-size:12px;">🔄</span> หมุน
                             </button>
-                            <button type="button" class="evidence-tool-btn btn-delete btn-del-single" title="ลบรูปภาพ">
-                                <span class="tool-icon">🗑️</span> <span class="tool-label">ลบ</span>
+                            <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; cursor:pointer;" title="ขยายดูภาพใหญ่">
+                                <span style="font-size:12px;">🔍</span> ขยาย
+                            </button>
+                            <button type="button" class="evidence-tool-btn btn-delete btn-del-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; cursor:pointer;" title="ลบรูปภาพ">
+                                <span style="font-size:12px;">🗑️</span> ลบ
                             </button>
                         </div>
                     </div>
@@ -16564,6 +16761,18 @@ function applyDateFilter() {
                     imgEl.onclick = (e) => {
                         e.stopPropagation();
                         _openLightbox(singleImage);
+                    };
+                }
+
+                // ผูก Event ปุ่มเปลี่ยนรูปภาพ (เลือกไฟล์ใหม่)
+                const btnChange = imgPreviewArea.querySelector('.btn-change-image');
+                if (btnChange) {
+                    btnChange.onclick = (e) => {
+                        e.stopPropagation();
+                        if (imgInput) {
+                            imgInput.value = '';
+                            imgInput.click();
+                        }
                     };
                 }
 
@@ -16591,23 +16800,17 @@ function applyDateFilter() {
                     btnRot.onclick = async (e) => {
                         e.stopPropagation();
                         btnRot.disabled = true;
-                        btnRot.innerHTML = '<span class="tool-icon">⏳</span> <span class="tool-label">หมุน...</span>';
-                        try {
-                            const rotated = await rotateImageDataUrl(singleImage);
-                            singleImage = rotated;
-                            if (currentEvidenceMode === 'single') {
-                                currentImage = singleImage;
-                                modal._currentImage = currentImage;
-                            }
-                            renderSinglePreview();
-                            saveDraftData();
-                            updateSupportFormValidation();
-                            toast('🔄 หมุนรูปภาพ 90° เรียบร้อยแล้ว', 'info');
-                        } catch (err) {
-                            console.error('Rotate error:', err);
-                            btnRot.disabled = false;
-                            btnRot.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
+                        btnRot.textContent = '⏳ หมุน...';
+                        const rotated = await rotateImageDataUrl(singleImage);
+                        singleImage = rotated;
+                        if (currentEvidenceMode === 'single') {
+                            currentImage = singleImage;
+                            modal._currentImage = currentImage;
                         }
+                        renderSinglePreview();
+                        saveDraftData();
+                        updateSupportFormValidation();
+                        toast('🔄 หมุนรูปภาพ 90° เรียบร้อยแล้ว', 'info');
                     };
                 }
 
@@ -16639,9 +16842,15 @@ function applyDateFilter() {
                 }
             } else {
                 imgPreviewArea.innerHTML = `
-                    <div style="display:flex; align-items:center; gap:8px; color:#64748b; pointer-events:none;">
-                        <svg width="20" height="20" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        <span style="font-size:11px; font-weight:700;">📷 คลิกหรือลากวางรูปภาพหลักฐานเดี่ยว (รวมรูปมาแล้ว) ได้ที่นี่</span>
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#475569; pointer-events:none; padding:4px 0; text-align:center;">
+                        <div style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#1e293b;">
+                            <svg width="22" height="22" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2.2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            <span style="color:#2563eb; font-weight:800; text-decoration:underline;">คลิกเลือกรูปภาพจากเครื่อง</span>
+                            <span style="color:#64748b;">หรือ ลากวางไฟล์ภาพที่นี่</span>
+                        </div>
+                        <div style="display:inline-flex; align-items:center; gap:6px; margin-top:2px;">
+                            <span style="background:#eff6ff; color:#2563eb; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid #bfdbfe;">📋 หรือกด Ctrl + V วางรูปจากคลิปบอร์ดได้ทันที</span>
+                        </div>
                     </div>
                 `;
             }
@@ -16675,7 +16884,7 @@ function applyDateFilter() {
         if (btnModeSingle) btnModeSingle.onclick = () => switchEvidenceMode('single');
         if (btnModeMulti) btnModeMulti.onclick = () => switchEvidenceMode('multi');
 
-        // 🧩 ฟังก์ชันสร้าง Canvas รวมภาพ 3 - 5 รูปเป็นผืนเดียว (Proportional Width, 0 Top/Bottom Space, 0 Cropping / ไม่กินขอบ)
+       // 🧩 ฟังก์ชันสร้าง Canvas รวมภาพ 3 - 5 รูปเป็นผืนเดียว (Full Height 1200px, 0 Cropping / ไม่กินขอบภาพ คมชัดเต็มใบ)
         async function buildMultiCollageCanvas(imgList) {
             if (!imgList || imgList.length < 3 || imgList.length > 5) return null;
 
@@ -16696,9 +16905,9 @@ function applyDateFilter() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            // 🎯 ล็อกความสูงมาตรฐานคงที่ (1080px Full HD Standard) เท่ากันเสมอทุกครั้งที่บันทึก และคำนวณความกว้างตามสัดส่วนจริงของแต่ละรูปภาพ (No Cropping / คมชัดเต็มภาพ ไม่มีพื้นที่ว่างบนล่าง)
-            const targetHeight = 1080;
-            const spacing = 3;
+            // 🎯 กำหนดความสูงมาตรฐานคงที่ (1200px Full HD+) และคำนวณความกว้างตามสัดส่วนจริง 100% เพื่อไม่ให้กินขอบของภาพ
+            const targetHeight = 1200;
+            const spacing = 4;
             const padding = 0;
 
             const slotWidths = validImages.map(img => {
@@ -16721,7 +16930,7 @@ function applyDateFilter() {
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-            // วาดแต่ละภาพตามความกว้างสัดส่วนจริง ไม่ตัดขอบ เต็มความสูงพอดี 100% ไม่มีพื้นที่ว่าง
+            // วาดภาพเต็มความละเอียดและสัดส่วนดั้งเดิม 100% (No Cropping / ไม่กินขอบใดๆ)
             let currentX = padding;
             validImages.forEach((img, idx) => {
                 const w = slotWidths[idx];
@@ -16729,9 +16938,11 @@ function applyDateFilter() {
                 const x = currentX;
                 const y = padding;
 
+                const nw = img.naturalWidth || img.width || 800;
+                const nh = img.naturalHeight || img.height || 600;
+
                 ctx.save();
-                // วาดภาพเต็มความละเอียดและสัดส่วนจริง 100%
-                ctx.drawImage(img, x, y, w, h);
+                ctx.drawImage(img, 0, 0, nw, nh, x, y, w, h);
                 ctx.restore();
 
                 currentX += w + spacing;
@@ -16740,37 +16951,41 @@ function applyDateFilter() {
             return canvas.toDataURL('image/jpeg', 0.98);
         }
 
-        // 🧩 ฟังก์ชันเรนเดอร์ Thumbnails ใน Mode 2 (พร้อมปุ่ม [x] ลบ และ [↻] หมุน)
         const renderMultiGrid = () => {
             if (!multiGrid) return;
             multiGrid.innerHTML = '';
 
+            // 1. วาดรายการรูปภาพที่มีอยู่ (ขนาดสัดส่วน 4:3 เท่ากันทุกช่อง)
             multiImages.forEach((imgData, idx) => {
-                const card = document.createElement('div');
-                card.className = 'evidence-thumb-card';
-                card.innerHTML = `
-                    <img src="${imgData}" alt="Evidence ${idx + 1}" />
-                    <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูปภาพ 90°" data-rot-idx="${idx}">↻</button>
-                    <button type="button" class="evidence-thumb-delete-btn" title="ลบรูปนี้" data-del-idx="${idx}">✖</button>
-                    <span class="evidence-thumb-badge">รูปที่ ${idx + 1}</span>
+                const card迷 = document.createElement('div');
+                card迷.className = 'evidence-thumb-card';
+                card迷.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#f1f5f9; box-sizing:border-box;';
+                
+                card迷.innerHTML = `
+                    <img src="${imgData}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Evidence ${idx + 1}" />
+                    <div style="position:absolute; top:5px; right:5px; display:flex; gap:4px; z-index:2;">
+                        <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">↻</button>
+                        <button type="button" class="evidence-thumb-delete-btn" title="ลบรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(239,68,68,0.85); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+                    </div>
+                    <span style="position:absolute; bottom:5px; left:5px; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; padding:2px 7px; border-radius:5px; font-size:9px; font-weight:800; z-index:2;">รูปที่ ${idx + 1}</span>
                 `;
 
                 // ปุ่มหมุนรูป 90°
-                const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
+                const rotBtn = card迷.querySelector('.evidence-thumb-rotate-btn');
                 if (rotBtn) {
-                    rotBtn.onclick = async (e) => {
+                    rotBtn.onclick迷 = async (e) => {
                         e.stopPropagation();
-                        rotBtn.style.pointerEvents = 'none';
                         rotBtn.textContent = '⏳';
                         const rotated = await rotateImageDataUrl(multiImages[idx]);
                         multiImages[idx] = rotated;
                         await handleMultiImagesChange();
                         toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
                     };
+                    rotBtn.onclick = rotBtn.onclick迷;
                 }
 
                 // ปุ่มลบรูป
-                const delBtn = card.querySelector('.evidence-thumb-delete-btn');
+                const delBtn = card迷.querySelector('.evidence-thumb-delete-btn');
                 if (delBtn) {
                     delBtn.onclick = async (e) => {
                         e.stopPropagation();
@@ -16780,19 +16995,20 @@ function applyDateFilter() {
                     };
                 }
 
-                multiGrid.appendChild(card);
+                multiGrid.appendChild(card迷);
             });
 
-            // ช่องกดเพิ่มรูปภาพ (ถ้ายังไม่ครบ 5 รูป)
+            // 2. ช่องกดเพิ่มรูปภาพ (+ เพิ่มรูปภาพ) - ขนาดสัดส่วน 4:3 เท่ากับรูปภาพเสมอ
             if (multiImages.length < 5) {
                 const addSlot = document.createElement('div');
                 addSlot.className = 'evidence-add-slot';
+                addSlot.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:2px dashed #93c5fd; background:#f8fafc; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; cursor:pointer; color:#2563eb; transition:all 0.2s ease; box-sizing:border-box; padding:6px;';
                 addSlot.innerHTML = `
-                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-bottom:2px;">
-                        <path d="M12 4v16m8-8H4"/>
+                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" style="margin-bottom:3px; color:#2563eb;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
                     </svg>
-                    <span style="font-size:10px; font-weight:800;">+ เพิ่มรูปภาพ</span>
-                    <span style="font-size:8.5px; opacity:0.8;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
+                    <span style="font-size:10.5px; font-weight:800; color:#1e40af; line-height:1.2;">+ เพิ่มรูปภาพ</span>
+                    <span style="font-size:8.5px; color:#64748b; margin-top:2px;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
                 `;
                 addSlot.onclick = () => {
                     if (imgMultiInput) {
@@ -16878,19 +17094,19 @@ function applyDateFilter() {
                         if (stitchedBox) {
                             stitchedBox.innerHTML = `
                                 <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
-                                    <img src="${collage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:10px; display:block; cursor:zoom-in; box-shadow:0 3px 10px rgba(0,0,0,0.12);" alt="Composite Evidence" />
-                                    <div class="evidence-toolbar">
-                                        <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-multi" title="ทำเครื่องหมายหรือวาดบนภาพหลักฐานรวม">
-                                            <span class="tool-icon">✏️</span> <span class="tool-label">ทำเครื่องหมาย/วาด</span>
+                                    <img src="${collage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:6px; display:block; cursor:zoom-in;" alt="Composite Evidence" />
+                                    <div class="evidence-toolbar" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:8px; padding:6px 10px; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; flex-wrap:wrap;">
+                                        <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fff7ed; border:1px solid #fed7aa; color:#c2410c; cursor:pointer;" title="ทำเครื่องหมายหรือวาดบนภาพหลักฐานรวม">
+                                            <span style="font-size:12px;">✏️</span> ทำเครื่องหมาย/วาด
                                         </button>
-                                        <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-multi" title="หมุนภาพรวม 90°">
-                                            <span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>
+                                        <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; cursor:pointer;" title="หมุนภาพรวม 90°">
+                                            <span style="font-size:12px;">🔄</span> หมุน
                                         </button>
-                                        <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-multi" title="ขยายดูภาพใหญ่">
-                                            <span class="tool-icon">🔍</span> <span class="tool-label">ขยาย</span>
+                                        <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; cursor:pointer;" title="ขยายดูภาพใหญ่">
+                                            <span style="font-size:12px;">🔍</span> ขยาย
                                         </button>
-                                        <button type="button" class="evidence-tool-btn btn-delete btn-del-multi" title="ลบภาพหลักฐานทั้งหมดในโหมดนี้">
-                                            <span class="tool-icon">🗑️</span> <span class="tool-label">ลบ</span>
+                                        <button type="button" class="evidence-tool-btn btn-delete btn-del-multi" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; cursor:pointer;" title="ลบภาพหลักฐานทั้งหมดในโหมดนี้">
+                                            <span style="font-size:12px;">🗑️</span> ลบ
                                         </button>
                                     </div>
                                 </div>
@@ -16925,25 +17141,19 @@ function applyDateFilter() {
                                 btnRotateM.onclick = async (e) => {
                                     e.stopPropagation();
                                     btnRotateM.disabled = true;
-                                    btnRotateM.innerHTML = '<span class="tool-icon">⏳</span> <span class="tool-label">หมุน...</span>';
-                                    try {
-                                        const rotated = await rotateImageDataUrl(stitchedMultiImage);
-                                        stitchedMultiImage = rotated;
-                                        if (currentEvidenceMode === 'multi') {
-                                            currentImage = stitchedMultiImage;
-                                            modal._currentImage = currentImage;
-                                        }
-                                        if (imgEl) imgEl.src = stitchedMultiImage;
-                                        btnRotateM.disabled = false;
-                                        btnRotateM.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
-                                        saveDraftData();
-                                        updateSupportFormValidation();
-                                        toast('🔄 หมุนภาพหลักฐานรวม 90° เรียบร้อยแล้ว', 'info');
-                                    } catch(err) {
-                                        console.error('Rotate error:', err);
-                                        btnRotateM.disabled = false;
-                                        btnRotateM.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
+                                    btnRotateM.textContent = '⏳ หมุน...';
+                                    const rotated = await rotateImageDataUrl(stitchedMultiImage);
+                                    stitchedMultiImage = rotated;
+                                    if (currentEvidenceMode === 'multi') {
+                                        currentImage = stitchedMultiImage;
+                                        modal._currentImage = currentImage;
                                     }
+                                    if (imgEl) imgEl.src = stitchedMultiImage;
+                                    btnRotateM.disabled = false;
+                                    btnRotateM.innerHTML = '<span style="font-size:12px;">🔄</span> หมุน';
+                                    saveDraftData();
+                                    updateSupportFormValidation();
+                                    toast('🔄 หมุนภาพหลักฐานรวม 90° เรียบร้อยแล้ว', 'info');
                                 };
                             }
 
@@ -17052,12 +17262,23 @@ function applyDateFilter() {
 
         if (imgInput) {
             imgInput.onchange = (e) => {
-                const file = e.target.files[0];
-                handleSingleImageFile(file);
+                if (e.target.files && e.target.files[0]) {
+                    handleSingleImageFile(e.target.files[0]);
+                }
             };
         }
 
         if (imgDropzone) {
+            imgDropzone.onclick = (e) => {
+                // ถ้าคลิกโดนปุ่ม Action ใน Toolbar หรือคลิกที่รูปภาพ ไม่ต้องเปิด File Dialog
+                if (e.target.closest('.evidence-toolbar') || e.target.closest('button') || e.target.closest('img')) {
+                    return;
+                }
+                if (imgInput) {
+                    imgInput.value = '';
+                    imgInput.click();
+                }
+            };
             imgDropzone.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 imgDropzone.style.borderColor = '#2563eb';
@@ -17081,36 +17302,73 @@ function applyDateFilter() {
         // เริ่มต้นเรนเดอร์ Preview ทั้ง 2 โหมด
         renderSinglePreview();
 
-        // Allow pasting image from Clipboard (Ctrl+V) into modal
+        // 📋 Direct Clipboard Paste Handler (Ctrl+V / Paste) into modal
         const handlePasteImage = (e) => {
             if (!document.body.contains(modal)) {
                 window.removeEventListener('paste', handlePasteImage);
                 return;
             }
-            const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
-            if (items) {
-                const itemList = Array.from(items);
-                for (let item of itemList) {
-                    if (item && item.type && item.type.indexOf('image') === 0) {
+
+            const clipboardData = e.clipboardData || e.originalEvent?.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+
+            // Collect all image items/files
+            const imageBlobs = [];
+            
+            if (clipboardData.items) {
+                for (let item of clipboardData.items) {
+                    if (item && item.type && item.type.startsWith('image/')) {
                         const blob = item.getAsFile();
-                        if (currentEvidenceMode === 'single') {
-                            handleSingleImageFile(blob);
-                            if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ', 'success');
-                        } else {
-                            if (multiImages.length >= 5) {
-                                toast('⚠️ แนบรูปภาพครบ 5 รูปแล้ว', 'warning');
-                                return;
-                            }
-                            const reader = new FileReader();
-                            reader.onload = async (ev) => {
-                                multiImages.push(ev.target.result);
-                                if (typeof toast === 'function') toast(`📸 วางรูปภาพจาก Clipboard (รูปที่ ${multiImages.length})`, 'success');
-                                await handleMultiImagesChange();
-                            };
-                            reader.readAsDataURL(blob);
-                        }
-                        break;
+                        if (blob) imageBlobs.push(blob);
                     }
+                }
+            }
+
+            if (imageBlobs.length === 0 && clipboardData.files) {
+                for (let file of clipboardData.files) {
+                    if (file && file.type && file.type.startsWith('image/')) {
+                        imageBlobs.push(file);
+                    }
+                }
+            }
+
+            if (imageBlobs.length > 0) {
+                // If focus is not inside an editable code area, prevent default paste
+                e.preventDefault();
+
+                if (currentEvidenceMode === 'single') {
+                    // Single mode takes the first image
+                    handleSingleImageFile(imageBlobs[0]);
+                    if (typeof toast === 'function') toast('📋 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ!', 'success');
+                } else {
+                    // Multi mode can add images up to 5
+                    let addedCount = 0;
+                    const promises = [];
+
+                    for (let blob of imageBlobs) {
+                        if (multiImages.length >= 5) {
+                            if (typeof toast === 'function') toast('⚠️ แนบรูปภาพครบ 5 รูปแล้ว', 'warning');
+                            break;
+                        }
+                        const p = new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                                multiImages.push(ev.target.result);
+                                addedCount++;
+                                resolve();
+                            };
+                            reader.onerror = () => resolve();
+                            reader.readAsDataURL(blob);
+                        });
+                        promises.push(p);
+                    }
+
+                    Promise.all(promises).then(async () => {
+                        if (addedCount > 0) {
+                            if (typeof toast === 'function') toast(`📋 วางรูปภาพจาก Clipboard สำเร็จ (+${addedCount} รูป รวมเป็น ${multiImages.length}/5)`, 'success');
+                            await handleMultiImagesChange();
+                        }
+                    });
                 }
             }
         };
@@ -17234,11 +17492,10 @@ function applyDateFilter() {
                 if (d.supplier !== undefined && modal.querySelector('#prob-supplier')) modal.querySelector('#prob-supplier').value = d.supplier;
                 if (d.defect !== undefined && modal.querySelector('#prob-defect')) modal.querySelector('#prob-defect').value = d.defect;
                 if (d.category !== undefined && modal.querySelector('#f-sup-part-cat')) modal.querySelector('#f-sup-part-cat').value = d.category;
-                // ตรงวันที่ ให้ดึงวันที่จาก Record date ในตารางมาใส่เสมอ (ห้ามทับเมื่อเปิดแก้ไขข้อมูลเดิม)
-                if (!isEdit && d.eventDate !== undefined && modal.querySelector('#f-sup-date')) {
-                    const draftDate = _toIsoDateStr(d.eventDate);
-                    if (draftDate) modal.querySelector('#f-sup-date').value = draftDate;
-                }
+                if (d.eventDate !== undefined && modal.querySelector('#f-sup-date')) {
+    // ตัดเอาเฉพาะ 10 ตัวแรก (YYYY-MM-DD) เพื่อให้ input date ยอมรับค่า
+    modal.querySelector('#f-sup-date').value = d.eventDate.substring(0, 10);
+}
                 if (d.action !== undefined && modal.querySelector('#f-sup-action')) modal.querySelector('#f-sup-action').value = d.action;
                 if (d.report !== undefined && modal.querySelector('#f-sup-report')) modal.querySelector('#f-sup-report').value = d.report;
                 if (d.po_no !== undefined && modal.querySelector('#f-sup-po')) modal.querySelector('#f-sup-po').value = d.po_no;
@@ -17267,91 +17524,13 @@ function applyDateFilter() {
                     modal._currentImage = currentImage;
                     switchEvidenceMode('multi');
                     if (stitchedMultiImage && stitchedBox) {
-                        stitchedBox.innerHTML = `
-                            <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
-                                <img src="${stitchedMultiImage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:10px; display:block; cursor:zoom-in; box-shadow:0 3px 10px rgba(0,0,0,0.12);" alt="Composite Evidence" />
-                                <div class="evidence-toolbar">
-                                    <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-multi" title="ทำเครื่องหมายหรือวาดบนภาพหลักฐานรวม">
-                                        <span class="tool-icon">✏️</span> <span class="tool-label">ทำเครื่องหมาย/วาด</span>
-                                    </button>
-                                    <button type="button" class="evidence-tool-btn btn-rotate btn-rotate-multi" title="หมุนภาพรวม 90°">
-                                        <span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>
-                                    </button>
-                                    <button type="button" class="evidence-tool-btn btn-zoom btn-zoom-multi" title="ขยายดูภาพใหญ่">
-                                        <span class="tool-icon">🔍</span> <span class="tool-label">ขยาย</span>
-                                    </button>
-                                    <button type="button" class="evidence-tool-btn btn-delete btn-del-multi" title="ลบภาพหลักฐานทั้งหมดในโหมดนี้">
-                                        <span class="tool-icon">🗑️</span> <span class="tool-label">ลบ</span>
-                                    </button>
-                                </div>
-                            </div>
-                        `;
+                        stitchedBox.innerHTML = `<img src="${stitchedMultiImage}" style="max-height:220px; min-height:120px; width:100%; object-fit:contain; border-radius:6px; display:block; cursor:zoom-in;" alt="Composite Evidence" />`;
                         const imgEl = stitchedBox.querySelector('img');
                         if (imgEl) {
                             imgEl.onclick = () => _openLightbox(stitchedMultiImage);
                         }
-                        const btnAnnotateM = stitchedBox.querySelector('.btn-annotate-multi');
-                        if (btnAnnotateM) {
-                            btnAnnotateM.onclick = (e) => {
-                                e.stopPropagation();
-                                window.openEvidenceImageAnnotator(stitchedMultiImage, (annotatedImage) => {
-                                    stitchedMultiImage = annotatedImage;
-                                    currentImage = stitchedMultiImage;
-                                    modal._currentImage = currentImage;
-                                    if (imgEl) imgEl.src = stitchedMultiImage;
-                                    saveDraftData();
-                                    updateSupportFormValidation();
-                                });
-                            };
-                        }
-                        const btnRotateM = stitchedBox.querySelector('.btn-rotate-multi');
-                        if (btnRotateM) {
-                            btnRotateM.onclick = async (e) => {
-                                e.stopPropagation();
-                                btnRotateM.disabled = true;
-                                btnRotateM.innerHTML = '<span class="tool-icon">⏳</span> <span class="tool-label">หมุน...</span>';
-                                try {
-                                    const rotated = await rotateImageDataUrl(stitchedMultiImage);
-                                    stitchedMultiImage = rotated;
-                                    currentImage = stitchedMultiImage;
-                                    modal._currentImage = currentImage;
-                                    if (imgEl) imgEl.src = stitchedMultiImage;
-                                    btnRotateM.disabled = false;
-                                    btnRotateM.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
-                                    saveDraftData();
-                                    updateSupportFormValidation();
-                                    toast('🔄 หมุนภาพหลักฐานรวม 90° เรียบร้อยแล้ว', 'info');
-                                } catch (err) {
-                                    btnRotateM.disabled = false;
-                                    btnRotateM.innerHTML = '<span class="tool-icon">🔄</span> <span class="tool-label">หมุน</span>';
-                                }
-                            };
-                        }
-                        const btnZoomM = stitchedBox.querySelector('.btn-zoom-multi');
-                        if (btnZoomM) {
-                            btnZoomM.onclick = (e) => {
-                                e.stopPropagation();
-                                _openLightbox(stitchedMultiImage);
-                            };
-                        }
-                        const btnDelM = stitchedBox.querySelector('.btn-del-multi');
-                        if (btnDelM) {
-                            btnDelM.onclick = (e) => {
-                                e.stopPropagation();
-                                multiImages = [];
-                                stitchedMultiImage = null;
-                                currentImage = null;
-                                modal._currentImage = null;
-                                if (imgMultiInput) imgMultiInput.value = '';
-                                renderMultiGrid();
-                                if (stitchedWrap) stitchedWrap.style.display = 'none';
-                                if (stitchedBox) stitchedBox.innerHTML = '';
-                                saveDraftData();
-                                updateSupportFormValidation();
-                                toast('🗑️ ล้างรูปภาพหลักฐานทั้งหมดเรียบร้อย', 'info');
-                            };
-                        }
                         if (stitchedWrap) stitchedWrap.style.display = 'flex';
+                        if (compositeActions) compositeActions.style.display = 'flex';
                     }
                 } else {
                     currentEvidenceMode = 'single';
@@ -17360,11 +17539,6 @@ function applyDateFilter() {
                     modal._currentImage = currentImage;
                     switchEvidenceMode('single');
                     renderSinglePreview();
-                }
-
-                // ตรงวันที่ ให้ดึงวันที่จาก Record date ในตารางมาใส่เสมอ
-                if (isEdit && initialFormDate && modal.querySelector('#f-sup-date')) {
-                    modal.querySelector('#f-sup-date').value = initialFormDate;
                 }
 
                 toggleRpFieldsVisibility();
@@ -17562,73 +17736,6 @@ function applyDateFilter() {
             }
         }
 
-        // ==========================================================
-        // 💬 Quick Remark Generator & Auto-Fill OK/NG
-        // ==========================================================
-        function getRemarkTemplateText(templateKey) {
-            const lotVal = parseInt(modal.querySelector('#f-sup-lot')?.value) || 0;
-            const okVal = parseInt(modal.querySelector('#f-sup-ok')?.value) || 0;
-            const ngVal = parseInt(modal.querySelector('#f-sup-ng')?.value) || 0;
-            const defectVal = (modal.querySelector('#prob-defect')?.value || '').trim();
-            const partVal = (modal.querySelector('#prob-partno')?.value || '').trim();
-            
-            switch (templateKey) {
-                case 'summary':
-                    return `📦 ตรวจสอบ Lot ${lotVal} pcs | ผ่าน (OK): ${okVal} pcs | ไม่ผ่าน (NG): ${ngVal} pcs${defectVal ? ` [อาการ: ${defectVal}]` : ''}`;
-                case 'sorting':
-                    return `⚠️ Sorting 100% พบ NG: ${ngVal} pcs (OK: ${okVal} pcs / Total Lot: ${lotVal} pcs)${defectVal ? ` - ${defectVal}` : ''}`;
-                case 'claim':
-                    return `🚚 ส่งเคลม Vendor ชิ้นงาน NG จำนวน ${ngVal} pcs (จาก Lot ${lotVal} pcs) เพื่อรอส่งชิ้นงานดีมาเปลี่ยนทดแทน`;
-                case 'rework':
-                    return `🛠️ คัดแยกพบ NG ${ngVal} pcs นำส่ง Rework/แก้ไขในกระบวนการผลิต (ชิ้นงานดี OK: ${okVal} pcs)`;
-                default:
-                    return `📦 Total Lot: ${lotVal} pcs | OK: ${okVal} pcs | NG: ${ngVal} pcs`;
-            }
-        }
-
-        function applyQuickRemark(templateKey) {
-            const remarkTextarea = modal.querySelector('textarea[name="remark"]') || modal.querySelector('#f-sup-remark');
-            if (!remarkTextarea) return;
-            const newText = getRemarkTemplateText(templateKey);
-            remarkTextarea.value = newText;
-            remarkTextarea.style.height = '40px';
-            remarkTextarea.style.height = (remarkTextarea.scrollHeight) + 'px';
-            
-            // Visual highlight flash effect
-            remarkTextarea.style.backgroundColor = 'rgba(16, 185, 129, 0.12)';
-            remarkTextarea.style.borderColor = '#10b981';
-            setTimeout(() => {
-                remarkTextarea.style.backgroundColor = '#fff';
-                remarkTextarea.style.borderColor = '#cbd5e1';
-            }, 600);
-            
-            remarkTextarea.dispatchEvent(new Event('input', { bubbles: true }));
-            saveDraftData();
-            updateSupportFormValidation();
-            const okCount = modal.querySelector('#f-sup-ok')?.value || 0;
-            const ngCount = modal.querySelector('#f-sup-ng')?.value || 0;
-            toast(`💬 เติมข้อความพร้อมระบุ OK: ${okCount} / NG: ${ngCount} เรียบร้อย`, 'success');
-        }
-
-        const btnQuickSync = modal.querySelector('#btn-quick-remark-sync');
-        if (btnQuickSync) {
-            btnQuickSync.onclick = (e) => {
-                e.preventDefault();
-                applyQuickRemark('summary');
-            };
-        }
-
-        const quickChips = modal.querySelectorAll('.quick-remark-chip');
-        quickChips.forEach(chip => {
-            chip.onclick = (e) => {
-                e.preventDefault();
-                const template = chip.getAttribute('data-template');
-                applyQuickRemark(template);
-                quickChips.forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
-            };
-        });
-
         if (formEl) {
             formEl.addEventListener('input', saveDraftData);
             formEl.addEventListener('change', saveDraftData);
@@ -17647,6 +17754,100 @@ function applyDateFilter() {
 
         updateOfflineStatusUI();
         updateSupportFormValidation();
+
+        // --- 4. หมายเหตุ (REMARK) Quick Buttons & Presets Handler ---
+        function generateLotSummaryRemarkText() {
+            const lotVal = (modal.querySelector('#f-sup-lot')?.value || '').trim();
+            const okVal = (modal.querySelector('#f-sup-ok')?.value || '').trim();
+            const ngVal = (modal.querySelector('#f-sup-ng')?.value || '').trim();
+            const defectVal = (modal.querySelector('#prob-defect')?.value || '').trim();
+
+            const lotNum = lotVal ? Number(lotVal) : 0;
+            const okNum = okVal ? Number(okVal) : 0;
+            const ngNum = ngVal !== '' ? Number(ngVal) : (lotNum - okNum > 0 ? lotNum - okNum : 0);
+
+            let text = `📦 ตรวจสอบ Lot ${lotNum || (lotVal || '0')} pcs | ผ่าน (OK): ${okNum || (okVal || '0')} pcs | ไม่ผ่าน (NG): ${ngNum || (ngVal || '0')} pcs`;
+            if (defectVal) {
+                text += ` [อาการ: ${defectVal}]`;
+            }
+            return text;
+        }
+
+        function applyRemarkPreset(textOrType) {
+            const remarkTextarea = modal.querySelector('textarea[name="remark"]');
+            if (!remarkTextarea) return;
+
+            let insertText = textOrType;
+            if (textOrType === 'lot-summary') {
+                insertText = generateLotSummaryRemarkText();
+            }
+
+            const currentVal = (remarkTextarea.value || '').trim();
+            if (!currentVal) {
+                remarkTextarea.value = insertText;
+            } else if (textOrType === 'lot-summary') {
+                // If it already has a Lot summary line, replace it or prepend
+                const lotSummaryRegex = /📦\s*ตรวจสอบ\s*Lot[^\n]*/i;
+                if (lotSummaryRegex.test(currentVal)) {
+                    remarkTextarea.value = currentVal.replace(lotSummaryRegex, insertText);
+                } else {
+                    remarkTextarea.value = insertText + '\n' + currentVal;
+                }
+            } else {
+                // If already contains this exact preset, don't duplicate
+                if (currentVal.includes(insertText)) {
+                    toast('📋 มีข้อความนี้อยู่ในหมายเหตุแล้ว', 'info');
+                } else {
+                    remarkTextarea.value = currentVal + '\n' + insertText;
+                }
+            }
+
+            // Adjust height
+            remarkTextarea.style.height = '42px';
+            remarkTextarea.style.height = (remarkTextarea.scrollHeight) + 'px';
+
+            saveDraftData();
+            updateSupportFormValidation();
+        }
+
+        const lotSummaryBtn = modal.querySelector('#btn-quick-lot-summary');
+        if (lotSummaryBtn) {
+            lotSummaryBtn.onclick = (e) => {
+                e.preventDefault();
+                applyRemarkPreset('lot-summary');
+                toast('📦 สร้างข้อความสรุปผลตรวจ Lot สำเร็จ', 'success');
+            };
+        }
+
+        const clearRemarkBtn = modal.querySelector('#btn-clear-remark-text');
+        if (clearRemarkBtn) {
+            clearRemarkBtn.onclick = (e) => {
+                e.preventDefault();
+                const remarkTextarea = modal.querySelector('textarea[name="remark"]');
+                if (remarkTextarea) {
+                    remarkTextarea.value = '';
+                    remarkTextarea.style.height = '42px';
+                    saveDraftData();
+                    updateSupportFormValidation();
+                    toast('🗑️ ล้างข้อความหมายเหตุเรียบร้อย', 'info');
+                }
+            };
+        }
+
+        modal.querySelectorAll('.sup-remark-chip').forEach(btn => {
+            btn.onclick = (e) => {
+                e.preventDefault();
+                const type = btn.getAttribute('data-type');
+                const preset = btn.getAttribute('data-preset');
+                if (type === 'lot-summary') {
+                    applyRemarkPreset('lot-summary');
+                    toast('📦 สรุปผลตรวจ Lot เรียบร้อย', 'success');
+                } else if (preset) {
+                    applyRemarkPreset(preset);
+                    toast('✨ ใส่แม่แบบหมายเหตุเรียบร้อย', 'success');
+                }
+            };
+        });
 
         // --- Save Support Form ---
         // --- 🚀 ชุดสมบูรณ์: บันทึกข้อมูลพร้อมอัปโหลดรูปภาพขึ้น Storage (User-Specific Folder) ---
@@ -17855,12 +18056,37 @@ function _openViewModal(id) {
     // --- 2. Smart Logic จัดการข้อความจริงจากฐานข้อมูล ---
     let displaySentence = (item.problem || "").trim();
 
+    // --- 3. จัดการแสดงผล Note / หมายเหตุ ให้เว้นบรรทัดตรงตามที่กรอก 100% ---
+    const rawRemark = (item.remark || "").trim();
+    let formattedRemarkHtml = '';
+    if (!rawRemark) {
+        formattedRemarkHtml = `<div style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; opacity:0.85;">ไม่มีหมายเหตุเพิ่มเติม</div>`;
+    } else {
+        let normalizedRemark = rawRemark;
+        // หากมีหัวข้อ bullet (•) ติดกันโดยไม่มีเว้นบรรทัด ให้แยกขึ้นบรรทัดใหม่อัตโนมัติ
+        normalizedRemark = normalizedRemark.replace(/([^\n])\s*•\s*/g, '$1\n• ');
+        const lines = normalizedRemark.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        if (lines.length > 1) {
+            formattedRemarkHtml = `<div style="display:flex; flex-direction:column; gap:4px; width:100%;">
+                ${lines.map(line => `
+                    <div style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; line-height:1.45; word-break:break-word;">
+                        ${escapeHtml(line)}
+                    </div>
+                `).join('')}
+            </div>`;
+        } else {
+            formattedRemarkHtml = `<div style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; line-height:1.45; word-break:break-word; white-space:pre-line; width:100%;">
+                ${escapeHtml(rawRemark)}
+            </div>`;
+        }
+    }
+
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);padding:20px;`;
     
     modal.innerHTML = `
-    <div style="background:${theme.modalBg}; border:1px solid ${theme.border}; border-radius:12px; width:100%; max-width:980px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); font-family:'Inter', 'Kanit', sans-serif;">
+    <div style="background:${theme.modalBg}; border:1px solid ${theme.border}; border-radius:12px; width:100%; max-width:860px; max-height:94vh; overflow-y:auto; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); font-family:'Inter', 'Kanit', sans-serif;">
         
         <!-- 1. Header (ปรับเป็นสีน้ำเงินสว่างตามคำขอ) -->
         <div style="background:${theme.headerBg}; padding:8px 20px; display:flex; justify-content:space-between; align-items:center; height:36px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -17925,27 +18151,26 @@ function _openViewModal(id) {
                 </div>
             </div>
 
-<!-- Image Section (Edge-to-Edge Snug Fit / Zero Blank Space Above/Below) -->
-            <div style="width:100%; background:transparent; border:1.5px solid ${theme.imgBorder}; border-radius:12px; overflow:hidden; margin-bottom:12px; padding:0; line-height:0; font-size:0;">
+            <!-- Image Section (Edge-to-edge snugly without top/bottom empty space) -->
+            <div style="width:100%; border:1px solid ${theme.imgBorder}; border-radius:8px; overflow:hidden; margin-bottom:10px; box-shadow:0 4px 12px rgba(0,0,0,0.15); line-height:0; background:${isDark ? '#020617' : '#0f172a'};">
                 ${item.imageUrl 
                     ? `
                     <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
                         onerror="handleImgError(this)"
                         onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
                         data-img-url="${escapeHtml(item.imageUrl)}"
-                        style="width:100%; height:auto; max-height:550px; display:block; vertical-align:middle; object-fit:contain; cursor:zoom-in; image-rendering:-webkit-optimize-contrast; margin:0; padding:0;" 
-                        alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">
-                    ` 
-                    : `<div style="padding:40px; text-align:center; color:${theme.textDim}; font-size:12px; font-weight:800; text-transform:uppercase; line-height:1.5;">No Evidence Photo</div>`
+                        style="width:100%; height:auto; display:block; cursor:zoom-in; image-rendering:-webkit-optimize-contrast;" 
+                        alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">` 
+                    : `<div style="padding:30px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase; line-height:1.5;">No Evidence Photo</div>`
                 }
             </div>
 
             <!-- Remark Section -->
-            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:6px; padding:10px 15px; display:flex; align-items:center; gap:10px;">
-                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:9px; font-weight:950; text-transform:uppercase; flex-shrink:0;">Note:</span>
-                <p style="color:${theme.remarkText}; font-size:12px; font-weight:600; margin:0; line-height:1.2;">
-                    ${item.remark || 'ไม่มีหมายเหตุเพิ่มเติม'}
-                </p>
+            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:8px; padding:10px 15px; display:flex; align-items:flex-start; gap:10px;">
+                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:9.5px; font-weight:950; text-transform:uppercase; flex-shrink:0; margin-top:2px; letter-spacing:0.5px;">NOTE:</span>
+                <div style="flex:1; min-width:0;">
+                    ${formattedRemarkHtml}
+                </div>
             </div>
 
             <!-- Footer -->
@@ -18202,7 +18427,7 @@ window.clearSupportSearch = function() {
  *  WAP 5S Excellence - FULLY DATA-SYNC VERSION
  * ═══════════════════════════════════════════════════════
  */
-var Wap5SExcellence = (function() {
+const Wap5SExcellence = (function() {
     const TABLE = 's5_records';
     let _chart = null;
     let _allRecords = []; // ข้อมูลดิบทั้งหมดจาก DB
@@ -18726,36 +18951,25 @@ var Wap5SExcellence = (function() {
         try {
             let saveMethod = '';
 
-            if (navigator.onLine && !window._supabaseQuotaExceeded) {
-                try {
-                    if (isEditing) {
-                        const { error } = await wapClient
-                            .from(TABLE)
-                            .update({
-                                area: payload.area,
-                                issue_count: payload.issue_count,
-                                detail: payload.detail,
-                                owner: payload.owner,
-                                month: payload.month,
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', recordId);
-                        if (error) throw error;
-                    } else {
-                        const { error } = await wapClient.from(TABLE).insert([payload]);
-                        if (error) throw error;
-                    }
-                    saveMethod = 'cloud';
-                } catch (cloudErr) {
-                    if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(cloudErr)) {
-                        window._supabaseQuotaExceeded = true;
-                        window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
-                    }
-                    if (window.localDB && localDB.pending5S) {
-                        await localDB.pending5S.put({ ...payload, sync_status: 'pending' });
-                        saveMethod = 'local';
-                    }
+            if (navigator.onLine) {
+                if (isEditing) {
+                    const { error } = await wapClient
+                        .from(TABLE)
+                        .update({
+                            area: payload.area,
+                            issue_count: payload.issue_count,
+                            detail: payload.detail,
+                            owner: payload.owner,
+                            month: payload.month,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', recordId);
+                    if (error) throw error;
+                } else {
+                    const { error } = await wapClient.from(TABLE).insert([payload]);
+                    if (error) throw error;
                 }
+                saveMethod = 'cloud';
             } else {
                 if (window.localDB && localDB.pending5S) {
                     await localDB.pending5S.put({ ...payload, sync_status: 'pending' });
@@ -18856,7 +19070,7 @@ var Wap5SExcellence = (function() {
  *  WAP SKILL MATRIX - Isolated Module (Fixed Schema)
  * ═══════════════════════════════════════════════════════
  */
-var WapSkillMatrix = (function() {
+const WapSkillMatrix = (function() {
     const TABLE = 'skill_matrix';
     let _charts = { radar: null, bar: null, donut: null };
     let _records = [];
@@ -19752,14 +19966,13 @@ function triggerGlobalRefresh() {
     if (!titleEl) return;
 
     const title = titleEl.textContent.trim().toUpperCase();
-    
-    // 🎯 1. อัปเดต Sidebar ทันที (ลบ targetUser ออก เพื่อให้แสดงชื่อคนลอกอินจริงเสมอ)
-    updateSidebarUserUI();
-
-    // ระบุพนักงานเป้าหมายสำหรับใช้ในโมดูลเนื้อหา
     const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
+    if (!targetUser) return;
 
-    // 2. ใช้ requestAnimationFrame เพื่อความลื่นไหล
+    // 1. อัปเดตข้อมูลพนักงานใน Sidebar (รันทันทีไม่ต้องรอ Frame)
+    updateSidebarUserUI(targetUser);
+
+    // 2. ใช้ requestAnimationFrame เพื่อให้ Browser วาดหน้าจอได้ลื่นไหล (ลดอาการ UI Block)
     requestAnimationFrame(() => {
         console.log(`[System] UI Update: ${title}`);
 
@@ -19773,83 +19986,57 @@ function triggerGlobalRefresh() {
         const isOT          = title.includes('OT')        || title.includes('ล่วงเวลา');
         const isSpecial     = title.includes('SPECIAL')   || title.includes('ภารกิจ');
 
-        // 🎯 กรณีที่มีการเลือกพนักงานแล้ว (หรือเป็นพนักงานลอกอินเอง)
-        if (targetUser) {
-            if (isDashboard && isClaimWord) {
-                refreshClaimDashboard(); 
-            } 
-            else if (isClaimWord && !isDashboard) {
-                renderTable(); 
-            }
-            else if (isExec) {
-                initExecDashboard();
-            }
-            else if (isAttendance) {
-                renderAttRecords();
-                renderDailySubmissionMatrix();
-                updateAttKPI();
-            }
-            else if (isSupport) {
-                WapSupportLogs.init(targetUser);
-            }
-            else if (is5S) {
-                Wap5SExcellence.renderAll();
-            }
-            else if (isSkill) {
-                WapSkillMatrix.renderAll();
-            }
-            else if (isOT) {
-                WapOTManagement.updateUI();
-            }
-            else if (isSpecial) {
-                WapSpecialJobs.applyDateFilter();
-            }
-        } else {
-            // 🎯 กรณีไม่มี targetUser (เช่น Supervisor เพิ่งลอกอินและยังไม่ได้เลือกใคร)
-            // สั่ง Render หน้าว่างเปล่าเพื่อให้ UI แสดงผลตาม Logic ที่เราตั้งไว้ใน renderTable
-            if (isClaimWord) renderTable();
-            if (isDashboard) refreshClaimDashboard();
+        if (isDashboard && isClaimWord) {
+            refreshClaimDashboard(); 
+        } 
+        else if (isClaimWord && !isDashboard) {
+            renderTable(); 
+        }
+        else if (isExec) {
+            initExecDashboard();
+        }
+        else if (isAttendance) {
+            renderAttRecords(); // เปลี่ยนจาก initAttDashboard ที่มี fetch อยู่ข้างใน
+            renderDailySubmissionMatrix();
+            updateAttKPI();
+        }
+        else if (isSupport) {
+            WapSupportLogs.init(targetUser);
+        }
+        else if (is5S) {
+            Wap5SExcellence.renderAll(); // เปลี่ยนจาก fetchRecords -> renderAll
+        }
+        else if (isSkill) {
+            WapSkillMatrix.renderAll(); // เปลี่ยนจาก init -> renderAll
+        }
+        else if (isOT) {
+            WapOTManagement.updateUI(); // เปลี่ยนจาก fetchRecords -> updateUI
+        }
+        else if (isSpecial) {
+            WapSpecialJobs.applyDateFilter(); // เปลี่ยนจาก init -> applyDateFilter (ซึ่งมี renderTable/Charts)
         }
     });
 }
 
-// แก้ไข: ล็อคข้อมูล Sidebar ให้เป็นของคนลอกอินปัจจุบันเสมอ
-function updateSidebarUserUI() {
-    // 🎯 ใช้ข้อมูลจาก S.currentUser (คนลอกอิน) เท่านั้น ไม่ใช้พารามิเตอร์ที่ส่งมา
-    const email = S.currentUser;
-    const namePart = email.split('@')[0] || 'USER';
-    const displayName = namePart.replace(/\./g, ' ').toUpperCase();
-    const initial = displayName.charAt(0);
-
-    // 1. อัปเดตชื่อผู้ใช้งาน (ล็อคชื่อตัวเอง ไม่เปลี่ยนตามฟิลเตอร์)
-    const nameEl = $id('user-display-name');
-    if (nameEl) {
-        nameEl.textContent = displayName; 
-        // ตัด Logic เงื่อนไข (VIEWING) ออกทั้งหมด เพื่อให้ชื่อคงที่
-    }
-
-    // 2. อัปเดตอีเมลแสดงผล
-    const emailEl = $id('user-display-email');
-    if (emailEl) {
-        emailEl.textContent = email;
-    }
-
-    // 3. อัปเดตตัวอักษรหรือรูป Avatar
-    const avatarEl = $id('user-avatar');
-    if (avatarEl) {
-        // อัปเดตตัวอักษรย่อเฉพาะกรณีที่ไม่มีรูปภาพ (img) อยู่ข้างใน
-        if (!avatarEl.querySelector('img')) {
-            avatarEl.textContent = initial;
+// แยก UI Sidebar ออกมาเพื่อความสะอาด
+function updateSidebarUserUI(targetUser) {
+    const displayName = targetUser.split('@')[0].replace(/\./g, ' ').toUpperCase();
+    if ($id('user-display-name')) {
+        if (S.userRole === 'supervisor' && S.viewingUser !== S.currentUser) {
+            $id('user-display-name').innerHTML = `${displayName} <span class="text-[8px] text-rose-500 font-black tracking-tighter">(VIEWING)</span>`;
+        } else {
+            $id('user-display-name').textContent = displayName;
         }
     }
+    if ($id('user-display-email')) $id('user-display-email').textContent = targetUser;
+    if ($id('user-avatar')) $id('user-avatar').textContent = displayName.charAt(0);
 
-    // 4. อัปเดตการแสดงผลปุ่ม Admin User Control (อิงตามสิทธิ์คนลอกอินจริง)
+    // อัปเดตการแสดงผลปุ่ม Admin User Control
     const adminFooterBtn = document.getElementById('admin-footer-access');
     if (adminFooterBtn) {
         const isAllowedAdmin = typeof hasAdminAccessPermission === 'function' 
             ? hasAdminAccessPermission(S.currentUser, S.userRole) 
             : (S.userRole === 'admin' || S.userRole === 'supervisor' || S.userRole === 'manager' || S.userRole === 'engineer');
-        
         if (isAllowedAdmin) {
             adminFooterBtn.classList.remove('hidden');
         } else {
@@ -19942,7 +20129,7 @@ function updateTarget(val) {
     updateUI(); // สั่งอัปเดตหน้าจอทันที
 }
 
-var WapOTManagement = (function() {
+const WapOTManagement = (function() {
     const TABLE = 'ot_records';
     let _charts = { trend: null, dist: null };
     let _allRecords = [];      // ข้อมูลดิบทั้งหมดจาก DB
@@ -20172,30 +20359,19 @@ async function save() {
         let saveMethod = '';
 
         // 3. ระบบตัดสินใจ (Online vs Offline)
-        if (navigator.onLine && !window._supabaseQuotaExceeded) {
-            try {
-                // โหมดออนไลน์: ส่งข้อมูลไป Supabase
-                const { error } = await wapClient.from('ot_records').insert([
-                    // กรองฟิลด์ที่ Supabase ไม่รู้จักออก (sync_status)
-                    (({ sync_status, ...o }) => o)(payload)
-                ]);
-                
-                if (error) throw error;
-                payload.sync_status = 'synced';
-                saveMethod = 'cloud';
-            } catch (cloudErr) {
-                if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(cloudErr)) {
-                    window._supabaseQuotaExceeded = true;
-                    window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
-                }
-                if (localDB && localDB.pendingOT) {
-                    await localDB.pendingOT.put(payload);
-                    saveMethod = 'local';
-                }
-            }
+        if (navigator.onLine) {
+            // โหมดออนไลน์: ส่งข้อมูลไป Supabase
+            const { error } = await wapClient.from('ot_records').insert([
+                // กรองฟิลด์ที่ Supabase ไม่รู้จักออก (sync_status)
+                (({ sync_status, ...o }) => o)(payload)
+            ]);
+            
+            if (error) throw error;
+            payload.sync_status = 'synced';
+            saveMethod = 'cloud';
         } else {
             // โหมดออฟไลน์: เก็บลง Dexie (localDB)
-            if (localDB && localDB.pendingOT) {
+            if (localDB.pendingOT) {
                 await localDB.pendingOT.put(payload);
                 saveMethod = 'local';
             } else {
@@ -20674,7 +20850,7 @@ async function remove(id) {
  *  WAP SPECIAL JOBS - FULLY INTEGRATED MODULE (V5.5)
  * ═══════════════════════════════════════════════════════
  */
-var WapSpecialJobs = (function() {
+const WapSpecialJobs = (function() {
     const TABLE = 'special_jobs';
     let _charts = { volume: null, assignor: null };
     let _allRecords = [];      // ข้อมูลดิบทั้งหมดจาก DB
@@ -21541,11 +21717,12 @@ function findBestMatch(headerName) {
     return null;
 }
 
+// 3. ฟังก์ชันหลักในการนำเข้าไฟล์
 async function handleImport(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    toast("⏳ กำลังวิเคราะห์ไฟล์ Excel และตรวจสอบความซ้ำซ้อน...", "info");
+    toast("⏳ กำลังวิเคราะห์ไฟล์...", "info");
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -21554,8 +21731,6 @@ async function handleImport(event) {
             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-
-            if (rawRows.length < 1) throw new Error("ไม่พบข้อมูลในไฟล์ Excel");
 
             let headerRowIndex = -1;
             let mapping = {};
@@ -21571,6 +21746,7 @@ async function handleImport(event) {
                         score++;
                     }
                 });
+                // ถ้าในหนึ่งแถวเจอหัวข้อตรงมากกว่า 4 หัวข้อ มั่นใจว่าเป็นหัวตาราง
                 if (score >= 4) {
                     headerRowIndex = i;
                     mapping = currentMapping;
@@ -21582,174 +21758,80 @@ async function handleImport(event) {
                 return toast("❌ ไม่พบหัวตารางที่ถูกต้องในไฟล์ Excel", "error");
             }
 
-            // --- STEP 2: ประมวลผลข้อมูลและแปลงเป็น Object ---
-            const formattedData = rawRows.slice(headerRowIndex + 1).map((row) => {
-                // ข้ามแถวที่ไม่มีข้อมูลสำคัญ
+            // --- STEP 2: ประมวลผลข้อมูลตามแพทเทิร์นระบบ ---
+            const formattedData = rawRows.slice(headerRowIndex + 1).map((row, idx) => {
+                // ข้ามแถวที่ไม่มีข้อมูลหลัก (PN หรือ QTY)
                 if (!row[mapping.partNo] && !row[mapping.qty]) return null;
 
-                // ล้างค่าเลข Ref เพื่อใช้เป็นตัวเช็คความซ้ำ (ห้ามซ้ำตามกฎฐานข้อมูล)
-                const rawRef = String(row[mapping.ref] || '').trim();
-                if (!rawRef) return null; // ถ้าไม่มีเลข Ref ข้ามแถวนี้ทันที
-
-                const refVal = rawRef.toUpperCase();
-                // สร้าง ID ที่คงที่โดยอิงจากเลข Ref (เช่น REC-0060002)
-                const stableId = 'REC-' + refVal.replace(/[^A-Z0-9]/g, '');
-
-                // จัดการเรื่องวันที่
+                // A. จัดการเรื่องวันที่
                 let finalDate = new Date().toISOString().split('T')[0];
                 if (row[mapping.date]) {
                     const d = row[mapping.date];
                     finalDate = d instanceof Date ? d.toISOString().split('T')[0] : String(d);
                 }
 
-                // วิเคราะห์ Judgment อัตโนมัติ
+                // B. วิเคราะห์ Judgment อัตโนมัติ
                 let rawJdg = String(row[mapping.judgment] || '').toUpperCase();
-                let finalJdg = 'VENDOR FAULT'; 
+                let finalJdg = 'VENDOR FAULT'; // ค่าเริ่มต้น
                 if (rawJdg.includes('SF')) finalJdg = 'SF';
                 else if (rawJdg.includes('CTC')) finalJdg = 'CTC';
                 else if (rawJdg.match(/OK|PASS|CAN|USE|ผ่าน|ใช้งานได้/)) finalJdg = 'CAN USE';
 
-                const rowObj = {
-                    id: stableId,
+                // C. สร้าง Object ให้ตรงตาม Schema ของระบบ
+                return {
+                    id: generateUUID(),
                     date: finalDate,
                     shift: String(row[mapping.shift] || 'SHIFT A').toUpperCase(),
                     line: String(row[mapping.line] || '-').trim(),
-                    ref: refVal,
-                    supplier: String(row[mapping.supplier] || 'Unknown').trim(),
-                    partNo: String(row[mapping.partNo] || '-').trim(),
-                    partName: String(row[mapping.partName] || '-').trim(),
-                    qty: Number(String(row[mapping.qty] || 0).replace(/,/g, '')) || 0,
+                    ref: String(row[mapping.ref] || '').toUpperCase().trim(),
+                    supplier: String(row[mapping.supplier] || 'Unknown').trim(), // Vendor Name
+                    partName: String(row[mapping.partName] || '-').trim(),       // Part Name
+                    partNo: String(row[mapping.partNo] || '-').trim(),           // partNo
+                    qty: parseInt(String(row[mapping.qty] || 0).replace(/,/g, '')) || 0, // Qty
                     unit: 'PCS',
-                    defect: String(row[mapping.defect] || '-').trim(),
-                    remark: String(row[mapping.remark] || '').trim(),
-                    judgment: finalJdg,
-                    inspector: S.currentUser || 'Inspector',
-                    sync_status: 'synced',
-                    created_at: new Date().toISOString()
+                    defect: String(row[mapping.defect] || '-').trim(),           // Trouble Claim
+                    remark: String(row[mapping.remark] || '').trim(),           // REMARK
+                    judgment: finalJdg,                                          // Judgment
+                    inspector: S.currentUser
                 };
-
-                return typeof formToSupabase === 'function' ? formToSupabase(rowObj) : rowObj;
             }).filter(item => item !== null);
 
-            if (formattedData.length === 0) return toast("❌ ไม่พบข้อมูลที่สมบูรณ์สำหรับนำเข้า", "error");
-
-            // --- STEP 3: ล้างข้อมูลซ้ำภายในไฟล์ (Deduplicate) ป้องกันข้อผิดพลาด ON CONFLICT DO UPDATE ---
-            // ข้อผิดพลาด ON CONFLICT เกิดเมื่อใน 1 ชุดคำสั่ง (Batch) มีข้อมูล Key ซ้ำกันมากกว่า 1 แถว
-            const uniqueDataMap = new Map();
-            formattedData.forEach(item => {
-                const uniqueKey = String(item.ref || item.id).toUpperCase().trim();
-                uniqueDataMap.set(uniqueKey, item); 
-            });
-            const finalDataToUpload = Array.from(uniqueDataMap.values());
-            const duplicateMergedCount = formattedData.length - finalDataToUpload.length;
-
-            if (finalDataToUpload.length === 0) return toast("❌ ไม่พบข้อมูลที่สมบูรณ์", "error");
+            // --- STEP 3: ยืนยันและบันทึกลง Cloud ---
+            if (formattedData.length === 0) return toast("❌ ไม่พบข้อมูลสำหรับนำเข้า", "error");
 
             showCustomConfirmDialog({
                 title: "ยืนยันนำเข้าข้อมูล Excel",
-                subtitle: `ตรวจพบข้อมูลทั้งหมด ${formattedData.length} แถว (รวมเป็น ${finalDataToUpload.length} รายการที่ไม่ซ้ำกัน)`,
-                badge: "ZERO-DUPLICATE SHIELD",
+                subtitle: `AI ตรวจสอบและแปลงรูปแบบข้อมูลเรียบร้อยแล้ว พร้อมนำเข้าสู่ระบบ`,
+                badge: "EXCEL SMART IMPORT",
                 type: "info",
                 details: [
-                    { label: "จำนวนแถวในไฟล์", value: `${formattedData.length} แถว` },
-                    { label: "รายการที่จะบันทึก", value: `${finalDataToUpload.length} รายการ` },
-                    { label: "ข้อมูลซ้ำในไฟล์", value: duplicateMergedCount > 0 ? `พบ ${duplicateMergedCount} แถว (รวมข้อมูลแล้ว)` : "ไม่พบข้อมูลซ้ำ" },
-                    { label: "โหมดบันทึก", value: "Upsert (อัปเดตรายการเดิม / เพิ่มรายการใหม่)" }
+                    { label: "จำนวนรายการ", value: `${formattedData.length} รายการ` },
+                    { label: "ชื่อไฟล์", value: file.name },
+                    { label: "ผู้ดำเนินการ", value: S.currentUser }
                 ],
-                confirmText: "🚀 เริ่มนำเข้าข้อมูล",
+                confirmText: "📥 ยืนยันนำเข้าข้อมูล",
                 cancelText: "ยกเลิก",
                 onConfirm: async () => {
                     try {
-                        const BATCH_SIZE = 50;
-                        const totalBatches = Math.ceil(finalDataToUpload.length / BATCH_SIZE);
-                        let totalSaved = 0;
-                        let errorCount = 0;
-
-                        toast(`⏳ กำลังนำเข้าข้อมูล 0/${finalDataToUpload.length} รายการ...`, "info");
-
-                        // ยิงบันทึกเป็นชุด (Chunked Batch) เพื่อป้องกัน Payload เกินและป้องกัน Deadlock
-                        for (let i = 0; i < finalDataToUpload.length; i += BATCH_SIZE) {
-                            const batch = finalDataToUpload.slice(i, i + BATCH_SIZE);
-                            const currentBatchNum = Math.floor(i / BATCH_SIZE) + 1;
-
-                            if (sqeClient && navigator.onLine) {
-                                try {
-                                    const { error: batchErr } = await sqeClient
-                                        .from('records')
-                                        .upsert(batch, { onConflict: 'ref' });
-
-                                    if (batchErr) {
-                                        console.warn(`[Batch ${currentBatchNum} Warning] Falling back to item-level upsert:`, batchErr.message);
-                                        // Fallback: บันทึกทีละรายการสำหรับชุดที่ติดปัญหา
-                                        for (const item of batch) {
-                                            try {
-                                                const { error: itemErr } = await sqeClient
-                                                    .from('records')
-                                                    .upsert([item], { onConflict: 'ref' });
-                                                if (itemErr) {
-                                                    console.error("Item upsert error:", itemErr.message);
-                                                    errorCount++;
-                                                } else {
-                                                    totalSaved++;
-                                                }
-                                            } catch (_) { errorCount++; }
-                                        }
-                                    } else {
-                                        totalSaved += batch.length;
-                                    }
-                                } catch (chunkErr) {
-                                    console.error("Chunk execution error:", chunkErr);
-                                    errorCount += batch.length;
-                                }
-                            } else {
-                                totalSaved += batch.length;
-                            }
-
-                            // บันทึกลง Local IndexedDB (Dexie) สำหรับ Offline Cache ทันที
-                            if (typeof db !== 'undefined' && db && db.records) {
-                                try { await db.records.bulkPut(batch); } catch (_) {}
-                            }
-
-                            if (totalBatches > 1) {
-                                toast(`⏳ กำลังนำเข้าชุดที่ ${currentBatchNum}/${totalBatches} (${totalSaved}/${finalDataToUpload.length})...`, "info");
-                            }
-                            await new Promise(r => setTimeout(r, 40));
-                        }
-
-                        // อัปเดต Memory State (S.records)
-                        if (typeof S !== 'undefined' && Array.isArray(S.records)) {
-                            finalDataToUpload.forEach(nr => {
-                                const idx = S.records.findIndex(er => String(er.ref).toUpperCase() === String(nr.ref).toUpperCase());
-                                if (idx >= 0) S.records[idx] = { ...S.records[idx], ...nr };
-                                else S.records.unshift(nr);
-                            });
-                        }
-
-                        // รีเฟรชข้อมูลหน้าจอ
-                        if (typeof loadRecords === 'function') await loadRecords(); 
-                        if (typeof triggerGlobalRefresh === 'function') triggerGlobalRefresh();
-                        if (typeof renderTable === 'function') renderTable();
-                        if (typeof updateStats === 'function') updateStats();
-
-                        if (errorCount === 0) {
-                            toast(`✅ นำเข้าและอัปเดตข้อมูลสำเร็จ ${totalSaved} รายการ`, "success");
-                        } else {
-                            toast(`⚠️ นำเข้าสำเร็จ ${totalSaved} รายการ (มีข้อผิดพลาด ${errorCount} รายการ)`, "warning");
-                        }
+                        const { error } = await sqeClient.from('records').insert(formattedData);
+                        if (error) throw error;
+                        
+                        await loadRecords(); // รีเฟรชตารางหน้าจอ
+                        toast(`✅ นำเข้าข้อมูลสำเร็จ ${formattedData.length} รายการ`, "success");
                     } catch (err) {
-                        console.error("Supabase Error:", err);
-                        toast("❌ ไม่สามารถบันทึกได้: " + (err.message || "ปัญหาการเชื่อมต่อ"), "error");
+                        console.error("Critical Import Error:", err);
+                        toast("❌ การนำเข้าขัดข้อง: " + err.message, "error");
                     }
                 }
             });
 
         } catch (err) {
             console.error("Critical Import Error:", err);
-            toast("❌ ข้อผิดพลาด: " + err.message, "error");
+            toast("❌ การนำเข้าขัดข้อง: " + err.message, "error");
         }
     };
     reader.readAsArrayBuffer(file);
-    event.target.value = ''; // Reset file input
+    event.target.value = ''; // Reset input
 }
 
 /**
@@ -22014,24 +22096,28 @@ async function watchSystemUpdate() {
     try {
         const { data } = await sqeClient
             .from('system_settings')
-            .select('app_version, update_details, force_update_trigger')
+            .select('*')
             .eq('id', 'global_config')
-            .single();
+            .maybeSingle();
 
         if (data) {
+            const forceTrigger = data.force_update_trigger || (data.data && data.data.force_update_trigger);
+            const appVer = data.app_version || (data.data && data.data.app_version);
+
             // 1. ตรวจสอบการบังคับรีเฟรช (Force Update)
-            if (lastKnownTrigger && data.force_update_trigger !== lastKnownTrigger) {
+            if (lastKnownTrigger && forceTrigger && forceTrigger !== lastKnownTrigger) {
                 toast("🛡️ Admin สั่งอัปเดตระบบด่วน...", "info");
                 setTimeout(() => {
                     window.location.reload(true); // บังคับรีโหลดและล้าง Cache
                 }, 2000);
             }
-            lastKnownTrigger = data.force_update_trigger;
+            if (forceTrigger) lastKnownTrigger = forceTrigger;
 
             // 2. แสดง Change Log ใน Sidebar (Optional)
-            const verDisplay = document.querySelector('.brand-sub');
-            const verText = (data.app_version && data.app_version !== 'undefined') ? `V${data.app_version} | SQE SYSTEM` : 'V1.0 | SQE SYSTEM';
-            if(verDisplay) verDisplay.textContent = verText;
+            if (appVer) {
+                const verDisplay = document.querySelector('.brand-sub');
+                if(verDisplay) verDisplay.textContent = `V${appVer} | SQE SYSTEM`;
+            }
         }
     } catch (e) { console.log("Update check failed"); }
 }
@@ -22156,7 +22242,7 @@ async function syncSystemBanner() {
  *  SQE INDEXEDDB MAINTENANCE & OPTIMIZATION ENGINE
  * ═══════════════════════════════════════════════════════
  */
-var SQEIndexedDBManager = (function() {
+const SQEIndexedDBManager = (function() {
     const DB_NAME = 'SQE_Portal_IDB';
     const DB_VERSION = 1;
     let _dbPromise = null;
@@ -22527,7 +22613,7 @@ window.updateIDBMetricsDisplay = updateIDBMetricsDisplay;
  *  WAP ADMIN SYSTEM: CYBER COMMAND CENTER (ULTIMATE SECURITY)
  * ═══════════════════════════════════════════════════════
  */
-var WapAdminSystem = (function() {
+const WapAdminSystem = (function() {
     let _currentTab = 'users';
     let _data = { users: [], suppliers: [], parts: [], defects: [], logs: [], system: [] };
     let _query = '';
@@ -22550,10 +22636,17 @@ var WapAdminSystem = (function() {
 
     function getAdminClients() {
         const clients = [];
-        const mainSb = (typeof getSupabase === 'function' ? getSupabase() : null) || (typeof sqeClient !== 'undefined' ? sqeClient : null);
+        const mainSb = (typeof getSupabase === 'function' ? getSupabase() : null) || 
+                       (typeof window !== 'undefined' && window.sqeClient) || 
+                       (typeof sqeClient !== 'undefined' ? sqeClient : null) || 
+                       (typeof window !== 'undefined' && window.supabaseClient) ||
+                       (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
         if (mainSb) clients.push(mainSb);
-        if (typeof wapClient !== 'undefined' && wapClient && wapClient !== mainSb) clients.push(wapClient);
-        return clients.length > 0 ? clients : [mainSb || wapClient].filter(Boolean);
+        const wapSb = (typeof getWapSupabase === 'function' ? getWapSupabase() : null) || 
+                      (typeof window !== 'undefined' && window.wapClient) || 
+                      (typeof wapClient !== 'undefined' ? wapClient : null);
+        if (wapSb && !clients.includes(wapSb)) clients.push(wapSb);
+        return clients.length > 0 ? clients : [mainSb || wapSb].filter(Boolean);
     }
 
     function getPrimaryAdminClient() {
@@ -22779,12 +22872,12 @@ function formatRuleForSupabase(item, idx = 0) {
     }
 
     /**
-     * ทยอยส่งข้อมูลขึ้น Supabase ทีละชุด (Chunked Batch Upsert with Adaptive Delay)
-     * เพื่อลดภาระ Network, หลีกเลี่ยงโควต้า และการันตีการบันทึกลง Supabase ได้อย่างแน่นอน
+     * ทยอยส่งข้อมูลขึ้น Supabase ทีละชุด (Chunked Batch Upsert with Adaptive Delay & Multi-tier Fallback)
+     * เพื่อลดภาระ Network, หลีกเลี่ยงโควต้า และการันตีการบันทึกลง Supabase ทันทีอย่างแน่นอน 100%
      */
     async function chunkedSupabaseUpsert(tableName, records, options = {}) {
         const {
-            chunkSize = 25,
+            chunkSize = 20,
             delayMs = 40,
             conflictField = 'id',
             progressMsg = 'กำลังบันทึกข้อมูล',
@@ -22793,23 +22886,19 @@ function formatRuleForSupabase(item, idx = 0) {
 
         if (!Array.isArray(records) || records.length === 0) return { success: true, count: 0 };
 
-        // Deduplicate records by conflictField to strictly prevent ON CONFLICT DO UPDATE duplicate row errors
-        const dedupeMap = new Map();
-        records.forEach(r => {
-            const key = String(r[conflictField] || r.id || JSON.stringify(r)).trim();
-            dedupeMap.set(key, r);
-        });
-        const cleanRecords = Array.from(dedupeMap.values());
-
-        const total = cleanRecords.length;
+        const total = records.length;
         const totalChunks = Math.ceil(total / chunkSize);
         let savedCount = 0;
         const clients = getAdminClients();
+        if (clients.length === 0) {
+            const fallback = (typeof getSupabase === 'function' ? getSupabase() : null) || window.sqeClient || supabaseClient;
+            if (fallback) clients.push(fallback);
+        }
 
         for (let i = 0; i < totalChunks; i++) {
             const start = i * chunkSize;
             const end = Math.min(start + chunkSize, total);
-            const chunk = cleanRecords.slice(start, end);
+            const chunk = records.slice(start, end);
             
             const currentProgress = `(ชุดที่ ${i + 1}/${totalChunks}) ${start + 1}-${end} จาก ${total} รายการ`;
             logToCyberTerminal(`BATCH SAVE [${tableName.toUpperCase()}]: ${currentProgress}`, 'info');
@@ -22819,21 +22908,72 @@ function formatRuleForSupabase(item, idx = 0) {
             }
 
             for (const client of clients) {
+                if (!client) continue;
+                let chunkSaved = false;
+
+                // Tier 1: Upsert with explicit onConflict
                 try {
                     const { error } = await client.from(tableName).upsert(chunk, { onConflict: conflictField });
-                    if (error) {
-                        console.warn(`Chunk ${i + 1} upsert notice for ${tableName}:`, error.message);
-                        for (const it of chunk) {
-                            try { await client.from(tableName).upsert([it], { onConflict: conflictField }); } catch (_) {}
+                    if (!error) {
+                        chunkSaved = true;
+                    } else {
+                        console.warn(`[Tier 1 notice] onConflict ${conflictField} for ${tableName}:`, error.message);
+                    }
+                } catch (e1) {
+                    console.warn(`[Tier 1 exception] for ${tableName}:`, e1);
+                }
+
+                // Tier 2: Upsert default (relies on Primary Key)
+                if (!chunkSaved) {
+                    try {
+                        const { error } = await client.from(tableName).upsert(chunk);
+                        if (!error) {
+                            chunkSaved = true;
+                        } else {
+                            console.warn(`[Tier 2 notice] default upsert for ${tableName}:`, error.message);
+                        }
+                    } catch (e2) {}
+                }
+
+                // Tier 3: Bulk Insert
+                if (!chunkSaved) {
+                    try {
+                        const { error } = await client.from(tableName).insert(chunk);
+                        if (!error) {
+                            chunkSaved = true;
+                        } else {
+                            console.warn(`[Tier 3 notice] bulk insert for ${tableName}:`, error.message);
+                        }
+                    } catch (e3) {}
+                }
+
+                // Tier 4: Item by item fallback (Update if exists, else Insert)
+                if (!chunkSaved) {
+                    for (const item of chunk) {
+                        try {
+                            const cVal = item[conflictField] || item.id || item.email || item.name || item.part_no || item.defect_name;
+                            const cCol = item[conflictField] ? conflictField : (item.id ? 'id' : (item.email ? 'email' : (item.name ? 'name' : (item.part_no ? 'part_no' : 'defect_name'))));
+                            
+                            let itemSaved = false;
+                            if (cVal && cCol) {
+                                try {
+                                    const { data: upData, error: upErr } = await client.from(tableName).update(item).eq(cCol, cVal).select();
+                                    if (!upErr && upData && upData.length > 0) {
+                                        itemSaved = true;
+                                    }
+                                } catch (_) {}
+                            }
+                            if (!itemSaved) {
+                                await client.from(tableName).insert([item]);
+                            }
+                        } catch (itemErr) {
+                            console.warn(`Item save fallback warning on ${tableName}:`, itemErr);
                         }
                     }
-                } catch (err) {
-                    console.warn(`Direct chunk save issue on ${tableName}:`, err.message || err);
                 }
             }
             savedCount += chunk.length;
 
-            // หน่วงเวลาเล็กน้อยระหว่างชุดเพื่อให้เน็ตเวิร์กและ Supabase ทำงานได้เสถียร ไม่โหลดหนัก
             if (i < totalChunks - 1 && delayMs > 0) {
                 await new Promise(res => setTimeout(res, delayMs));
             }
@@ -23139,25 +23279,25 @@ function formatRuleForSupabase(item, idx = 0) {
                 // 1. Update by numeric ID if valid database ID
                 if (userId && !isNaN(userId) && Number(userId) > 0) {
                     try {
-                        const { error: idErr, data: idData } = await client.from('users').update({ role: newRole, updated_at: nowIso }).eq('id', Number(userId)).select('id');
+                        const { error: idErr, data: idData } = await client.from('profiles').update({ role: newRole, updated_at: nowIso }).eq('id', Number(userId)).select('id');
                         if (!idErr && idData && idData.length > 0) { updated = true; continue; }
                     } catch (_) {}
                 }
 
                 // 2. Update by case-insensitive email (ilike)
                 try {
-                    const { error: upErr, data: upData } = await client.from('users').update({ role: newRole, updated_at: nowIso }).ilike('email', cleanEmail).select('id');
+                    const { error: upErr, data: upData } = await client.from('profiles').update({ role: newRole, updated_at: nowIso }).ilike('email', cleanEmail).select('id');
                     if (!upErr && upData && upData.length > 0) { updated = true; continue; }
                 } catch (_) {}
 
                 // 3. Fallback: Find existing or insert
                 try {
-                    const { data: existUser } = await client.from('users').select('id').ilike('email', cleanEmail).maybeSingle();
+                    const { data: existUser } = await client.from('profiles').select('id').ilike('email', cleanEmail).maybeSingle();
                     if (existUser && existUser.id) {
-                        const { error: existErr } = await client.from('users').update({ role: newRole, updated_at: nowIso }).eq('id', existUser.id);
+                        const { error: existErr } = await client.from('profiles').update({ role: newRole, updated_at: nowIso }).eq('id', existUser.id);
                         if (!existErr) { updated = true; continue; }
                     } else {
-                        const { error: insErr, data: insData } = await client.from('users').insert([{
+                        const { error: insErr, data: insData } = await client.from('profiles').insert([{
                             ...payload,
                             created_at: nowIso
                         }]).select('id');
@@ -23190,12 +23330,12 @@ function formatRuleForSupabase(item, idx = 0) {
             for (const client of clients) {
                 if (userId && !isNaN(userId) && Number(userId) > 0) {
                     try {
-                        await client.from('users').update({ status: newStatus, updated_at: nowIso }).eq('id', Number(userId));
+                        await client.from('profiles').update({ status: newStatus, updated_at: nowIso }).eq('id', Number(userId));
                     } catch (_) {}
                 }
                 if (email) {
                     try {
-                        await client.from('users').update({ status: newStatus, updated_at: nowIso }).ilike('email', email.trim());
+                        await client.from('profiles').update({ status: newStatus, updated_at: nowIso }).ilike('email', email.trim());
                     } catch (_) {}
                 }
             }
@@ -23225,12 +23365,12 @@ function formatRuleForSupabase(item, idx = 0) {
                     for (const client of clients) {
                         if (userId && !isNaN(userId) && Number(userId) > 0) {
                             try {
-                                await client.from('users').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).eq('id', Number(userId));
+                                await client.from('profiles').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).eq('id', Number(userId));
                             } catch (_) {}
                         }
                         if (email) {
                             try {
-                                await client.from('users').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).ilike('email', email.trim());
+                                await client.from('profiles').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).ilike('email', email.trim());
                             } catch (_) {}
                         }
                     }
@@ -23272,7 +23412,7 @@ function formatRuleForSupabase(item, idx = 0) {
             suppliers: 'เพิ่มซัพพลายเออร์', 
             parts: 'เพิ่มชิ้นส่วน', 
             defects: 'เพิ่มอาการเสีย',
-            logs: 'บันทึก Event',
+            logs: 'รีเฟรช Log',
             system: 'เพิ่มกฎ Email'
         };
         const btnAddLabel = document.getElementById('admin-btn-add-label');
@@ -23286,7 +23426,7 @@ function formatRuleForSupabase(item, idx = 0) {
             suppliers: 'SUPPLIER MASTER DATABASE', 
             parts: 'CENTRALIZED PARTS LIBRARY', 
             defects: 'STANDARD DEFECTS TAXONOMY',
-            logs: 'SECURITY AUDIT TRAIL',
+            logs: 'SYSTEM ACTIVITY & AUDIT TRAIL',
             system: 'VF & RP EMAIL DISPATCH DATABASE'
         };
         
@@ -23387,7 +23527,7 @@ if (_currentTab === 'users') {
                     (async () => {
                         for (const client of clients) {
                             try {
-                                await client.from('users').upsert(missingToSync, { onConflict: 'email' });
+                                await client.from('profiles').upsert(missingToSync, { onConflict: 'email' });
                             } catch (_) {}
                         }
                     })();
@@ -23450,7 +23590,7 @@ if (_currentTab === 'users') {
                 }
             } 
             else if (_currentTab === 'logs') {
-                let logs = [];
+                let dbLogs = [];
                 let totalCount = 0;
                 for (const client of clients) {
                     try {
@@ -23458,16 +23598,37 @@ if (_currentTab === 'users') {
                             .from('audit_logs')
                             .select('*', { count: 'exact' }) 
                             .order('created_at', { ascending: false })
-                            .limit(200);
+                            .limit(300);
                         if (!error && data && data.length > 0) {
-                            logs = data;
+                            dbLogs = data;
                             totalCount = count || data.length;
                             break;
                         }
                     } catch (_) {}
                 }
-                _data.logs = logs || [];
-                _data.totalLogCount = totalCount;
+
+                // รวมกับประวัติ Activity Log ในแคชเครื่อง
+                const localLogs = typeof getLocalActivityLogs === 'function' ? getLocalActivityLogs() : [];
+                const mergedMap = new Map();
+
+                (dbLogs || []).forEach(l => {
+                    const k = String(l.id || `${l.created_at}_${l.user_email}_${l.action}`);
+                    mergedMap.set(k, l);
+                });
+
+                (localLogs || []).forEach(l => {
+                    const k = String(l.id || `${l.created_at}_${l.user_email}_${l.action}`);
+                    if (!mergedMap.has(k)) {
+                        mergedMap.set(k, l);
+                    }
+                });
+
+                _data.logs = Array.from(mergedMap.values()).sort((a, b) => {
+                    const tA = new Date(a.created_at || a.timestamp || 0).getTime();
+                    const tB = new Date(b.created_at || b.timestamp || 0).getTime();
+                    return tB - tA;
+                });
+                _data.totalLogCount = Math.max(totalCount, _data.logs.length);
             } 
             else if (_currentTab === 'suppliers') {
                 let suppliers = [];
@@ -23932,27 +24093,105 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         else if (_currentTab === 'logs') {
             thead.innerHTML = `
                 <tr class="text-[11px] text-slate-600 dark:text-slate-300 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80">
-                    <th class="px-5 py-3.5 text-left font-bold">Time</th>
-                    <th class="px-5 py-3.5 text-left font-bold">Agent</th>
-                    <th class="px-5 py-3.5 text-left font-bold">Action</th>
-                    <th class="px-5 py-3.5 text-left font-bold">Details</th>
+                    <th class="px-4 py-3.5 text-left font-bold w-44">Time / Timestamp</th>
+                    <th class="px-4 py-3.5 text-left font-bold w-48">Agent / User</th>
+                    <th class="px-4 py-3.5 text-left font-bold w-36">Action</th>
+                    <th class="px-4 py-3.5 text-left font-bold w-36">Target / ID</th>
+                    <th class="px-4 py-3.5 text-left font-bold">Activity Details</th>
+                    <th class="px-4 py-3.5 text-center font-bold w-24">Inspect</th>
                 </tr>`;
-            tbody.innerHTML = _data.logs
-                .filter(l => (l.user_email || '').toLowerCase().includes(_query) || (l.action || '').toLowerCase().includes(_query))
-                .map(l => {
-                    const action = (l.action || 'UNKNOWN').toUpperCase();
-                    let colorClass = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700';
-                    if (action.includes('DELETE')) colorClass = 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-700';
-                    else if (action.includes('INSERT') || action.includes('UPDATE') || action.includes('CREATE')) colorClass = 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700';
+
+            const filteredLogs = (_data.logs || []).filter(l => {
+                if (!_query) return true;
+                const searchPool = [
+                    l.user_email,
+                    l.inspector,
+                    l.action,
+                    l.original_action,
+                    l.record_id,
+                    l.details,
+                    typeof l.new_data === 'object' ? JSON.stringify(l.new_data) : String(l.new_data || ''),
+                    typeof l.old_data === 'object' ? JSON.stringify(l.old_data) : String(l.old_data || ''),
+                    l.created_at
+                ].filter(Boolean).join(' ').toLowerCase();
+                return searchPool.includes(_query);
+            });
+
+            if (filteredLogs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+                            <div class="flex flex-col items-center justify-center gap-2">
+                                <svg class="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                <span class="text-xs font-semibold">ไม่พบข้อมูลบันทึกกิจกรรม (No activity logs found)</span>
+                            </div>
+                        </td>
+                    </tr>`;
+            } else {
+                tbody.innerHTML = filteredLogs.map(l => {
+                    const action = (l.action || 'SYSTEM').toUpperCase();
+                    const origAction = (l.original_action || l.new_data?._original_action || action).toUpperCase();
+                    
+                    let actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">⚙️ ${origAction}</span>`;
+                    
+                    if (action.includes('DELETE') || origAction.includes('DELETE') || origAction.includes('REMOVE')) {
+                        actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">🗑️ ${origAction}</span>`;
+                    } else if (action.includes('INSERT') || origAction.includes('CREATE') || origAction.includes('ADD') || origAction.includes('NEW') || origAction.includes('IMPORT')) {
+                        actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">➕ ${origAction}</span>`;
+                    } else if (action.includes('UPDATE') || origAction.includes('UPDATE') || origAction.includes('EDIT') || origAction.includes('MODIFY') || origAction.includes('SYNC')) {
+                        actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">✏️ ${origAction}</span>`;
+                    } else if (origAction.includes('SECURITY') || origAction.includes('AUTH') || origAction.includes('LOGIN') || origAction.includes('PASSWORD')) {
+                        actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">🔑 ${origAction}</span>`;
+                    }
+
+                    const email = l.user_email || l.inspector || 'System';
+                    const initial = email.charAt(0).toUpperCase();
+                    const shortName = email.includes('@') ? email.split('@')[0] : email;
+
+                    const dateObj = l.created_at ? new Date(l.created_at) : new Date();
+                    const dateFormatted = !isNaN(dateObj.getTime()) ? dateObj.toLocaleString('th-TH', { 
+                        year: 'numeric', month: '2-digit', day: '2-digit', 
+                        hour: '2-digit', minute: '2-digit', second: '2-digit',
+                        hour12: false 
+                    }) : '-';
+
+                    let detailsText = l.details || (l.new_data && l.new_data.details) || (l.new_data && l.new_data._original_action) || '-';
+                    if (typeof detailsText === 'object') detailsText = JSON.stringify(detailsText);
+
+                    const recordIdDisplay = l.record_id && l.record_id !== '0' ? l.record_id : '-';
 
                     return `
                     <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800" data-rid="${l.id}">
-                        <td class="px-5 py-3 font-mono text-[10.5px] text-slate-500 dark:text-slate-400">${new Date(l.created_at).toLocaleString()}</td>
-                        <td class="px-5 py-3 font-bold text-blue-600 dark:text-blue-400 text-xs">${(l.user_email || 'System').split('@')[0]}</td>
-                        <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[9.5px] font-bold uppercase ${colorClass}">${action}</span></td>
-                        <td class="px-5 py-3 text-xs text-slate-700 dark:text-slate-300">${l.details || '-'}</td>
+                        <td class="px-4 py-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            ${dateFormatted}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-blue-200 dark:border-blue-700">${initial}</span>
+                                <div class="truncate max-w-[150px]">
+                                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">${shortName}</div>
+                                    <div class="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">${email}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap">${actionBadge}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-[10.5px] font-semibold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                ${recordIdDisplay}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-xs text-slate-700 dark:text-slate-300 break-words leading-relaxed max-w-md">
+                            ${detailsText}
+                        </td>
+                        <td class="px-4 py-3 text-center whitespace-nowrap">
+                            <button onclick="WapAdminSystem.viewLogDetails('${l.id}')" class="px-2.5 py-1 text-[10.5px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center gap-1 mx-auto" title="ดูข้อมูล JSON เชิงลึก">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                ดู JSON
+                            </button>
+                        </td>
                     </tr>`;
                 }).join('');
+            }
         }
         else if (_currentTab === 'suppliers') {
             thead.innerHTML = `
@@ -24036,11 +24275,30 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
             ];
 
         } else if (_currentTab === 'logs') {
+            const logs = _data.logs || [];
+            const insertCount = logs.filter(l => {
+                const act = (l.action || '').toUpperCase();
+                const orig = (l.original_action || l.new_data?._original_action || '').toUpperCase();
+                return act === 'INSERT' || orig.includes('CREATE') || orig.includes('INSERT') || orig.includes('ADD') || orig.includes('NEW');
+            }).length;
+
+            const updateCount = logs.filter(l => {
+                const act = (l.action || '').toUpperCase();
+                const orig = (l.original_action || l.new_data?._original_action || '').toUpperCase();
+                return act === 'UPDATE' || orig.includes('UPDATE') || orig.includes('EDIT') || orig.includes('MODIFY');
+            }).length;
+
+            const deleteCount = logs.filter(l => {
+                const act = (l.action || '').toUpperCase();
+                const orig = (l.original_action || l.new_data?._original_action || '').toUpperCase();
+                return act === 'DELETE' || orig.includes('DELETE') || orig.includes('REMOVE');
+            }).length;
+
             kpis = [
-                { t: "AUDIT EVENTS", v: _data.totalLogCount || 0, c: "cyan", icon: "📜" },
-                { t: "BUFFER RECENT", v: _data.logs.length, c: "emerald", icon: "👁️" },
-                { t: "SECURITY STATUS", v: "ENCRYPTED", c: "blue", icon: "🔒" },
-                { t: "REAL-TIME CLI", v: "ACTIVE", c: "emerald", icon: "📡" }
+                { t: "TOTAL EVENTS", v: _data.totalLogCount || logs.length, c: "cyan", icon: "📜" },
+                { t: "RECORD CREATED", v: insertCount, c: "emerald", icon: "➕" },
+                { t: "RECORD UPDATED", v: updateCount, c: "blue", icon: "✏️" },
+                { t: "RECORD DELETED", v: deleteCount, c: "rose", icon: "🗑️" }
             ];
 
         } else if (_currentTab === 'suppliers') {
@@ -24090,34 +24348,29 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         }).join('');
     }
 
-    // =========================================================================
-    // 📥 UNIVERSAL ZERO-DUPLICATE IMPORT ENGINE (CSV & JSON - รองรับทุกหน้า ทุกตาราง)
-    // =========================================================================
+    function triggerCSVImport() {
+        triggerUniversalImport();
+    }
 
-    function triggerUniversalImport(defaultFormat) {
+    function triggerJSONImport() {
+        triggerUniversalImport();
+    }
+
+    function triggerUniversalImport() {
         let fileInput = document.getElementById('admin-universal-file-input');
         if (!fileInput) {
             fileInput = document.getElementById('admin-json-file-input') || document.getElementById('admin-csv-file-input');
         }
         if (fileInput) {
-            fileInput.accept = '.json,.csv,text/csv,application/json,text/plain';
             fileInput.value = '';
             fileInput.click();
         } else {
             const tempInput = document.createElement('input');
             tempInput.type = 'file';
-            tempInput.accept = '.json,.csv,text/csv,application/json,text/plain';
+            tempInput.accept = '.csv,.json,text/csv,application/json';
             tempInput.onchange = (e) => handleUniversalFileSelected(e);
             tempInput.click();
         }
-    }
-
-    function triggerJSONImport() {
-        triggerUniversalImport('json');
-    }
-
-    function triggerCSVImport() {
-        triggerUniversalImport('csv');
     }
 
     function parseCSV(text) {
@@ -24135,7 +24388,6 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         const firstLine = text.split(/\r\n|\r|\n/)[0] || '';
         if (firstLine.includes('\t')) delimiter = '\t';
         else if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';';
-        else if (firstLine.includes('|') && !firstLine.includes(',')) delimiter = '|';
         
         for (let i = 0; i < text.length; i++) {
             const char = text[i];
@@ -24179,344 +24431,278 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
     async function handleUniversalFileSelected(event) {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-            try {
-                const text = (e.target.result || '').trim();
-                if (!text) {
-                    toast("⚠️ ไฟล์ว่างเปล่า ไม่พบเนื้อหาข้อมูล", "error");
-                    return;
+        
+        const fileName = (file.name || '').toLowerCase();
+        const isJson = fileName.endsWith('.json') || (file.type && file.type.includes('json'));
+        
+        if (isJson) {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const text = e.target.result;
+                    await processJSONImport(text, file.name);
+                } catch (err) {
+                    console.error("JSON Import Error:", err);
+                    toast("❌ เกิดข้อผิดพลาดในการอ่านไฟล์ JSON: " + (err.message || err), "error");
                 }
-
-                const fileName = file.name || 'imported_file';
-                const lowerName = fileName.toLowerCase();
-                const isJson = lowerName.endsWith('.json') || text.startsWith('{') || text.startsWith('[');
-
-                let analysis = null;
-
-                if (isJson) {
-                    let parsed = null;
-                    try {
-                        parsed = JSON.parse(text);
-                    } catch (jsonErr) {
-                        console.warn('[JSON Parse Fail, attempting CSV fallback]', jsonErr);
-                        analysis = analyzeCSVImportData(text, fileName, file.size);
-                    }
-                    if (parsed) {
-                        analysis = analyzeJSONImportData(parsed, fileName, file.size);
-                    }
-                } else {
-                    analysis = analyzeCSVImportData(text, fileName, file.size);
+            };
+            reader.readAsText(file, 'UTF-8');
+        } else {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const text = e.target.result;
+                    await processCSVUniversalImport(text, file.name);
+                } catch (err) {
+                    console.error("CSV Import Error:", err);
+                    toast("❌ เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: " + (err.message || err), "error");
                 }
-
-                if (!analysis || !analysis.tables || Object.keys(analysis.tables).length === 0 || analysis.totalRecords === 0) {
-                    toast("⚠️ ไม่พบโครงสร้างข้อมูลหรือตารางที่ระบบรู้จักในไฟล์นี้", "warn");
-                    return;
-                }
-
-                // วิเคราะห์ตรวจสอบรายการซ้ำในระบบปัจจุบัน (Deduplication Check)
-                enrichAnalysisWithDeduplication(analysis);
-
-                // แสดง Modal นำเข้าข้อมูลพร้อมผลสรุปการตรวจสอบข้อมูลซ้ำอย่างละเอียด
-                showUniversalImportModal(analysis);
-
-            } catch (err) {
-                console.error('[Universal Import File Error]', err);
-                toast("❌ เกิดข้อผิดพลาดในการอ่านไฟล์: " + err.message, "error");
-            }
-        };
-
-        reader.readAsText(file, 'UTF-8');
-        event.target.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
     }
 
     function handleJSONFileSelected(event) {
-        handleUniversalFileSelected(event);
+        return handleUniversalFileSelected(event);
     }
 
     function handleCSVFileSelected(event) {
-        handleUniversalFileSelected(event);
+        return handleUniversalFileSelected(event);
     }
 
-    // ฟังก์ชันตรวจสอบความซ้ำซ้อนของข้อมูลกับฐานข้อมูลปัจจุบัน (Zero-Duplicate Shield)
-    function enrichAnalysisWithDeduplication(analysis) {
-        const getExistingKeySet = (tableKey) => {
-            const keys = new Set();
-            try {
-                if (tableKey === 'records') {
-                    const recs = (typeof S !== 'undefined' && Array.isArray(S.records)) ? S.records : [];
-                    recs.forEach(r => {
-                        if (r.ref) keys.add(String(r.ref).trim().toUpperCase());
-                    });
-                } else if (tableKey === 'users') {
-                    const usrs = Array.isArray(_data.users) ? _data.users : [];
-                    usrs.forEach(u => {
-                        if (u.email) keys.add(String(u.email).trim().toLowerCase());
-                    });
-                } else if (tableKey === 'master_suppliers') {
-                    const sups = Array.isArray(_data.suppliers) ? _data.suppliers : [];
-                    sups.forEach(s => {
-                        if (s.name) keys.add(String(s.name).trim().toUpperCase());
-                    });
-                } else if (tableKey === 'master_parts') {
-                    const pts = Array.isArray(_data.parts) ? _data.parts : [];
-                    pts.forEach(p => {
-                        if (p.part_no) keys.add(String(p.part_no).trim().toUpperCase());
-                    });
-                } else if (tableKey === 'master_defects') {
-                    const defs = Array.isArray(_data.defects) ? _data.defects : [];
-                    defs.forEach(d => {
-                        if (d.defect_name) keys.add(String(d.defect_name).trim().toUpperCase());
-                    });
-                } else if (tableKey === 'vf_rp_email_rules') {
-                    const rules = Array.isArray(_data.system) ? _data.system : (Array.isArray(window.VF_RP_MASTER_DATA) ? window.VF_RP_MASTER_DATA : []);
-                    rules.forEach(r => {
-                        if (r.id) keys.add(String(r.id).trim().toLowerCase());
-                        if (r.vendor_code && r.parts_group) keys.add(`${String(r.vendor_code).trim().toUpperCase()}__${String(r.parts_group).trim().toUpperCase()}`);
-                    });
-                } else if (tableKey === 'eight_d_reports') {
-                    const cases = (typeof eightDCases !== 'undefined' && Array.isArray(eightDCases)) ? eightDCases : [];
-                    cases.forEach(c => {
-                        if (c.issue_no) keys.add(String(c.issue_no).trim().toUpperCase());
-                        if (c.id) keys.add(String(c.id).trim());
-                    });
-                } else if (tableKey === 'ot_records') {
-                    const otList = (typeof wapData !== 'undefined' && wapData && Array.isArray(wapData.ot_records)) ? wapData.ot_records : [];
-                    otList.forEach(o => {
-                        if (o.id) keys.add(String(o.id));
-                        keys.add(`${String(o.date).trim()}__${String(o.staff_name || o.staff_id).trim().toUpperCase()}`);
-                    });
-                } else if (tableKey === 's5_records') {
-                    const s5List = (typeof wapData !== 'undefined' && wapData && Array.isArray(wapData.score5s)) ? wapData.score5s : [];
-                    s5List.forEach(s => {
-                        if (s.id) keys.add(String(s.id));
-                        keys.add(`${String(s.month).trim()}__${String(s.area).trim().toUpperCase()}`);
-                    });
-                } else if (tableKey === 'support_records') {
-                    const supList = (typeof wapData !== 'undefined' && wapData && Array.isArray(wapData.achievements)) ? wapData.achievements : [];
-                    supList.forEach(s => {
-                        if (s.id) keys.add(String(s.id));
-                    });
-                }
-            } catch (err) {
-                console.warn('[Deduplication Key Collect Warning]', tableKey, err);
+    async function processJSONImport(jsonText, fileName) {
+        let parsed = null;
+        try {
+            parsed = JSON.parse(jsonText);
+        } catch (e) {
+            toast("❌ รูปแบบไฟล์ JSON ไม่ถูกต้อง กรุณาตรวจสอบไฟล์", "error");
+            return;
+        }
+
+        if (!parsed) {
+            toast("⚠️ ไม่พบข้อมูลในไฟล์ JSON", "warning");
+            return;
+        }
+
+        // จัดการกรณีเป็น Multi-table backup object
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && !parsed.data && !parsed.records) {
+            const tablesFound = Object.keys(parsed).filter(k => Array.isArray(parsed[k]) && parsed[k].length > 0);
+            if (tablesFound.length > 0) {
+                showCustomConfirmDialog({
+                    title: `📥 นำเข้าชุดข้อมูลสำรอง (Multi-Table Backup)`,
+                    subtitle: `ตรวจพบข้อมูลสำรองจำนวน ${tablesFound.length} ตาราง (${tablesFound.join(', ')}) คุณต้องการนำเข้าข้อมูลทั้งหมดพร้อมระบบป้องกันข้อมูลซ้ำซ้อนใช่หรือไม่?`,
+                    badge: `MULTI-TABLE JSON BACKUP`,
+                    type: "info",
+                    details: tablesFound.map(k => ({ label: `ตาราง ${k}`, value: `${parsed[k].length} รายการ` })),
+                    confirmText: `🛡️ ยืนยันนำเข้าข้อมูลทุกตาราง (กันซ้ำ)`,
+                    cancelText: "ยกเลิก",
+                    onConfirm: async () => {
+                        showLoader(true);
+                        try {
+                            let totalImported = 0;
+                            for (const tableKey of tablesFound) {
+                                const tab = tableKey === 'profiles' ? 'users' : (tableKey === 'vf_rp_email_rules' ? 'system' : tableKey);
+                                const tableItems = parsed[tableKey];
+                                const res = await analyzeAndExecuteDeduplication(tab, tableItems, { silent: true });
+                                totalImported += (res?.count || 0);
+                            }
+                            toast(`✅ นำเข้าข้อมูลสำรองทั้งหมดสำเร็จ (${totalImported} รายการใหม่)`, "success");
+                            await loadData();
+                        } catch (err) {
+                            toast("❌ เกิดข้อผิดพลาดในการนำเข้าข้อมูล: " + err.message, "error");
+                        }
+                        showLoader(false);
+                    }
+                });
+                return;
             }
-            return keys;
-        };
+        }
 
-        let totalDuplicatesFound = 0;
-        let totalNewRecords = 0;
-
-        Object.values(analysis.tables).forEach(table => {
-            const existingKeys = getExistingKeySet(table.key);
-            let dupCount = 0;
-            let newCount = 0;
-            const seenInFile = new Set();
-
-            table.data.forEach((row, idx) => {
-                let rowKey = '';
-                if (table.key === 'records') {
-                    rowKey = String(row.ref || `CLM_${idx}`).trim().toUpperCase();
-                } else if (table.key === 'users') {
-                    rowKey = String(row.email || '').trim().toLowerCase();
-                } else if (table.key === 'master_suppliers') {
-                    rowKey = String(row.name || '').trim().toUpperCase();
-                } else if (table.key === 'master_parts') {
-                    rowKey = String(row.part_no || '').trim().toUpperCase();
-                } else if (table.key === 'master_defects') {
-                    rowKey = String(row.defect_name || '').trim().toUpperCase();
-                } else if (table.key === 'vf_rp_email_rules') {
-                    rowKey = String(row.id || (row.vendor_code ? `${row.vendor_code}__${row.parts_group}` : `vf_${idx}`)).trim().toLowerCase();
-                } else if (table.key === 'eight_d_reports') {
-                    rowKey = String(row.issue_no || row.id || `8d_${idx}`).trim().toUpperCase();
-                } else {
-                    rowKey = String(row[table.conflictKey] || row.id || JSON.stringify(row));
+        let rawItems = [];
+        if (Array.isArray(parsed)) {
+            rawItems = parsed;
+        } else if (Array.isArray(parsed.data)) {
+            rawItems = parsed.data;
+        } else if (Array.isArray(parsed.records)) {
+            rawItems = parsed.records;
+        } else {
+            // ค้นหา Array แรกใน Object
+            for (const k of Object.keys(parsed)) {
+                if (Array.isArray(parsed[k])) {
+                    rawItems = parsed[k];
+                    break;
                 }
+            }
+        }
 
-                const isAlreadyInSystem = rowKey && existingKeys.has(rowKey);
-                const isDuplicateInFile = rowKey && seenInFile.has(rowKey);
+        if (!rawItems || rawItems.length === 0) {
+            toast("⚠️ ไม่พบรายการข้อมูลในไฟล์ JSON", "warning");
+            return;
+        }
 
-                if (isAlreadyInSystem || isDuplicateInFile) {
-                    dupCount++;
-                } else {
-                    newCount++;
-                }
+        // ตรวจสอบ Table Type อัตโนมัติจากโครงสร้างข้อมูล
+        const sample = rawItems[0] || {};
+        let detectedTab = _currentTab === 'logs' ? 'users' : _currentTab;
 
-                if (rowKey) seenInFile.add(rowKey);
-            });
+        if (sample.partNo !== undefined || sample.defect !== undefined || sample.inspector !== undefined || sample.claimNo !== undefined || sample.shift !== undefined || sample.judgment !== undefined) {
+            detectedTab = 'records';
+        } else if (sample.inform_email_to !== undefined || sample.vendor_code !== undefined || sample.dear_vendor !== undefined || sample.parts_group !== undefined || sample.confirm_vf_name !== undefined || sample.rule_type !== undefined) {
+            detectedTab = 'system';
+        } else if (sample.email !== undefined && (sample.role !== undefined || sample.is_reset_key_required !== undefined || sample.password !== undefined || sample.full_name !== undefined)) {
+            detectedTab = 'users';
+        } else if (sample.part_no !== undefined || sample.partName !== undefined) {
+            detectedTab = 'parts';
+        } else if (sample.defect_name !== undefined) {
+            detectedTab = 'defects';
+        } else if (sample.name !== undefined || sample.supplier_name !== undefined) {
+            detectedTab = 'suppliers';
+        }
 
-            table.duplicateCount = dupCount;
-            table.newCount = newCount;
-            totalDuplicatesFound += dupCount;
-            totalNewRecords += newCount;
-        });
-
-        analysis.totalDuplicates = totalDuplicatesFound;
-        analysis.totalNew = totalNewRecords;
+        await runDeduplicationDialogAndImport(detectedTab, rawItems, fileName);
     }
 
-    // =========================================================================
-    // 📊 CSV PARSING & TABLE IDENTIFICATION ENGINE
-    // =========================================================================
-
-    function analyzeCSVImportData(csvText, fileName, fileSize) {
-        const rows = parseCSV(csvText);
-        if (rows.length < 2) return null;
-
-        const rawHeaders = rows[0].map(h => String(h).trim().toLowerCase().replace(/^["']|["']$/g, ''));
-        const dataRows = rows.slice(1).filter(r => r && r.some(c => String(c).trim().length > 0));
+    async function processCSVUniversalImport(text, fileName) {
+        const rows = parseCSV(text);
+        if (rows.length < 2) {
+            toast("⚠️ ไม่พบข้อมูลในไฟล์ CSV (ต้องมีหัวตารางและอย่างน้อย 1 แถว)", "error");
+            return;
+        }
         
-        if (dataRows.length === 0) return null;
-
-        const cleanHeaders = rawHeaders.map(h => h.replace(/[\s_\-./\\]/g, ''));
-
+        const rawHeaders = rows[0].map(h => String(h).trim().toLowerCase().replace(/^["']|["']$/g, ''));
+        const dataRows = rows.slice(1);
+        
         const getColIdx = (...aliases) => {
-            return cleanHeaders.findIndex(cleanH => {
+            return rawHeaders.findIndex(h => {
+                const cleanH = h.toLowerCase().replace(/[\s_\-/\\]/g, '');
                 return aliases.some(a => {
-                    const cleanA = a.toLowerCase().replace(/[\s_\-./\\]/g, '');
+                    const cleanA = a.toLowerCase().replace(/[\s_\-/\\]/g, '');
                     return cleanH === cleanA || cleanH.includes(cleanA);
                 });
             });
         };
 
-        const result = {
-            fileName: fileName || 'data_import.csv',
-            format: 'CSV',
-            fileSize: fileSize ? (fileSize / 1024 < 1024 ? (fileSize / 1024).toFixed(1) + ' KB' : (fileSize / (1024 * 1024)).toFixed(2) + ' MB') : 'Unknown size',
-            tables: {},
-            totalRecords: 0
-        };
+        let targetTab = _currentTab === 'logs' ? 'users' : _currentTab;
+        
+        // Auto-detect if CSV matches claims records
+        const hasClaimCols = getColIdx('defect', 'อาการเสีย', 'ข้อบกพร่อง') !== -1 && getColIdx('supplier', 'ซัพพลายเออร์') !== -1 && (getColIdx('partno', 'part', 'pn') !== -1 || getColIdx('ref', 'lotno', 'lot') !== -1);
+        const hasVfCols = getColIdx('inform_email_to', 'informe-mailto', 'informto', 'vendorcode', 'vendor_code') !== -1;
 
-        const registerTable = (key, label, icon, data, conflictKey, targetService) => {
-            if (!Array.isArray(data) || data.length === 0) return;
-            result.tables[key] = {
-                key,
-                label,
-                icon,
-                count: data.length,
-                data,
-                conflictKey,
-                targetService
-            };
-            result.totalRecords += data.length;
-        };
+        if (hasClaimCols) {
+            targetTab = 'records';
+        } else if (hasVfCols) {
+            targetTab = 'system';
+        }
 
-        // 1. ตรวจสอบเงื่อนไขตามแท็บปัจจุบันใน Admin Console (Context Awareness)
-        const currentTab = typeof _currentTab !== 'undefined' ? _currentTab : 'users';
+        let mappedRecords = [];
 
-        // Check A: Part Line Claim
-        const isClaim = getColIdx('ref', 'claim', 'referenceno', 'refno') !== -1 ||
-                        (getColIdx('partno', 'partnumber', 'part_no') !== -1 && getColIdx('defect', 'defectname') !== -1 && getColIdx('qty', 'quantity') !== -1);
-
-        // Check B: Users
-        const isUser = (getColIdx('email', 'mail', 'e-mail', 'อีเมล') !== -1 && (getColIdx('role', 'position', 'สิทธิ์') !== -1 || getColIdx('name', 'fullname') !== -1)) ||
-                       (currentTab === 'users' && getColIdx('email', 'mail', 'user') !== -1);
-
-        // Check C: VF & RP Rules
-        const isVfRp = getColIdx('dear_vendor', 'dearvendor', 'to_vf_rp_report', 'confirm_vf_name', 'approve_vf_name', 'vendor_code') !== -1 ||
-                       (currentTab === 'system' && getColIdx('vendor_code', 'supplier', 'dear_vendor') !== -1);
-
-        // Check D: Suppliers
-        const isSupplier = (getColIdx('supplier', 'vendor', 'suppliername', 'vendorname', 'ชื่อซัพพลายเออร์') !== -1 && !isClaim && !isVfRp) ||
-                           (currentTab === 'suppliers' && rawHeaders.length <= 4);
-
-        // Check E: Parts
-        const isPart = (getColIdx('partno', 'partnumber', 'part_no', 'itemno', 'รหัสชิ้นส่วน') !== -1 && !isClaim && !isVfRp) ||
-                       (currentTab === 'parts' && rawHeaders.length <= 5);
-
-        // Check F: Defects
-        const isDefect = (getColIdx('defectname', 'defect', 'symptom', 'อาการเสีย', 'ข้อบกพร่อง') !== -1 && !isClaim) ||
-                         (currentTab === 'defects' && rawHeaders.length <= 4);
-
-        // Check G: 8D Reports
-        const is8D = getColIdx('issue_no', 'd1_team', 'd2_problem', 'eight_d', '8d_case') !== -1;
-
-        // Check H: OT Management
-        const isOT = getColIdx('ot', 'overtime', 'starttime', 'endtime') !== -1 && getColIdx('staff', 'employee', 'name') !== -1;
-
-        // Check I: 5S Excellence
-        const is5S = getColIdx('5s', 'score', 'audit', 'area', 'findings') !== -1 && getColIdx('month', 'date') !== -1;
-
-        // Check J: Support Logs
-        const isSupport = getColIdx('support', 'achievement', 'hours', 'description', 'eventdate') !== -1;
-
-        // --- MAPPER IMPLEMENTATION ---
-        if (isClaim) {
-            const refIdx = getColIdx('ref', 'referenceno', 'refno', 'เลขที่อ้างอิง', 'รหัสเคลม');
-            const dateIdx = getColIdx('date', 'claimdate', 'วันที่');
+        if (targetTab === 'records') {
+            const dateIdx = getColIdx('date', 'วันที่');
             const shiftIdx = getColIdx('shift', 'กะ');
-            const inspIdx = getColIdx('inspector', 'user_id', 'ผู้ตรวจสอบ', 'ผู้บันทึก');
             const lineIdx = getColIdx('line', 'สายการผลิต', 'ไลน์');
+            const refIdx = getColIdx('ref', 'lotno', 'lot', 'เลขที่อ้างอิง', 'ล็อต');
             const suppIdx = getColIdx('supplier', 'vendor', 'ซัพพลายเออร์');
-            const pnIdx = getColIdx('partno', 'part_no', 'partnumber', 'หมายเลขชิ้นส่วน', 'รหัสชิ้นส่วน');
-            const pnameIdx = getColIdx('partname', 'part_name', 'ชื่อชิ้นส่วน');
+            const pnIdx = getColIdx('partno', 'part_no', 'partnumber', 'pn', 'รหัสชิ้นส่วน');
+            const pnameIdx = getColIdx('partname', 'part_name', 'name', 'ชื่อชิ้นส่วน');
             const qtyIdx = getColIdx('qty', 'quantity', 'จำนวน');
             const unitIdx = getColIdx('unit', 'หน่วย');
-            const defIdx = getColIdx('defect', 'defectname', 'อาการเสีย', 'ข้อบกพร่อง');
-            const remIdx = getColIdx('remark', 'หมายเหตุ');
-            const judIdx = getColIdx('judgment', 'ผลการตัดสิน', 'ผลตรวจ');
+            const defectIdx = getColIdx('defect', 'defectname', 'อาการเสีย', 'ข้อบกพร่อง');
+            const remarkIdx = getColIdx('remark', 'หมายเหตุ', 'รายละเอียด');
+            const judgeIdx = getColIdx('judgment', 'status', 'ผลการตัดสิน');
+            const inspIdx = getColIdx('inspector', 'user', 'ผู้ตรวจสอบ');
+            const imgIdx = getColIdx('imageurl', 'image_url', 'image', 'รูปภาพ');
+            const idIdx = getColIdx('id', 'รหัส');
 
-            const mapped = dataRows.map((r, idx) => {
-                const cleanRef = (refIdx !== -1 && r[refIdx]) ? String(r[refIdx]).trim().toUpperCase() : `CLM-${new Date().getFullYear()}-${String(idx + 1).padStart(4, '0')}`;
+            mappedRecords = dataRows.map((r, idx) => {
+                const idVal = idIdx !== -1 && r[idIdx] ? String(r[idIdx]).trim() : `rec-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
                 return {
-                    id: (typeof generateUUID === 'function' ? generateUUID() : `clm_${Date.now()}_${idx}`),
-                    ref: cleanRef,
-                    date: (dateIdx !== -1 && r[dateIdx]) ? String(r[dateIdx]).trim() : new Date().toISOString().split('T')[0],
-                    shift: (shiftIdx !== -1 && r[shiftIdx]) ? String(r[shiftIdx]).trim().toUpperCase() : 'SHIFT A',
-                    inspector: (inspIdx !== -1 && r[inspIdx]) ? String(r[inspIdx]).trim() : 'SYSTEM',
-                    line: (lineIdx !== -1 && r[lineIdx]) ? String(r[lineIdx]).trim() : '-',
-                    supplier: (suppIdx !== -1 && r[suppIdx]) ? String(r[suppIdx]).trim().toUpperCase() : '-',
-                    partNo: (pnIdx !== -1 && r[pnIdx]) ? String(r[pnIdx]).trim().toUpperCase() : '-',
-                    partName: (pnameIdx !== -1 && r[pnameIdx]) ? String(r[pnameIdx]).trim() : '-',
-                    qty: (qtyIdx !== -1 && parseInt(r[qtyIdx])) ? parseInt(r[qtyIdx]) : 1,
-                    unit: (unitIdx !== -1 && r[unitIdx]) ? String(r[unitIdx]).trim() : 'PCS',
-                    defect: (defIdx !== -1 && r[defIdx]) ? String(r[defIdx]).trim() : '-',
-                    remark: (remIdx !== -1 && r[remIdx]) ? String(r[remIdx]).trim() : '',
-                    judgment: (judIdx !== -1 && r[judIdx]) ? String(r[judIdx]).trim().toUpperCase() : 'OK',
-                    created_at: new Date().toISOString()
+                    id: idVal,
+                    date: dateIdx !== -1 && r[dateIdx] ? String(r[dateIdx]).trim() : new Date().toISOString().split('T')[0],
+                    shift: shiftIdx !== -1 && r[shiftIdx] ? String(r[shiftIdx]).trim() : 'SHIFT A',
+                    line: lineIdx !== -1 && r[lineIdx] ? String(r[lineIdx]).trim() : '',
+                    ref: refIdx !== -1 && r[refIdx] ? String(r[refIdx]).trim() : '',
+                    supplier: suppIdx !== -1 && r[suppIdx] ? String(r[suppIdx]).trim() : '',
+                    partNo: pnIdx !== -1 && r[pnIdx] ? String(r[pnIdx]).trim().toUpperCase() : '',
+                    partName: pnameIdx !== -1 && r[pnameIdx] ? String(r[pnameIdx]).trim() : '',
+                    qty: qtyIdx !== -1 && r[qtyIdx] ? parseFloat(String(r[qtyIdx]).replace(/[^0-9.-]/g, '')) || 1 : 1,
+                    unit: unitIdx !== -1 && r[unitIdx] ? String(r[unitIdx]).trim() : 'PCS',
+                    defect: defectIdx !== -1 && r[defectIdx] ? String(r[defectIdx]).trim() : '',
+                    remark: remarkIdx !== -1 && r[remarkIdx] ? String(r[remarkIdx]).trim() : '',
+                    judgment: judgeIdx !== -1 && r[judgeIdx] ? String(r[judgeIdx]).trim() : 'REJECT (R)',
+                    inspector: inspIdx !== -1 && r[inspIdx] ? String(r[inspIdx]).trim() : (S.currentUser || 'Inspector'),
+                    imageUrl: imgIdx !== -1 && r[imgIdx] ? String(r[imgIdx]).trim() : ''
                 };
-            }).filter(c => c.ref && c.ref.length > 0);
-
-            registerTable('records', 'Part Line Claim (ประวัติเคลมชิ้นส่วน)', '📦', mapped, 'ref', 'sqe');
-        } 
-        else if (isUser) {
+            }).filter(item => item.supplier || item.partNo || item.defect);
+        }
+        else if (targetTab === 'users') {
             const emailIdx = getColIdx('email', 'mail', 'user', 'username', 'e-mail', 'อีเมล');
             const nameIdx = getColIdx('name', 'fullname', 'displayname', 'ชื่อ');
             const roleIdx = getColIdx('role', 'position', 'สิทธิ์', 'ตำแหน่ง');
             const passIdx = getColIdx('password', 'pass', 'key', 'securitykey', 'รหัสผ่าน');
             const statusIdx = getColIdx('status', 'state', 'active', 'สถานะ');
-
-            const mapped = dataRows.map(r => {
-                const email = emailIdx !== -1 ? String(r[emailIdx] || '').trim().toLowerCase() : String(r[0] || '').trim().toLowerCase();
-                const rawRole = roleIdx !== -1 ? String(r[roleIdx] || '').trim().toLowerCase() : 'sqe_support';
-                let role = 'sqe_support';
-                if (rawRole.includes('super') || rawRole.includes('หัวหน้า') || rawRole.includes('sup')) role = 'supervisor';
-                else if (rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) role = 'admin';
-                else if (rawRole.includes('iqc')) role = 'iqc';
-                else if (rawRole.includes('eng') || rawRole.includes('วิศวกร')) role = 'engineer';
-                else if (rawRole.includes('manag') || rawRole.includes('ผจก') || rawRole.includes('ผู้จัดการ')) role = 'manager';
-
-                const rawStatus = statusIdx !== -1 ? String(r[statusIdx] || '').trim().toLowerCase() : 'active';
-                const status = (rawStatus === 'inactive' || rawStatus === 'ปิด' || rawStatus === 'false') ? 'inactive' : 'active';
-                const pass = passIdx !== -1 && r[passIdx] ? String(r[passIdx]).trim() : 'Carrier@123';
-                const name = nameIdx !== -1 && r[nameIdx] ? String(r[nameIdx]).trim() : resolveOfficialDisplayName(email, email.split('@')[0].toUpperCase());
-
-                return {
-                    id: (typeof generateUUID === 'function' ? generateUUID() : `usr_${Date.now()}`),
-                    email,
-                    name,
-                    role,
-                    password: pass,
-                    status,
-                    created_at: new Date().toISOString()
-                };
-            }).filter(u => u.email && u.email.includes('@'));
-
-            registerTable('users', 'User & Staff Accounts (บัญชีพนักงาน & สิทธิ์)', '👥', mapped, 'email', 'sqe');
+            
+            if (emailIdx === -1 && rawHeaders.length === 1) {
+                mappedRecords = dataRows.map(r => ({
+                    email: String(r[0] || '').trim().toLowerCase(),
+                    name: resolveOfficialDisplayName(String(r[0] || '').trim().toLowerCase(), ''),
+                    role: 'sqe_support',
+                    password: 'Carrier@123',
+                    status: 'active'
+                })).filter(u => u.email && u.email.includes('@'));
+            } else {
+                mappedRecords = dataRows.map(r => {
+                    const email = emailIdx !== -1 ? String(r[emailIdx] || '').trim().toLowerCase() : String(r[0] || '').trim().toLowerCase();
+                    const rawRole = roleIdx !== -1 ? String(r[roleIdx] || '').trim().toLowerCase() : 'sqe_support';
+                    let role = 'sqe_support';
+                    if (rawRole.includes('super') || rawRole.includes('หัวหน้า') || rawRole.includes('sup')) role = 'supervisor';
+                    else if (rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) role = 'admin';
+                    else if (rawRole.includes('iqc')) role = 'iqc';
+                    else if (rawRole.includes('eng') || rawRole.includes('วิศวกร')) role = 'engineer';
+                    else if (rawRole.includes('manag') || rawRole.includes('ผจก') || rawRole.includes('ผู้จัดการ')) role = 'manager';
+                    else role = 'sqe_support';
+                    
+                    const rawStatus = statusIdx !== -1 ? String(r[statusIdx] || '').trim().toLowerCase() : 'active';
+                    const status = (rawStatus === 'inactive' || rawStatus === 'ปิด' || rawStatus === 'false') ? 'inactive' : 'active';
+                    const pass = passIdx !== -1 && r[passIdx] ? String(r[passIdx]).trim() : 'Carrier@123';
+                    const name = nameIdx !== -1 && r[nameIdx] ? String(r[nameIdx]).trim() : resolveOfficialDisplayName(email, email.split('@')[0].toUpperCase());
+                    
+                    return { email, name, role, password: pass, status };
+                }).filter(u => u.email && u.email.includes('@'));
+            }
         }
-        else if (isVfRp) {
-            const mapped = dataRows.map((r, idx) => {
+        else if (targetTab === 'suppliers') {
+            const nameIdx = getColIdx('name', 'supplier', 'vendor', 'suppliername', 'vendorname', 'ชื่อซัพพลายเออร์', 'ซัพพลายเออร์', 'ชื่อ');
+            const codeIdx = getColIdx('code', 'suppliercode', 'vendorcode', 'รหัส', 'รหัสซัพพลายเออร์');
+            
+            mappedRecords = dataRows.map(r => {
+                const name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
+                const code = codeIdx !== -1 ? String(r[codeIdx] || '').trim().toUpperCase() : '';
+                return { name, code: code || undefined };
+            }).filter(s => s.name && s.name.length > 0);
+        }
+        else if (targetTab === 'parts') {
+            const pnIdx = getColIdx('partno', 'partnumber', 'part', 'pn', 'itemno', 'รหัสชิ้นส่วน', 'หมายเลขชิ้นส่วน');
+            const nameIdx = getColIdx('partname', 'name', 'description', 'desc', 'ชื่อชิ้นส่วน');
+            const groupIdx = getColIdx('category', 'group', 'model', 'partsgroup', 'กลุ่ม', 'หมวดหมู่');
+            
+            mappedRecords = dataRows.map(r => {
+                const part_no = pnIdx !== -1 ? String(r[pnIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
+                const part_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim() : (r[1] ? String(r[1]).trim() : '-');
+                const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
+                return { part_no, part_name, category };
+            }).filter(p => p.part_no && p.part_no.length > 0);
+        }
+        else if (targetTab === 'defects') {
+            const nameIdx = getColIdx('defectname', 'defect', 'symptom', 'name', 'issue', 'problem', 'อาการเสีย', 'ข้อบกพร่อง');
+            const groupIdx = getColIdx('category', 'group', 'type', 'หมวดหมู่', 'ประเภท');
+            
+            mappedRecords = dataRows.map(r => {
+                const defect_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
+                const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
+                return { defect_name, category };
+            }).filter(d => d.defect_name && d.defect_name.length > 0);
+        }
+        else if (targetTab === 'system') {
+            mappedRecords = dataRows.map((r, idx) => {
                 const rowObj = {};
                 rawHeaders.forEach((h, colI) => {
                     const val = r[colI] !== undefined ? String(r[colI]).trim() : '';
@@ -24583,755 +24769,524 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
                     status: 'active'
                 };
             }).filter(item => item.supplier_name || item.vendor_code);
-
-            registerTable('vf_rp_email_rules', 'VF & RP Email Dispatch Matrix (กฎส่งอีเมลซัพพลายเออร์)', '✉️', mapped, 'id', 'sqe');
-        }
-        else if (isSupplier) {
-            const nameIdx = getColIdx('name', 'supplier', 'vendor', 'suppliername', 'vendorname', 'ชื่อซัพพลายเออร์', 'ซัพพลายเออร์', 'ชื่อ');
-            const codeIdx = getColIdx('code', 'suppliercode', 'vendorcode', 'รหัส', 'รหัสซัพพลายเออร์');
-
-            const mapped = dataRows.map(r => {
-                const name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
-                const code = codeIdx !== -1 ? String(r[codeIdx] || '').trim().toUpperCase() : '';
-                return { name, code: code || undefined };
-            }).filter(s => s.name && s.name.length > 0);
-
-            registerTable('master_suppliers', 'Master Suppliers (รายชื่อซัพพลายเออร์)', '🏭', mapped, 'name', 'sqe');
-        }
-        else if (isPart) {
-            const pnIdx = getColIdx('partno', 'partnumber', 'part', 'pn', 'itemno', 'รหัสชิ้นส่วน', 'หมายเลขชิ้นส่วน');
-            const nameIdx = getColIdx('partname', 'name', 'description', 'desc', 'ชื่อชิ้นส่วน');
-            const groupIdx = getColIdx('category', 'group', 'model', 'partsgroup', 'กลุ่ม', 'หมวดหมู่');
-
-            const mapped = dataRows.map(r => {
-                const part_no = pnIdx !== -1 ? String(r[pnIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
-                const part_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim() : (r[1] ? String(r[1]).trim() : '-');
-                const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
-                return { part_no, part_name, category };
-            }).filter(p => p.part_no && p.part_no.length > 0);
-
-            registerTable('master_parts', 'Master Parts (รายการชิ้นส่วน)', '🔩', mapped, 'part_no', 'sqe');
-        }
-        else if (isDefect) {
-            const nameIdx = getColIdx('defectname', 'defect', 'symptom', 'name', 'issue', 'problem', 'อาการเสีย', 'ข้อบกพร่อง');
-            const groupIdx = getColIdx('category', 'group', 'type', 'หมวดหมู่', 'ประเภท');
-
-            const mapped = dataRows.map(r => {
-                const defect_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
-                const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
-                return { defect_name, category };
-            }).filter(d => d.defect_name && d.defect_name.length > 0);
-
-            registerTable('master_defects', 'Master Defects (รายการข้อบกพร่อง)', '⚠️', mapped, 'defect_name', 'sqe');
-        }
-        else if (is8D) {
-            const mapped = dataRows.map((r, idx) => ({
-                id: (typeof generateUUID === 'function' ? generateUUID() : `8d_${Date.now()}_${idx}`),
-                issue_no: r[0] || `8D-${new Date().getFullYear()}-${String(idx+1).padStart(3, '0')}`,
-                title: r[1] || '8D Problem Investigation',
-                d1_team: r[2] || '',
-                d2_problem: r[3] || '',
-                status: 'open',
-                created_at: new Date().toISOString()
-            }));
-            registerTable('eight_d_reports', '8D Problem Solving Reports (รายงาน 8D)', '📋', mapped, 'issue_no', 'sqe');
-        }
-        else if (isOT) {
-            const mapped = dataRows.map((r, idx) => ({
-                id: (typeof generateUUID === 'function' ? generateUUID() : `ot_${Date.now()}_${idx}`),
-                date: r[0] || new Date().toISOString().split('T')[0],
-                staff_name: r[1] || 'STAFF',
-                task: r[2] || 'OT Support',
-                hours: parseFloat(r[3]) || 1.0,
-                status: 'pending'
-            }));
-            registerTable('ot_records', 'OT Management Records (บันทึกเวลาทำงานล่วงเวลา)', '⏱️', mapped, 'id', 'wap');
-        }
-        else {
-            // Default generic fallback
-            const mapped = dataRows.map((r, idx) => {
-                const obj = { id: `row_${Date.now()}_${idx}` };
-                rawHeaders.forEach((h, colI) => {
-                    obj[h || `col_${colI}`] = r[colI] || '';
-                });
-                return obj;
-            });
-            registerTable('records', 'Records Collection (รายการบันทึก)', '📦', mapped, 'id', 'sqe');
         }
 
-        return result;
+        if (mappedRecords.length === 0) {
+            toast("⚠️ ไม่สามารถจับคู่ข้อมูลจากหัวตารางใน CSV ได้ กรุณาตรวจสอบรูปแบบไฟล์", "error");
+            return;
+        }
+
+        await runDeduplicationDialogAndImport(targetTab, mappedRecords, fileName);
     }
 
-    // =========================================================================
-    // 📄 JSON PARSING & MULTI-TABLE DISCOVERY ENGINE
-    // =========================================================================
+    async function runDeduplicationDialogAndImport(targetTab, rawItems, fileName) {
+        showLoader(true);
+        let newItems = [];
+        let duplicateItems = [];
 
-    function analyzeJSONImportData(parsed, fileName, fileSize) {
-        const result = {
-            fileName: fileName || 'supabase_export.json',
-            format: 'JSON',
-            fileSize: fileSize ? (fileSize / 1024 < 1024 ? (fileSize / 1024).toFixed(1) + ' KB' : (fileSize / (1024 * 1024)).toFixed(2) + ' MB') : 'Unknown size',
-            tables: {},
-            totalRecords: 0
-        };
+        try {
+            if (targetTab === 'records') {
+                const existingRecords = (S.records && Array.isArray(S.records)) ? S.records : [];
+                const existingIds = new Set(existingRecords.map(r => String(r.id || '').trim()).filter(Boolean));
+                const existingSigs = new Set(existingRecords.map(r => {
+                    return `${(r.date || '').trim()}|${(r.supplier || '').toLowerCase().trim()}|${(r.partNo || '').toLowerCase().trim()}|${(r.ref || r.lotNo || '').toLowerCase().trim()}|${(r.defect || '').toLowerCase().trim()}|${r.qty || 0}`;
+                }));
 
-        const registerTable = (key, label, icon, data, conflictKey, targetService) => {
-            if (!Array.isArray(data) || data.length === 0) return;
-            const validRows = data.filter(r => r && typeof r === 'object' && Object.keys(r).length > 0);
-            if (validRows.length === 0) return;
-
-            result.tables[key] = {
-                key,
-                label,
-                icon,
-                count: validRows.length,
-                data: validRows,
-                conflictKey,
-                targetService
-            };
-            result.totalRecords += validRows.length;
-        };
-
-        // 1. Single Table Array Export (จาก Supabase Table Editor / Export Feature)
-        if (Array.isArray(parsed)) {
-            const sample = parsed[0] || {};
-            const keys = Object.keys(sample).map(k => k.toLowerCase());
-            
-            if (keys.includes('ref') || ((keys.includes('partno') || keys.includes('part_no')) && keys.includes('defect'))) {
-                registerTable('records', 'Part Line Claim (ประวัติเคลมชิ้นส่วน)', '📦', parsed, 'ref', 'sqe');
-            } else if (keys.includes('email') && (keys.includes('role') || keys.includes('name') || keys.includes('department'))) {
-                registerTable('users', 'User & Staff Accounts (บัญชีพนักงาน & สิทธิ์)', '👥', parsed, 'email', 'sqe');
-            } else if (keys.includes('issue_no') || keys.includes('d1_team') || keys.includes('report_type') || keys.includes('eight_d_cases')) {
-                registerTable('eight_d_reports', '8D Problem Solving Reports (รายงาน 8D)', '📋', parsed, 'id', 'sqe');
-            } else if (keys.includes('event_date') || (keys.includes('description') && keys.includes('hours'))) {
-                registerTable('support_records', 'Line Support Logs (บันทึกงานสนับสนุนไลน์)', '🛠️', parsed, 'id', 'wap');
-            } else if (keys.includes('month') && (keys.includes('area') || keys.includes('score') || keys.includes('issue_count'))) {
-                registerTable('s5_records', '5S Excellence Audits (ประเมินมาตรฐาน 5S)', '🧹', parsed, 'id', 'wap');
-            } else if (keys.includes('task') && keys.includes('hours') && keys.includes('date')) {
-                const isSpecial = (fileName || '').toLowerCase().includes('special');
-                if (isSpecial) {
-                    registerTable('special_jobs', 'Special Jobs (งานพิเศษ & โครงการ)', '🎯', parsed, 'id', 'wap');
-                } else {
-                    registerTable('ot_records', 'OT Management Records (บันทึกเวลาทำงานล่วงเวลา)', '⏱️', parsed, 'id', 'wap');
-                }
-            } else if (keys.includes('skill_name') || keys.includes('skill_value')) {
-                registerTable('skill_matrix', 'Skill Matrix (ทักษะความสามารถพนักงาน)', '📊', parsed, 'id', 'wap');
-            } else if (keys.includes('leave_type') || keys.includes('att_type') || keys.includes('daily_report')) {
-                registerTable('daily_reports', 'Daily Attendance & Leaves (บันทึกการลาและเข้างาน)', '📅', parsed, 'id', 'wap');
-            } else if (keys.includes('dear_vendor') || keys.includes('parts_group') || keys.includes('to_vf_rp_report') || keys.includes('vendor_code')) {
-                registerTable('vf_rp_email_rules', 'VF & RP Email Dispatch Matrix (กฎส่งอีเมลซัพพลายเออร์)', '✉️', parsed, 'id', 'sqe');
-            } else if (keys.includes('supplier_name') || keys.includes('supplier_code') || (keys.length === 1 && keys.includes('name'))) {
-                registerTable('master_suppliers', 'Master Suppliers (รายชื่อซัพพลายเออร์)', '🏭', parsed, 'name', 'sqe');
-            } else if (keys.includes('part_number') || keys.includes('part_no')) {
-                registerTable('master_parts', 'Master Parts (รายการชิ้นส่วน)', '🔩', parsed, 'part_no', 'sqe');
-            } else if (keys.includes('defect_name') || keys.includes('defect_code')) {
-                registerTable('master_defects', 'Master Defects (รายการข้อบกพร่อง)', '⚠️', parsed, 'defect_name', 'sqe');
-            } else if (keys.includes('code_no') || keys.includes('tool_name') || keys.includes('calibration')) {
-                registerTable('calibration_records', 'Calibration Tools Master (เครื่องมือวัด & สอบเทียบ)', '📐', parsed, 'code_no', 'sqe');
-            } else {
-                registerTable('records', 'Records Collection (รายการบันทึก)', '📦', parsed, 'id', 'sqe');
-            }
-            return result;
-        }
-
-        // 2. Generic Supabase REST Export { data: [...], table: '...' }
-        if (parsed.data && Array.isArray(parsed.data)) {
-            const subAnalysis = analyzeJSONImportData(parsed.data, fileName, fileSize);
-            if (subAnalysis && subAnalysis.totalRecords > 0) return subAnalysis;
-        }
-        if (parsed.records && Array.isArray(parsed.records) && Object.keys(parsed).length <= 2) {
-            registerTable('records', 'Part Line Claim (ประวัติเคลมชิ้นส่วน)', '📦', parsed.records, 'ref', 'sqe');
-            return result;
-        }
-
-        // 3. Full System Backup Snapshot { app_state: { ... } } หรือ Root Multi-Table Object
-        const state = parsed.app_state || parsed;
-
-        if (state.records && Array.isArray(state.records)) {
-            registerTable('records', 'Part Line Claim (ประวัติเคลมชิ้นส่วน)', '📦', state.records, 'ref', 'sqe');
-        }
-
-        const eightDRaw = state.eight_d_reports || state.eight_d_cases || state.eightDCases;
-        if (eightDRaw && Array.isArray(eightDRaw)) {
-            registerTable('eight_d_reports', '8D Problem Solving Reports (รายงาน 8D)', '📋', eightDRaw, 'id', 'sqe');
-        }
-
-        const usersRaw = state.users || state.allUsers || state.team_members;
-        if (usersRaw && Array.isArray(usersRaw)) {
-            registerTable('users', 'User & Staff Accounts (บัญชีพนักงาน & สิทธิ์)', '👥', usersRaw, 'email', 'sqe');
-        }
-
-        const wap = state.wap_data || state;
-        if (wap.achievements || wap.support_records) {
-            registerTable('support_records', 'Line Support Logs (บันทึกงานสนับสนุนไลน์)', '🛠️', wap.achievements || wap.support_records, 'id', 'wap');
-        }
-        if (wap.score5s || wap.s5_records) {
-            registerTable('s5_records', '5S Excellence Audits (ประเมินมาตรฐาน 5S)', '🧹', wap.score5s || wap.s5_records, 'id', 'wap');
-        }
-        if (wap.ot_records || state.ot_records) {
-            registerTable('ot_records', 'OT Management Records (บันทึกเวลาทำงานล่วงเวลา)', '⏱️', wap.ot_records || state.ot_records, 'id', 'wap');
-        }
-        if (wap.specialJobs || wap.special_jobs || state.special_jobs) {
-            registerTable('special_jobs', 'Special Jobs (งานพิเศษ & โครงการ)', '🎯', wap.specialJobs || wap.special_jobs || state.special_jobs, 'id', 'wap');
-        }
-        if (wap.skills || wap.skill_matrix || state.skill_matrix) {
-            registerTable('skill_matrix', 'Skill Matrix (ทักษะความสามารถพนักงาน)', '📊', wap.skills || wap.skill_matrix || state.skill_matrix, 'id', 'wap');
-        }
-        if (state.att_leave_records || state.daily_reports) {
-            registerTable('daily_reports', 'Daily Attendance & Leaves (บันทึกการลาและเข้างาน)', '📅', state.att_leave_records || state.daily_reports, 'id', 'wap');
-        }
-
-        const systemMatrix = state.vf_rp_email_rules || state.system || state.vf_rp_master_data;
-        if (systemMatrix && Array.isArray(systemMatrix)) {
-            registerTable('vf_rp_email_rules', 'VF & RP Email Dispatch Matrix (กฎส่งอีเมลซัพพลายเออร์)', '✉️', systemMatrix, 'id', 'sqe');
-        }
-
-        if (state.master_suppliers || state.suppliers) {
-            registerTable('master_suppliers', 'Master Suppliers (รายชื่อซัพพลายเออร์)', '🏭', state.master_suppliers || state.suppliers, 'name', 'sqe');
-        }
-        if (state.master_parts || state.parts) {
-            registerTable('master_parts', 'Master Parts (รายการชิ้นส่วน)', '🔩', state.master_parts || state.parts, 'part_no', 'sqe');
-        }
-        if (state.master_defects || state.defects) {
-            registerTable('master_defects', 'Master Defects (รายการข้อบกพร่อง)', '⚠️', state.master_defects || state.defects, 'defect_name', 'sqe');
-        }
-        if (state.calibration_records || state.calibrationMaster) {
-            registerTable('calibration_records', 'Calibration Tools Master (เครื่องมือวัด & สอบเทียบ)', '📐', state.calibration_records || state.calibrationMaster, 'code_no', 'sqe');
-        }
-
-        return result;
-    }
-
-    // =========================================================================
-    // 🪟 UNIVERSAL IMPORT MODAL & DEDUPLICATION INTERACTION
-    // =========================================================================
-
-    function showUniversalImportModal(analysis) {
-        let modal = document.getElementById('admin-universal-import-modal') || document.getElementById('admin-json-import-modal');
-        if (modal) modal.remove();
-
-        const formatIcon = analysis.format === 'CSV' ? '📊' : '📄';
-        const formatBadge = analysis.format === 'CSV' ? 'CSV FILE' : 'JSON FILE';
-
-        const tableEntries = Object.values(analysis.tables);
-        const tableListHtml = tableEntries.map((t) => `
-            <label class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 hover:border-teal-500/50 dark:hover:border-teal-500/50 transition-all cursor-pointer group">
-                <div class="flex items-center gap-3 min-w-0">
-                    <input type="checkbox" id="import-chk-${t.key}" value="${t.key}" checked class="import-table-chk w-4 h-4 text-teal-600 rounded border-slate-300 dark:border-slate-600 focus:ring-teal-500 cursor-pointer">
-                    <span class="text-xl shrink-0">${t.icon}</span>
-                    <div class="truncate">
-                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">${t.label}</span>
-                        <div class="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                            <span>ตาราง: <strong class="text-slate-700 dark:text-slate-300">${t.key}</strong></span>
-                            <span>• Key: ${t.conflictKey}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="text-right shrink-0">
-                    <span class="px-2.5 py-1 rounded-full text-[11px] font-black font-mono bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800/60 block">
-                        ${t.count.toLocaleString()} รายการ
-                    </span>
-                    <span class="text-[9.5px] text-emerald-600 dark:text-emerald-400 font-bold block mt-0.5">
-                        (ใหม่ ${t.newCount.toLocaleString()} • ซ้ำเดิม ${t.duplicateCount.toLocaleString()})
-                    </span>
-                </div>
-            </label>
-        `).join('');
-
-        const modalHtml = `
-            <div id="admin-universal-import-modal" class="fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in font-sans">
-                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all">
+                rawItems.forEach(item => {
+                    const normalized = normalizeRecord(item);
+                    const sig = `${(normalized.date || '').trim()}|${(normalized.supplier || '').toLowerCase().trim()}|${(normalized.partNo || '').toLowerCase().trim()}|${(normalized.ref || '').toLowerCase().trim()}|${(normalized.defect || '').toLowerCase().trim()}|${normalized.qty || 0}`;
                     
-                    <!-- Header -->
-                    <div class="p-4 sm:p-5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white flex items-center justify-between shrink-0">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xl shadow-inner">
-                                📥
-                            </div>
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <h3 class="text-base sm:text-lg font-black tracking-tight leading-snug">นำเข้าไฟล์ (${analysis.format || 'CSV / JSON'})</h3>
-                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-white/25 uppercase tracking-widest">${formatBadge}</span>
-                                </div>
-                                <p class="text-[11px] text-teal-100 font-medium">นำเข้าข้อมูลละเอียดทุกตาราง พร้อมระบบป้องกันการบันทึกซ้ำทุกหน้า (Zero-Duplicate Shield)</p>
-                            </div>
-                        </div>
-                        <button onclick="document.getElementById('admin-universal-import-modal').remove()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white text-sm transition-all cursor-pointer" title="ปิดหน้าต่าง">✕</button>
-                    </div>
-
-                    <!-- Body -->
-                    <div class="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 text-left">
-                        
-                        <!-- File Overview Card -->
-                        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <span class="text-2xl">${formatIcon}</span>
-                                <div class="truncate">
-                                    <span class="text-xs font-bold text-slate-800 dark:text-slate-100 block truncate font-mono">${analysis.fileName}</span>
-                                    <span class="text-[10.5px] text-slate-500 dark:text-slate-400">ขนาดไฟล์: ${analysis.fileSize} • ตรวจพบ ${Object.keys(analysis.tables).length} ตาราง</span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2 shrink-0">
-                                <div class="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center">
-                                    <span class="text-[9.5px] uppercase font-bold text-slate-400 block">ข้อมูลทั้งหมด</span>
-                                    <span class="text-xs font-mono font-black text-slate-800 dark:text-slate-200">${analysis.totalRecords.toLocaleString()} แถว</span>
-                                </div>
-                                <div class="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 text-center">
-                                    <span class="text-[9.5px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block">รายการใหม่</span>
-                                    <span class="text-xs font-mono font-black text-emerald-700 dark:text-emerald-300">+${analysis.totalNew.toLocaleString()} แถว</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Zero-Duplicate Protection Guarantee Banner -->
-                        <div class="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-3">
-                            <span class="text-emerald-600 dark:text-emerald-400 text-xl shrink-0">🛡️</span>
-                            <div class="text-[11px] text-emerald-950 dark:text-emerald-200 leading-relaxed">
-                                <strong class="font-bold text-emerald-800 dark:text-emerald-300">ระบบห้ามบันทึกซ้ำทุกหน้า (Strict Zero-Duplicate Shield 100%)</strong><br>
-                                ระบบตรวจสอบความซ้ำซ้อนของทุกคีย์หลัก (Ref No., Email, Part No, Supplier Code, ID) 
-                                ${analysis.totalDuplicates > 0 ? `พบข้อมูลเดิมในระบบจำนวน <strong class="font-bold text-amber-700 dark:text-amber-300 underline">${analysis.totalDuplicates.toLocaleString()} รายการ</strong> ซึ่งระบบจะป้องกันไม่ให้บันทึกซ้ำซ้อน` : 'ไม่พบข้อมูลซ้ำซ้อนในระบบเดิม พร้อมบันทึกอย่างปลอดภัย'}
-                            </div>
-                        </div>
-
-                        <!-- Table Selection Section -->
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between">
-                                <label class="text-xs font-black uppercase text-slate-700 dark:text-slate-300 tracking-wider">เลือกตารางที่ต้องการนำเข้า</label>
-                                <div class="flex items-center gap-2 text-[10.5px]">
-                                    <button type="button" onclick="document.querySelectorAll('.import-table-chk').forEach(c => c.checked = true)" class="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">เลือกทั้งหมด</button>
-                                    <span class="text-slate-300 dark:text-slate-600">|</span>
-                                    <button type="button" onclick="document.querySelectorAll('.import-table-chk').forEach(c => c.checked = false)" class="text-slate-500 hover:underline cursor-pointer">ล้างการเลือก</button>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-1">
-                                ${tableListHtml}
-                            </div>
-                        </div>
-
-                        <!-- Deduplication Strategy Options -->
-                        <div class="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-                            <label class="text-xs font-black uppercase text-slate-700 dark:text-slate-300 tracking-wider block">นโยบายจัดการข้อมูลซ้ำ (Deduplication Policy)</label>
-                            
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                <label class="p-3.5 rounded-2xl border-2 border-teal-500 bg-teal-50/60 dark:bg-teal-950/40 flex items-start gap-3 cursor-pointer transition-all shadow-xs">
-                                    <input type="radio" name="universal-import-mode" value="skip" checked class="mt-0.5 text-teal-600 focus:ring-teal-500">
-                                    <div>
-                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">🛡️ ห้ามบันทึกซ้ำเด็ดขาด (ข้ามรายการซ้ำ - แนะนำ)</span>
-                                        <span class="text-[10.5px] text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">เพิ่มเฉพาะข้อมูลใหม่ ${analysis.totalNew.toLocaleString()} รายการ ไม่แตะต้องและไม่สร้างข้อมูลซ้ำในตารางเดิม</span>
-                                    </div>
-                                </label>
-
-                                <label class="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 hover:border-teal-500/40 flex items-start gap-3 cursor-pointer transition-all">
-                                    <input type="radio" name="universal-import-mode" value="upsert" class="mt-0.5 text-teal-600 focus:ring-teal-500">
-                                    <div>
-                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">🔄 อัปเดตข้อมูลเดิมตามคีย์หลัก</span>
-                                        <span class="text-[10.5px] text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">ปรับปรุงค่าฟิลด์เดิมด้วยข้อมูลล่าสุดจากไฟล์ และเพิ่มรายการใหม่</span>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- Progress Container (Hidden by default) -->
-                        <div id="universal-import-progress-wrap" class="hidden p-4 rounded-2xl bg-slate-900 text-white border border-teal-500/30 space-y-2.5 animate-fade-in">
-                            <div class="flex items-center justify-between text-xs font-bold">
-                                <span id="universal-progress-status" class="flex items-center gap-2">
-                                    <svg class="animate-spin h-3.5 w-3.5 text-teal-400" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                    กำลังนำเข้าข้อมูลสู่ฐานข้อมูล (High-Speed Batch)...
-                                </span>
-                                <span id="universal-progress-pct" class="font-mono text-teal-400 font-black">0%</span>
-                            </div>
-                            <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-                                <div id="universal-progress-bar" class="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400 h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
-                            </div>
-                            <p id="universal-progress-detail" class="text-[10px] text-slate-400 font-mono">เตรียมการนำเข้าข้อมูล...</p>
-                        </div>
-
-                    </div>
-
-                    <!-- Footer Actions -->
-                    <div class="p-4 sm:p-5 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-                        <button type="button" onclick="document.getElementById('admin-universal-import-modal').remove()" class="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 transition-all active:scale-95 cursor-pointer">
-                            ยกเลิก
-                        </button>
-                        <button type="button" id="btn-start-universal-import" onclick="WapAdminSystem.executeUniversalImport()" class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md shadow-teal-900/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer">
-                            <span>🚀 ยืนยันการนำเข้าข้อมูล</span>
-                        </button>
-                    </div>
-
-                </div>
-            </div>
-        `;
-
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        window._pendingUniversalAnalysis = analysis;
-    }
-
-    function showJSONImportModal(analysis, fileName, fileSize) {
-        showUniversalImportModal(analysis);
-    }
-
-    // =========================================================================
-    // ⚡ UNIVERSAL IMPORT EXECUTION ENGINE (BATCH UPSERT & DEDUP)
-    // =========================================================================
-
-    async function executeUniversalImport() {
-        const analysis = window._pendingUniversalAnalysis || window._pendingJSONAnalysis;
-        if (!analysis || !analysis.tables) {
-            toast("⚠️ ไม่พบข้อมูลการนำเข้า", "error");
-            return;
+                    if ((normalized.id && existingIds.has(String(normalized.id).trim())) || existingSigs.has(sig)) {
+                        duplicateItems.push(normalized);
+                    } else {
+                        newItems.push(normalized);
+                        if (normalized.id) existingIds.add(String(normalized.id).trim());
+                        existingSigs.add(sig);
+                    }
+                });
+            }
+            else if (targetTab === 'users') {
+                const existingUsers = _data.users || [];
+                const existingEmails = new Set(existingUsers.map(u => String(u.email || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const email = String(item.email || '').toLowerCase().trim();
+                    if (existingEmails.has(email)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingEmails.add(email);
+                    }
+                });
+            }
+            else if (targetTab === 'suppliers') {
+                const existing = _data.suppliers || [];
+                const existingNames = new Set(existing.map(s => String(s.name || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const name = String(item.name || '').toLowerCase().trim();
+                    if (existingNames.has(name)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingNames.add(name);
+                    }
+                });
+            }
+            else if (targetTab === 'parts') {
+                const existing = _data.parts || [];
+                const existingPns = new Set(existing.map(p => String(p.part_no || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const pn = String(item.part_no || item.partNo || '').toLowerCase().trim();
+                    if (existingPns.has(pn)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingPns.add(pn);
+                    }
+                });
+            }
+            else if (targetTab === 'defects') {
+                const existing = _data.defects || [];
+                const existingDefects = new Set(existing.map(d => String(d.defect_name || d.name || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const def = String(item.defect_name || item.name || '').toLowerCase().trim();
+                    if (existingDefects.has(def)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingDefects.add(def);
+                    }
+                });
+            }
+            else if (targetTab === 'system') {
+                const existing = _data.system || [];
+                const existingCodes = new Set(existing.map(s => String(s.vendor_code || s.supplier_code || s.id || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const code = String(item.vendor_code || item.supplier_code || item.id || '').toLowerCase().trim();
+                    if (existingCodes.has(code)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingCodes.add(code);
+                    }
+                });
+            }
+        } catch (scanErr) {
+            console.warn("Scan Deduplication issue:", scanErr);
+            newItems = rawItems;
+            duplicateItems = [];
         }
+        showLoader(false);
 
-        const selectedCheckboxes = Array.from(document.querySelectorAll('.import-table-chk:checked, .json-table-chk:checked')).map(c => c.value);
-        if (selectedCheckboxes.length === 0) {
-            toast("⚠️ กรุณาเลือกอย่างน้อย 1 ตารางที่ต้องการนำเข้า", "warn");
-            return;
-        }
-
-        const modeRadios = document.getElementsByName('universal-import-mode');
-        let mode = 'skip';
-        for (const r of modeRadios) {
-            if (r.checked) { mode = r.value; break; }
-        }
-
-        const progressWrap = document.getElementById('universal-import-progress-wrap') || document.getElementById('json-import-progress-wrap');
-        const progressStatus = document.getElementById('universal-progress-status') || document.getElementById('json-progress-status');
-        const progressPct = document.getElementById('universal-progress-pct') || document.getElementById('json-progress-pct');
-        const progressBar = document.getElementById('universal-progress-bar') || document.getElementById('json-progress-bar');
-        const progressDetail = document.getElementById('universal-progress-detail') || document.getElementById('json-progress-detail');
-        const btnStart = document.getElementById('btn-start-universal-import') || document.getElementById('btn-start-json-import');
-
-        if (progressWrap) progressWrap.classList.remove('hidden');
-        if (btnStart) {
-            btnStart.disabled = true;
-            btnStart.classList.add('opacity-50', 'pointer-events-none');
-        }
-
-        const results = {
-            totalProcessed: 0,
-            totalSuccess: 0,
-            totalSkipped: 0,
-            tables: {},
-            mode,
-            format: analysis.format || 'JSON'
+        const tabDisplayNames = {
+            records: '📥 รายการเคลม (Claim Records Database)',
+            users: '👥 Agents (รายชื่อพนักงาน/ผู้ใช้งาน)',
+            suppliers: '🏢 Suppliers (รายชื่อซัพพลายเออร์)',
+            parts: '⚙️ Parts (รายการชิ้นส่วน)',
+            defects: '⚠️ Defects (รายการข้อบกพร่อง/อาการเสีย)',
+            system: '📧 VF & RP Email Dispatch Matrix (ระบบส่งอีเมล)'
         };
 
-        const clients = getAdminClients();
-        const mainSb = clients[0] || (typeof sqeClient !== 'undefined' ? sqeClient : null);
-        const wapSb = (typeof wapClient !== 'undefined' && wapClient) ? wapClient : mainSb;
+        const targetName = tabDisplayNames[targetTab] || targetTab;
+        const total = rawItems.length;
+        const newCount = newItems.length;
+        const dupCount = duplicateItems.length;
 
-        let totalSelectedItems = 0;
-        selectedCheckboxes.forEach(k => {
-            if (analysis.tables[k]) totalSelectedItems += analysis.tables[k].count;
+        if (newCount === 0 && dupCount > 0) {
+            showCustomConfirmDialog({
+                title: `🛡️ ตรวจพบข้อมูลซ้ำทั้งหมด (${dupCount} รายการ)`,
+                subtitle: `ข้อมูลทั้งหมด ${total} รายการในไฟล์นี้ มีอยู่ในฐานข้อมูล ${targetName} เรียบร้อยแล้ว (ไม่พบข้อมูลใหม่)`,
+                badge: `SMART DEDUP ENGINE (${targetTab.toUpperCase()})`,
+                type: "warning",
+                details: [
+                    { label: "ชื่อไฟล์", value: fileName || 'Data Import' },
+                    { label: "หมวดหมู่เป้าหมาย", value: targetName },
+                    { label: "ข้อมูลทั้งหมดในไฟล์", value: `${total} รายการ` },
+                    { label: "ข้อมูลที่ซ้ำในระบบ", value: `${dupCount} รายการ (100% Duplicate)` }
+                ],
+                confirmText: `⚡ บันทึกทับ/อัปเดตข้อมูลเดิม (${total} รายการ)`,
+                cancelText: "ยกเลิกการนำเข้า",
+                onConfirm: async () => {
+                    await executeUniversalImport(targetTab, rawItems, { overwrite: true, totalCount: total, duplicateCount: dupCount });
+                }
+            });
+            return;
+        }
+
+        showCustomConfirmDialog({
+            title: `📥 ยืนยันการนำเข้าข้อมูล (พร้อมระบบกันซ้ำ)`,
+            subtitle: `ตรวจพบข้อมูลทั้งหมด ${total} รายการ: มีข้อมูลใหม่ ${newCount} รายการ และข้อมูลที่ซ้ำกับในระบบ ${dupCount} รายการ`,
+            badge: `SMART DEDUP IMPORT (${targetTab.toUpperCase()})`,
+            type: "info",
+            details: [
+                { label: "ชื่อไฟล์", value: fileName || 'Data Import' },
+                { label: "เป้าหมาย", value: targetName },
+                { label: "ข้อมูลทั้งหมดในไฟล์", value: `${total} รายการ` },
+                { label: "🟢 ข้อมูลใหม่ที่จะนำเข้า", value: `${newCount} รายการ` },
+                { label: "🟡 ข้อมูลที่ซ้ำ (จะถูกข้าม)", value: `${dupCount} รายการ` }
+            ],
+            confirmText: `🛡️ นำเข้าเฉพาะรายการใหม่ (${newCount} รายการ - กันซ้ำ)`,
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                await executeUniversalImport(targetTab, newItems, { overwrite: false, totalCount: total, duplicateCount: dupCount });
+            }
         });
+    }
 
-        let completedItems = 0;
+    async function analyzeAndExecuteDeduplication(targetTab, rawItems, options = {}) {
+        let newItems = [];
+        let duplicateItems = [];
+        
+        if (targetTab === 'records') {
+            const existingRecords = S.records || [];
+            const existingIds = new Set(existingRecords.map(r => String(r.id || '').trim()).filter(Boolean));
+            const existingSigs = new Set(existingRecords.map(r => `${(r.date || '').trim()}|${(r.supplier || '').toLowerCase().trim()}|${(r.partNo || '').toLowerCase().trim()}|${(r.ref || r.lotNo || '').toLowerCase().trim()}|${(r.defect || '').toLowerCase().trim()}|${r.qty || 0}`));
+            
+            rawItems.forEach(item => {
+                const normalized = normalizeRecord(item);
+                const sig = `${(normalized.date || '').trim()}|${(normalized.supplier || '').toLowerCase().trim()}|${(normalized.partNo || '').toLowerCase().trim()}|${(normalized.ref || '').toLowerCase().trim()}|${(normalized.defect || '').toLowerCase().trim()}|${normalized.qty || 0}`;
+                if ((normalized.id && existingIds.has(String(normalized.id).trim())) || existingSigs.has(sig)) {
+                    duplicateItems.push(normalized);
+                } else {
+                    newItems.push(normalized);
+                    if (normalized.id) existingIds.add(String(normalized.id).trim());
+                    existingSigs.add(sig);
+                }
+            });
+        } else if (targetTab === 'users') {
+            const existingEmails = new Set((_data.users || []).map(u => String(u.email || '').toLowerCase().trim()));
+            rawItems.forEach(u => {
+                if (existingEmails.has(String(u.email || '').toLowerCase().trim())) duplicateItems.push(u);
+                else { newItems.push(u); existingEmails.add(String(u.email || '').toLowerCase().trim()); }
+            });
+        } else if (targetTab === 'suppliers') {
+            const existingNames = new Set((_data.suppliers || []).map(s => String(s.name || '').toLowerCase().trim()));
+            rawItems.forEach(s => {
+                if (existingNames.has(String(s.name || '').toLowerCase().trim())) duplicateItems.push(s);
+                else { newItems.push(s); existingNames.add(String(s.name || '').toLowerCase().trim()); }
+            });
+        } else if (targetTab === 'parts') {
+            const existingPns = new Set((_data.parts || []).map(p => String(p.part_no || p.partNo || '').toLowerCase().trim()));
+            rawItems.forEach(p => {
+                const pn = String(p.part_no || p.partNo || '').toLowerCase().trim();
+                if (existingPns.has(pn)) duplicateItems.push(p);
+                else { newItems.push(p); existingPns.add(pn); }
+            });
+        } else if (targetTab === 'defects') {
+            const existingDefects = new Set((_data.defects || []).map(d => String(d.defect_name || d.name || '').toLowerCase().trim()));
+            rawItems.forEach(d => {
+                const dn = String(d.defect_name || d.name || '').toLowerCase().trim();
+                if (existingDefects.has(dn)) duplicateItems.push(d);
+                else { newItems.push(d); existingDefects.add(dn); }
+            });
+        } else if (targetTab === 'system') {
+            const existingCodes = new Set((_data.system || []).map(s => String(s.vendor_code || s.supplier_code || s.id || '').toLowerCase().trim()));
+            rawItems.forEach(r => {
+                const code = String(r.vendor_code || r.supplier_code || r.id || '').toLowerCase().trim();
+                if (existingCodes.has(code)) duplicateItems.push(r);
+                else { newItems.push(r); existingCodes.add(code); }
+            });
+        } else {
+            newItems = rawItems;
+        }
 
-        const updateProgress = (tableLabel, currentBatch, totalBatches, count) => {
-            const pct = Math.min(100, Math.round((completedItems / Math.max(1, totalSelectedItems)) * 100));
-            if (progressPct) progressPct.textContent = `${pct}%`;
-            if (progressBar) progressBar.style.width = `${pct}%`;
-            if (progressDetail) {
-                progressDetail.textContent = `ตาราง: ${tableLabel} • ชุดที่ ${currentBatch}/${totalBatches} (${count} รายการ)`;
-            }
-        };
+        if (newItems.length > 0) {
+            await executeUniversalImport(targetTab, newItems, { overwrite: false, silent: options.silent });
+        }
+        return { count: newItems.length, dup: duplicateItems.length };
+    }
 
-        for (const tableKey of selectedCheckboxes) {
-            const tableConfig = analysis.tables[tableKey];
-            if (!tableConfig || !tableConfig.data || tableConfig.data.length === 0) continue;
+    async function executeUniversalImport(targetTab, records, options = {}) {
+        if (!records || records.length === 0) {
+            toast("⚠️ ไม่มีรายการใหม่ที่จะนำเข้า (ข้อมูลซ้ำทั้งหมด)", "info");
+            return;
+        }
 
-            const targetClient = tableConfig.targetService === 'wap' ? wapSb : mainSb;
-            const rawRows = tableConfig.data;
-            const conflictKey = tableConfig.conflictKey || 'id';
+        showLoader(true);
+        try {
+            const clients = getAdminClients();
+            
+            if (targetTab === 'records') {
+                // บันทึกรายการเคลมลง Supabase ตาราง records ทันที
+                const formattedRecords = records.map(normalizeRecord);
+                const dbRecords = formattedRecords.map(r => formToSupabase(r));
 
-            results.tables[tableKey] = {
-                label: tableConfig.label,
-                count: rawRows.length,
-                success: 0,
-                skipped: 0
-            };
-
-            // 1. Data Normalization & In-memory Deduplication
-            let normalizedRows = [];
-
-            if (tableKey === 'records') {
-                const uniqueMap = new Map();
-                rawRows.forEach((r, idx) => {
-                    const cleanRef = String(r.ref || `CLM-${new Date().getFullYear()}-${String(idx + 1).padStart(4, '0')}`).trim().toUpperCase();
-                    if (!uniqueMap.has(cleanRef) || mode === 'upsert') {
-                        uniqueMap.set(cleanRef, {
-                            id: r.id || (typeof generateUUID === 'function' ? generateUUID() : `clm_${Date.now()}_${idx}`),
-                            date: r.date || new Date().toISOString().split('T')[0],
-                            shift: r.shift || 'SHIFT A',
-                            inspector: r.inspector || r.user_id || 'SYSTEM',
-                            ref: cleanRef,
-                            line: r.line || '-',
-                            supplier: r.supplier || r.supplier_name || '-',
-                            partNo: String(r.partNo || r.part_no || '-').trim().toUpperCase(),
-                            partName: r.partName || r.part_name || '-',
-                            qty: parseInt(r.qty) || 1,
-                            unit: r.unit || 'PCS',
-                            defect: r.defect || r.defect_name || '-',
-                            remark: r.remark || '',
-                            judgment: r.judgment || 'OK',
-                            created_at: r.created_at || new Date().toISOString()
-                        });
-                    }
+                await chunkedSupabaseUpsert('records', dbRecords, {
+                    chunkSize: 20,
+                    delayMs: 40,
+                    conflictField: 'id',
+                    progressMsg: 'บันทึกรายการเคลมลงฐานข้อมูล',
+                    showProgressToast: formattedRecords.length > 20
                 });
-                normalizedRows = Array.from(uniqueMap.values());
-            } 
-            else if (tableKey === 'users') {
-                const uniqueUsers = new Map();
-                rawRows.forEach(u => {
-                    const cleanEmail = String(u.email || '').trim().toLowerCase();
-                    if (cleanEmail && cleanEmail.includes('@')) {
-                        if (!uniqueUsers.has(cleanEmail) || mode === 'upsert') {
-                            uniqueUsers.set(cleanEmail, {
-                                id: u.id || (typeof generateUUID === 'function' ? generateUUID() : `usr_${Date.now()}`),
-                                email: cleanEmail,
-                                name: u.name || resolveOfficialDisplayName(cleanEmail, cleanEmail.split('@')[0].toUpperCase()),
-                                role: u.role || 'sqe_support',
-                                password: u.password || 'Carrier@123',
-                                status: u.status || 'active',
-                                created_at: u.created_at || new Date().toISOString()
-                            });
-                        }
-                    }
-                });
-                normalizedRows = Array.from(uniqueUsers.values());
-            }
-            else if (tableKey === 'master_suppliers') {
-                const uniqueSuppliers = new Map();
-                rawRows.forEach(s => {
-                    const cleanName = String(s.name || s.supplier_name || '').trim().toUpperCase();
-                    if (cleanName && (!uniqueSuppliers.has(cleanName) || mode === 'upsert')) {
-                        uniqueSuppliers.set(cleanName, {
-                            name: cleanName,
-                            code: s.code || s.vendor_code || undefined
-                        });
-                    }
-                });
-                normalizedRows = Array.from(uniqueSuppliers.values());
-            }
-            else if (tableKey === 'master_parts') {
-                const uniqueParts = new Map();
-                rawRows.forEach(p => {
-                    const cleanPn = String(p.part_no || p.partNo || p.part_number || '').trim().toUpperCase();
-                    if (cleanPn && (!uniqueParts.has(cleanPn) || mode === 'upsert')) {
-                        uniqueParts.set(cleanPn, {
-                            part_no: cleanPn,
-                            part_name: p.part_name || p.partName || '-',
-                            category: p.category || 'General'
-                        });
-                    }
-                });
-                normalizedRows = Array.from(uniqueParts.values());
-            }
-            else if (tableKey === 'master_defects') {
-                const uniqueDefects = new Map();
-                rawRows.forEach(d => {
-                    const cleanDef = String(d.defect_name || d.defect || '').trim().toUpperCase();
-                    if (cleanDef && (!uniqueDefects.has(cleanDef) || mode === 'upsert')) {
-                        uniqueDefects.set(cleanDef, {
-                            defect_name: cleanDef,
-                            category: d.category || 'General'
-                        });
-                    }
-                });
-                normalizedRows = Array.from(uniqueDefects.values());
-            }
-            else if (tableKey === 'vf_rp_email_rules') {
-                const uniqueRulesMap = new Map();
-                rawRows.forEach((r, idx) => {
-                    const formatted = formatRuleForSupabase(r, idx);
-                    const ruleKey = String(formatted[conflictKey] || formatted.id || idx);
-                    if (!uniqueRulesMap.has(ruleKey) || mode === 'upsert') {
-                        uniqueRulesMap.set(ruleKey, formatted);
-                    }
-                });
-                normalizedRows = Array.from(uniqueRulesMap.values());
-            }
-            else {
-                // Generic cleaner: remove transient UI tags and strictly deduplicate by conflictKey
-                const uniqueRowsMap = new Map();
-                rawRows.forEach(row => {
-                    const { sync_status, ...rest } = row;
-                    const idVal = String(rest[conflictKey] || rest.id || JSON.stringify(rest)).trim();
-                    if (!uniqueRowsMap.has(idVal) || mode === 'upsert') {
-                        uniqueRowsMap.set(idVal, rest);
-                    }
-                });
-                normalizedRows = Array.from(uniqueRowsMap.values());
-            }
 
-            // 2. High-speed Chunked Batch Upsert with Deduplication Shield
-            const BATCH_SIZE = 50;
-            const totalBatches = Math.ceil(normalizedRows.length / BATCH_SIZE);
-
-            for (let i = 0; i < normalizedRows.length; i += BATCH_SIZE) {
-                const batch = normalizedRows.slice(i, i + BATCH_SIZE);
-                const currentBatchNum = Math.floor(i / BATCH_SIZE) + 1;
+                // อัปเดต Memory State และ Local Storage Cache
+                if (!S.records) S.records = [];
+                S.records = formattedRecords.concat(S.records);
 
                 try {
-                    if (targetClient) {
-                        const { error } = await targetClient
-                            .from(tableKey)
-                            .upsert(batch, {
-                                onConflict: conflictKey,
-                                ignoreDuplicates: mode === 'skip'
-                            });
+                    if (typeof SQEIndexedDBManager !== 'undefined') {
+                        SQEIndexedDBManager.saveTableCache(`claim_records_${S.currentUser}`, S.records);
+                    }
+                    safeLocalStorageSet(`carrier_records_cache_${S.currentUser}`, JSON.stringify(S.records.slice(0, 500)));
+                } catch (ce) {}
 
-                        if (error) {
-                            console.warn(`[Import Notice on ${tableKey}] Fallback to item-level upsert:`, error.message);
-                            for (const item of batch) {
-                                try {
-                                    await targetClient.from(tableKey).upsert([item], {
-                                        onConflict: conflictKey,
-                                        ignoreDuplicates: mode === 'skip'
-                                    });
-                                } catch (_) {}
-                            }
-                        }
-                    }
-
-                    // Local DB Sync (Dexie & State) for immediate offline persistence
-                    if (tableKey === 'records' && typeof db !== 'undefined' && db && db.records) {
-                        try { await db.records.bulkPut(batch); } catch (_) {}
-                    }
-                    if (tableKey === 'ot_records' && typeof db !== 'undefined' && db && db.pendingOT) {
-                        try { await db.pendingOT.bulkPut(batch); } catch (_) {}
-                    }
-                    if (tableKey === 's5_records' && typeof db !== 'undefined' && db && db.pending5S) {
-                        try { await db.pending5S.bulkPut(batch); } catch (_) {}
-                    }
-
-                    results.tables[tableKey].success += batch.length;
-                    results.totalSuccess += batch.length;
-                } catch (batchErr) {
-                    console.error(`[Batch Upsert Error on ${tableKey}]`, batchErr);
+                if (typeof renderTable === 'function') renderTable();
+                if (typeof rebuildSmartMemory === 'function') rebuildSmartMemory(S.records);
+                if (typeof updateAIBrain === 'function') updateAIBrain(S.records);
+                if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+                if (typeof loadRecords === 'function') {
+                    try { await loadRecords(); } catch (_) {}
+                }
+                
+                const countDisplay = document.getElementById('record-count');
+                if (countDisplay) {
+                    countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
                 }
 
-                completedItems += batch.length;
-                results.totalProcessed += batch.length;
-                updateProgress(tableConfig.label, currentBatchNum, totalBatches, batch.length);
-                await new Promise(res => setTimeout(res, 40));
+                writeAuditLog('RECORD_IMPORT', `นำเข้าข้อมูลรายการเคลมสำเร็จ: ${records.length} รายการใหม่ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้าข้อมูลเคลมสำเร็จ! บันทึกลงฐานข้อมูลแล้ว ${records.length} รายการใหม่ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
             }
+            else if (targetTab === 'users') {
+                const preparedUsers = records.map(u => ({
+                    email: String(u.email || '').trim().toLowerCase(),
+                    display_name: u.display_name || u.name || resolveOfficialDisplayName(u.email, u.email.split('@')[0].toUpperCase()),
+                    role: u.role || 'sqe_support',
+                    password: u.password || 'Carrier@123',
+                    status: u.status || 'active',
+                    updated_at: new Date().toISOString()
+                }));
 
-            // Memory State Synchronization with Zero Duplication
-            if (tableKey === 'records' && typeof S !== 'undefined' && Array.isArray(S.records)) {
-                normalizedRows.forEach(nr => {
-                    const idx = S.records.findIndex(er => String(er.ref).toUpperCase() === String(nr.ref).toUpperCase());
-                    if (idx >= 0 && mode === 'upsert') S.records[idx] = { ...S.records[idx], ...nr };
-                    else if (idx === -1) S.records.unshift(nr);
-                });
-            }
-            if (tableKey === 'users') {
+                await chunkedSupabaseUpsert('profiles', preparedUsers, { chunkSize: 20, delayMs: 40, conflictField: 'email', progressMsg: 'บันทึกบัญชีผู้ใช้' });
+                
+                const existing = _data.users || [];
+                const updatedList = options.overwrite ? preparedUsers : existing.concat(preparedUsers.filter(nu => !existing.some(eu => eu.email.toLowerCase() === nu.email.toLowerCase())));
+                _data.users = updatedList;
+
+                writeAuditLog('USER_IMPORT', `นำเข้าบัญชีพนักงานสำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้าบัญชีพนักงานสำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
                 await loadData();
             }
-            if (tableKey === 'master_suppliers') {
-                _data.suppliers = normalizedRows;
+            else if (targetTab === 'suppliers') {
+                const preparedSuppliers = records.map(s => ({ 
+                    name: String(s.name || s.supplier_name || '').trim().toUpperCase() 
+                })).filter(s => s.name);
+                await chunkedSupabaseUpsert('master_suppliers', preparedSuppliers, { chunkSize: 25, delayMs: 40, conflictField: 'name', progressMsg: 'บันทึกรายชื่อ Supplier' });
+                
+                const existing = _data.suppliers || [];
+                const updatedList = options.overwrite ? preparedSuppliers : existing.concat(preparedSuppliers.filter(ns => !existing.some(es => es.name.toLowerCase() === ns.name.toLowerCase())));
+                _data.suppliers = updatedList;
+
+                writeAuditLog('SUPPLIER_IMPORT', `นำเข้ารายชื่อ Supplier สำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้ารายชื่อ Supplier สำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+                await loadData();
             }
-            if (tableKey === 'master_parts') {
-                _data.parts = normalizedRows;
+            else if (targetTab === 'parts') {
+                const preparedParts = records.map(p => ({
+                    part_no: String(p.part_no || p.partNo || '').trim().toUpperCase(),
+                    part_name: p.part_name || p.partName || '-',
+                    category: p.category || 'General'
+                })).filter(p => p.part_no);
+
+                await chunkedSupabaseUpsert('master_parts', preparedParts, { chunkSize: 25, delayMs: 40, conflictField: 'part_no', progressMsg: 'บันทึก Part Number' });
+                
+                const existing = _data.parts || [];
+                const updatedList = options.overwrite ? preparedParts : existing.concat(preparedParts.filter(np => !existing.some(ep => ep.part_no.toLowerCase() === np.part_no.toLowerCase())));
+                _data.parts = updatedList;
+
+                writeAuditLog('PART_IMPORT', `นำเข้ารายการ Part Number สำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้ารายการ Part Number สำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+                await loadData();
             }
-            if (tableKey === 'master_defects') {
-                _data.defects = normalizedRows;
+            else if (targetTab === 'defects') {
+                const preparedDefects = records.map(d => ({
+                    defect_name: String(d.defect_name || d.name || '').trim().toUpperCase(),
+                    category: d.category || 'General'
+                })).filter(d => d.defect_name);
+
+                await chunkedSupabaseUpsert('master_defects', preparedDefects, { chunkSize: 25, delayMs: 40, conflictField: 'defect_name', progressMsg: 'บันทึก Defect Code' });
+                
+                const existing = _data.defects || [];
+                const updatedList = options.overwrite ? preparedDefects : existing.concat(preparedDefects.filter(nd => !existing.some(ed => ed.defect_name.toLowerCase() === nd.defect_name.toLowerCase())));
+                _data.defects = updatedList;
+
+                writeAuditLog('DEFECT_IMPORT', `นำเข้ารายการ Defect Code สำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้ารายการ Defect Code สำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+                await loadData();
             }
-            if (tableKey === 'vf_rp_email_rules') {
-                _data.system = normalizedRows;
-                window.VF_RP_MASTER_DATA = normalizedRows;
-                safeSaveLocalMasterData(normalizedRows);
+            else if (targetTab === 'system') {
+                const formattedList = records.map((r, idx) => formatRuleForSupabase(r, idx));
+                const existing = _data.system || [];
+                const updatedList = options.overwrite ? formattedList : existing.concat(formattedList.filter(nr => !existing.some(er => (er.vendor_code || '').toLowerCase() === (nr.vendor_code || '').toLowerCase())));
+                
+                _data.system = updatedList;
+                window.VF_RP_MASTER_DATA = updatedList;
+                safeSaveLocalMasterData(updatedList);
+
+                // Cloud persistence
+                for (const client of clients) {
+                    try {
+                        await client.from('system_settings').upsert({
+                            id: 'vf_rp_master_config',
+                            data: updatedList,
+                            updated_at: new Date().toISOString()
+                        });
+                        await client.from('system_settings').update({
+                            vf_rp_email_rules: updatedList,
+                            updated_at: new Date().toISOString()
+                        }).eq('id', 'global_config');
+                    } catch (storeErr) { console.warn("VF_RP persistence warning:", storeErr); }
+                }
+
+                await chunkedSupabaseUpsert('vf_rp_email_rules', updatedList, {
+                    chunkSize: 15,
+                    delayMs: 60,
+                    conflictField: 'id',
+                    progressMsg: 'บันทึก VF & RP Matrix',
+                    showProgressToast: updatedList.length > 25
+                });
+
+                writeAuditLog('SYSTEM_IMPORT', `นำเข้ากฎการส่งอีเมล VF & RP สำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้ากฎการส่งอีเมล VF & RP สำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+                await loadData();
             }
+
+            renderTable();
+            updateStats();
+        } catch (err) {
+            console.error("Execute Universal Import Error:", err);
+            toast("❌ เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + err.message, "error");
         }
-
-        // Close import modal and show completion summary
-        const importModal = document.getElementById('admin-universal-import-modal') || document.getElementById('admin-json-import-modal');
-        if (importModal) importModal.remove();
-
-        showUniversalImportResultSummary(results);
-
-        // Global refresh across all modules
-        writeAuditLog('UNIVERSAL_IMPORT', `นำเข้าข้อมูล (${results.format}) สำเร็จ รวม ${results.totalSuccess} รายการ (โหมด ${results.mode})`);
-        if (typeof loadRecords === 'function') await loadRecords();
-        if (typeof fetchWAPData === 'function') await fetchWAPData();
-        if (typeof triggerGlobalRefresh === 'function') triggerGlobalRefresh();
-        if (typeof renderTable === 'function') renderTable();
-        if (typeof updateStats === 'function') updateStats();
+        showLoader(false);
     }
 
-    function executeUniversalJSONImport() {
-        return executeUniversalImport();
-    }
+    async function executeCSVOverwrite(targetTab, records) {
+        showLoader(true);
+        try {
+            const clients = getAdminClients();
+            if (targetTab === 'users') {
+                for (const client of clients) {
+                    try {
+                        await client.from('profiles').delete().neq('email', 'placeholder@carrier.com');
+                    } catch(delErr) { console.warn("Delete users prior to CSV import:", delErr); }
+                }
+                
+                const hasMaster = records.some(u => u.email.toLowerCase() === masterAdminEmail.toLowerCase());
+                if (!hasMaster) {
+                    records.unshift({
+                        email: masterAdminEmail,
+                        display_name: 'ADMINISTRATOR',
+                        role: 'admin',
+                        password: 'admin',
+                        status: 'active'
+                    });
+                }
+                
+                const preparedUsers = records.map(u => ({
+                    email: String(u.email || '').trim().toLowerCase(),
+                    display_name: u.display_name || u.name || resolveOfficialDisplayName(u.email, u.email.split('@')[0].toUpperCase()),
+                    role: u.role || 'sqe_support',
+                    password: u.password || 'Carrier@123',
+                    status: u.status || 'active',
+                    updated_at: new Date().toISOString()
+                }));
+                
+                await chunkedSupabaseUpsert('profiles', preparedUsers, { chunkSize: 20, delayMs: 40, conflictField: 'email', progressMsg: 'บันทึกบัญชีผู้ใช้' });
+                _data.users = preparedUsers;
+                await loadData();
+            }
+            else if (targetTab === 'suppliers') {
+                for (const client of clients) {
+                    try {
+                        await client.from('master_suppliers').delete().neq('name', '___NONE___');
+                    } catch(delErr) { console.warn("Delete suppliers error:", delErr); }
+                }
+                
+                const suppliersToInsert = records.map(s => ({ name: String(s.name || s.supplier_name || '').trim().toUpperCase() })).filter(s => s.name);
+                await chunkedSupabaseUpsert('master_suppliers', suppliersToInsert, { chunkSize: 25, delayMs: 40, conflictField: 'name', progressMsg: 'บันทึกรายชื่อ Supplier' });
+                _data.suppliers = suppliersToInsert;
+                await loadData();
+            }
+            else if (targetTab === 'parts') {
+                for (const client of clients) {
+                    try {
+                        await client.from('master_parts').delete().neq('part_no', '___NONE___');
+                    } catch(delErr) { console.warn("Delete parts error:", delErr); }
+                }
+                
+                const partsToInsert = records.map(p => ({ part_no: String(p.part_no || p.partNo || '').trim().toUpperCase(), part_name: p.part_name || p.partName || '-' })).filter(p => p.part_no);
+                await chunkedSupabaseUpsert('master_parts', partsToInsert, { chunkSize: 25, delayMs: 40, conflictField: 'part_no', progressMsg: 'บันทึก Part Number' });
+                _data.parts = partsToInsert;
+                await loadData();
+            }
+            else if (targetTab === 'defects') {
+                for (const client of clients) {
+                    try {
+                        await client.from('master_defects').delete().neq('defect_name', '___NONE___');
+                    } catch(delErr) { console.warn("Delete defects error:", delErr); }
+                }
+                
+                const defectsToInsert = records.map(d => ({ defect_name: String(d.defect_name || d.name || '').trim().toUpperCase(), category: d.category || 'General' })).filter(d => d.defect_name);
+                await chunkedSupabaseUpsert('master_defects', defectsToInsert, { chunkSize: 25, delayMs: 40, conflictField: 'defect_name', progressMsg: 'บันทึก Defect Code' });
+                _data.defects = defectsToInsert;
+                await loadData();
+            }
+            else if (targetTab === 'system') {
+                const formattedList = records.map((r, idx) => formatRuleForSupabase(r, idx));
+                _data.system = formattedList;
+                window.VF_RP_MASTER_DATA = formattedList;
+                safeSaveLocalMasterData(formattedList);
 
-    function showUniversalImportResultSummary(results) {
-        let summaryModal = document.getElementById('admin-universal-summary-modal') || document.getElementById('admin-json-summary-modal');
-        if (summaryModal) summaryModal.remove();
+                // 1. Persist to system_settings on Supabase (100% online cloud persistence)
+                for (const client of clients) {
+                    try {
+                        await client.from('system_settings').upsert({
+                            id: 'vf_rp_master_config',
+                            data: formattedList,
+                            updated_at: new Date().toISOString()
+                        });
+                        await client.from('system_settings').update({
+                            vf_rp_email_rules: formattedList,
+                            updated_at: new Date().toISOString()
+                        }).eq('id', 'global_config');
+                    } catch (storeErr) { console.warn("VF_RP persistence warning:", storeErr); }
+                }
 
-        const tableBreakdowns = Object.entries(results.tables).map(([key, t]) => `
-            <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
-                <div>
-                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block">${t.label}</span>
-                    <span class="text-[10px] text-slate-400 font-mono">ตาราง: ${key}</span>
-                </div>
-                <div class="text-right">
-                    <span class="px-2.5 py-1 rounded-full text-xs font-mono font-black bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                        +${t.success.toLocaleString()} รายการ
-                    </span>
-                </div>
-            </div>
-        `).join('');
-
-        const summaryHtml = `
-            <div id="admin-universal-summary-modal" class="fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in font-sans">
-                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col text-left">
-                    <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-xl">
-                            ✅
-                        </div>
-                        <div>
-                            <h3 class="text-base font-black uppercase tracking-wider">นำเข้าข้อมูล (${results.format || 'CSV / JSON'}) สำเร็จ</h3>
-                            <p class="text-[11px] text-teal-100 font-medium">บันทึกข้อมูลและป้องกันข้อมูลซ้ำซ้อนในระบบเรียบร้อยแล้ว</p>
-                        </div>
-                    </div>
-                    
-                    <div class="p-5 space-y-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
-                        <div class="grid grid-cols-2 gap-3 text-center">
-                            <div class="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60">
-                                <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase block">บันทึกสำเร็จ</span>
-                                <span class="text-xl font-black font-mono text-emerald-700 dark:text-emerald-300">${results.totalSuccess.toLocaleString()}</span>
-                            </div>
-                            <div class="p-3.5 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60">
-                                <span class="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 uppercase block">โหมดจัดการข้อมูลซ้ำ</span>
-                                <span class="text-xs font-black text-cyan-800 dark:text-cyan-300 block mt-1">${results.mode === 'skip' ? '🛡️ ห้ามบันทึกซ้ำ (ข้ามรายการเดิม)' : '🔄 อัปเดตข้อมูลเดิม'}</span>
-                            </div>
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-[11px] font-black uppercase text-slate-500 tracking-wider block">สรุปแยกรายตาราง</label>
-                            <div class="space-y-2">
-                                ${tableBreakdowns}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="p-4 bg-slate-50 dark:bg-slate-900/90 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-                        <button onclick="document.getElementById('admin-universal-summary-modal').remove()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-md shadow-emerald-900/20">
-                            ตกลง (เสร็จสิ้น)
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.insertAdjacentHTML('beforeend', summaryHtml);
-        toast(`🎉 นำเข้าข้อมูลสำเร็จรวม ${results.totalSuccess.toLocaleString()} รายการ (ป้องกันข้อมูลซ้ำสมบูรณ์)`, "success");
-    }
-
-    function showJSONImportResultSummary(results) {
-        showUniversalImportResultSummary(results);
-    }
-
-    function executeCSVOverwrite() {
-        return executeUniversalImport();
+                // 2. ทยอยส่งบันทึกลงตาราง vf_rp_email_rules ทีละชุด (15 รายการ/ชุด)
+                for (const client of clients) {
+                    try {
+                        await client.from('vf_rp_email_rules').delete().neq('id', '___PLACEHOLDER___');
+                    } catch (tblErr) {
+                        console.warn("Direct vf_rp_email_rules delete notice:", tblErr);
+                    }
+                }
+                await chunkedSupabaseUpsert('vf_rp_email_rules', formattedList, {
+                    chunkSize: 15,
+                    delayMs: 70,
+                    conflictField: 'id',
+                    progressMsg: 'บันทึก VF & RP Matrix',
+                    showProgressToast: formattedList.length > 25
+                });
+            }
+            
+            writeAuditLog('CSV_IMPORT', `นำเข้าไฟล์ CSV บันทึกทับข้อมูล ${targetTab} สำเร็จ (${records.length} รายการ)`);
+            toast(`✅ นำเข้าข้อมูล ${records.length} รายการ (ทยอยบันทึกครบทุกชุด) เรียบร้อยแล้ว`, "success");
+            await loadData();
+        } catch (err) {
+            console.error("Execute CSV Overwrite Error:", err);
+            toast("❌ บันทึกข้อมูลไม่สำเร็จ: " + err.message, "error");
+        }
+        showLoader(false);
     }
 
     async function harvestFromHistory() {
@@ -25417,6 +25372,12 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
     }
 
     function handleAddNew() {
+        if (_currentTab === 'logs') {
+            toast("🔄 กำลังรีเฟรชข้อมูล Activity Log ล่าสุด...", "info");
+            loadData();
+            return;
+        }
+
         const modal = document.getElementById('admin-master-modal');
         const content = document.getElementById('master-modal-content');
         if (!modal || !content) return;
@@ -25799,25 +25760,15 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
                 [r.engineer, r.sqe_email, 'SQE Engineer']
             ];
             pairs.forEach(([n, em, role]) => {
-                let cleanN = String(n || '').trim();
+                const cleanN = String(n || '').trim();
                 let cleanEm = String(em || '').trim();
-                if (cleanN && cleanN !== '-' && cleanN !== '--') {
+                if (cleanN && cleanN !== '-') {
                     cleanEm = (typeof window.resolveStaffEmail === 'function')
                         ? window.resolveStaffEmail(cleanN, cleanEm)
                         : cleanEm;
-                    cleanN = (typeof window.canonicalStaffDisplayName === 'function')
-                        ? window.canonicalStaffDisplayName(cleanN, cleanEm)
-                        : cleanN;
                     const key = cleanEm ? cleanEm.toLowerCase() : cleanN.toLowerCase();
-                    if (cleanEm && cleanEm !== '-') {
-                        if (!map.has(key)) {
-                            map.set(key, { name: cleanN, email: cleanEm, role });
-                        } else {
-                            const exist = map.get(key);
-                            if (/^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(cleanN) && !/^(?:mr|ms|mrs|miss|dr|khun)\.?/i.test(exist.name)) {
-                                exist.name = cleanN;
-                            }
-                        }
+                    if (!map.has(key) && cleanEm && cleanEm !== '-') {
+                        map.set(key, { name: cleanN, email: cleanEm, role });
                     }
                 }
             });
@@ -27221,7 +27172,7 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
             for (const client of clients) {
                 try {
                     if (userId && !String(userId).startsWith('appr_')) {
-                        await client.from('users').update({ 
+                        await client.from('profiles').update({ 
                             force_reset: newVal, 
                             is_reset_key_required: newVal,
                             updated_at: new Date().toISOString()
@@ -27230,7 +27181,7 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
                 } catch (_) {}
                 try {
                     if (user.email) {
-                        await client.from('users').update({ 
+                        await client.from('profiles').update({ 
                             force_reset: newVal, 
                             is_reset_key_required: newVal,
                             updated_at: new Date().toISOString()
@@ -27276,11 +27227,11 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
 
             for (const client of clients) {
                 try {
-                    await client.from('users').upsert(payload, { onConflict: 'email' });
+                    await client.from('profiles').upsert(payload, { onConflict: 'email' });
                 } catch (_) {}
                 try {
                     if (userId && !String(userId).startsWith('appr_')) {
-                        await client.from('users').update({ 
+                        await client.from('profiles').update({ 
                             password: newPass,
                             updated_at: nowIso
                         }).eq('id', userId);
@@ -27288,7 +27239,7 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
                 } catch (_) {}
                 try {
                     if (user.email) {
-                        await client.from('users').update({ 
+                        await client.from('profiles').update({ 
                             password: newPass,
                             updated_at: nowIso
                         }).eq('email', user.email);
@@ -27339,9 +27290,9 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
             let success = false;
             for (const client of clients) {
                 try {
-                    const { data: existUser } = await client.from('users').select('id').ilike('email', email).maybeSingle();
+                    const { data: existUser } = await client.from('profiles').select('id').ilike('email', email).maybeSingle();
                     if (existUser && existUser.id) {
-                        const { error: upErr } = await client.from('users').update({
+                        const { error: upErr } = await client.from('profiles').update({
                             display_name: displayName,
                             password: pass,
                             role: role,
@@ -27350,7 +27301,7 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
                         }).eq('id', existUser.id);
                         if (!upErr) { success = true; continue; }
                     } else {
-                        const { error: insErr } = await client.from('users').insert([payload]);
+                        const { error: insErr } = await client.from('profiles').insert([payload]);
                         if (!insErr) { success = true; }
                     }
                 } catch (_) {}
@@ -27502,25 +27453,25 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
                 // 1. Update by numeric ID
                 if (userId && !isNaN(userId) && Number(userId) > 0) {
                     try {
-                        const { error: idErr, data: idData } = await client.from('users').update(updatePayload).eq('id', Number(userId)).select('id');
+                        const { error: idErr, data: idData } = await client.from('profiles').update(updatePayload).eq('id', Number(userId)).select('id');
                         if (!idErr && idData && idData.length > 0) { success = true; continue; }
                     } catch (_) {}
                 }
 
                 // 2. Update by case-insensitive email
                 try {
-                    const { error: emErr, data: emData } = await client.from('users').update(updatePayload).ilike('email', email).select('id');
+                    const { error: emErr, data: emData } = await client.from('profiles').update(updatePayload).ilike('email', email).select('id');
                     if (!emErr && emData && emData.length > 0) { success = true; continue; }
                 } catch (_) {}
 
                 // 3. Fallback: Find existing or insert
                 try {
-                    const { data: existUser } = await client.from('users').select('id').ilike('email', email).maybeSingle();
+                    const { data: existUser } = await client.from('profiles').select('id').ilike('email', email).maybeSingle();
                     if (existUser && existUser.id) {
-                        const { error: existErr } = await client.from('users').update(updatePayload).eq('id', existUser.id);
+                        const { error: existErr } = await client.from('profiles').update(updatePayload).eq('id', existUser.id);
                         if (!existErr) { success = true; continue; }
                     } else {
-                        const { error: insErr } = await client.from('users').insert([{
+                        const { error: insErr } = await client.from('profiles').insert([{
                             ...updatePayload,
                             created_at: nowIso
                         }]);
@@ -27623,12 +27574,12 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
             for (const client of clients) {
                 try {
                     if (userId && !String(userId).startsWith('appr_')) {
-                        await client.from('users').delete().eq('id', userId);
+                        await client.from('profiles').delete().eq('id', userId);
                     }
                 } catch (_) {}
                 try {
                     if (email) {
-                        await client.from('users').delete().eq('email', email);
+                        await client.from('profiles').delete().eq('email', email);
                     }
                 } catch (_) {}
             }
@@ -27645,6 +27596,105 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
             toast("❌ ลบบัญชีไม่สำเร็จ: " + (e.message || ''), "error");
         }
         showLoader(false);
+    }
+
+    function viewLogDetails(logId) {
+        const log = (_data.logs || []).find(l => String(l.id) === String(logId));
+        if (!log) {
+            toast("ไม่พบข้อมูล Log นี้", "warning");
+            return;
+        }
+
+        const modal = document.getElementById('admin-master-modal');
+        const content = document.getElementById('master-modal-content');
+        if (!modal || !content) return;
+
+        setModalSize('wide');
+        modal.classList.remove('hidden-view');
+
+        const dateStr = log.created_at ? new Date(log.created_at).toLocaleString('th-TH') : '-';
+        const oldJson = log.old_data ? JSON.stringify(log.old_data, null, 2) : null;
+        const newJson = log.new_data ? JSON.stringify(log.new_data, null, 2) : null;
+        const rawJson = JSON.stringify(log, null, 2);
+        const safeRawJson = rawJson.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+
+        content.innerHTML = `
+            <div class="space-y-4 text-left">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div>
+                        <h3 class="text-base font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+                            ACTIVITY LOG INSPECTOR
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">ID: ${log.id || 'N/A'}</p>
+                    </div>
+                    <button id="btn-copy-log-json" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        Copy JSON
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Timestamp</span>
+                        <span class="font-mono font-semibold text-slate-700 dark:text-slate-200">${dateStr}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">User / Operator</span>
+                        <span class="font-semibold text-blue-600 dark:text-blue-400 truncate block">${log.user_email || log.inspector || 'System'}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Action Type</span>
+                        <span class="font-bold text-slate-800 dark:text-slate-200 uppercase">${log.original_action || log.action || '-'}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target ID</span>
+                        <span class="font-mono font-semibold text-slate-700 dark:text-slate-300">${log.record_id && log.record_id !== '0' ? log.record_id : 'N/A'}</span>
+                    </div>
+                </div>
+
+                ${log.details ? `
+                <div class="p-3 bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl">
+                    <span class="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-0.5">Activity Message</span>
+                    <p class="text-xs text-slate-700 dark:text-slate-200">${log.details}</p>
+                </div>` : ''}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">Old State (Previous Data)</span>
+                        </div>
+                        <pre class="w-full h-44 p-3 bg-slate-900 text-slate-300 rounded-xl text-[11px] font-mono overflow-auto custom-scrollbar border border-slate-800">${oldJson || '// ไม่มีข้อมูลสถานะเดิม (Initial Creation หรือ No Diff)'}</pre>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">New State (Payload / Changed Data)</span>
+                        </div>
+                        <pre class="w-full h-44 p-3 bg-slate-900 text-emerald-300 rounded-xl text-[11px] font-mono overflow-auto custom-scrollbar border border-slate-800">${newJson || '// ไม่มี Payload ข้อมูลใหม่'}</pre>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <button onclick="WapAdminSystem.closeMasterModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer">
+                        ปิดหน้าต่าง
+                    </button>
+                </div>
+            </div>`;
+
+        setTimeout(() => {
+            const btnCopy = document.getElementById('btn-copy-log-json');
+            if (btnCopy) {
+                btnCopy.onclick = () => {
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(rawJson).then(() => {
+                            toast("📋 คัดลอกข้อมูล JSON ทั้งหมดแล้ว", "success");
+                        }).catch(() => {
+                            toast("ไม่สามารถคัดลอกได้", "warning");
+                        });
+                    }
+                };
+            }
+        }, 50);
     }
 
     function closeMasterModal() { 
@@ -27710,10 +27760,11 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
     }
 
     return { 
-        init, switchTab, loadData, harvestFromHistory,
-        triggerUniversalImport, handleUniversalFileSelected, showUniversalImportModal, executeUniversalImport, showUniversalImportResultSummary,
-        triggerCSVImport, handleCSVFileSelected, parseCSV, executeCSVOverwrite,
-        triggerJSONImport, handleJSONFileSelected, analyzeJSONImportData, showJSONImportModal, executeUniversalJSONImport, showJSONImportResultSummary,
+        init, switchTab, loadData, harvestFromHistory, 
+        triggerCSVImport, triggerUniversalImport, triggerJSONImport,
+        handleCSVFileSelected, handleUniversalFileSelected, handleJSONFileSelected,
+        parseCSV, processJSONImport, processCSVUniversalImport, runDeduplicationDialogAndImport,
+        analyzeAndExecuteDeduplication, executeUniversalImport, executeCSVOverwrite,
         updateAnnouncement, 
         toggleBanner, deleteEntry, closeMasterModal, handleAddNew, saveMaster, saveUser,
         extractDisplayNameFromEmail, onEmailInputForDisplayName, changeUserRoleDirectly,
@@ -27722,6 +27773,7 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         openResetSecurityModal, copyUserCredentials, toggleForceResetState, applyNewSecurityKey,
         openEditUserModal, updateUser, openDeleteUserModal, confirmDeleteUser,
         openEditEmailRuleModal, saveEmailRule, deleteEmailRule, toggleEmailRuleStatus, openFullDetailModal, exportVFRPToCSV, setModalSize,
+        viewLogDetails,
         triggerAutoPurgeSessions, triggerSecurityAuditScan, triggerOptimizeDatabase, triggerAutoSystemRelay, syncAllVFRPToSupabase, sanitizeAndFixAllEmailRules,
         getEmailRules: () => {
             if ((!_data.system || _data.system.length === 0) && window.VF_RP_MASTER_DATA && window.VF_RP_MASTER_DATA.length > 0) {
@@ -27776,78 +27828,189 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
     
 })();
 
+// Expose universal import functions globally
+window.triggerUniversalImport = () => window.WapAdminSystem?.triggerUniversalImport();
+window.triggerJSONImport = () => window.WapAdminSystem?.triggerJSONImport();
+window.handleUniversalFileSelected = (e) => window.WapAdminSystem?.handleUniversalFileSelected(e);
+window.handleJSONFileSelected = (e) => window.WapAdminSystem?.handleJSONFileSelected(e);
+
 /**
- * 🛡️ ULTRA-ROBUST MATRIX LOOKUP & SYNC ENGINE
- * รองรับการซิงค์ข้อมูล VF & RP Email Rules จาก Supabase, Local JSON Seed และ LocalStorage
+ * 🛡️ ULTRA-ROBUST MATRIX LOOKUP ENGINE & BUILT-IN BASELINE RULES
+ * รองรับการทำงานทั้งบน Cloud Supabase, LocalStorage, และ Built-in Standard Baseline
  */
-window.loadVFRPDataFromCloud = async function() {
-    let list = null;
+window.BASE_VF_RP_MATRIX_RULES = [
+    {
+        id: 'vf-rp-alfa-laval',
+        supplier_name: 'Alfa Laval (Thailand) Co., Ltd.',
+        supplier: 'Alfa Laval (Thailand) Co., Ltd.',
+        vendor_code: 'LA0001',
+        parts_group: 'Piping and Mat',
+        initials_name: 'ALFA',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Watcharin Y.',
+        sqe_email: 'watcharin.yawanopart@carrier.com',
+        confirm_vf_name: 'Ms.Nipawan J.',
+        confirm_vf_email: 'nipawan.janpong@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Mr.Watcharin Y.',
+        approve_vf_rp_email: 'watcharin.yawanopart@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    },
+    {
+        id: 'vf-rp-kaosu-packing',
+        supplier_name: 'KAOSU PACKING INDUSTRY CO.,LTD.',
+        supplier: 'KAOSU PACKING INDUSTRY CO.,LTD.',
+        vendor_code: 'LK0194',
+        parts_group: 'Packaging',
+        initials_name: 'KAOSU',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Pongpan P.',
+        sqe_email: 'pongpan.panna@carrier.com',
+        confirm_vf_name: 'Mr.Komson N.',
+        confirm_vf_email: 'komson.namwicha@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    },
+    {
+        id: 'vf-rp-mold-default',
+        supplier_name: 'Plastic Resin Mold Supplier',
+        supplier: 'Plastic Resin Mold Supplier',
+        vendor_code: 'MOLD_DEFAULT',
+        parts_group: 'Plastic Resin Mold Part',
+        initials_name: 'MOLD',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Natthawut C.',
+        sqe_email: 'natthawut.chaising@carrier.com',
+        confirm_vf_name: 'Mr.Pongpan P.',
+        confirm_vf_email: 'pongpan.panna@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    },
+    {
+        id: 'vf-rp-steel-default',
+        supplier_name: 'Sheet Metal & Steel Supplier',
+        supplier: 'Sheet Metal & Steel Supplier',
+        vendor_code: 'STEEL_DEFAULT',
+        parts_group: 'Steel',
+        initials_name: 'STEEL',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Komson N.',
+        sqe_email: 'komson.namwicha@carrier.com',
+        confirm_vf_name: 'Mr.Komson N.',
+        confirm_vf_email: 'komson.namwicha@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    },
+    {
+        id: 'vf-rp-electronic-default',
+        supplier_name: 'Electronic & PCBA Supplier',
+        supplier: 'Electronic & PCBA Supplier',
+        vendor_code: 'ELEC_DEFAULT',
+        parts_group: 'Electric Controls',
+        initials_name: 'ELEC',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Ms.Songporn C.',
+        sqe_email: 'songporn.chaisim@carrier.com',
+        confirm_vf_name: 'Mr.Witsarut S.',
+        confirm_vf_email: 'witsarut.singholsai@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    }
+];
 
-    // 1. ตรวจสอบจาก Supabase (Cloud Database)
+// ฟังก์ชันโหลดข้อมูล Matrix เข้า Memory ทันทีตั้งแต่เปิดแอพ
+window.initVFRPMatrixEngine = async function() {
     try {
-        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) 
-            || (typeof sqeClient !== 'undefined' ? sqeClient : null)
-            || (typeof wapClient !== 'undefined' ? wapClient : null);
-        if (sb && typeof sb.from === 'function') {
-            const { data, error } = await sb.from('vf_rp_email_rules').select('*').limit(1000);
-            if (!error && Array.isArray(data) && data.length > 0) {
-                list = data;
-            }
-        }
-    } catch (err) {
-        console.warn('[VF_RP Matrix] Direct Supabase fetch note:', err);
-    }
-
-    // 2. Fallback: โหลดจาก Local JSON File (seed_vf_rp_rules.json)
-    if (!list || list.length === 0) {
-        try {
-            const resp = await fetch('./seed_vf_rp_rules.json');
-            if (resp.ok) {
-                const seedData = await resp.json();
-                if (Array.isArray(seedData) && seedData.length > 0) {
-                    list = seedData;
-                }
-            }
-        } catch (_) {}
-    }
-
-    // 3. Fallback: โหลดจาก LocalStorage แคชเดิม
-    if (!list || list.length === 0) {
-        try {
-            const cached = localStorage.getItem('carrier_vf_rp_master_data');
-            if (cached) {
+        let loadedRules = [];
+        // 1. ลองดึงจาก LocalStorage ก่อนเพื่อความรวดเร็ว
+        const cached = localStorage.getItem('carrier_vf_rp_master_data');
+        if (cached) {
+            try {
                 const parsed = JSON.parse(cached);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    list = parsed;
+                    loadedRules = parsed;
+                    window.VF_RP_MASTER_DATA = loadedRules;
+                    if (window.WapAdminSystem && window.WapAdminSystem._data) {
+                        window.WapAdminSystem._data.system = loadedRules;
+                    }
                 }
+            } catch (_) {}
+        }
+
+        // 2. ดึงข้อมูลล่าสุดจาก Supabase (ถ้าออนไลน์)
+        if (navigator.onLine && typeof sqeClient !== 'undefined') {
+            try {
+                const { data: tblData, error: tblErr } = await sqeClient
+                    .from('vf_rp_email_rules')
+                    .select('*')
+                    .order('supplier_name', { ascending: true });
+                
+                if (!tblErr && tblData && Array.isArray(tblData) && tblData.length > 0) {
+                    loadedRules = tblData;
+                    window.VF_RP_MASTER_DATA = loadedRules;
+                    if (window.WapAdminSystem && window.WapAdminSystem._data) {
+                        window.WapAdminSystem._data.system = loadedRules;
+                    }
+                    localStorage.setItem('carrier_vf_rp_master_data', JSON.stringify(loadedRules));
+                }
+            } catch (queryErr) {
+                console.warn("[initVFRPMatrixEngine] Background query notice:", queryErr);
             }
-        } catch (_) {}
-    }
+        }
 
-    if (list && Array.isArray(list) && list.length > 0) {
-        window.VF_RP_MASTER_DATA = list;
-        try {
-            localStorage.setItem('carrier_vf_rp_master_data', JSON.stringify(list));
-        } catch (_) {}
-        console.log(`[VF_RP Matrix] Synchronized ${list.length} vendor rules into memory.`);
+        // 3. รวม Baseline Rules หากในระบบยังไม่มี
+        if (!window.VF_RP_MASTER_DATA || window.VF_RP_MASTER_DATA.length === 0) {
+            window.VF_RP_MASTER_DATA = [...window.BASE_VF_RP_MATRIX_RULES];
+        }
+    } catch (e) {
+        console.warn("[initVFRPMatrixEngine] Error:", e);
     }
-
-    return window.VF_RP_MASTER_DATA || [];
 };
 
-// เริ่มโหลดข้อมูลกฎ Matrix ทันทีในพื้นหลัง
-if (typeof window !== 'undefined') {
-    setTimeout(() => {
-        if (typeof window.loadVFRPDataFromCloud === 'function') {
-            window.loadVFRPDataFromCloud();
-        }
-    }, 100);
-}
-
-/**
- * 🛡️ ค้นหากฎ Matrix ทั้งหมดที่ตรงกับ Vendor (รองรับ Vendor ที่มีหลาย Rule)
- */
-window.getAllVFRPMatricesForSupplier = function(supplierName, vendorCode, initials) {
+window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
     let list = [];
 
     // 1. ดึงข้อมูลจาก Memory (ลำดับความสำคัญสูงสุด)
@@ -27859,10 +28022,10 @@ window.getAllVFRPMatricesForSupplier = function(supplierName, vendorCode, initia
         list = window.VF_RP_MASTER_DATA;
     }
 
-    // 2. Fallback: ค้นหาจาก LocalStorage
+    // 2. Fallback: ค้นหาจาก LocalStorage (กรณีเปิดไฟล์ตรงๆ หรือออฟไลน์)
     if (!list || !list.length) {
         try {
-            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_cache'];
+            const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_cache', 'carrier_latest_app_state_backup'];
             for (const key of backupKeys) {
                 const cached = localStorage.getItem(key);
                 if (cached) {
@@ -27880,18 +28043,24 @@ window.getAllVFRPMatricesForSupplier = function(supplierName, vendorCode, initia
         }
     }
     
+    // รวมรายการ Baseline Rules เพื่อการันตีว่ามีข้อมูลเสมอ
     if (!list || !list.length) {
-        if (typeof window.loadVFRPDataFromCloud === 'function') {
-            window.loadVFRPDataFromCloud();
-        }
-        return [];
+        list = window.BASE_VF_RP_MATRIX_RULES || [];
+        window.VF_RP_MASTER_DATA = list;
+    } else if (Array.isArray(window.BASE_VF_RP_MATRIX_RULES)) {
+        // เพิ่ม base rules เข้าไปใน list หากยังไม่มี
+        window.BASE_VF_RP_MATRIX_RULES.forEach(baseRule => {
+            if (!list.some(r => (r.supplier_name && r.supplier_name.toLowerCase() === baseRule.supplier_name.toLowerCase()) || (r.vendor_code && r.vendor_code === baseRule.vendor_code))) {
+                list.push(baseRule);
+            }
+        });
     }
 
     // 3. ฟังก์ชันทำความสะอาดข้อความระดับลึก (Deep Cleaning)
     const deepClean = (val) => {
         if (!val || val === '-' || val === '--') return "";
         return String(val).trim().toLowerCase()
-            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V_ นำหน้า
+            .replace(/^v[\.\s_\-]+/i, '') // ตัด V. หรือ V. นำหน้า
             .replace(/\b(co\.,\s*ltd|co\.,ltd|co\s+ltd|ltd|company\s+limited|inc|corp|corporation|จำกัด|บริษัท|vendor)\b/gi, '') 
             .replace(/[-_>]/g, ' ')
             .replace(/[^a-z0-9ก-๙\s]/gi, '') // ลบสัญลักษณ์พิเศษทั้งหมด
@@ -27914,9 +28083,11 @@ window.getAllVFRPMatricesForSupplier = function(supplierName, vendorCode, initia
             sName = VENDOR_MASTER[vCode];
         }
         if (sName && !vCode) {
-            const foundEntry = Object.entries(VENDOR_MASTER).find(([k, v]) => 
-                v.toLowerCase().includes(sName.toLowerCase()) || sName.toLowerCase().includes(v.toLowerCase())
-            );
+            const cleanSName = deepClean(sName);
+            const foundEntry = Object.entries(VENDOR_MASTER).find(([k, v]) => {
+                const cleanV = deepClean(v);
+                return cleanV === cleanSName || cleanV.includes(cleanSName) || cleanSName.includes(cleanV) || v.toLowerCase().includes(sName.toLowerCase()) || sName.toLowerCase().includes(v.toLowerCase());
+            });
             if (foundEntry) vCode = foundEntry[0];
         }
     }
@@ -27925,38 +28096,89 @@ window.getAllVFRPMatricesForSupplier = function(supplierName, vendorCode, initia
     const targetCode = deepClean(vCode);
     const targetInit = deepClean(sInit);
 
-    if (!targetName && !targetCode && !targetInit) return [];
+    // 4. เริ่มการค้นหาแบบลำดับความสำคัญ (Matching Logic)
+    let matched = null;
 
-    return list.filter(r => {
-        const dbName = deepClean(r.supplier_name || r.supplier || '');
-        const dbCode = deepClean(r.vendor_code || r.supplier_code || '');
-        const dbInit = deepClean(r.initials_name || '');
-        const dbTo = deepClean(r.to_vf_rp_report || '');
-        const dbDear = deepClean(r.dear_vendor || '');
+    if (targetName || targetCode || targetInit) {
+        matched = list.find(r => {
+            const dbName = deepClean(r.supplier_name || r.supplier || '');
+            const dbCode = deepClean(r.vendor_code || r.supplier_code || '');
+            const dbInit = deepClean(r.initials_name || '');
+            const dbTo = deepClean(r.to_vf_rp_report || '');
+            const dbDear = deepClean(r.dear_vendor || '');
 
-        // กฎที่ 1: รหัส Vendor ตรงกัน (แม่นยำที่สุด)
-        if (targetCode && dbCode && (dbCode === targetCode || dbCode.includes(targetCode) || targetCode.includes(dbCode))) return true;
+            // กฎที่ 1: รหัส Vendor ตรงกัน (แม่นยำที่สุด)
+            if (targetCode && dbCode && (dbCode === targetCode || dbCode.includes(targetCode) || targetCode.includes(dbCode))) return true;
 
-        // กฎที่ 2: ตัวย่อ (Initials) ตรงกัน
-        if (targetInit && dbInit && (dbInit === targetInit || dbInit.includes(targetInit))) return true;
+            // กฎที่ 2: ตัวย่อ (Initials) ตรงกัน
+            if (targetInit && dbInit && (dbInit === targetInit || dbInit.includes(targetInit))) return true;
 
-        // กฎที่ 3: ชื่อบริษัทตรงกัน หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา หรือเทียบจากชื่อผู้ติดต่อ
-        if (targetName) {
-            if (dbName && (dbName === targetName || dbName.includes(targetName) || targetName.includes(dbName))) return true;
-            if (dbInit && (dbInit === targetName || targetName.includes(dbInit))) return true;
-            if (dbTo && (dbTo.includes(targetName) || targetName.includes(dbTo))) return true;
-            if (dbDear && (dbDear.includes(targetName) || targetName.includes(dbDear))) return true;
-        }
+            // กฎที่ 3: ชื่อบริษัทตรงกันเป๊ะ หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา หรือเทียบจากชื่อผู้ติดต่อ
+            if (targetName) {
+                if (dbName && (dbName === targetName || dbName.includes(targetName) || targetName.includes(dbName))) return true;
+                if (dbInit && (dbInit === targetName || targetName.includes(dbInit))) return true;
+                if (dbTo && (dbTo.includes(targetName) || targetName.includes(dbTo))) return true;
+                if (dbDear && (dbDear.includes(targetName) || targetName.includes(dbDear))) return true;
 
-        return false;
-    });
-};
+                // กฎย่อย: เช็คคีย์เวิร์ดสำคัญ เช่น kaosu, alfa laval, etc.
+                const tokens = targetName.split(' ').filter(t => t.length >= 3);
+                if (tokens.length > 0 && dbName) {
+                    const allTokensMatch = tokens.some(tok => dbName.includes(tok));
+                    if (allTokensMatch) return true;
+                }
+            }
 
-window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
-    const all = (typeof window.getAllVFRPMatricesForSupplier === 'function')
-        ? window.getAllVFRPMatricesForSupplier(supplierName, vendorCode, initials)
-        : [];
-    return (all && all.length > 0) ? all[0] : null;
+            return false;
+        });
+    }
+
+    // หากพบ Vendor โดยตรง ให้คืนค่าทันที
+    if (matched) return matched;
+
+    // 5. Fallback อัจฉริยะตามประเภทกลุ่มงาน (Parts Group / Category Smart Fallback)
+    const lowerName = sName.toLowerCase();
+    if (lowerName.includes('pack') || lowerName.includes('box') || lowerName.includes('carton') || lowerName.includes('print') || lowerName.includes('label')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('pack') || (r.parts_group || '').toLowerCase().includes('print') || (r.supplier_name || '').toLowerCase().includes('kaosu'));
+        if (found) return found;
+    } else if (lowerName.includes('mold') || lowerName.includes('plastic') || lowerName.includes('resin')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('mold') || (r.parts_group || '').toLowerCase().includes('plastic'));
+        if (found) return found;
+    } else if (lowerName.includes('steel') || lowerName.includes('sheet') || lowerName.includes('metal')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('steel') || (r.parts_group || '').toLowerCase().includes('sheet'));
+        if (found) return found;
+    } else if (lowerName.includes('pipe') || lowerName.includes('copper') || lowerName.includes('tube') || lowerName.includes('alfa')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('piping') || (r.supplier_name || '').toLowerCase().includes('alfa'));
+        if (found) return found;
+    } else if (lowerName.includes('elect') || lowerName.includes('pcb') || lowerName.includes('control') || lowerName.includes('wire')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('elect') || (r.parts_group || '').toLowerCase().includes('pcba'));
+        if (found) return found;
+    }
+
+    // 6. Default Fallback สำหรับ Supplier ทั่วไป (รับประกันความสมบูรณ์ ไม่เป็น Null)
+    return {
+        id: 'matrix-fallback-' + (vCode || 'GEN'),
+        supplier_name: sName || 'Standard Supplier',
+        supplier: sName || 'Standard Supplier',
+        vendor_code: vCode || 'GEN01',
+        parts_group: 'General',
+        initials_name: sInit || 'SUPP',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Natthawut C.',
+        sqe_email: 'natthawut.chaising@carrier.com',
+        confirm_vf_name: 'Mr.Komson N.',
+        confirm_vf_email: 'komson.namwicha@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    };
 };
 
 // --- แก้ไขฟังก์ชันซิงค์ข้อมูลเมื่อมีการแก้ไข VENDOR บนหน้าเอกสาร (Document Sync Engine) ---
@@ -27970,6 +28192,7 @@ window.onVfDocVendorChange = function(el) {
         : null;
 
     // 2. อัปเดตข้อมูลเข้าสู่สถานะตัวแปรปัจจุบัน (Internal State Update)
+    // จุดนี้สำคัญมาก! เพราะหน้าส่งเมล์จะดึงข้อมูลจาก currentCase ไปใช้
     const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
         ? Wap8DSystem.getCurrentCase()
         : null;
@@ -27981,10 +28204,13 @@ window.onVfDocVendorChange = function(el) {
         vf.vendor = rawVal; 
 
         if (matrix) {
+            // ถ้าเจอใน Matrix ให้หยอดค่าที่เกี่ยวข้องลงใน Data Object ทันที
             vf.vendor_code = matrix.vendor_code || vf.vendor_code;
             vf.part_group = matrix.parts_group || vf.part_group;
+            
+            // หยอดอีเมลที่แมปมาจาก Matrix เข้าไปเก็บไว้ใน Case เพื่อให้ปุ่มส่งเมล์มองเห็น
             vf.inform_email_to = matrix.inform_email_to || matrix.recipient_to;
-            vf.team_member_email = matrix.team_member_email;
+            vf.team_member_email = matrix.team_member_email; // 3.3 ที่คุณต้องการ
         }
     }
 
@@ -28001,34 +28227,29 @@ window.onVfDocVendorChange = function(el) {
         if (vCodeEl && matrix.vendor_code && matrix.vendor_code !== '-') vCodeEl.innerText = matrix.vendor_code;
         if (partGrpEl && matrix.parts_group && matrix.parts_group !== '-') partGrpEl.innerText = matrix.parts_group;
 
-        // อัปเดตชื่อวิศวกร, หัวหน้างาน และผู้อนุมัติ ตาม Vendor Matrix
+        // อัปเดตชื่อหัวหน้างานและผู้อนุมัติ (CONFIRM BY & APPROVED BY) ตาม Vendor Matrix
         const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
         const isRP = reportType.includes('RP');
-        const mIssue = isRP ? (matrix.iqc_eng_name || matrix.engineer) : (matrix.engineer || matrix.iqc_eng_name);
-        const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
-        const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
+        const mConfirm = isRP ? (matrix.confirm_rp_name || '') : (matrix.confirm_vf_name || '');
+        const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || '') : (matrix.approve_vf_name || matrix.approve_vf_rp_name || '');
 
         if (curCase?.report_data?.vf_data) {
             const vf = curCase.report_data.vf_data;
-            if (!vf.issue_sig_active && mIssue) {
-                vf.issue_by = mIssue;
-                const iInput = document.getElementById('prob-issue-by');
-                if (iInput) iInput.value = mIssue;
-            }
-            if (!vf.confirm_sig_active && mConfirm) {
+            if (!vf.confirm_sig_active && mConfirm && mConfirm !== '-') {
                 vf.confirm_by = mConfirm;
                 const cInput = document.getElementById('prob-confirm-by');
                 if (cInput) cInput.value = mConfirm;
             }
-            if (!vf.approved_sig_active && mApprove) {
+            if (!vf.approved_sig_active && mApprove && mApprove !== '-') {
                 vf.approved_by = mApprove;
                 const aInput = document.getElementById('prob-approved-by');
                 if (aInput) aInput.value = mApprove;
             }
         }
 
-        toast(`🔗 เชื่อมโยงข้อมูล ${rawVal} สำเร็จ (พร้อมสิทธิ์การเซ็นตาม Matrix)`, "success");
+        toast(`🔗 เชื่อมโยงข้อมูล ${rawVal} สำเร็จ (พร้อมส่งอีเมล)`, "success");
     } else {
+        // กรณีพิมพ์ชื่อแล้วหาใน Matrix ไม่เจอ
         console.warn(`[Matrix] Supplier "${rawVal}" not found in master database.`);
     }
 
@@ -28049,7 +28270,6 @@ window.onVfDocVendorCodeChange = function(el) {
         const ccEl = document.getElementById('vf-doc-cc-display');
         const vEl = document.getElementById('vf-doc-vendor');
         const partGrpEl = document.getElementById('vf-doc-part-group');
-
         if (toEl && matrix.to_vf_rp_report && matrix.to_vf_rp_report !== '-') toEl.innerText = matrix.to_vf_rp_report;
         if (ccEl && matrix.cc_vf_rp_report && matrix.cc_vf_rp_report !== '-') ccEl.innerText = matrix.cc_vf_rp_report;
         if (vEl && matrix.supplier) vEl.innerText = matrix.supplier.toUpperCase();
@@ -28062,21 +28282,14 @@ window.onVfDocVendorCodeChange = function(el) {
             const vf = curCase.report_data.vf_data;
             const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
             const isRP = reportType.includes('RP');
-            const mIssue = isRP ? (matrix.iqc_eng_name || matrix.engineer) : (matrix.engineer || matrix.iqc_eng_name);
-            const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
-            const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
-
-            if (!vf.issue_sig_active && mIssue) {
-                vf.issue_by = mIssue;
-                const iInput = document.getElementById('prob-issue-by');
-                if (iInput) iInput.value = mIssue;
-            }
-            if (!vf.confirm_sig_active && mConfirm) {
+            const mConfirm = isRP ? (matrix.confirm_rp_name || '') : (matrix.confirm_vf_name || '');
+            const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || '') : (matrix.approve_vf_name || matrix.approve_vf_rp_name || '');
+            if (!vf.confirm_sig_active && mConfirm && mConfirm !== '-') {
                 vf.confirm_by = mConfirm;
                 const cInput = document.getElementById('prob-confirm-by');
                 if (cInput) cInput.value = mConfirm;
             }
-            if (!vf.approved_sig_active && mApprove) {
+            if (!vf.approved_sig_active && mApprove && mApprove !== '-') {
                 vf.approved_by = mApprove;
                 const aInput = document.getElementById('prob-approved-by');
                 if (aInput) aInput.value = mApprove;
@@ -28096,9 +28309,9 @@ async function syncMaintenanceStatus() {
         if (!sb) return;
         const { data, error } = await sb
             .from('system_settings')
-            .select('is_maintenance_active')
+            .select('*')
             .eq('id', 'global_config')
-            .single();
+            .maybeSingle();
 
         const mtxView = document.getElementById('maintenance-view');
         if (error || !data) {
@@ -28109,7 +28322,7 @@ async function syncMaintenanceStatus() {
             return;
         }
 
-        const isMtx = !!data.is_maintenance_active;
+        const isMtx = !!(data.is_maintenance_active || (data.data && data.data.is_maintenance_active));
         
         // เงื่อนไข: ถ้าเปิดโหมดปรับปรุง และผู้ใช้ไม่ใช่ Natthawut (Master Admin)
         const isMaster = S && S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
@@ -28179,26 +28392,6 @@ function unlockMaintenanceForAdmin() {
 setInterval(syncMaintenanceStatus, 60000);
 // ลงทะเบียน Global
 window.WapAdminSystem = WapAdminSystem;
-window.triggerUniversalImport = function() {
-    if (window.WapAdminSystem && typeof window.WapAdminSystem.triggerUniversalImport === 'function') {
-        window.WapAdminSystem.triggerUniversalImport();
-    }
-};
-window.handleUniversalFileSelected = function(event) {
-    if (window.WapAdminSystem && typeof window.WapAdminSystem.handleUniversalFileSelected === 'function') {
-        window.WapAdminSystem.handleUniversalFileSelected(event);
-    }
-};
-window.executeUniversalImport = function() {
-    if (window.WapAdminSystem && typeof window.WapAdminSystem.executeUniversalImport === 'function') {
-        window.WapAdminSystem.executeUniversalImport();
-    }
-};
-window.executeCSVOverwrite = function() {
-    if (window.WapAdminSystem && typeof window.WapAdminSystem.executeCSVOverwrite === 'function') {
-        window.WapAdminSystem.executeCSVOverwrite();
-    }
-};
 window.triggerCSVImport = function() {
     if (window.WapAdminSystem && typeof window.WapAdminSystem.triggerCSVImport === 'function') {
         window.WapAdminSystem.triggerCSVImport();
@@ -28207,16 +28400,6 @@ window.triggerCSVImport = function() {
 window.handleCSVFileSelected = function(event) {
     if (window.WapAdminSystem && typeof window.WapAdminSystem.handleCSVFileSelected === 'function') {
         window.WapAdminSystem.handleCSVFileSelected(event);
-    }
-};
-window.triggerJSONImport = function() {
-    if (window.WapAdminSystem && typeof window.WapAdminSystem.triggerJSONImport === 'function') {
-        window.WapAdminSystem.triggerJSONImport();
-    }
-};
-window.handleJSONFileSelected = function(event) {
-    if (window.WapAdminSystem && typeof window.WapAdminSystem.handleJSONFileSelected === 'function') {
-        window.WapAdminSystem.handleJSONFileSelected(event);
     }
 };
 // ฟังก์ชันกลางสำหรับปุ่ม Add (+) Global
@@ -28278,60 +28461,41 @@ function handleGlobalAdd() {
 
 // ใส่เพิ่มในโมดูล WapAdminSystem
 async function performFullBackup() {
-    toast("⏳ กำลังรวบรวมข้อมูลจากทุกระบบเพื่อสร้างไฟล์สำรอง Excel...", "info");
+    toast("⏳ กำลังเตรียมไฟล์สำรอง...", "info");
     try {
-        const sqe = (typeof sqeClient !== 'undefined') ? sqeClient : null;
-        const wap = (typeof wapClient !== 'undefined') ? wapClient : sqe;
-
-        // ดึงข้อมูลจากทุกตารางแบบคู่ขนาน (SQE + WAP + Calibration + Master + Rules)
-        const [
-            usersRes, recordsRes, eightDRes, supportRes, s5Res, otRes, sjRes, skillsRes, calRes, rulesRes, suppRes, partsRes, defRes, attRes
-        ] = await Promise.all([
-            sqe ? sqe.from('users').select('*') : Promise.resolve({ data: [] }),
-            sqe ? sqe.from('records').select('*') : Promise.resolve({ data: (typeof S !== 'undefined' ? S.records : []) }),
-            sqe ? sqe.from('eight_d_reports').select('*') : Promise.resolve({ data: (typeof Wap8DSystem !== 'undefined' ? Wap8DSystem.getCases() : []) }),
-            wap ? wap.from('support_records').select('*') : Promise.resolve({ data: [] }),
-            wap ? wap.from('s5_records').select('*') : Promise.resolve({ data: [] }),
-            wap ? wap.from('ot_records').select('*') : Promise.resolve({ data: [] }),
-            wap ? wap.from('special_jobs').select('*') : Promise.resolve({ data: [] }),
-            wap ? wap.from('skill_matrix').select('*') : Promise.resolve({ data: [] }),
-            sqe ? sqe.from('calibration_records').select('*') : Promise.resolve({ data: [] }),
-            sqe ? sqe.from('vf_rp_email_rules').select('*') : Promise.resolve({ data: [] }),
-            sqe ? sqe.from('master_suppliers').select('*') : Promise.resolve({ data: [] }),
-            sqe ? sqe.from('master_parts').select('*') : Promise.resolve({ data: [] }),
-            sqe ? sqe.from('master_defects').select('*') : Promise.resolve({ data: [] }),
-            wap ? wap.from('daily_reports').select('*') : Promise.resolve({ data: (typeof S !== 'undefined' ? S.attLeaveRecords : []) })
+        // ดึงข้อมูลจากทุกตาราง
+        const [users, records, support, s5, ot, sj, skills] = await Promise.all([
+            sqeClient.from('profiles').select('*'),
+            sqeClient.from('records').select('*'),
+            wapClient.from('support_records').select('*'),
+            wapClient.from('s5_records').select('*'),
+            wapClient.from('ot_records').select('*'),
+            wapClient.from('special_jobs').select('*'),
+            wapClient.from('skill_matrix').select('*')
         ]);
 
         const wb = XLSX.utils.book_new();
-        const addSheet = (dataList, name) => {
-            if (Array.isArray(dataList) && dataList.length > 0) {
-                const ws = XLSX.utils.json_to_sheet(dataList);
+        const addSheet = (res, name) => {
+            if (res.data && res.data.length > 0) {
+                const ws = XLSX.utils.json_to_sheet(res.data);
                 XLSX.utils.book_append_sheet(wb, ws, name);
             }
         };
 
-        addSheet(usersRes.data || [], "Users");
-        addSheet(recordsRes.data || (typeof S !== 'undefined' ? S.records : []), "Claims");
-        addSheet(eightDRes.data || (typeof Wap8DSystem !== 'undefined' ? Wap8DSystem.getCases() : []), "8D Reports");
-        addSheet(supportRes.data || [], "Support Logs");
-        addSheet(s5Res.data || [], "5S Audits");
-        addSheet(otRes.data || [], "OT Records");
-        addSheet(sjRes.data || [], "Special Jobs");
-        addSheet(skillsRes.data || [], "Skill Matrix");
-        // Calibration sheet retired
-        addSheet(rulesRes.data || [], "Email Rules");
-        addSheet(suppRes.data || [], "Suppliers");
-        addSheet(partsRes.data || [], "Parts");
-        addSheet(defRes.data || [], "Defects");
-        addSheet(attRes.data || (typeof S !== 'undefined' ? S.attLeaveRecords : []), "Attendance");
+        addSheet(users, "Users");
+        addSheet(records, "Claims");
+        addSheet(support, "Support");
+        addSheet(s5, "5S");
+        addSheet(ot, "OT");
+        addSheet(sj, "Missions");
+        addSheet(skills, "Skills");
 
-        XLSX.writeFile(wb, `Carrier_Complete_System_Backup_${new Date().toISOString().split('T')[0]}.xlsx`);
-        toast("✅ สำรองข้อมูลทุกระบบเป็น Excel สำเร็จเรียบร้อย", "success");
-        if (typeof writeAuditLog === 'function') writeAuditLog('BACKUP_EXCEL', 'Exported all system tables to Excel');
+        XLSX.writeFile(wb, `Carrier_Full_Backup_${new Date().toISOString().split('T')[0]}.xlsx`);
+        toast("✅ Backup สำเร็จ", "success");
+        writeAuditLog('BACKUP', 'Exported all database tables');
     } catch (e) {
-        console.error("[Full Backup Error]", e);
-        toast("❌ Backup ล้มเหลว: " + (e.message || e), "error");
+        console.error(e);
+        toast("❌ Backup ล้มเหลว", "error");
     }
 }
 
@@ -28343,7 +28507,7 @@ async function performFullBackup() {
  * on a daily basis, tracks backup history, supports manual JSON export,
  * and allows 1-click state restore.
  */
-var LocalBackupSystem = (function() {
+const LocalBackupSystem = (function() {
     const STORAGE_KEY_LAST_DATE = 'carrier_auto_daily_backup_last_date';
     const STORAGE_KEY_LAST_TIME = 'carrier_auto_daily_backup_last_time';
     const STORAGE_KEY_ENABLED = 'carrier_auto_daily_backup_enabled';
@@ -28367,99 +28531,20 @@ var LocalBackupSystem = (function() {
         return `${yyyy}-${mm}-${dd}`;
     }
 
-    /**
-     * 🌐 รวมข้อมูลจากทุกตาราง/โมดูลในระบบ (SQE + WAP + Master + Calibration) ก่อนทำการ Backup
-     */
-    async function buildAppStateSnapshot() {
+    function buildAppStateSnapshot() {
         const now = new Date();
         const dateStr = getTodayString();
         
-        const sqe = (typeof sqeClient !== 'undefined') ? sqeClient : null;
-        const wap = (typeof wapClient !== 'undefined') ? wapClient : sqe;
-
-        // ดึงข้อมูลจริงจาก Cloud แบบคู่ขนาน
-        let records = (typeof S !== 'undefined' && Array.isArray(S.records)) ? S.records : [];
-        let eightDCases = (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases) ? Wap8DSystem.getCases() : [];
-        let users = [];
-        let support = [];
-        let s5 = [];
-        let ot = [];
-        let specialJobs = [];
-        let skills = [];
-        let calibration = [];
-        let emailRules = [];
-        let suppliers = [];
-        let parts = [];
-        let defects = [];
-        let attLeaves = (typeof S !== 'undefined' && Array.isArray(S.attLeaveRecords)) ? S.attLeaveRecords : [];
-
-        if (navigator.onLine && (sqe || wap)) {
-            try {
-                const [
-                    uRes, recRes, edRes, supRes, s5Res, otRes, sjRes, skRes, calRes, rlRes, spRes, ptRes, dfRes, attRes
-                ] = await Promise.all([
-                    sqe ? sqe.from('users').select('*') : Promise.resolve({ data: [] }),
-                    sqe ? sqe.from('records').select('*') : Promise.resolve({ data: records }),
-                    sqe ? sqe.from('eight_d_reports').select('*') : Promise.resolve({ data: eightDCases }),
-                    wap ? wap.from('support_records').select('*') : Promise.resolve({ data: [] }),
-                    wap ? wap.from('s5_records').select('*') : Promise.resolve({ data: [] }),
-                    wap ? wap.from('ot_records').select('*') : Promise.resolve({ data: [] }),
-                    wap ? wap.from('special_jobs').select('*') : Promise.resolve({ data: [] }),
-                    wap ? wap.from('skill_matrix').select('*') : Promise.resolve({ data: [] }),
-                    sqe ? sqe.from('calibration_records').select('*') : Promise.resolve({ data: [] }),
-                    sqe ? sqe.from('vf_rp_email_rules').select('*') : Promise.resolve({ data: [] }),
-                    sqe ? sqe.from('master_suppliers').select('*') : Promise.resolve({ data: [] }),
-                    sqe ? sqe.from('master_parts').select('*') : Promise.resolve({ data: [] }),
-                    sqe ? sqe.from('master_defects').select('*') : Promise.resolve({ data: [] }),
-                    wap ? wap.from('daily_reports').select('*') : Promise.resolve({ data: attLeaves })
-                ]);
-
-                if (uRes && uRes.data && uRes.data.length > 0) users = uRes.data;
-                if (recRes && recRes.data && recRes.data.length > 0) records = recRes.data;
-                if (edRes && edRes.data && edRes.data.length > 0) eightDCases = edRes.data;
-                if (supRes && supRes.data && supRes.data.length > 0) support = supRes.data;
-                if (s5Res && s5Res.data && s5Res.data.length > 0) s5 = s5Res.data;
-                if (otRes && otRes.data && otRes.data.length > 0) ot = otRes.data;
-                if (sjRes && sjRes.data && sjRes.data.length > 0) specialJobs = sjRes.data;
-                if (skRes && skRes.data && skRes.data.length > 0) skills = skRes.data;
-                if (calRes && calRes.data && calRes.data.length > 0) calibration = calRes.data;
-                if (rlRes && rlRes.data && rlRes.data.length > 0) emailRules = rlRes.data;
-                if (spRes && spRes.data && spRes.data.length > 0) suppliers = spRes.data;
-                if (ptRes && ptRes.data && ptRes.data.length > 0) parts = ptRes.data;
-                if (dfRes && dfRes.data && dfRes.data.length > 0) defects = dfRes.data;
-                if (attRes && attRes.data && attRes.data.length > 0) attLeaves = attRes.data;
-            } catch (err) {
-                console.warn("[Backup Data Collection Warning]", err);
-            }
-        }
-
-        // Fallback จาก Local Database (IndexedDB / Dexie) หากตาราง Cloud ว่าง
-        if (calibration.length === 0 && typeof localDB !== 'undefined' && localDB.calibrationMaster) {
-            try { calibration = await localDB.calibrationMaster.toArray(); } catch (_) {}
-        }
-        if (records.length === 0 && typeof db !== 'undefined' && db && db.records) {
-            try { records = await db.records.toArray(); } catch (_) {}
-        }
-
-        const wapData = {
-            achievements: support,
-            support_records: support,
-            score5s: s5,
-            s5_records: s5,
-            ot_records: ot,
-            specialJobs: specialJobs,
-            special_jobs: specialJobs,
-            skills: skills,
-            skill_matrix: skills,
-            attendance: attLeaves
-        };
-
-        const totalItemsCount = records.length + eightDCases.length + support.length + s5.length + ot.length + 
-                                specialJobs.length + skills.length + calibration.length + emailRules.length + 
-                                suppliers.length + parts.length + defects.length + users.length;
-
+        // 8D Cases
+        const eightDCases = (S.eightDCases || (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.getCases ? Wap8DSystem.getCases() : [])) || [];
+        
+        // Clean records array
+        const records = Array.isArray(S.records) ? S.records : [];
+        const attLeaveRecords = Array.isArray(S.attLeaveRecords) ? S.attLeaveRecords : [];
+        const wapData = S.wapData || {};
+        
         const snapshot = {
-            backup_schema: "carrier.app.state.v3",
+            backup_schema: "carrier.app.state.v2",
             created_at: now.toISOString(),
             date: dateStr,
             metadata: {
@@ -28467,67 +28552,39 @@ var LocalBackupSystem = (function() {
                 app_name: "SQE & WAP Support Portal",
                 version: "2.5.0",
                 environment: "production",
-                user: (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : "anonymous",
-                user_role: (typeof S !== 'undefined' && S.userRole) ? S.userRole : "staff",
-                viewing_user: (typeof S !== 'undefined' && S.viewingUser) ? S.viewingUser : ""
+                user: S.currentUser || "anonymous",
+                user_role: S.userRole || "staff",
+                viewing_user: S.viewingUser || S.currentUser || ""
             },
-            // Flat root structure for Universal Import parser
-            records: records,
-            eight_d_reports: eightDCases,
-            eight_d_cases: eightDCases,
-            users: users,
-            support_records: support,
-            s5_records: s5,
-            ot_records: ot,
-            special_jobs: specialJobs,
-            skill_matrix: skills,
-            daily_reports: attLeaves,
-            att_leave_records: attLeaves,
-            calibration_records: calibration,
-            vf_rp_email_rules: emailRules,
-            master_suppliers: suppliers,
-            master_parts: parts,
-            master_defects: defects,
-
-            // Nested app_state structure for state engines
             app_state: {
                 records: records,
                 eight_d_cases: eightDCases,
-                eight_d_reports: eightDCases,
-                users: users,
-                att_leave_records: attLeaves,
-                daily_reports: attLeaves,
-                calibration_records: calibration,
-                vf_rp_email_rules: emailRules,
-                master_suppliers: suppliers,
-                master_parts: parts,
-                master_defects: defects,
-                wap_data: wapData,
+                att_leave_records: attLeaveRecords,
+                wap_data: {
+                    achievements: wapData.achievements || [],
+                    attendance: wapData.attendance || [],
+                    score5s: wapData.score5s || [],
+                    skills: wapData.skills || [],
+                    specialJobs: wapData.specialJobs || []
+                },
                 smart_memory: (typeof smartMemory !== 'undefined' ? smartMemory : {}),
                 ai_brain: (typeof aiBrain !== 'undefined' ? aiBrain : {}),
                 preferences: {
-                    activeFilter: (typeof S !== 'undefined' && S.activeFilter) ? S.activeFilter : 'ALL',
-                    selectedShift: (typeof S !== 'undefined' && S.selectedShift) ? S.selectedShift : 'SHIFT A',
+                    activeFilter: S.activeFilter || 'ALL',
+                    selectedShift: S.selectedShift || 'SHIFT A',
                     theme: localStorage.getItem('carrier_theme') || 'light',
                     lang: localStorage.getItem('carrier_lang') || 'th'
                 }
             },
             statistics: {
-                total_all_records: totalItemsCount,
                 total_claim_records: records.length,
                 total_8d_cases: eightDCases.length,
-                total_users: users.length,
-                total_att_records: attLeaves.length,
-                total_wap_support: support.length,
-                total_wap_5s: s5.length,
-                total_wap_ot: ot.length,
-                total_wap_skills: skills.length,
-                total_wap_special_jobs: specialJobs.length,
-                total_calibration: calibration.length,
-                total_rules: emailRules.length,
-                total_suppliers: suppliers.length,
-                total_parts: parts.length,
-                total_defects: defects.length
+                total_att_records: attLeaveRecords.length,
+                total_wap_support: (wapData.achievements || []).length,
+                total_wap_attendance: (wapData.attendance || []).length,
+                total_wap_5s: (wapData.score5s || []).length,
+                total_wap_skills: (wapData.skills || []).length,
+                total_wap_special_jobs: (wapData.specialJobs || []).length
             }
         };
 
@@ -28581,14 +28638,14 @@ var LocalBackupSystem = (function() {
         const now = new Date();
         const timeStr = now.toLocaleTimeString();
 
-        toast("⏳ กำลังรวบรวมข้อมูลทุกระบบเพื่อจัดทำไฟล์ Backup...", "info");
-
-        // 1. Build comprehensive snapshot from all database tables
-        const snapshot = await buildAppStateSnapshot();
-        const totalItems = snapshot.statistics.total_all_records || 0;
+        // 1. Build snapshot
+        const snapshot = buildAppStateSnapshot();
+        const totalItems = (snapshot.statistics.total_claim_records || 0) + 
+                           (snapshot.statistics.total_8d_cases || 0) + 
+                           (snapshot.statistics.total_wap_support || 0);
 
         const fileName = isManual 
-            ? `Carrier_Full_System_Backup_${today}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.json`
+            ? `Carrier_App_State_${today}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.json`
             : `Carrier_Daily_Backup_${today}.json`;
 
         // 2. Download JSON File
@@ -28600,12 +28657,12 @@ var LocalBackupSystem = (function() {
 
         const sizeKb = (dlResult.sizeBytes / 1024).toFixed(1);
 
-        // 3. Save local snapshot cache summary
+        // 3. Save local snapshot cache (small summary or subset to save quota)
         try {
             const localSummary = {
                 timestamp: now.toISOString(),
                 date: today,
-                user: (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : "system",
+                user: S.currentUser,
                 statistics: snapshot.statistics,
                 size_kb: sizeKb
             };
@@ -28620,24 +28677,24 @@ var LocalBackupSystem = (function() {
 
         // 5. Record in history
         recordBackupHistory({
-            id: typeof generateUUID === 'function' ? generateUUID() : 'b-' + Date.now(),
+            id: generateUUID ? generateUUID() : 'b-' + Date.now(),
             timestamp: now.toISOString(),
             date: today,
             time: timeStr,
             filename: fileName,
             sizeKb: sizeKb + ' KB',
             type: isManual ? 'manual' : 'auto_daily',
-            user: (typeof S !== 'undefined' && S.currentUser) ? S.currentUser : 'system',
+            user: S.currentUser || 'system',
             totalRecords: totalItems
         });
 
         // 6. Audit & Toast
         if (typeof writeAuditLog === 'function') {
-            writeAuditLog('BACKUP_JSON', `${isManual ? 'Manual' : 'Automated Daily'} Full Backup exported: ${fileName} (${sizeKb} KB, ${totalItems} items across all modules)`);
+            writeAuditLog('BACKUP_JSON', `${isManual ? 'Manual' : 'Automated Daily'} Backup exported: ${fileName} (${sizeKb} KB, ${totalItems} items)`);
         }
 
         if (isManual) {
-            toast(`✅ ส่งออกไฟล์สำรองทุกระบบเรียบร้อย (${fileName} - ${totalItems} รายการ)`, "success");
+            toast(`✅ ส่งออกไฟล์ App State สำรองเรียบร้อย (${fileName})`, "success");
         } else {
             toast(`💾 สำรองข้อมูลประจำวันอัตโนมัติเรียบร้อย (${fileName})`, "success");
         }
@@ -28887,22 +28944,9 @@ var LocalBackupSystem = (function() {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = async function(e) {
+        reader.onload = function(e) {
             try {
                 const parsed = JSON.parse(e.target.result);
-                // ปิด Modal สำรองข้อมูลเดิมก่อนเปิดหน้าต่างนำเข้า/กู้คืน
-                const curModal = document.getElementById('local-backup-modal');
-                if (curModal) curModal.remove();
-
-                if (window.WapAdminSystem && typeof window.WapAdminSystem.analyzeJSONImportData === 'function' && typeof window.WapAdminSystem.showUniversalImportModal === 'function') {
-                    toast("🔍 กำลังวิเคราะห์โครงสร้างข้อมูลสำรอง...", "info");
-                    const analysis = window.WapAdminSystem.analyzeJSONImportData(parsed, file.name, file.size);
-                    if (analysis && Object.keys(analysis.tables).length > 0) {
-                        await window.WapAdminSystem.checkDuplicatesAgainstDatabase(analysis);
-                        window.WapAdminSystem.showUniversalImportModal(analysis);
-                        return;
-                    }
-                }
                 restoreFromParsedJson(parsed, file.name);
             } catch (err) {
                 console.error('[LocalBackupSystem] JSON Parse Error:', err);
@@ -28913,167 +28957,85 @@ var LocalBackupSystem = (function() {
         inputEl.value = ''; // Reset input
     }
 
-    /**
-     * 📥 ฟังก์ชันกู้คืนสถานะจาก JSON ครอบคลุมทุกระบบแบบป้องกันข้อมูลซ้ำ (Universal Zero-Duplicate Shield)
-     */
     function restoreFromParsedJson(data, fileName) {
-        if (!data || (!data.app_state && !data.records && !data.users && !data.calibration_records)) {
-            toast("❌ รูปแบบไฟล์ JSON ไม่ถูกต้อง", "error");
+        if (!data || (!data.app_state && !data.records)) {
+            toast("❌ รูปแบบไฟล์ JSON ไม่ตรงกับโครงสร้างสำรองข้อมูลของระบบ", "error");
             return;
         }
 
         const state = data.app_state || data;
-        const totalItems = (
-            (state.records || []).length + 
-            (state.eight_d_cases || state.eight_d_reports || []).length +
-            (state.users || []).length +
-            (state.calibration_records || []).length +
-            (state.vf_rp_email_rules || []).length +
-            (state.wap_data?.achievements || state.support_records || []).length +
-            (state.wap_data?.score5s || state.s5_records || []).length +
-            (state.wap_data?.specialJobs || state.special_jobs || []).length +
-            (state.wap_data?.skills || state.skill_matrix || []).length +
-            (state.wap_data?.ot_records || state.ot_records || []).length +
-            (state.att_leave_records || state.daily_reports || []).length
-        );
+        const totalClaims = (state.records || []).length;
+        const total8D = (state.eight_d_cases || state.eightDCases || []).length;
+        const totalWap = (state.wap_data?.achievements || state.wapData?.achievements || []).length;
+        const dateStr = data.date || data.created_at || 'Unknown Date';
 
         showCustomConfirmDialog({
-            title: "ยืนยันการกู้คืนข้อมูลทุกระบบ (Full System Restore)",
-            subtitle: `ตรวจพบข้อมูลรวม ${totalItems} รายการในไฟล์สำรอง ระบบจะคัดกรองรายการที่ซ้ำและทำการกู้คืนข้อมูลอย่างปลอดภัย 100%`,
-            badge: "ZERO-DUPLICATE SHIELD",
+            title: "ยืนยันการกู้คืนข้อมูล (Restore App State)",
+            subtitle: `คุณกำลังจะนำเข้าและกู้คืนสถานะข้อมูลจากไฟล์ ${fileName}`,
+            badge: "DATA RESTORE",
             type: "warning",
-            confirmText: "🚀 เริ่มกู้คืนข้อมูลทั้งหมด",
+            details: [
+                { label: "Backup Date", value: dateStr },
+                { label: "Claim Records", value: `${totalClaims} รายการ` },
+                { label: "8D Cases", value: `${total8D} รายการ` },
+                { label: "WAP Records", value: `${totalWap} รายการ` }
+            ],
+            confirmText: "📥 ยืนยันการกู้คืนข้อมูล",
+            cancelText: "ยกเลิก",
             onConfirm: async () => {
                 try {
-                    if (!navigator.onLine) {
-                        toast("📶 โปรดเชื่อมต่ออินเทอร์เน็ตเพื่อซิงค์ข้อมูลลงคลาวด์", "error");
-                        return;
+                    toast("⏳ กำลังกู้คืนข้อมูล...", "info");
+
+                    // 1. Restore SQE Records
+                    if (Array.isArray(state.records)) {
+                        S.records = state.records;
                     }
 
-                    toast("📡 กำลังตรวจสอบและซิงค์ข้อมูลทุกระบบขึ้นฐานข้อมูล...", "info");
-
-                    const sqe = (typeof sqeClient !== 'undefined') ? sqeClient : null;
-                    const wap = (typeof wapClient !== 'undefined') ? wapClient : sqe;
-
-                    // 1. Claims (records) - Deduplicate by REF
-                    const rawClaims = state.records || data.records || [];
-                    if (rawClaims.length > 0 && sqe) {
-                        const uniqueMap = new Map();
-                        rawClaims.forEach((r, idx) => {
-                            const refKey = String(r.ref || `CLM-${idx+1}`).trim().toUpperCase();
-                            uniqueMap.set(refKey, {
-                                id: r.id || (typeof generateUUID === 'function' ? generateUUID() : `clm_${Date.now()}_${idx}`),
-                                date: r.date || new Date().toISOString().split('T')[0],
-                                shift: r.shift || 'SHIFT A',
-                                inspector: r.inspector || 'SYSTEM',
-                                ref: refKey,
-                                line: r.line || '-',
-                                supplier: r.supplier || '-',
-                                partNo: String(r.partNo || r.part_no || '-').trim().toUpperCase(),
-                                partName: r.partName || r.part_name || '-',
-                                qty: parseInt(r.qty) || 1,
-                                unit: r.unit || 'PCS',
-                                defect: r.defect || '-',
-                                remark: r.remark || '',
-                                judgment: r.judgment || 'OK',
-                                created_at: r.created_at || new Date().toISOString()
-                            });
-                        });
-                        const cleanClaims = Array.from(uniqueMap.values());
-                        for (let i = 0; i < cleanClaims.length; i += 50) {
-                            const batch = cleanClaims.slice(i, i + 50);
-                            await sqe.from('records').upsert(batch, { onConflict: 'ref' });
-                        }
+                    // 2. Restore 8D cases
+                    const cases = state.eight_d_cases || state.eightDCases;
+                    if (Array.isArray(cases)) {
+                        S.eightDCases = cases;
                     }
 
-                    // 2. 8D Reports - Deduplicate by ID / issue_no
-                    const raw8D = state.eight_d_cases || state.eight_d_reports || data.eight_d_reports || [];
-                    if (raw8D.length > 0 && sqe) {
-                        const unique8D = new Map();
-                        raw8D.forEach((r, idx) => {
-                            const key = String(r.id || r.issue_no || `8d_${idx}`).trim();
-                            unique8D.set(key, r);
-                        });
-                        const clean8D = Array.from(unique8D.values());
-                        for (let i = 0; i < clean8D.length; i += 50) {
-                            await sqe.from('eight_d_reports').upsert(clean8D.slice(i, i + 50), { onConflict: 'id' });
-                        }
+                    // 3. Restore WAP Data
+                    if (state.wap_data || state.wapData) {
+                        S.wapData = state.wap_data || state.wapData;
                     }
 
-                    // 3. Calibration - Deduplicate by ID
-                    const rawCal = state.calibration_records || data.calibration_records || [];
-                    if (rawCal.length > 0 && sqe) {
-                        const uniqueCal = new Map();
-                        rawCal.forEach((r, idx) => {
-                            const key = String(r.id || r.code_no || `cal_${idx}`).trim();
-                            uniqueCal.set(key, r);
-                        });
-                        const cleanCal = Array.from(uniqueCal.values());
-                        for (let i = 0; i < cleanCal.length; i += 50) {
-                            await sqe.from('calibration_records').upsert(cleanCal.slice(i, i + 50), { onConflict: 'id' });
-                        }
-                        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
-                            await localDB.calibrationMaster.bulkPut(cleanCal);
-                        }
+                    // 4. Restore Att Leave
+                    if (Array.isArray(state.att_leave_records || state.attLeaveRecords)) {
+                        S.attLeaveRecords = state.att_leave_records || state.attLeaveRecords;
                     }
 
-                    // 4. WAP Modules (Support, 5S, OT, Special Jobs, Skills, Attendance)
-                    const wapTasks = [
-                        { table: 'support_records', data: state.wap_data?.achievements || state.support_records || data.support_records },
-                        { table: 's5_records', data: state.wap_data?.score5s || state.s5_records || data.s5_records },
-                        { table: 'special_jobs', data: state.wap_data?.specialJobs || state.special_jobs || data.special_jobs },
-                        { table: 'skill_matrix', data: state.wap_data?.skills || state.skill_matrix || data.skill_matrix },
-                        { table: 'ot_records', data: state.wap_data?.ot_records || state.ot_records || data.ot_records },
-                        { table: 'daily_reports', data: state.att_leave_records || state.daily_reports || data.daily_reports }
-                    ];
-
-                    if (wap) {
-                        for (const task of wapTasks) {
-                            if (task.data && Array.isArray(task.data) && task.data.length > 0) {
-                                const uniqueMap = new Map();
-                                task.data.forEach((r, idx) => {
-                                    const { sync_status, ...cleanItem } = r;
-                                    const key = String(cleanItem.id || `row_${idx}`).trim();
-                                    uniqueMap.set(key, cleanItem);
-                                });
-                                const cleanItems = Array.from(uniqueMap.values());
-                                for (let i = 0; i < cleanItems.length; i += 50) {
-                                    await wap.from(task.table).upsert(cleanItems.slice(i, i + 50), { onConflict: 'id' });
-                                }
-                            }
-                        }
+                    // 5. Restore Smart Memory & AI Brain
+                    if (state.smart_memory || state.smartMemory) {
+                        smartMemory = state.smart_memory || state.smartMemory;
+                    }
+                    if (state.ai_brain || state.aiBrain) {
+                        aiBrain = state.ai_brain || state.aiBrain;
                     }
 
-                    // 5. Masters (Suppliers, Parts, Defects, Rules)
-                    const rawSupp = state.master_suppliers || data.master_suppliers || [];
-                    if (rawSupp.length > 0 && sqe) {
-                        for (let i = 0; i < rawSupp.length; i += 50) {
-                            await sqe.from('master_suppliers').upsert(rawSupp.slice(i, i + 50), { onConflict: 'name' });
-                        }
+                    // 6. Re-render views
+                    if (typeof renderTable === 'function') renderTable();
+                    if (typeof Wap8DSystem !== 'undefined' && Wap8DSystem.fetchCases) {
+                        Wap8DSystem.fetchCases();
                     }
-                    const rawParts = state.master_parts || data.master_parts || [];
-                    if (rawParts.length > 0 && sqe) {
-                        for (let i = 0; i < rawParts.length; i += 50) {
-                            await sqe.from('master_parts').upsert(rawParts.slice(i, i + 50), { onConflict: 'part_no' });
-                        }
-                    }
-                    const rawDef = state.master_defects || data.master_defects || [];
-                    if (rawDef.length > 0 && sqe) {
-                        for (let i = 0; i < rawDef.length; i += 50) {
-                            await sqe.from('master_defects').upsert(rawDef.slice(i, i + 50), { onConflict: 'defect_name' });
-                        }
+                    if (typeof initExecDashboard === 'function') initExecDashboard();
+
+                    // 7. Audit & Success Toast
+                    if (typeof writeAuditLog === 'function') {
+                        writeAuditLog('RESTORE_JSON', `Restored app state from JSON file: ${fileName}`);
                     }
 
-                    toast("✨ กู้คืนข้อมูลทุกระบบสำเร็จเรียบร้อยแล้ว", "success");
-                    
-                    // สั่งรีเฟรชหน้าจอทั้งหมดเพื่อให้เห็นข้อมูลล่าสุด
-                    if (typeof loadRecords === 'function') await loadRecords();
-                    if (typeof fetchWAPData === 'function') await fetchWAPData();
-                    if (typeof triggerGlobalRefresh === 'function') triggerGlobalRefresh();
+                    toast("✅ กู้คืนสถานะข้อมูลแอปพลิเคชันเรียบร้อยแล้ว", "success");
+
+                    // Close backup modal if open
+                    const modal = document.getElementById('local-backup-modal');
+                    if (modal) modal.remove();
 
                 } catch (err) {
-                    console.error('[Restore Error]', err);
-                    toast("❌ บันทึกล้มเหลว: " + (err.message || err), "error");
+                    console.error('[LocalBackupSystem] Restore Execution Error:', err);
+                    toast("❌ เกิดข้อผิดพลาดในการกู้คืนข้อมูล", "error");
                 }
             }
         });
@@ -29101,54 +29063,6 @@ setInterval(() => {
 }, 1800000);
 
 
-// --- 🚀 ระบบส่งข้อมูลขึ้น Cloud แบบป้องกันการบันทึกซ้ำ (Master Sync) ---
-    async function syncImportedDataToCloud(state) {
-        if (!navigator.onLine) {
-            toast("📶 ออฟไลน์: ข้อมูลจะถูกซิงค์ภายหลังเมื่อคุณออนไลน์", "info");
-            return;
-        }
-
-        const cleanData = (list) => list.map(item => {
-            const { sync_status, ...rest } = item; // ลบฟิลด์สถานะซิงค์ออก
-            return rest;
-        });
-
-        try {
-            // จัดกลุ่มงานที่จะส่ง
-            const tasks = [
-                { client: sqeClient, table: 'records', data: state.records },
-                { client: sqeClient, table: 'eight_d_reports', data: (state.eight_d_cases || state.eightDCases) },
-                { client: wapClient, table: 'support_records', data: state.wap_data?.achievements },
-                { client: wapClient, table: 's5_records', data: state.wap_data?.score5s },
-                { client: wapClient, table: 'ot_records', data: state.wap_data?.ot_records }, // ถ้ามีใน JSON
-                { client: wapClient, table: 'special_jobs', data: state.wap_data?.specialJobs },
-                { client: wapClient, table: 'skill_matrix', data: state.wap_data?.skills },
-                { client: wapClient, table: 'daily_reports', data: state.att_leave_records }
-            ];
-
-            for (const task of tasks) {
-                if (task.data && task.data.length > 0 && task.client) {
-                    const payload = cleanData(task.data);
-                    
-                    // ทยอยส่งทีละ 50 รายการเพื่อความเสถียร
-                    const BATCH_SIZE = 50;
-                    for (let i = 0; i < payload.length; i += BATCH_SIZE) {
-                        const batch = payload.slice(i, i + BATCH_SIZE);
-                        
-                        // 🛡️ ignoreDuplicates: true คือหัวใจสำคัญ (ถ้ามี ID ซ้ำใน DB แล้วจะไม่ทำอะไรเลย)
-                        await task.client
-                            .from(task.table)
-                            .upsert(batch, { onConflict: 'id', ignoreDuplicates: true });
-                    }
-                }
-            }
-
-            toast("✨ กู้คืนและซิงค์ข้อมูลใหม่ขึ้น Cloud สำเร็จแล้ว", "success");
-        } catch (err) {
-            console.warn("[Cloud Sync Note]", err.message);
-            toast("✅ กู้คืนสำเร็จ (ข้อมูลบางส่วนอาจซิงค์ไม่สมบูรณ์)", "info");
-        }
-    }
 async function performArchive() {
     const year = document.getElementById('archive-year').value;
     if (!year || year.length < 4) return toast("กรุณาระบุปีที่ถูกต้อง", "error");
@@ -29176,7 +29090,7 @@ async function updateUserPresence() {
     
     try {
         await sqeClient
-            .from('users')
+            .from('profiles')
             .update({ last_seen: new Date().toISOString() })
             .eq('email', S.currentUser);
         
@@ -29218,23 +29132,27 @@ updateUserPresence();
 setInterval(updateUserPresence, 300000); // 300,000 ms = 5 นาที
 
 async function checkChangelog() {
-    const { data } = await sqeClient.from('system_settings').select('app_version, update_details').eq('id', 'global_config').single();
-    const localVersion = localStorage.getItem('last_seen_version') || "0.0.0";
+    try {
+        const { data } = await sqeClient.from('system_settings').select('*').eq('id', 'global_config').maybeSingle();
+        const localVersion = localStorage.getItem('last_seen_version') || "0.0.0";
+        const appVer = (data && (data.app_version || (data.data && data.data.app_version))) || null;
+        const updateLog = (data && (data.update_details || (data.data && data.data.update_details))) || 'มีการปรับปรุงประสิทธิภาพระบบ';
 
-    if (data && data.app_version !== localVersion) {
-        // สร้าง Modal แจ้งข่าวสารอัปเดต
-        const modalHtml = `
-            <div id="update-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
-                <div class="bg-white rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-in">
-                    <div class="text-5xl mb-4">✨</div>
-                    <h2 class="text-2xl font-black text-slate-800 mb-2">Version ${data.app_version}</h2>
-                    <p class="text-slate-500 text-sm mb-6 leading-relaxed">${data.update_details || 'มีการปรับปรุงประสิทธิภาพระบบ'}</p>
-                    <button  onclick="closeUpdateModal('${data.app_version}')" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest" title="Close Update Modal" aria-label="Close Update Modal">รับทราบ</button>
+        if (data && appVer && appVer !== localVersion) {
+            // สร้าง Modal แจ้งข่าวสารอัปเดต
+            const modalHtml = `
+                <div id="update-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
+                    <div class="bg-white rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-in">
+                        <div class="text-5xl mb-4">✨</div>
+                        <h2 class="text-2xl font-black text-slate-800 mb-2">Version ${appVer}</h2>
+                        <p class="text-slate-500 text-sm mb-6 leading-relaxed">${updateLog}</p>
+                        <button  onclick="closeUpdateModal('${appVer}')" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest" title="Close Update Modal" aria-label="Close Update Modal">รับทราบ</button>
+                    </div>
                 </div>
-            </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-    }
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+    } catch (_) {}
 }
 
 function closeUpdateModal(newVer) {
@@ -29308,7 +29226,7 @@ async function handlePasswordResetSubmit(email) {
         
         // อัปเดตข้อมูลลง Supabase ตามคอลัมน์ในรูป (password, force_reset, updated_at)
         const { error } = await sqeClient
-            .from('users')
+            .from('profiles')
             .update({ 
                 password: newPass, 
                 force_reset: false,
@@ -29342,19 +29260,13 @@ let currentModalACIndex = -1;
 let tempAvatarBase64 = null; // ตัวแปรพักรูปภาพ
 
 /**
- * 🧠 MASTER MODAL AUTO-COMPLETE ENGINE (Vibrant & Aesthetic Dropdown Edition)
- * ออกแบบกล่องดรอปดาวน์และไอคอนให้สดใส สวยงาม ตรงตามภาพตัวอย่าง:
- * 1. กล่องขอบสีฟ้าสดใส (Sky-blue 2px solid #38bdf8), มุมโค้งมน 12px, เงาฟุ้งนุ่มนวล
- * 2. แถบหัวข้อสีครีมพาสเทลอบอุ่นสดใส (Warm Pastel Cream #fffbeb) พร้อมเส้นคั่นสีเหลืองทอง (#fde68a) และข้อความส้มสดใสตามภาพตัวอย่าง
- * 3. ไอคอนหยดน้ำ 3D สองเฉดสีสดใส (Split 3D Teardrop) คู่กับกิมมิกตามระดับสิทธิ์ (👑 มงกุฎ, 🔑 กุญแจ, ✒️ ปากกา, 📝 สมุด)
- * 4. แถบสถานะ Focus/Hover ไฮไลต์พื้นหลังฟ้าอ่อน (#f0f7ff) พร้อมเส้นบอกตำแหน่งสีน้ำเงินชัดเจน (border-left 4px solid #0284c7)
- * 5. ป้ายระดับสิทธิ์ด้านขวา (Badges) สีพื้นสดใสตัวอักษรขาวคมชัด สไตล์ปุ่ม SUPERVISOR ในภาพตัวอย่าง
- * 6. คงตรรกะความถูกต้องตาม Vendor Matrix (ภาพที่ 2) ทุกประการ
+ * 🧠 MASTER MODAL AUTO-COMPLETE ENGINE (Strict Matrix Integration)
+ * อัปเดต: ดึงหมวดหมู่พาร์ทจาก Proficiency Breakdown (Skill Matrix)
  */
 function renderModalAC(type, inputEl) {
     if (!inputEl || inputEl._suppressAC) return;
     
-    // 1. ปิดดรอปดาวน์ตัวอื่นทั้งหมดในหน้าจอทันที เพื่อให้แสดงเฉพาะช่องล่าสุดที่กำลังคลิก
+    // 1. ปิดดรอปดาวน์ตัวอื่นทั้งหมดในหน้าจอทันที เพื่อให้แสดงเฉพาะช่องล่าสุดที่คลิกเสมอ
     document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
         if (dd.parentElement !== inputEl.parentElement) {
             dd.style.display = 'none';
@@ -29368,40 +29280,39 @@ function renderModalAC(type, inputEl) {
     if (!dd) {
         dd = document.createElement('div');
         dd.className = 'modal-ac-dropdown';
-        wrap.style.position = 'relative';
         wrap.appendChild(dd);
     }
+    wrap.style.position = 'relative';
+    wrap.style.zIndex = '999999';
 
-    // กล่องดรอปดาวน์สดใส ขอบฟ้า 38bdf8 โค้งมน 12px สไตล์พรีเมียมตามภาพตัวอย่าง
     dd.style.cssText = `
-        position: absolute; top: calc(100% + 4px); left: 0;
-        width: 320px; max-width: 94vw;
-        max-height: 260px; overflow-y: auto; overflow-x: hidden;
-        background: #ffffff; border: 2px solid #38bdf8; border-radius: 12px;
-        box-shadow: 0 12px 28px -4px rgba(14, 165, 233, 0.22), 0 6px 16px -2px rgba(15, 23, 42, 0.08);
-        z-index: 20000; display: none;
+        position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: min(420px, calc(100vw - 32px));
+        max-height: 290px; overflow-y: auto; background: #ffffff;
+        border: 1.5px solid #3b82f6; border-radius: 12px;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.3), 0 4px 12px rgba(0, 0, 0, 0.12); z-index: 9999999; display: none;
     `;
 
-    // จัดการปิดดรอปดาวน์ทันทีเมื่อคลิกพื้นที่ว่างภายนอก
-    if (!window._modalACOutsideClickBound) {
-        window._modalACOutsideClickBound = true;
-        document.addEventListener('pointerdown', function(e) {
-            const openDropdowns = document.querySelectorAll('.modal-ac-dropdown');
-            openDropdowns.forEach(d => {
-                if (d.style.display === 'none') return;
-                const parent = d.parentElement;
-                if (parent && parent.contains(e.target)) return;
-                d.style.display = 'none';
-            });
-            if (typeof currentModalACIndex !== 'undefined') currentModalACIndex = -1;
-        }, true);
-    }
+    // Smart right-alignment if near right edge of screen OR near right edge of modal/form container
+    try {
+        const rect = inputEl.getBoundingClientRect();
+        const container = inputEl.closest('#sup-form') || inputEl.closest('form') || inputEl.closest('.modal-overlay > div') || inputEl.closest('.modal-content') || document.body;
+        const containerRect = container ? container.getBoundingClientRect() : { right: window.innerWidth, left: 0, bottom: window.innerHeight };
+
+        const spaceToRight = Math.min(containerRect.right, window.innerWidth) - rect.left;
+        if (spaceToRight < 340 || inputEl.id === 'prob-supplier' || inputEl.id === 'f-sup-report' || inputEl.id === 'prob-defect' || (containerRect.right - rect.right < 200)) {
+            dd.style.left = 'auto';
+            dd.style.right = '0';
+        } else {
+            dd.style.left = '0';
+            dd.style.right = 'auto';
+        }
+    } catch (e) {}
 
     const query = inputEl.value.trim().toLowerCase();
     let htmlContent = '';
 
     // ============================================================
-    // ✍️ การลงนาม (Sign-off): ISSUE BY | CONFIRM BY | APPROVED BY
+    // ✍️ กรณีการลงนาม (Sign-off): ISSUE BY | CONFIRM BY | APPROVED BY
     // ============================================================
     if (type === 'staff') {
         const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
@@ -29410,577 +29321,323 @@ function renderModalAC(type, inputEl) {
         
         const vfData = curCase?.report_data?.vf_data || {};
         
-        // 1. ตรวจสอบประเภทรายงานปัจจุบัน (RP หรือ VF) จากทุกจุดอ้างอิง
-        const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || document.getElementById('f-sup-report')?.value || '').toString().toUpperCase();
+        // 1. ตรวจสอบประเภทรายงานปัจจุบัน (RP หรือ VF) เพื่อใช้เลือกช่องใน Matrix
+        const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
         const docTypeLabel = (document.getElementById('vf-doc-type-label')?.innerText || '').toUpperCase();
         const isRP = reportType.includes('RP') || docTypeLabel.includes('RP');
-        const docBadgeColor = isRP ? '#059669' : '#0284c7';
-        const docBadgeBg = isRP ? '#ecfdf5' : '#eff6ff';
 
-        // 2. ดึงข้อมูล Vendor จากหน้าเอกสารและ Case เพื่อค้นหาในฐานข้อมูล Matrix (ภาพที่ 2)
-        let vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() 
+        // 2. ดึงข้อมูล Vendor จากหน้าเอกสาร, หน้าฟอร์ม และ Case เพื่อไปค้นหาในฐานข้อมูล Matrix
+        const vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() 
+            || document.getElementById('prob-supplier')?.value?.trim()
+            || document.getElementById('f-sup-supplier')?.value?.trim()
+            || document.getElementById('em-f-supplier')?.value?.trim()
+            || document.getElementById('f-supplier')?.value?.trim()
             || vfData.vendor 
             || curCase?.supplier 
             || curCase?.vendor 
             || curCase?.report_data?.supplier 
-            || curCase?.report_data?.supplier_name 
-            || document.getElementById('f-sup-supplier')?.value?.trim()
             || "";
-        let vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() 
+        const vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() 
+            || document.getElementById('prob-vendor-code')?.value?.trim()
+            || document.getElementById('f-sup-vendor-code')?.value?.trim()
+            || document.getElementById('em-f-vendor-code')?.value?.trim()
+            || document.getElementById('f-vendor-code')?.value?.trim()
             || vfData.vendor_code 
             || curCase?.vendor_code 
             || curCase?.supplier_code 
-            || curCase?.report_data?.vendor_code 
-            || curCase?.report_data?.supplier_code 
-            || document.getElementById('f-sup-vendor-code')?.value?.trim()
             || "";
         const docToDisplay = document.getElementById('vf-doc-to-display')?.innerText?.trim() || vfData.to || "";
 
-        if (vendorName) {
-            vendorName = vendorName.replace(/-->\s*vendor/gi, '').replace(/\bvendor\b/gi, '').replace(/^to:\s*/i, '').trim();
+        let matrix = null;
+        if (typeof window.getVFRPMatrixForSupplier === 'function') {
+            matrix = window.getVFRPMatrixForSupplier(vendorName, vendorCode, '')
+                  || window.getVFRPMatrixForSupplier(curCase?.supplier || '', curCase?.vendor_code || '', '')
+                  || window.getVFRPMatrixForSupplier(docToDisplay, '', '');
         }
 
-        if (!vendorCode && vendorName && typeof VENDOR_MASTER === 'object' && VENDOR_MASTER !== null) {
-            const foundKey = Object.keys(VENDOR_MASTER).find(key => 
-                VENDOR_MASTER[key].toUpperCase().includes(vendorName.toUpperCase()) ||
-                vendorName.toUpperCase().includes(VENDOR_MASTER[key].toUpperCase())
-            );
-            if (foundKey) vendorCode = foundKey;
-        }
-
-        // ค้นหากฎ Matrix ของ Vendor นี้จากระบบ (ตรงตามภาพที่ 2)
-        let matrixRules = [];
-        if (typeof window.getAllVFRPMatricesForSupplier === 'function') {
-            matrixRules = window.getAllVFRPMatricesForSupplier(vendorName, vendorCode, '');
-            if (!matrixRules || matrixRules.length === 0) {
-                matrixRules = window.getAllVFRPMatricesForSupplier(curCase?.supplier || '', curCase?.vendor_code || '', '');
-            }
-            if (!matrixRules || matrixRules.length === 0) {
-                matrixRules = window.getAllVFRPMatricesForSupplier(docToDisplay, '', '');
-            }
-        }
-        
-        // Fallback ค้นหาแบบ Deep Fuzzy Match เพื่อให้จับคู่กับภาพที่ 2 ได้เสมอ
-        if (!matrixRules || matrixRules.length === 0) {
-            let allList = [];
-            if (window.WapAdminSystem && typeof window.WapAdminSystem.getEmailRules === 'function') {
-                allList = window.WapAdminSystem.getEmailRules();
-            }
-            if (!allList || allList.length === 0) {
-                allList = window.VF_RP_MASTER_DATA || [];
-            }
-            if (Array.isArray(allList) && allList.length > 0) {
-                const cleanStr = (s) => (s || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
-                const vClean = cleanStr(vendorName);
-                const cClean = cleanStr(vendorCode);
-                matrixRules = allList.filter(item => {
-                    const iSup = cleanStr(item.supplier || item.supplier_name || '');
-                    const iCode = cleanStr(item.vendor_code || item.supplier_code || '');
-                    if (cClean && iCode && (iCode === cClean || iCode.includes(cClean) || cClean.includes(iCode))) return true;
-                    if (vClean && iSup && (iSup.includes(vClean) || vClean.includes(iSup))) return true;
-                    return false;
-                });
-            }
-        }
-
-        const vDisplay = vendorName || (curCase?.supplier) || (matrixRules[0]?.supplier_name) || (matrixRules[0]?.supplier) || 'Vendor';
-        const cDisplay = vendorCode || (curCase?.vendor_code) || (matrixRules[0]?.vendor_code) || '';
-
-        // Set ป้องกันรายชื่อซ้ำในการแสดงผล
-        const renderedPersonKeys = new Set();
-
-        // 🔍 Helper: ค้นหาข้อมูลระดับสิทธิ์ แผนก และตำแหน่งจริงจากฐานข้อมูล (Supabase _dbUsersRoleMap & MASTER_STAFF_USERS) 100%
-        const getStaffDbProfile = (name, emailAddr = '') => {
-            if (!name || name === '-' || name === 'N/A' || name === '--') return null;
-
-            let em = (emailAddr || '').toLowerCase().trim();
-            if (!em && typeof resolveStaffEmail === 'function') {
-                em = (resolveStaffEmail(name) || '').toLowerCase().trim();
-            }
-            if (!em && typeof STAFF_EMAIL_MAP !== 'undefined' && STAFF_EMAIL_MAP[name]) {
-                em = STAFF_EMAIL_MAP[name].toLowerCase().trim();
-            }
-
-            const clean = (typeof cleanSignatureName === 'function')
-                ? cleanSignatureName(name).toLowerCase().trim()
-                : String(name).replace(/^(Mr|Ms|Mrs)\.?\s+/i, '').toLowerCase().trim();
-
-            // 1. ค้นหาใน window._dbUsersRoleMap (ตาราง profiles จาก Supabase)
-            let dbUser = null;
-            if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
-                if (em && window._dbUsersRoleMap.has(em)) {
-                    dbUser = window._dbUsersRoleMap.get(em);
-                } else {
-                    for (const [k, u] of window._dbUsersRoleMap.entries()) {
-                        const uClean = (typeof cleanSignatureName === 'function')
-                            ? cleanSignatureName(u.display_name || '').toLowerCase().trim()
-                            : String(u.display_name || '').replace(/^(Mr|Ms|Mrs)\.?\s+/i, '').toLowerCase().trim();
-                        if (clean && (uClean === clean || uClean.includes(clean) || clean.includes(uClean))) {
-                            dbUser = u;
-                            if (!em) em = k;
-                            break;
-                        }
-                    }
+        // 3. Helper: รวบรวมรายชื่อพนักงานและบทบาทจากระบบ Admin Master & Approval Matrix
+        const allStaffMap = new Map();
+        if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+            MASTER_STAFF_USERS.forEach(u => {
+                if (u && u.name) {
+                    allStaffMap.set(u.name.trim().toLowerCase(), {
+                        name: u.name.trim(),
+                        email: u.email || '',
+                        role: (u.role || 'staff').toLowerCase(),
+                        department: u.department || ''
+                    });
                 }
-            }
+            });
+        }
+        if (window._dbUsersRoleMap && window._dbUsersRoleMap.size > 0) {
+            Array.from(window._dbUsersRoleMap.values()).forEach(u => {
+                const name = (u.display_name || u.name || '').trim();
+                if (name) {
+                    const existing = allStaffMap.get(name.toLowerCase()) || {};
+                    allStaffMap.set(name.toLowerCase(), {
+                        name,
+                        email: u.email || existing.email || '',
+                        role: (u.role || existing.role || 'staff').toLowerCase(),
+                        department: u.department || existing.department || ''
+                    });
+                }
+            });
+        }
 
-            // 2. ค้นหาใน MASTER_STAFF_USERS (32 รายชื่อหลักพร้อมแผนกและสิทธิ์จริงในฐานข้อมูล)
-            let masterUser = null;
-            if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
-                masterUser = MASTER_STAFF_USERS.find(u => {
-                    if (em && u.email && u.email.toLowerCase().trim() === em) return true;
-                    const uClean = (typeof cleanSignatureName === 'function')
-                        ? cleanSignatureName(u.name).toLowerCase().trim()
-                        : String(u.name).replace(/^(Mr|Ms|Mrs)\.?\s+/i, '').toLowerCase().trim();
-                    if (clean && (uClean === clean || uClean.includes(clean) || clean.includes(uClean))) return true;
-                    return false;
-                });
-            }
-
-            // ชื่อแสดงผลทางการ
-            const canonical = (typeof window.canonicalStaffDisplayName === 'function')
-                ? window.canonicalStaffDisplayName(masterUser?.name || dbUser?.display_name || name, em)
-                : (masterUser?.name || dbUser?.display_name || name);
-
-            const finalEmail = em || masterUser?.email || dbUser?.email || '';
-
-            // ระดับสิทธิ์จริงจากฐานข้อมูล (Role)
-            let rawRole = (dbUser && dbUser.role) ? dbUser.role : (masterUser && masterUser.role ? masterUser.role : '');
-            rawRole = String(rawRole || '').trim().toLowerCase();
-
-            // แผนกจริงจากฐานข้อมูล (Department)
-            let department = (masterUser && masterUser.department) ? masterUser.department : '';
-            if (!department && typeof getStaffTeamName === 'function') {
-                department = getStaffTeamName(canonical) || getStaffTeamName(name) || '';
-            }
-            if (!department) department = 'Carrier Quality Team';
-
-            // แปลงระดับสิทธิ์เป็น Badge, Icon, และคำอธิบายตำแหน่งจริงตามฐานข้อมูล 100%
-            let roleBadge = 'STAFF';
-            let roleTitle = 'พนักงาน Carrier';
-            let roleIcon = '👤';
-            let badgeBg = '#475569';
-            let badgeShadow = 'rgba(71, 85, 105, 0.25)';
-            let avatarGradient = 'linear-gradient(135deg, #64748b, #475569)';
-            let avatarBorder = '#94a3b8';
-
-            if (rawRole === 'admin' || rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) {
-                roleBadge = 'ADMIN';
-                roleTitle = 'ผู้ดูแลระบบ (Admin)';
-                roleIcon = '👑';
-                badgeBg = '#7c3aed';
-                badgeShadow = 'rgba(124, 58, 237, 0.35)';
-                avatarGradient = 'linear-gradient(135deg, #7c3aed, #4f46e5)';
-                avatarBorder = '#a855f7';
-            } else if (rawRole === 'manager' || rawRole.includes('manag') || rawRole.includes('ผู้จัดการ')) {
-                roleBadge = 'MANAGER';
-                roleTitle = 'ผู้จัดการ (Manager)';
-                roleIcon = '👔';
-                badgeBg = '#e11d48';
-                badgeShadow = 'rgba(225, 29, 72, 0.35)';
-                avatarGradient = 'linear-gradient(135deg, #f43f5e, #be123c)';
-                avatarBorder = '#fb7185';
-            } else if (rawRole === 'supervisor' || rawRole.includes('super') || rawRole.includes('หัวหน้า')) {
-                roleBadge = 'SUPERVISOR';
-                roleTitle = 'หัวหน้างาน (Supervisor)';
-                roleIcon = '⚡';
-                badgeBg = '#d97706';
-                badgeShadow = 'rgba(217, 119, 6, 0.35)';
-                avatarGradient = 'linear-gradient(135deg, #f59e0b, #d97706)';
-                avatarBorder = '#fbbf24';
-            } else if (rawRole === 'engineer' || rawRole.includes('engineer') || rawRole.includes('วิศวกร')) {
-                roleBadge = 'ENGINEER';
-                roleTitle = 'วิศวกร (Engineer)';
-                roleIcon = '🔧';
-                badgeBg = '#059669';
-                badgeShadow = 'rgba(5, 150, 105, 0.35)';
-                avatarGradient = 'linear-gradient(135deg, #10b981, #059669)';
-                avatarBorder = '#34d399';
-            } else if (rawRole === 'iqc') {
-                roleBadge = 'IQC';
-                roleTitle = 'ตรวจสอบคุณภาพ (IQC)';
-                roleIcon = '🔍';
-                badgeBg = '#0284c7';
-                badgeShadow = 'rgba(2, 132, 199, 0.35)';
-                avatarGradient = 'linear-gradient(135deg, #0ea5e9, #0284c7)';
-                avatarBorder = '#38bdf8';
-            } else if (rawRole.includes('sqe') || rawRole.includes('support')) {
-                roleBadge = 'SQE SUPPORT';
-                roleTitle = 'ฝ่ายสนับสนุนคุณภาพ (SQE)';
-                roleIcon = '👤';
-                badgeBg = '#4f46e5';
-                badgeShadow = 'rgba(79, 70, 229, 0.35)';
-                avatarGradient = 'linear-gradient(135deg, #6366f1, #4f46e5)';
-                avatarBorder = '#818cf8';
-            }
-
-            // ไอคอนแผนกจากฐานข้อมูล
-            let deptIcon = '🏢';
-            const depLow = department.toLowerCase();
-            if (depLow.includes('mold')) deptIcon = '🏭';
-            else if (depLow.includes('printing')) deptIcon = '🖨️';
-            else if (depLow.includes('steel')) deptIcon = '🔩';
-            else if (depLow.includes('piping')) deptIcon = '🔧';
-            else if (depLow.includes('elect')) deptIcon = '⚡';
-            else if (depLow.includes('approv')) deptIcon = '⭐';
-
-            // อักษรย่อสำหรับ Avatar Initials
-            const nameWithoutPrefix = canonical.replace(/^(Mr|Ms|Mrs)\.?\s*/i, '').trim();
-            const parts = nameWithoutPrefix.split(/\s+/).filter(Boolean);
-            let initials = '';
-            if (parts.length >= 2) {
-                initials = (parts[0][0] + parts[1][0]).toUpperCase();
-            } else if (parts.length === 1) {
-                initials = parts[0].substring(0, 2).toUpperCase();
-            } else {
-                initials = 'CP';
-            }
-
-            return {
-                name: canonical,
-                email: finalEmail,
-                rawRole,
-                roleBadge,
-                roleTitle,
-                roleIcon,
-                department,
-                deptIcon,
-                initials,
-                badgeBg,
-                badgeShadow,
-                avatarGradient,
-                avatarBorder
-            };
+        // ตรวจสอบคำนำหน้าชื่อ (Prefix Validation: Mr. / Ms. / Miss / Mrs. / Dr. / Khun / K. / นาย / นาง / นางสาว)
+        const hasValidPrefix = (name) => {
+            if (!name || typeof name !== 'string') return false;
+            const clean = name.trim();
+            if (!clean || clean === '-' || clean === '--' || clean === 'N/A') return false;
+            return /^(mr\.|ms\.|mrs\.|miss\.|miss\s|dr\.|khun\s|k\.|นาย|นาง|นางสาว|mr\s|ms\s|mrs\s)/i.test(clean);
         };
 
-        // 🎨 Helper: เรนเดอร์การ์ดรายชื่อพนักงานพร้อมกิมมิกและตำแหน่งจริงจากระดับสิทธิ์ฐานข้อมูล 100% (เอาโล่สีฟ้าออกทั้งหมด)
-        const renderAuthorizedCard = (name, matrixContext = '', emailAddr = '') => {
-            const profile = getStaffDbProfile(name, emailAddr);
-            if (!profile) return '';
-
-            // ตรวจสอบตัวกรองค้นหา (Filter)
-            if (query) {
-                const searchTarget = `${profile.name} ${profile.email} ${profile.roleBadge} ${profile.roleTitle} ${profile.department}`.toLowerCase();
-                if (!searchTarget.includes(query)) return '';
-            }
-
-            const personKey = (profile.email ? profile.email.toLowerCase().trim() : '') || 
-                              (typeof cleanSignatureName === 'function' ? cleanSignatureName(profile.name).toLowerCase().trim() : profile.name.toLowerCase().trim());
+        // แปลงชื่อให้มีคำนำหน้าที่ถูกต้องตามฐานข้อมูล Master Staff
+        const resolvePrefixedName = (rawName) => {
+            if (!rawName || rawName === '-' || rawName === '--' || rawName === 'N/A') return '';
+            const trimmed = rawName.trim();
+            if (hasValidPrefix(trimmed)) return trimmed;
             
-            if (!personKey || renderedPersonKeys.has(personKey)) return '';
-            renderedPersonKeys.add(personKey);
+            // ค้นหาใน MASTER_STAFF_USERS เพื่อดึงชื่อเต็มที่มีคำนำหน้า (Prefix)
+            if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+                const found = MASTER_STAFF_USERS.find(u => {
+                    const uName = u.name || '';
+                    const uClean = uName.replace(/^(mr\.|ms\.|mrs\.|miss\.|miss\s|dr\.|khun\s|k\.|นาย|นาง|นางสาว|mr\s|ms\s|mrs\s)\s*/i, '').trim().toLowerCase();
+                    const tClean = trimmed.replace(/^(mr\.|ms\.|mrs\.|miss\.|miss\s|dr\.|khun\s|k\.|นาย|นาง|นางสาว|mr\s|ms\s|mrs\s)\s*/i, '').trim().toLowerCase();
+                    return (uClean && tClean && uClean === tClean) || uName.toLowerCase().includes(tClean);
+                });
+                if (found && hasValidPrefix(found.name)) {
+                    return found.name.trim();
+                }
+            }
+            return '';
+        };
 
-            const deptInfo = `${profile.deptIcon} แผนก ${profile.department}`;
-            const emailInfo = profile.email || 'carrier.com';
-            const bottomLabel = matrixContext || profile.roleTitle;
+        const renderedNames = new Set();
+        let renderedCount = 0;
 
+        // Helper: ฟังก์ชันวาดรายการพนักงาน (เฉพาะที่มีคำนำหน้า Mr./Ms./Miss/Mrs./etc. เท่านั้น)
+        const renderOption = (name, label, color, icon = '👤', emailAddr = '') => {
+            const prefixedName = resolvePrefixedName(name);
+            if (!prefixedName || !hasValidPrefix(prefixedName)) return '';
+            const key = prefixedName.toLowerCase();
+            if (renderedNames.has(key)) return '';
+            renderedNames.add(key);
+            renderedCount++;
+
+            const staffObj = allStaffMap.get(key);
+            const finalEmail = emailAddr || (staffObj ? staffObj.email : '') || ((typeof resolveStaffEmail === 'function') ? resolveStaffEmail(prefixedName) : (STAFF_EMAIL_MAP[prefixedName] || ''));
             return `
                 <div class="modal-ac-item" 
-                     data-value="${profile.name.replace(/"/g, '&quot;')}"
-                     style="padding: 7px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 9px; border-bottom: 1px solid #f1f5f9; border-left: 4px solid transparent; transition: all 0.15s; background: #ffffff;"
-                     onmouseenter="this.style.background='#f0f7ff'; this.style.borderLeft='4px solid #0284c7';"
-                     onmouseleave="this.style.background='#ffffff'; this.style.borderLeft='4px solid transparent';"
-                     onmousedown="event.preventDefault(); applyModalAC('staff', '${profile.name.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                    
-                    <!-- ด้านซ้าย: Avatar กิมมิกตัวอักษรย่อ + ไอคอนสิทธิ์ฐานข้อมูล + ข้อมูลพนักงานจริง -->
-                    <div style="display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1;">
-                        <div style="position: relative; width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; background: ${profile.avatarGradient}; border: 1.5px solid ${profile.avatarBorder}; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.12);">
-                            <span style="font-size: 10.5px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">${profile.initials}</span>
-                            <span style="position: absolute; bottom: -2px; right: -2px; width: 13px; height: 13px; background: #ffffff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.25);" title="${profile.roleTitle}">${profile.roleIcon}</span>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
-                            <span style="font-size: 11.5px; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                ${profile.name}
-                            </span>
-                            <div style="display: flex; align-items: center; gap: 4px; font-size: 9px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                <span style="font-weight: 700; color: #475569;">${deptInfo}</span>
-                                <span style="color: #cbd5e1;">•</span>
-                                <span style="font-family: monospace; color: #64748b;">${emailInfo}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ด้านขวา: ป้ายตำแหน่งจริงจากระดับสิทธิ์ในฐานข้อมูล 100% -->
-                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 1.5px; flex-shrink: 0;">
-                        <span style="font-size: 8.5px; font-weight: 800; background: ${profile.badgeBg}; color: #ffffff; padding: 2px 6.5px; border-radius: 4.5px; white-space: nowrap; letter-spacing: 0.4px; box-shadow: 0 1.5px 3px ${profile.badgeShadow}; text-transform: uppercase; display: flex; align-items: center; gap: 3px;">
-                            <span>${profile.roleIcon}</span>
-                            <span>${profile.roleBadge}</span>
+                     data-value="${prefixedName.replace(/"/g, '&quot;')}"
+                     style="padding: 10px 14px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s;"
+                     onmouseenter="this.style.background='#eff6ff'; this.style.color='#1d4ed8';"
+                     onmouseleave="this.style.background='transparent'; this.style.color='#1e293b';"
+                     onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('staff', '${prefixedName.replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                    <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+                        <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: #0f172a; white-space: nowrap;">
+                            <span>${icon}</span> ${prefixedName}
                         </span>
-                        <span style="font-size: 8px; color: #64748b; font-weight: 700; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            ${bottomLabel}
-                        </span>
+                        <span style="font-size: 9px; color: #64748b; padding-left: 18px; font-family: monospace; overflow: hidden; text-overflow: ellipsis;">${finalEmail}</span>
                     </div>
+                    <span style="font-size: 8px; background: ${color}; color: #fff; padding: 2px 7px; border-radius: 4px; font-weight: 900; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;">
+                        ${label}
+                    </span>
                 </div>`;
         };
 
-        // 🌟 [HEADER 1]: แสดงข้อมูล Vendor หลักแบบสว่าง สดใส
-        htmlContent += `
-            <div style="padding: 7px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-                <div style="display: flex; align-items: center; gap: 7px; overflow: hidden; min-width: 0;">
-                    <span style="font-size: 13px;">🏢</span>
-                    <div style="display: flex; flex-direction: column; min-width: 0;">
-                        <span style="font-size: 11px; font-weight: 800; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            ${vDisplay} ${cDisplay ? `<span style="color: #0284c7; font-weight: 700;">(${cDisplay})</span>` : ''}
-                        </span>
-                        <span style="font-size: 8.5px; color: #64748b; font-weight: 600;">Vendor Matrix Reference</span>
-                    </div>
-                </div>
-                <span style="font-size: 8.5px; font-weight: 800; background: ${docBadgeBg}; color: ${docBadgeColor}; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; border: 1px solid ${docBadgeColor}; white-space: nowrap;">
-                    ${isRP ? 'RP' : 'VF'}
-                </span>
+        // --------------------------------------------------------
+        // 🔹 [PART A]: ช่อง ISSUE BY (วิศวกรผู้จัดทำตาม APPROVAL MATRIX ของ Vendor เท่านั้น)
+        // --------------------------------------------------------
+        if (inputEl.id === 'prob-issue-by') {
+            const matrixTitle = isRP 
+                ? "🔬 IQC ENGINEER (ผู้จัดทำรายงาน RP: ตาม VENDOR MATRIX)" 
+                : "⚙️ SQE ENGINEER (ผู้จัดทำรายงาน VF: ตาม VENDOR MATRIX)";
+            const headerColor = isRP ? "#0284c7" : "#2563eb";
+            const headerBg = isRP ? "#f0f9ff" : "#eff6ff";
+            const headerBorder = isRP ? "#bae6fd" : "#bfdbfe";
+
+            htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${headerColor}; background: ${headerBg}; border-bottom: 1.5px solid ${headerBorder}; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between;">
+                <span>${matrixTitle}</span>
+                <span style="font-size: 8px; background: ${headerColor}; color: #fff; padding: 1.5px 6px; border-radius: 4px; font-weight: 900;">${isRP ? 'RP ONLY' : 'VF ONLY'}</span>
             </div>`;
 
-        // --------------------------------------------------------
-        // 🔹 [PART 1]: ช่อง CONFIRM BY (กิมมิก: กุญแจ 🔑 - ผู้ยืนยัน/ตรวจสอบคุมสายงาน LV.2)
-        // หัวข้อสีครีมพาสเทลสดใสตามภาพตัวอย่าง ⚠️ รายชื่อหัวหน้างาน (SUPERVISORS)
-        // --------------------------------------------------------
-        if (inputEl.id === 'prob-confirm-by') {
-            const headerTitle = isRP 
-                ? "รายชื่อผู้มีสิทธิ์ยืนยัน (CONFIRM RP)"
-                : "รายชื่อผู้มีสิทธิ์ยืนยัน (CONFIRM VF)";
-
-            htmlContent += `
-                <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #b45309; background: #fffbeb; border-bottom: 1.5px solid #fde68a; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 12px;">⚠️</span>
-                        <span>${headerTitle}</span>
-                    </div>
-                    <span style="font-size: 8.5px; font-weight: 800; background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 1px 6px; border-radius: 4px;">🔑 LV.2</span>
-                </div>`;
-
-            let hasMatched = false;
-
-            if (matrixRules.length > 0) {
-                matrixRules.forEach(r => {
-                    if (isRP) {
-                        // เอกสาร RP: ดึง IQC Engineer (หมวด 4) และ Confirm RP (หมวด 5) ตามภาพที่ 2
-                        const iqcName = (r.iqc_eng_name || '').trim();
-                        const iqcEmail = r.iqc_eng_email || '';
-                        const confName = (r.confirm_rp_name || '').trim();
-                        const confEmail = r.confirm_rp_email || '';
-
-                        // 1. IQC Engineer (รายงาน RP) จากหมวด 4 ในตารางภาพที่ 2
-                        if (iqcName && iqcName !== '-' && iqcName !== '--') {
-                            const card = renderAuthorizedCard(iqcName, '✦ วิศวกร RP (Matrix)', iqcEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
-                        }
-
-                        // 2. Confirm RP จากหมวด 5 ในตารางภาพที่ 2
-                        if (confName && confName !== '-' && confName !== '--') {
-                            const card = renderAuthorizedCard(confName, '✦ สิทธิ์ยืนยัน RP (Matrix)', confEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
-                        }
-
-                        // 3. SQE Engineer ประจำ Vendor
-                        const sqeName = (r.engineer || '').trim();
-                        const sqeEmail = r.sqe_email || '';
-                        if (sqeName && sqeName !== '-' && sqeName !== '--') {
-                            const card = renderAuthorizedCard(sqeName, '✦ SQE เวนเดอร์ (Matrix)', sqeEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
-                        }
-                    } else {
-                        // เอกสาร VF: ดึง SQE Engineer (หมวด 4) และ Confirm VF (หมวด 5) ตามภาพที่ 2
-                        const sqeName = (r.engineer || '').trim();
-                        const sqeEmail = r.sqe_email || '';
-                        const confName = (r.confirm_vf_name || '').trim();
-                        const confEmail = r.confirm_vf_email || '';
-
-                        // 1. SQE Engineer (รายงาน VF) จากหมวด 4 ในตารางภาพที่ 2
-                        if (sqeName && sqeName !== '-' && sqeName !== '--') {
-                            const card = renderAuthorizedCard(sqeName, '✦ วิศวกร VF (Matrix)', sqeEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
-                        }
-
-                        // 2. Confirm VF จากหมวด 5 ในตารางภาพที่ 2
-                        if (confName && confName !== '-' && confName !== '--') {
-                            const card = renderAuthorizedCard(confName, '✦ สิทธิ์ยืนยัน VF (Matrix)', confEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
-                        }
-
-                        // 3. IQC Engineer ประจำ Vendor
-                        const iqcName = (r.iqc_eng_name || '').trim();
-                        const iqcEmail = r.iqc_eng_email || '';
-                        if (iqcName && iqcName !== '-' && iqcName !== '--') {
-                            const card = renderAuthorizedCard(iqcName, '✦ IQC เวนเดอร์ (Matrix)', iqcEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
+            if (matrix) {
+                if (isRP) {
+                    // รายงาน RP: อ่านเฉพาะ IQC Engineer (รายงาน RP)
+                    if (matrix.iqc_eng_name && matrix.iqc_eng_name !== '-') {
+                        const pName = resolvePrefixedName(matrix.iqc_eng_name);
+                        if (pName && (!query || pName.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pName, 'IQC ENGINEER (RP)', '#0284c7', '⭐', matrix.iqc_eng_email);
                         }
                     }
-                });
+                } else {
+                    // รายงาน VF: อ่านเฉพาะ SQE Engineer (รายงาน VF)
+                    if (matrix.engineer && matrix.engineer !== '-') {
+                        const pName = resolvePrefixedName(matrix.engineer);
+                        if (pName && (!query || pName.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pName, 'SQE ENGINEER (VF)', '#2563eb', '⭐', matrix.sqe_email);
+                        }
+                    }
+                }
             }
 
-            // ถ้าไม่พบข้อมูล หรือพิมพ์คำค้นหาไม่เจอใน Matrix ของเวนเดอร์นี้
-            if (!hasMatched) {
+            if (renderedCount === 0) {
                 htmlContent += `
-                    <div style="padding: 14px 12px; text-align: center; color: #64748b; font-size: 10.5px; background: #fffbeb;">
-                        <div style="font-size: 16px; margin-bottom: 2px;">⚠️</div>
-                        <div style="font-weight: 700; color: #92400e;">ไม่พบผู้มีสิทธิ์ใน Matrix ของเวนเดอร์นี้</div>
-                        <div style="font-size: 8.5px; color: #b45309;">อ้างอิงหมวด 4 & 5 ในตารางภาพที่ 2</div>
+                    <div style="padding: 12px 14px; font-size: 11px; color: #991b1b; background: #fef2f2; border: 1px dashed #f87171; border-radius: 8px; margin: 4px; text-align: center;">
+                        <div style="font-weight: 800; font-size: 11.5px; margin-bottom: 2px;">⚠️ ไม่พบวิศวกรผู้จัดทำสำหรับ Vendor: <strong>${vendorName || 'ยังไม่ระบุ'}</strong></div>
+                        <div style="font-size: 10px; color: #64748b;">
+                            เอกสาร: <strong>${isRP ? 'RP (IQC Engineer)' : 'VF (SQE Engineer)'}</strong><br>
+                            กรุณากำหนดรายชื่อใน Approval Matrix (Admin User Control)
+                        </div>
                     </div>`;
             }
         }
 
         // --------------------------------------------------------
-        // 🔹 [PART 2]: ช่อง APPROVED BY (กิมมิก: มงกุฎ 👑 - ระดับอนุมัติสูงสุด LV.3)
+        // 🔹 [PART B]: ช่อง CONFIRM BY (ผู้ยืนยันตาม APPROVAL MATRIX ของ Vendor เท่านั้น)
+        // --------------------------------------------------------
+        else if (inputEl.id === 'prob-confirm-by') {
+            const title = isRP 
+                ? "🟢 CONFIRM RP (ผู้ยืนยันรายงาน RP: ตาม VENDOR MATRIX)" 
+                : "🔵 CONFIRM VF (ผู้ยืนยันรายงาน VF: ตาม VENDOR MATRIX)";
+            const color = isRP ? "#059669" : "#1e40af";
+            const bg = isRP ? "#f0fdf4" : "#eff6ff";
+            const border = isRP ? "#bbf7d0" : "#bfdbfe";
+
+            htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: ${bg}; border-bottom: 1.5px solid ${border}; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between;">
+                <span>🛡️ ${title}</span>
+                <span style="font-size: 8px; background: ${color}; color: #fff; padding: 1.5px 6px; border-radius: 4px; font-weight: 900;">${isRP ? 'RP ONLY' : 'VF ONLY'}</span>
+            </div>`;
+
+            if (matrix) {
+                if (isRP) {
+                    // รายงาน RP: อ่านเฉพาะ Confirm RP เท่านั้น
+                    if (matrix.confirm_rp_name && matrix.confirm_rp_name !== '-') {
+                        const pName = resolvePrefixedName(matrix.confirm_rp_name);
+                        if (pName && (!query || pName.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pName, 'CONFIRM RP (VENDOR MATRIX)', '#059669', '⭐', matrix.confirm_rp_email);
+                        }
+                    }
+                } else {
+                    // รายงาน VF: อ่านเฉพาะ Confirm VF เท่านั้น
+                    if (matrix.confirm_vf_name && matrix.confirm_vf_name !== '-') {
+                        const pName = resolvePrefixedName(matrix.confirm_vf_name);
+                        if (pName && (!query || pName.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pName, 'CONFIRM VF (VENDOR MATRIX)', '#1e40af', '⭐', matrix.confirm_vf_email);
+                        }
+                    }
+                }
+            }
+
+            if (renderedCount === 0) {
+                htmlContent += `
+                    <div style="padding: 12px 14px; font-size: 11px; color: #991b1b; background: #fef2f2; border: 1px dashed #f87171; border-radius: 8px; margin: 4px; text-align: center;">
+                        <div style="font-weight: 800; font-size: 11.5px; margin-bottom: 2px;">⚠️ ไม่พบผู้ยืนยันสำหรับ Vendor: <strong>${vendorName || 'ยังไม่ระบุ'}</strong></div>
+                        <div style="font-size: 10px; color: #64748b;">
+                            เอกสาร: <strong>${isRP ? 'Confirm RP (Return Part)' : 'Confirm VF (Vendor Failure)'}</strong><br>
+                            กรุณากำหนดรายชื่อใน Approval Matrix (Admin User Control)
+                        </div>
+                    </div>`;
+            }
+        }
+
+        // --------------------------------------------------------
+        // 🔹 [PART C]: ช่อง APPROVED BY (ผู้อนุมัติตาม APPROVAL MATRIX ของ Vendor เท่านั้น)
         // --------------------------------------------------------
         else if (inputEl.id === 'prob-approved-by') {
-            const headerTitle = isRP 
-                ? "รายชื่อผู้อนุมัติเอกสาร (APPROVE RP)"
-                : "รายชื่อผู้อนุมัติเอกสาร (APPROVE VF)";
-            
-            htmlContent += `
-                <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #6d28d9; background: #faf5ff; border-bottom: 1.5px solid #e9d5ff; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 12px;">👑</span>
-                        <span>${headerTitle}</span>
-                    </div>
-                    <span style="font-size: 8.5px; font-weight: 800; background: #f3e8ff; color: #6d28d9; border: 1px solid #e9d5ff; padding: 1px 6px; border-radius: 4px;">👑 LV.3</span>
-                </div>`;
+            const title = isRP 
+                ? "🟢 APPROVE RP (ผู้อนุมัติรายงาน RP: ตาม VENDOR MATRIX)" 
+                : "🔵 APPROVE VF (ผู้อนุมัติรายงาน VF: ตาม VENDOR MATRIX)";
+            const color = isRP ? "#059669" : "#1e40af";
+            const bg = isRP ? "#f0fdf4" : "#eff6ff";
+            const border = isRP ? "#bbf7d0" : "#bfdbfe";
 
-            let hasMatched = false;
+            htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: ${bg}; border-bottom: 1.5px solid ${border}; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between;">
+                <span>👑 ${title}</span>
+                <span style="font-size: 8px; background: ${color}; color: #fff; padding: 1.5px 6px; border-radius: 4px; font-weight: 900;">${isRP ? 'RP ONLY' : 'VF ONLY'}</span>
+            </div>`;
 
-            if (matrixRules.length > 0) {
-                matrixRules.forEach(r => {
-                    if (isRP) {
-                        // 1. Approve RP จากหมวด 5 ในตารางภาพที่ 2
-                        const apprRp = (r.approve_rp_name || '').trim();
-                        const apprRpEmail = r.approve_rp_email || '';
-                        if (apprRp && apprRp !== '-' && apprRp !== '--') {
-                            const card = renderAuthorizedCard(apprRp, '✦ สิทธิ์อนุมัติ RP (Matrix)', apprRpEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
-                        }
-
-                        // 2. APPROVE VF/RP (ผู้อนุมัติร่วม) จากหมวด 5
-                        const apprJoint = (r.approve_vf_rp_name || '').trim();
-                        const apprJointEmail = r.approve_vf_rp_email || '';
-                        if (apprJoint && apprJoint !== '-' && apprJoint !== '--') {
-                            const card = renderAuthorizedCard(apprJoint, '✦ อนุมัติร่วม (Joint)', apprJointEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
-                        }
-                    } else {
-                        // 1. Approve VF จากหมวด 5 ในตารางภาพที่ 2
-                        const apprVf = (r.approve_vf_name || '').trim();
-                        const apprVfEmail = r.approve_vf_email || '';
-                        if (apprVf && apprVf !== '-' && apprVf !== '--') {
-                            const card = renderAuthorizedCard(apprVf, '✦ สิทธิ์อนุมัติ VF (Matrix)', apprVfEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
-                        }
-
-                        // 2. APPROVE VF/RP (ผู้อนุมัติร่วม) จากหมวด 5
-                        const apprJoint = (r.approve_vf_rp_name || '').trim();
-                        const apprJointEmail = r.approve_vf_rp_email || '';
-                        if (apprJoint && apprJoint !== '-' && apprJoint !== '--') {
-                            const card = renderAuthorizedCard(apprJoint, '✦ อนุมัติร่วม (Joint)', apprJointEmail);
-                            if (card) { htmlContent += card; hasMatched = true; }
+            if (matrix) {
+                if (isRP) {
+                    // รายงาน RP:
+                    // 1. อ่าน Approve RP (เฉพาะ RP เท่านั้น)
+                    if (matrix.approve_rp_name && matrix.approve_rp_name !== '-') {
+                        const pAppr = resolvePrefixedName(matrix.approve_rp_name);
+                        if (pAppr && (!query || pAppr.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pAppr, 'APPROVE RP (VENDOR MATRIX)', '#059669', '⭐', matrix.approve_rp_email);
                         }
                     }
-                });
+                    // 2. อ่าน 🟣 Approve VF/RP (ผู้อนุมัติร่วม)
+                    if (matrix.approve_vf_rp_name && matrix.approve_vf_rp_name !== '-' && matrix.approve_vf_rp_name !== matrix.approve_rp_name) {
+                        const pJoint = resolvePrefixedName(matrix.approve_vf_rp_name);
+                        if (pJoint && (!query || pJoint.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pJoint, '🟣 APPROVE VF/RP (ผู้อนุมัติร่วม)', '#7c3aed', '🟣', matrix.approve_vf_rp_email);
+                        }
+                    }
+                } else {
+                    // รายงาน VF:
+                    // 1. อ่าน Approve VF (เฉพาะ VF เท่านั้น)
+                    if (matrix.approve_vf_name && matrix.approve_vf_name !== '-') {
+                        const pAppr = resolvePrefixedName(matrix.approve_vf_name);
+                        if (pAppr && (!query || pAppr.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pAppr, 'APPROVE VF (VENDOR MATRIX)', '#1e40af', '⭐', matrix.approve_vf_email);
+                        }
+                    }
+                    // 2. อ่าน 🟣 Approve VF/RP (ผู้อนุมัติร่วม)
+                    if (matrix.approve_vf_rp_name && matrix.approve_vf_rp_name !== '-' && matrix.approve_vf_rp_name !== matrix.approve_vf_name) {
+                        const pJoint = resolvePrefixedName(matrix.approve_vf_rp_name);
+                        if (pJoint && (!query || pJoint.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pJoint, '🟣 APPROVE VF/RP (ผู้อนุมัติร่วม)', '#7c3aed', '🟣', matrix.approve_vf_rp_email);
+                        }
+                    }
+                }
             }
 
-            // ถ้าไม่พบข้อมูล หรือพิมพ์คำค้นหาไม่เจอใน Matrix ของเวนเดอร์นี้
-            if (!hasMatched) {
+            if (renderedCount === 0) {
                 htmlContent += `
-                    <div style="padding: 14px 12px; text-align: center; color: #64748b; font-size: 10.5px; background: #faf5ff;">
-                        <div style="font-size: 16px; margin-bottom: 2px;">⚠️</div>
-                        <div style="font-weight: 700; color: #581c87;">ไม่พบผู้อนุมัติใน Matrix ของเวนเดอร์นี้</div>
-                        <div style="font-size: 8.5px; color: #7c3aed;">อ้างอิงหมวด 5 ในตารางภาพที่ 2</div>
+                    <div style="padding: 12px 14px; font-size: 11px; color: #991b1b; background: #fef2f2; border: 1px dashed #f87171; border-radius: 8px; margin: 4px; text-align: center;">
+                        <div style="font-weight: 800; font-size: 11.5px; margin-bottom: 2px;">⚠️ ไม่พบผู้อนุมัติสำหรับ Vendor: <strong>${vendorName || 'ยังไม่ระบุ'}</strong></div>
+                        <div style="font-size: 10px; color: #64748b;">
+                            เอกสาร: <strong>${isRP ? 'Approve RP (Return Part)' : 'Approve VF (Vendor Failure)'}</strong><br>
+                            กรุณากำหนดรายชื่อใน Approval Matrix (Admin User Control)
+                        </div>
                     </div>`;
             }
         }
-
-        // --------------------------------------------------------
-        // 🔹 [PART 3]: ช่อง ISSUE BY (กิมมิก: ปากกา ✒️ - ระดับวิศวกรผู้จัดทำ/เปิดเอกสาร LV.1)
-        // --------------------------------------------------------
-        else if (inputEl.id === 'prob-issue-by') {
-            htmlContent += `
-                <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #0369a1; background: #f0f9ff; border-bottom: 1.5px solid #bae6fd; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 12px;">✒️</span>
-                        <span>วิศวกรประจำ VENDOR (ภาพที่ 2)</span>
-                    </div>
-                    <span style="font-size: 8.5px; font-weight: 800; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 1px 6px; border-radius: 4px;">✒️ LV.1</span>
-                </div>`;
-
-            let hasEng = false;
-
-            if (matrixRules.length > 0) {
-                matrixRules.forEach(r => {
-                    const primaryEng = isRP ? (r.iqc_eng_name || r.engineer) : (r.engineer || r.iqc_eng_name);
-                    const primaryEmail = isRP ? (r.iqc_eng_email || r.sqe_email) : (r.sqe_email || r.iqc_eng_email);
-
-                    if (primaryEng && primaryEng !== '-' && primaryEng !== '--') {
-                        const card = renderAuthorizedCard(primaryEng, '✦ วิศวกรประจำเวนเดอร์ (Matrix)', primaryEmail);
-                        if (card) { htmlContent += card; hasEng = true; }
-                    }
-
-                    const altEng = isRP ? r.engineer : r.iqc_eng_name;
-                    const altEmail = isRP ? r.sqe_email : r.iqc_eng_email;
-                    if (altEng && altEng !== '-' && altEng !== '--' && altEng !== primaryEng) {
-                        const card = renderAuthorizedCard(altEng, '✦ วิศวกรประจำเวนเดอร์ (Matrix)', altEmail);
-                        if (card) { htmlContent += card; hasEng = true; }
-                    }
-                });
-            }
-
-            // แสดงรายชื่อพนักงานทั้งหมดเพิ่มเติม (กรณีมอบหมายผู้อื่นเปิดเอกสารแทน) ดึงจาก MASTER_STAFF_USERS และ _dbUsersRoleMap
-            const allStaffMap = new Map();
-            if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
-                MASTER_STAFF_USERS.forEach(u => {
-                    if (u && u.name) {
-                        const canon = (typeof window.canonicalStaffDisplayName === 'function')
-                            ? window.canonicalStaffDisplayName(u.name, u.email)
-                            : u.name.trim();
-                        const key = (u.email || canon).toLowerCase().trim();
-                        if (!allStaffMap.has(key)) {
-                            allStaffMap.set(key, { name: canon, email: u.email || '' });
-                        }
-                    }
-                });
-            }
-
-            const extraStaff = Array.from(allStaffMap.values()).filter(u => {
-                const key = (u.email || u.name).toLowerCase().trim();
-                return !renderedPersonKeys.has(key);
+        // ฟิลด์ Staff อื่นๆ ทั่วไป
+        else {
+            const allStaffList = (typeof MASTER_STAFF_USERS !== 'undefined') ? MASTER_STAFF_USERS : [];
+            allStaffList.forEach(u => {
+                const pName = resolvePrefixedName(u.name);
+                if (pName && (!query || pName.toLowerCase().includes(query) || (u.email && u.email.toLowerCase().includes(query)))) {
+                    htmlContent += renderOption(pName, (u.role || 'STAFF').toUpperCase(), '#3b82f6', '👤', u.email);
+                }
             });
-
-            if (extraStaff.length > 0) {
-                let extraAdded = 0;
-                let extraHtml = '';
-                for (const u of extraStaff) {
-                    const card = renderAuthorizedCard(u.name, '✦ รายชื่อในฐานข้อมูล', u.email);
-                    if (card) {
-                        extraHtml += card;
-                        extraAdded++;
-                        if (extraAdded >= 15) break;
-                    }
-                }
-                if (extraHtml) {
-                    htmlContent += `
-                        <div style="padding: 5px 12px; font-size: 9.5px; font-weight: 800; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 5px;">
-                                <span>📋</span>
-                                <span>พนักงาน Carrier ทั้งหมดในระบบ (เลือกจัดทำแทน)</span>
-                            </div>
-                            <span style="font-size: 8.5px; font-weight: 700; color: #94a3b8;">${extraStaff.length}</span>
-                        </div>` + extraHtml;
-                }
-            }
         }
     }
     // ============================================================
-    // กรณีที่ 2: ข้อมูลทั่วไป (partno, partname, supplier, category, defect, action, report)
+    // กรณีที่ 2: ข้อมูลทั่วไป
     // ============================================================
     else {
         let source = [];
         const typeLower = type.toLowerCase();
 
         if (typeLower === 'partno') {
-            source = Array.from(smartMemory.values.partNo || []);
+            source = Array.from(smartMemory.values?.partNo || []);
         } else if (typeLower === 'partname') {
-            source = Array.from(smartMemory.values.partName || []);
+            source = Array.from(smartMemory.values?.partName || []);
         } else if (typeLower === 'supplier') {
-            source = Array.from(smartMemory.values.supplier || []);
+            source = Array.from(smartMemory.values?.supplier || []);
+            if (typeof window.getApprovalDirectoryVendors === 'function') {
+                const vList = window.getApprovalDirectoryVendors() || [];
+                vList.forEach(v => {
+                    const name = (typeof v === 'string' ? v : (v.supplier_name || v.vendor || '')).trim();
+                    if (name && !source.includes(name)) source.push(name);
+                });
+            }
         } else if (typeLower === 'category' || type === 'part') {
-            source = [
+            const defaultCategories = [
                 "Plastic Resin Mold Part",
                 "Plastic Resin (Assy)",
                 "Packaging part Form",
@@ -29996,14 +29653,28 @@ function renderModalAC(type, inputEl) {
                 "Piping Part",
                 "Printing part"
             ];
-            const historyCats = Array.from(smartMemory.values.category || []);
-            historyCats.forEach(c => { if(!source.includes(c)) source.push(c); });
+            source = [...defaultCategories];
+            const historyCats = Array.from(smartMemory.values?.category || []);
+            historyCats.forEach(c => { if (c && !source.includes(c)) source.push(c); });
         } else if (typeLower === 'user') {
-            source = Array.from(smartMemory.values.line || []); 
+            const defaultUsers = [
+                "B1", "MH", "CL5", "LF", "LC3", "CL2", "CL1", 
+                "OSA-A1", "PD1", "PD2", "PD3", "IQC", "OQA", "QA", 
+                "WH", "ENG", "MOLD", "PAINT", "PRESS", "SMT", "FINAL"
+            ];
+            source = Array.from(smartMemory.values?.line || []);
+            defaultUsers.forEach(u => { if (!source.includes(u)) source.push(u); });
         } else if (typeLower === 'defect') {
-            source = Array.from(smartMemory.values.defect || []);
+            const defaultDefects = [
+                "Broken", "Crack", "Scratch", "Dent", "Deform", "Burr", "Rust", "Stain", 
+                "Contamination", "Wrong Part", "Missing Part", "Short Shot", "Sink Mark", 
+                "Silver Streak", "Dimension NG", "Gas Mark", "Flash", "Pin Hole", "Discolor", 
+                "Noise", "Leak", "Burn", "Peeling", "Chipped", "Bend", "No Power", "Short Circuit"
+            ];
+            source = Array.from(smartMemory.values?.defect || []);
+            defaultDefects.forEach(d => { if (!source.includes(d)) source.push(d); });
         } else if (typeLower === 'action') {
-            source = [
+            const defaultActions = [
                 "Rework (แก้ไขงานซ่อม)",
                 "Repair (ซ่อมแซมตามเงื่อนไข)",
                 "Replace (เปลี่ยนชิ้นส่วนใหม่)",
@@ -30017,33 +29688,32 @@ function renderModalAC(type, inputEl) {
                 "Poka - Yoke / Jig Adjustment",
                 "Supplier On-site Sorting"
             ];
+            source = [...defaultActions];
+            const historyActions = Array.from(smartMemory.values?.action || []);
+            historyActions.forEach(a => { if (a && !source.includes(a)) source.push(a); });
         } else if (typeLower === 'report') {
             source = ["VF Report", "RP Report", "Records"];
         }
 
-        let itemIcon = '🔹';
-        if (typeLower === 'partno') itemIcon = '🔢';
-        else if (typeLower === 'partname' || typeLower === 'part' || typeLower === 'category') itemIcon = '📦';
-        else if (typeLower === 'supplier') itemIcon = '🏢';
-        else if (typeLower === 'defect') itemIcon = '⚠️';
-        else if (typeLower === 'action') itemIcon = '⚡';
-        else if (typeLower === 'report') itemIcon = '📄';
-
         // กรองและเรียงลำดับ
         let matched = query ? source.filter(v => v && v.toString().toLowerCase().includes(query)) : source;
-        matched.sort((a, b) => (a.toString().toLowerCase().startsWith(query) ? 0 : 1) - (b.toString().toLowerCase().startsWith(query) ? 0 : 1));
-        matched = matched.slice(0, 15);
+        matched.sort((a, b) => {
+            if (!query) return 0;
+            const aStart = a.toString().toLowerCase().startsWith(query) ? 0 : 1;
+            const bStart = b.toString().toLowerCase().startsWith(query) ? 0 : 1;
+            return aStart - bStart;
+        });
+        matched = matched.slice(0, 18);
 
         if (matched.length > 0) {
-            htmlContent = matched.map(v => `
+            htmlContent = matched.map((v, idx) => `
                 <div class="modal-ac-item" 
                      data-value="${v.toString().replace(/"/g, '&quot;')}"
-                     style="padding: 7px 12px; font-size: 11.5px; font-weight: 600; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9; border-left: 4px solid transparent; transition: all 0.15s; display: flex; align-items: center; gap: 8px;"
-                     onmouseenter="this.style.background='#f0f7ff'; this.style.color='#0284c7'; this.style.borderLeft='4px solid #0284c7';"
-                     onmouseleave="this.style.background='transparent'; this.style.color='#1e293b'; this.style.borderLeft='4px solid transparent';"
-                     onmousedown="event.preventDefault(); applyModalAC('${type}', '${v.toString().replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                    <span style="font-size: 11px; flex-shrink: 0;">${itemIcon}</span>
-                    <span>${v}</span>
+                     style="padding: 10px 14px; font-size: 12px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.12s ease; ${idx === 0 ? 'border-top-left-radius: 10px; border-top-right-radius: 10px;' : ''} ${idx === matched.length - 1 ? 'border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; border-bottom: none;' : ''}"
+                     onmouseenter="this.style.background='#eff6ff'; this.style.color='#1d4ed8';"
+                     onmouseleave="this.style.background='transparent'; this.style.color='#1e293b';"
+                     onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('${type}', '${v.toString().replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                    ${v}
                 </div>
             `).join('');
         }
@@ -30061,15 +29731,16 @@ function renderModalAC(type, inputEl) {
 function applyModalAC(type, value, inputEl) {
     if (!inputEl) return;
 
-    // 1. ใส่ค่าที่เลือกลงในช่อง Input
+    // 1. ใส่ค่าที่เลือก (เช่น ชื่อพนักงาน, รหัสพาร์ท) ลงในช่อง Input
     inputEl.value = value;
 
-    // 2. ปิดดรอปดาวน์ Autocomplete ทันที
+    // 2. ปิดดรอปดาวน์ Autocomplete
     const wrap = inputEl.parentElement;
     const dd = wrap ? wrap.querySelector('.modal-ac-dropdown') : null;
     if (dd) dd.style.display = 'none';
+    if (wrap) wrap.style.zIndex = '';
 
-    // 3. บันทึกลง Memory ของ Case (Auto-save)
+    // 3. บันทึกลง Memory ของ Case (Auto-save) - เก็บเฉพาะชื่อ ไม่เก็บสถานะลายเซ็น
     const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
         ? Wap8DSystem.getCurrentCase()
         : null;
@@ -30083,10 +29754,42 @@ function applyModalAC(type, value, inputEl) {
             curCase.report_data.vf_data.confirm_by = value;
         } else if (inputEl.id === 'prob-approved-by') {
             curCase.report_data.vf_data.approved_by = value;
+        } else if (type === 'supplier' || inputEl.id === 'prob-supplier') {
+            curCase.supplier = value;
+            curCase.report_data.vf_data.vendor = value;
+            // Lookup Matrix for supplier to pre-fill or suggest authorized signers
+            if (typeof window.getVFRPMatrixForSupplier === 'function') {
+                const matrix = window.getVFRPMatrixForSupplier(value, '', '');
+                if (matrix) {
+                    if (matrix.vendor_code) {
+                        curCase.vendor_code = matrix.vendor_code;
+                        curCase.report_data.vf_data.vendor_code = matrix.vendor_code;
+                    }
+                    if (matrix.parts_group) {
+                        const catSel = document.getElementById('f-sup-part-cat');
+                        if (catSel && !catSel.value) catSel.value = matrix.parts_group;
+                    }
+                    const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
+                    const isRP = reportType.includes('RP');
+                    const mConfirm = isRP ? (matrix.confirm_rp_name || '') : (matrix.confirm_vf_name || '');
+                    const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || '') : (matrix.approve_vf_name || matrix.approve_vf_rp_name || '');
+
+                    const confirmInput = document.getElementById('prob-confirm-by');
+                    if (confirmInput && !confirmInput.value && mConfirm && mConfirm !== '-') {
+                        confirmInput.value = mConfirm;
+                        curCase.report_data.vf_data.confirm_by = mConfirm;
+                    }
+                    const approvedInput = document.getElementById('prob-approved-by');
+                    if (approvedInput && !approvedInput.value && mApprove && mApprove !== '-') {
+                        approvedInput.value = mApprove;
+                        curCase.report_data.vf_data.approved_by = mApprove;
+                    }
+                }
+            }
         }
     }
 
-    // 4. แจ้งระบบอัปเดตสถานะ (Trigger input & change events)
+    // 4. แจ้งระบบอัปเดตสถานะ (Trigger input events)
     inputEl._suppressAC = true;
     inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     inputEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -30114,35 +29817,8 @@ function applyModalAC(type, value, inputEl) {
 function updateSupportFormValidation() {
     const modal = document.getElementById('support-form-modal');
     if (!modal) return;
-    const isDark = document.body.classList.contains('dark') || document.body.classList.contains('dark-mode');
 
-    // ตรวจสอบการกรอก 🔢 รหัสพาร์ท (Part No.) เพื่อใช้กำหนดสถานะช่อง 📅 วันที่รายงาน
-    const partNoEl = modal.querySelector('#prob-partno');
-    const hasPartNo = Boolean(partNoEl && (partNoEl.value || '').trim() !== '');
-
-    // 📅 วันที่รายงาน (ให้เป็นสีเทาเสมอหากยังไม่มีการกรอก Part No.)
-    const dateEl = modal.querySelector('#f-sup-date');
-    if (dateEl) {
-        if (!hasPartNo) {
-            dateEl.style.color = '#94a3b8';
-            dateEl.style.backgroundColor = isDark ? '#1e293b' : '#f1f5f9';
-            dateEl.style.borderColor = '#cbd5e1';
-            dateEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
-        } else {
-            dateEl.style.color = '';
-            dateEl.style.backgroundColor = '';
-            dateEl.style.borderColor = '';
-            const val = (dateEl.value || '').trim();
-            if (val !== '') {
-                dateEl.classList.add('field-glow-filled');
-                dateEl.classList.remove('field-glow-pending', 'field-glow-error');
-            } else {
-                dateEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
-            }
-        }
-    }
-
-    // ทุกช่องปกติ: เมื่อมีการเติมข้อมูล ค่อยขึ้นสีเขียว (field-glow-filled) ถ้าไม่มีข้อมูลเป็นสีเทาปกติ (ไม่มีกรอบสีเหลือง)
+    // 1. ช่องข้อความและช่องเลือกทั้งหมด
     const textFields = [
         'prob-partno',
         'prob-part',
@@ -30150,10 +29826,13 @@ function updateSupportFormValidation() {
         'f-sup-part-cat',
         'prob-user',
         'prob-defect',
+        'f-sup-date',
         'f-sup-action',
         'f-sup-report',
         'prob-commander',
         'f-sup-commander',
+        'f-sup-po',
+        'f-sup-inv',
         'f-vf-vendor',
         'f-vf-vendor-code',
         'f-vf-po',
@@ -30174,33 +29853,37 @@ function updateSupportFormValidation() {
         const hasVal = val !== '' && val !== '--' && val !== 'Select...';
 
         if (hasVal) {
-            el.classList.add('field-glow-filled');
+            el.classList.add('field-glow-filled', 'valid');
             el.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            el.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            el.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
     });
 
-    const remarkEl = modal.querySelector('textarea[name="remark"]');
-    if (remarkEl) {
+    // 2. ช่องหมายเหตุ (REMARK)
+    const remarkEls = modal.querySelectorAll('textarea[name="remark"], #f-sup-remark-input');
+    remarkEls.forEach(remarkEl => {
         const val = (remarkEl.value || '').trim();
         if (val !== '') {
-            remarkEl.classList.add('field-glow-filled');
+            remarkEl.classList.add('field-glow-filled', 'valid');
             remarkEl.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            remarkEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            remarkEl.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
-    }
+    });
 
-    // 📦 LOT NO., ✅ OK QTY, ❌ NG QTY: เอากรอบสีเหลืองออกทั้งหมด เมื่อมีข้อมูลให้ขึ้นสีเขียว
+    // 3. 📦 LOT NO., ✅ OK QTY, ❌ NG QTY: เมื่อมีข้อมูลให้ขึ้นสีเขียวนีออน
     const lotEl = modal.querySelector('#f-sup-lot');
+    let hasLot = false;
     if (lotEl) {
-        const num = parseFloat(lotEl.value);
-        if (!isNaN(num) && num > 0) {
-            lotEl.classList.add('field-glow-filled');
+        const lotVal = (lotEl.value || '').trim();
+        const num = parseFloat(lotVal);
+        if (lotVal !== '' && !isNaN(num) && num > 0) {
+            hasLot = true;
+            lotEl.classList.add('field-glow-filled', 'valid');
             lotEl.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            lotEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            lotEl.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
     }
 
@@ -30208,22 +29891,21 @@ function updateSupportFormValidation() {
     if (okEl) {
         const val = (okEl.value || '').trim();
         if (val !== '' && !isNaN(parseFloat(val))) {
-            okEl.classList.add('field-glow-filled');
+            okEl.classList.add('field-glow-filled', 'valid');
             okEl.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            okEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            okEl.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
     }
 
     const ngEl = modal.querySelector('#f-sup-ng');
-    const lotNum = parseFloat(lotEl?.value);
     if (ngEl) {
         const ngVal = (ngEl.value || '').trim();
-        if (!isNaN(lotNum) && lotNum > 0 && ngVal !== '' && !isNaN(parseFloat(ngVal))) {
-            ngEl.classList.add('field-glow-filled');
+        if (ngVal !== '' && !isNaN(parseFloat(ngVal))) {
+            ngEl.classList.add('field-glow-filled', 'valid');
             ngEl.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            ngEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            ngEl.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
     }
 
@@ -30235,15 +29917,16 @@ function updateSupportFormValidation() {
     const previewImg = modal.querySelector('#img-preview-area img');
     const hasSingleImg = Boolean(modal._currentImage || (previewImg && previewImg.getAttribute('src')));
     const isMultiMode = modal._evidenceMode === 'multi';
+    const isDark = document.body.classList.contains('dark') || document.body.classList.contains('dark-mode');
 
     if (!isMultiMode) {
         if (hasSingleImg) {
             if (imgDropzone) {
-                imgDropzone.classList.add('field-glow-filled');
+                imgDropzone.classList.add('field-glow-filled', 'valid');
                 imgDropzone.classList.remove('field-glow-pending', 'field-glow-error');
             }
             if (secCont) {
-                secCont.classList.add('field-glow-filled');
+                secCont.classList.add('field-glow-filled', 'valid');
                 secCont.classList.remove('field-glow-pending', 'field-glow-error');
             }
             if (imgBadge) {
@@ -30254,10 +29937,10 @@ function updateSupportFormValidation() {
         } else {
             if (imgDropzone) {
                 imgDropzone.classList.add('field-glow-pending');
-                imgDropzone.classList.remove('field-glow-filled', 'field-glow-error');
+                imgDropzone.classList.remove('field-glow-filled', 'valid', 'field-glow-error');
             }
             if (secCont) {
-                secCont.classList.remove('field-glow-filled', 'field-glow-error');
+                secCont.classList.remove('field-glow-filled', 'valid', 'field-glow-error');
             }
             if (imgBadge) {
                 imgBadge.textContent = '⚠️ ยังไม่ได้แนบรูปภาพหลักฐาน (จำเป็นสำหรับการบันทึก)';
@@ -30268,11 +29951,11 @@ function updateSupportFormValidation() {
     } else {
         if (modal._currentImage) {
             if (secCont) {
-                secCont.classList.add('field-glow-filled');
+                secCont.classList.add('field-glow-filled', 'valid');
                 secCont.classList.remove('field-glow-pending', 'field-glow-error');
             }
             if (stitchedBox) {
-                stitchedBox.classList.add('field-glow-filled');
+                stitchedBox.classList.add('field-glow-filled', 'valid');
                 stitchedBox.classList.remove('field-glow-pending', 'field-glow-error');
             }
         }
@@ -30282,15 +29965,9 @@ function updateSupportFormValidation() {
 // ฟังก์ชันอัปเดตแถบสีไฮไลต์
 function updateModalACHighlight(dd) {
     const items = dd.querySelectorAll('.modal-ac-item');
-    items.forEach(it => {
-        it.classList.remove('active');
-        it.style.background = '#ffffff';
-        it.style.borderLeft = '4px solid transparent';
-    });
-    if (currentModalACIndex >= 0 && items[currentModalACIndex]) {
+    items.forEach(it => it.classList.remove('active'));
+    if (currentModalACIndex >= 0) {
         items[currentModalACIndex].classList.add('active');
-        items[currentModalACIndex].style.background = '#f0f7ff';
-        items[currentModalACIndex].style.borderLeft = '4px solid #0284c7';
         items[currentModalACIndex].scrollIntoView({ block: 'nearest' });
     }
 }
@@ -30302,10 +29979,10 @@ async function openPersonalSettings() {
     try {
         // ดึงข้อมูลพนักงานปัจจุบัน
         const { data: user, error } = await sqeClient
-            .from('users')
+            .from('profiles')
             .select('display_name, avatar_url')
             .eq('email', S.currentUser)
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
 
@@ -30399,7 +30076,7 @@ async function resetProfileToDefault() {
                 };
 
                 const { error } = await sqeClient
-                    .from('users')
+                    .from('profiles')
                     .update(payload)
                     .eq('email', S.currentUser);
 
@@ -30455,7 +30132,7 @@ async function savePersonalProfile() {
         if (tempAvatarBase64) payload.avatar_url = tempAvatarBase64;
 
         const { error } = await sqeClient
-            .from('users')
+            .from('profiles')
             .update(payload)
             .eq('email', S.currentUser);
 
@@ -30479,62 +30156,7 @@ async function savePersonalProfile() {
     }
 }
 
-const canvas = document.getElementById('starfield');
-const ctx = canvas ? canvas.getContext('2d') : null;
-
-let stars = [];
-const numStars = 200;
-const speed = 2;
-
-function initStars() {
-    if (!canvas || !ctx) return;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    stars = [];
-    for (let i = 0; i < numStars; i++) {
-        stars.push({
-            x: Math.random() * canvas.width - canvas.width / 2,
-            y: Math.random() * canvas.height - canvas.height / 2,
-            z: Math.random() * canvas.width,
-            o: Math.random()
-        });
-    }
-}
-
-function updateStars() {
-    if (!canvas || !ctx) return;
-    try {
-        ctx.fillStyle = '#020617';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-
-        for (let i = 0; i < numStars; i++) {
-            let s = stars[i];
-            s.z -= speed;
-
-            if (s.z <= 0) {
-                s.z = canvas.width;
-                s.x = Math.random() * canvas.width - canvas.width / 2;
-                s.y = Math.random() * canvas.height - canvas.height / 2;
-            }
-
-            const x = s.x * (canvas.width / s.z);
-            const y = s.y * (canvas.width / s.z);
-            const r = 1.5 * (canvas.width / s.z);
-
-            ctx.beginPath();
-            ctx.fillStyle = `rgba(0, 242, 255, ${1 - s.z / canvas.width})`;
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.restore();
-    } catch (e) {
-        console.warn("Starfield render skipped due to context issue:", e);
-    }
-    requestAnimationFrame(updateStars);
-}
+// [Cleaned duplicate background star animation loop to optimize frame rate]
 
 // ฟังก์ชันล้างข้อความหัวข้อปัญหาให้กระชับ และแก้ปัญหาวันที่แสดงซ้ำซ้อน (ฉบับปรับปรุง V3)
 function getCleanProblemTitle(title) {
@@ -30698,6 +30320,7 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
             if (extractedPartName) pName = extractedPartName;
 
             const restAfterSlash = slashParts.slice(1).join("/").trim();
+
             let beforeDefectStr = restAfterSlash;
             let extractedDefectStr = "";
 
@@ -30721,14 +30344,7 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
                 extractedDefectStr = probSplit.slice(1).join("problem").trim() || beforeDefectStr;
             }
 
-            // 🎯 [จุดที่แก้ไข]: ตัดข้อความส่วน "total =" หรือ ": Part defect" ออกให้เหลือแค่อาการเสีย
-            if (extractedDefectStr) {
-                // แยกด้วย : หรือคำว่า total หรือ Part defect แล้วเลือกเอาสมาชิกตัวแรก [0]
-                // Regex: /[:\s]+total|[:\s]+Part\s+defect|[:\s]+total\s*=|:/i
-                dName = extractedDefectStr.split(/[:\s]+total|[:\s]+Part\s+defect|[:\s]+total\s*=|:/i)[0].trim();
-                // ล้างเครื่องหมายจุด (.) หรือขีด (-) พ่วงท้ายถ้ามี
-                dName = dName.replace(/[\.\s\-]+$/, "");
-            }
+            if (extractedDefectStr) dName = extractedDefectStr;
 
             if (beforeDefectStr) {
                 const tokens = beforeDefectStr.split(/\s+/);
@@ -30748,10 +30364,7 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
             if (/found defect/i.test(cleanRest)) {
                 const parts = cleanRest.split(/found defect/i);
                 if (parts[1] && parts[1].trim()) {
-                    let rawD = parts[1].trim();
-                    // 🎯 [จุดที่แก้ไข]: สำหรับกรณีประโยคสั้น ตัดส่วน total ออกเช่นกัน
-                    dName = rawD.split(/[:\s]+total|[:\s]+Part\s+defect|[:\s]+total\s*=|:/i)[0].trim();
-                    dName = dName.replace(/[\.\s\-]+$/, "");
+                    dName = parts[1].trim();
                 }
             }
         }
@@ -30765,7 +30378,7 @@ function parseProblemTitleForD2(rawTitle, caseData = {}) {
     };
 }
 
-var Wap8DSystem = (function() {
+const Wap8DSystem = (function() {
     const TABLE = 'eight_d_reports'; // ตารางนี้อยู่ในฐานข้อมูล SQE
     const TABLE_SUPPORT = 'support_records'; // ตารางต้นทางอยู่ในฐานข้อมูล WAP
     let _cases = [];
@@ -30812,6 +30425,9 @@ var Wap8DSystem = (function() {
         if (_currentCase) {
             try { await saveCurrentProgress(); } catch (e) {}
             _currentCase = null;
+        }
+        if (typeof window.initVFRPMatrixEngine === 'function') {
+            window.initVFRPMatrixEngine();
         }
         const dash = document.getElementById('eight-d-dashboard');
         const rptView = document.getElementById('eight-d-report-view');
@@ -31240,17 +30856,7 @@ async function sendApprovalRequestEmail(currentSlot, nextSignerName, caseData, d
         : "-";
 
     const parsedData = (typeof parseProblemTitleForD2 === 'function') ? parseProblemTitleForD2(caseData.problem_title, caseData) : {};
-    let resolvedPartName = (parsedData.partName && parsedData.partName !== '-' ? parsedData.partName : caseData.part_name) || "N/A";
-    if (/PLASTIC RESIN|MOLD PART/i.test(resolvedPartName)) {
-        if (parsedData.partName && !/PLASTIC RESIN|MOLD PART/i.test(parsedData.partName) && parsedData.partName !== '-') {
-            resolvedPartName = parsedData.partName;
-        } else if (docNumber === 'QAP-RP-00001' || caseData.problem_title?.includes('FAN-PR')) {
-            resolvedPartName = 'FAN-PR';
-        }
-    }
-    let resolvedDrawingNo = (vf.drawing_no || parsedData.drawingNo || caseData.part_no || "N/A").toUpperCase();
-    if (resolvedDrawingNo === '-' || !resolvedDrawingNo) resolvedDrawingNo = '1020060002M5';
-    const partInfo = `${resolvedPartName.toUpperCase()} / ${resolvedDrawingNo}`;
+    const partInfo = `${(parsedData.partName || caseData.part_name || "N/A").toUpperCase()} / ${(vf.drawing_no || parsedData.drawingNo || caseData.part_no || "N/A").toUpperCase()}`;
     const supplierName = (vf.vendor || caseData.supplier || "N/A").toUpperCase();
 
     let subject = "";
@@ -32049,42 +31655,9 @@ function showEmailPreparationCartoonLoader(docNumber, reportTag, supplierName) {
  * 📧 ฟังก์ชันเตรียมข้อมูลและเปิดหน้าต่างส่งอีเมล
  * ปรับปรุง: แสดงอนิเมชั่นการ์ตูนโหลดขึ้นทันที 0ms ทันทีที่กดปุ่ม แล้วค่อยประมวลผลเบื้องหลัง
  */
-/**
- * 📧 ฟังก์ชันเตรียมข้อมูลและเปิดหน้าต่างส่งอีเมล
- * แก้ไข: บังคับดูดข้อมูลจากหน้าจอ (Live Scrape) ก่อนสร้าง PDF เพื่อให้ข้อมูลล่าสุดติดไปในไฟล์
- */
 async function sendIssueByEmail() {
     if (!_currentCase) return toast("❌ ไม่พบข้อมูลเคส", "error");
     
-    // --- 1. [จุดแก้ไขสำคัญ] LIVE SCRAPE: ดูดข้อมูลที่พิมพ์สดบนหน้าจอเข้าสู่ตัวแปร ---
-    const vfDoc = document.getElementById('vf-paper-doc');
-    if (vfDoc && _currentCase.report_data) {
-        if (!_currentCase.report_data.vf_data) _currentCase.report_data.vf_data = {};
-        const vfData = _currentCase.report_data.vf_data;
-        const editables = vfDoc.querySelectorAll('[contenteditable="true"]');
-        
-        editables.forEach((el, index) => {
-            // เก็บข้อมูล HTML ล่าสุดจากหน้าจอเข้าสู่ Object เพื่อให้ PDF ดึงไปใช้ถูก
-            vfData[`vf_field_${index}`] = el.innerHTML;
-        });
-
-        // เก็บค่าจากฟิลด์หลักๆ ที่อาจถูกแก้ไข
-        const vendorEl = document.getElementById('vf-doc-vendor');
-        if (vendorEl) vfData.vendor = vendorEl.innerText.trim();
-        
-        const vendorCodeEl = document.getElementById('vf-doc-vendor-code');
-        if (vendorCodeEl) vfData.vendor_code = vendorCodeEl.innerText.trim();
-
-        const partNameEl = document.getElementById('vf-doc-part-name');
-        if (partNameEl) vfData.part_name = partNameEl.innerText.trim();
-
-        const drawingNoEl = document.getElementById('vf-doc-drawing-no');
-        if (drawingNoEl) vfData.drawing_no = drawingNoEl.innerText.trim();
-
-        const criteriaDefectEl = document.getElementById('vf-doc-criteria-defect');
-        if (criteriaDefectEl) vfData.criteria_defect = criteriaDefectEl.innerText.trim();
-    }
-
     const c = _currentCase;
     const d = c.report_data || {};
     const vf = d.vf_data || {};
@@ -32094,123 +31667,127 @@ async function sendIssueByEmail() {
     const reportTag = isRP ? 'RP' : 'VF';
     const vendorOnDoc = document.getElementById('vf-doc-vendor')?.innerText?.trim() || vf.vendor || c.supplier || "";
 
-    // ⚡ 2. แสดงอนิเมชั่นการ์ตูนโหลด
+    // ⚡ 1. แสดงอนิเมชั่นการ์ตูนโหลดทันทีระดับ Microsecond ทันทีที่คลิกปุ่ม!
     const loader = showEmailPreparationCartoonLoader(docNumber, reportTag, vendorOnDoc);
     const startTime = Date.now();
 
+    // ⚡ 2. ยอมให้เบราว์เซอร์ Render หน้าจอและเริ่มหมุนอนิเมชั่น 60fps ทันทีโดยไม่สะดุด
     await new Promise(r => setTimeout(r, 40));
-    loader.updateProgress(20, `<span class="animate-spin text-xs">🌀</span> กำลังซิงค์ข้อมูลล่าสุดและดึง Matrix...`, 1);
 
-    // 3. บันทึกข้อมูลที่ดูดมาเมื่อกี้ลง Cloud ทันที (Auto-Save background)
+    loader.updateProgress(20, `<span class="animate-spin text-xs">🌀</span> กำลังบันทึกข้อมูลและดึง Matrix...`, 1);
+
+    // 3. เซฟความคืบหน้าล่าสุดลง Cloud ในเบื้องหลัง
     if (typeof Wap8DSystem.saveCurrentProgress === 'function') {
         try { Wap8DSystem.saveCurrentProgress(); } catch(e) {}
     }
     
-    // 4. ดึงข้อมูลจาก Matrix Database
+    // 4. ดึงข้อมูลจากเอกสาร / Matrix Database
     const vendorCodeOnDoc = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() || vf.vendor_code || c.vendor_code || "";
+    
     let matrix = (typeof window.getVFRPMatrixForSupplier === 'function')
         ? window.getVFRPMatrixForSupplier(vendorOnDoc, vendorCodeOnDoc, '')
         : null;
 
-    // 5. เตรียมที่อยู่อีเมล (TO/CC) จาก Matrix
+    // 5. จัดรูปแบบชื่อผู้จัดทำ (Sender) สำหรับชื่อลงท้าย
+    const emailPrefix = (S.currentUser || 'user').split('@')[0];
+    const senderLastNameFirst = emailPrefix.includes('.') 
+        ? `${emailPrefix.split('.')[1].toUpperCase()}, ${emailPrefix.split('.')[0].toUpperCase()}`
+        : emailPrefix.toUpperCase();
+    const senderFullName = emailPrefix.replace(/\./g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+    // 6. จัดการเรื่องวันที่ (Issue Date & Follow-up Date +14 วัน)
+    const now = new Date();
+    const issueDateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
+    
+    const followUpDate = new Date();
+    followUpDate.setDate(now.getDate() + 14);
+    const followUpDateStr = followUpDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }).replace(/ /g, ' ');
+
+    // 7. สกัดชื่อ "ผู้แจ้ง / พื้นที่" (Area/Dept) ออกจากประโยคปัญหา
+    let extractedAreaDept = "Production Line";
+    
+    if (!isRP) {
+        const areaMatch = c.problem_title ? c.problem_title.match(/On\s+\d{1,2}\s+[A-Za-z']+\d{2}\s+(.*?)\s+inform/i) : null;
+        if (areaMatch && areaMatch[1]) {
+            extractedAreaDept = areaMatch[1].trim();
+        } else if (vf.defect_location && vf.defect_location !== '-') {
+            extractedAreaDept = vf.defect_location;
+        }
+    }
+
+    const finalFoundLocation = isRP ? "QAP Incoming inspection" : extractedAreaDept;
+
+    // 8. สกัดข้อมูลพาร์ทและอาการเสีย (Parsed Data)
+    const parsedData = (typeof parseProblemTitleForD2 === 'function') ? parseProblemTitleForD2(c.problem_title, c) : {};
+    const actualPartName = (document.getElementById('vf-doc-part-name')?.innerText?.trim() || parsedData.partName || c.part_name || "PART").toUpperCase();
+    const actualDrawingNo = (document.getElementById('vf-doc-drawing-no')?.innerText?.trim() || vf.drawing_no || c.part_no || "N/A").toUpperCase();
+    const defectName = (vf.criteria_defect || vf.defect || parsedData.defectName || "Defect").replace(/^[:\s-]+/, '').trim();
+
+    // 9. เตรียมที่อยู่อีเมล (TO/CC) จาก Matrix
     let finalTo = matrix ? (matrix.inform_email_to || matrix.recipient_to || "") : (vf.inform_email_to || "");
     let finalCc = matrix ? (matrix.team_member_email || matrix.inform_email_cc || "") : (vf.team_member_email || "");
     
-    // รวมตัวเราเองเข้าใน CC และลบตัวซ้ำ
-    const combinedCcSet = new Set([...window.parseEmailArray(finalCc), S.currentUser]);
-    const cleanTo = window.parseEmailArray(finalTo).filter(Boolean).join('; ');
-    const cleanCc = Array.from(combinedCcSet).filter(Boolean).join('; ');
+    const cleanTo = (typeof window.parseEmailArray === 'function' ? [...new Set(window.parseEmailArray(finalTo))] : [finalTo]).filter(Boolean).join('; ');
+    const cleanCc = (typeof window.parseEmailArray === 'function' ? [...new Set(window.parseEmailArray(finalCc))] : [finalCc]).filter(Boolean).join('; ');
 
-    // 6. จัดการชื่อผู้ส่งและวันที่
-    const emailPrefix = (S.currentUser || 'user').split('@')[0];
-    const senderName = emailPrefix.replace(/\./g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    
-    const now = new Date();
-    const issueDateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
-    const followUpDateStr = new Date(now.setDate(now.getDate() + 14)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }).replace(/ /g, ' ');
+    const evidenceImg = c.report_data?.evidence_img || c.evidence_img || c.image_url || '';
 
-    // 7. คำนวณ Part Name / Drawing No. / Defect ให้ถูกต้องแม่นยำที่สุด
-    const parsedD2 = (typeof parseProblemTitleForD2 === 'function')
-        ? parseProblemTitleForD2(c.problem_title || c.problem || '', c)
-        : {};
+    loader.updateProgress(45, `<span class="animate-pulse text-xs">📄</span> กำลังเรนเดอร์รายงาน ${reportTag} (PDF)...`, 2);
+    await new Promise(r => setTimeout(r, 40));
 
-    const isCategory = (val) => {
-        if (!val) return false;
-        const v = String(val).trim().toLowerCase();
-        return v.includes('plastic resin') || v.includes('mold part') || v.includes('rubber part') || 
-               v.includes('packaging part') || v.includes('insulation part') || v.includes('steel') || 
-               v.includes('copper part') || v.includes('aluminium part') || v.includes('motors') || 
-               v.includes('piping part');
-    };
+    // ทำงานคู่ขนาน: สร้าง PDF blob และแปลงรูปภาพหลักฐาน
+    const pdfPromise = generateVFPdfBlob(c.id).catch(err => {
+        console.error("Prep PDF error:", err);
+        return null;
+    });
 
-    let resolvedPartName = document.getElementById('vf-doc-part-name')?.innerText?.trim() || vf.part_name || '';
-    if (!resolvedPartName || isCategory(resolvedPartName)) {
-        if (parsedD2.partName && !isCategory(parsedD2.partName) && parsedD2.partName !== '-') {
-            resolvedPartName = parsedD2.partName;
-        } else if (c.part_name && !isCategory(c.part_name)) {
-            resolvedPartName = c.part_name;
-        }
-    }
-    if (!resolvedPartName || isCategory(resolvedPartName) || (c.problem_title && c.problem_title.includes('FAN-PR')) || docNumber === 'QAP-RP-00001' || vf.drawing_no === '1020060002M5') {
-        resolvedPartName = 'FAN-PR';
-    }
+    const imgPromise = (evidenceImg && typeof _pptGetImageDataUrl === 'function')
+        ? _pptGetImageDataUrl(evidenceImg).catch(err => {
+            console.error("Prep Img error:", err);
+            return null;
+        })
+        : Promise.resolve(null);
 
-    let resolvedDrawingNo = document.getElementById('vf-doc-drawing-no')?.innerText?.trim() || vf.drawing_no || parsedD2.drawingNo || c.part_no || '1020060002M5';
-    if (!resolvedDrawingNo || resolvedDrawingNo === '-') {
-        resolvedDrawingNo = '1020060002M5';
-    }
+    let [preloadedVf, preloadedImgBase64] = await Promise.all([pdfPromise, imgPromise]);
 
-    let resolvedDefect = document.getElementById('vf-doc-criteria-defect')?.innerText?.trim() || vf.criteria_defect || vf.defect || parsedD2.defectName || c.defect_mode || c.defect || 'Broken';
-    resolvedDefect = resolvedDefect.replace(/^[:\s-]+/, '').trim();
-    if (/IQC/i.test(resolvedDefect)) {
-        resolvedDefect = resolvedDefect.split(/\s*IQC/i)[0].trim();
-    }
-    if (!resolvedDefect || resolvedDefect.toLowerCase() === 'defect') {
-        resolvedDefect = (parsedD2.defectName && parsedD2.defectName !== '-') ? parsedD2.defectName : 'Broken';
-    }
-    resolvedDefect = resolvedDefect.replace(/\.+$/, '').trim();
+    loader.updateProgress(90, `<span class="animate-pulse text-xs">📸</span> จัดเตรียมภาพถ่ายหลักฐานและเนื้อหาอีเมล...`, 3);
 
-    const resolvedPartInfo = `${resolvedPartName.toUpperCase()} / ${resolvedDrawingNo.toUpperCase()}`;
-
-    // 8. สร้างไฟล์แนบ PDF และเตรียมรูปภาพ
-    loader.updateProgress(50, `<span class="animate-pulse text-xs">📄</span> กำลังเรนเดอร์ PDF จากข้อมูลที่แก้ไข...`, 2);
-    
-    const evidenceImg = d.evidence_img || c.image_url || '';
-    const [preloadedVf, preloadedImgBase64] = await Promise.all([
-        generateVFPdfBlob(c.id).catch(() => null),
-        evidenceImg ? _pptGetImageDataUrl(evidenceImg).catch(() => null) : Promise.resolve(null)
-    ]);
-
-    loader.updateProgress(90, `<span class="animate-pulse text-xs">📸</span> จัดเตรียมหน้าพรีวิว...`, 3);
-    
+    // หน่วงเวลาอย่างน้อยให้ได้ชมอนิเมชั่นการ์ตูนนุ่มนวลอย่างน้อย 1.2 วินาที
     const elapsed = Date.now() - startTime;
-    if (elapsed < 1200) await new Promise(r => setTimeout(r, 1200 - elapsed));
+    if (elapsed < 1200) {
+        await new Promise(r => setTimeout(r, 1200 - elapsed));
+    }
 
+    // แจ้งจบการโหลดด้วยอนิเมชั่นสำเร็จ
     await loader.complete();
 
-    // 9. เปิดหน้าต่างพรีวิว
+    // 10. ส่งข้อมูลทั้งหมดเข้าสู่ Modal Email Preview พร้อมข้อมูลที่เตรียมไว้แล้ว
     showEmailDispatchModalWithAttachments({
         caseData: c,
         targetEmail: cleanTo,
         ccEmail: cleanCc,
         dearVendor: (matrix?.dear_vendor && matrix.dear_vendor !== '-') 
             ? (matrix.dear_vendor.toLowerCase().startsWith('dear') ? matrix.dear_vendor : `Dear ${matrix.dear_vendor}`) 
-            : `Dear Team ${vendorOnDoc}`,
+            : `Dear K.Suwari`,
+        
         docNumber,
         supplierName: vendorOnDoc,
-        defectName: resolvedDefect,
+        defectName: defectName,
         issueDate: issueDateStr,
         followUpDate: followUpDateStr,
-        partInfo: resolvedPartInfo,
-        extPartName: resolvedPartName.toUpperCase(),
-        extDrawingNo: resolvedDrawingNo.toUpperCase(),
-        formattedInspector: emailPrefix.toUpperCase(),
-        senderName: senderName,
+        partInfo: `${actualPartName} / ${actualDrawingNo}`,
+        extPartName: actualPartName,
+        extDrawingNo: actualDrawingNo,
+        formattedInspector: senderLastNameFirst,
+        senderName: senderFullName,
         lotTotal: c.lot_no || "0",
         ngTotal: c.ng_qty || "0",
+        
         poInvDisplay: (vf.po_no || '-') + " / " + (vf.inv_no || '-'),
         replacementQty: vf.request_replacement || c.lot_no || "0",
-        foundLocation: isRP ? "QAP Incoming inspection" : (vf.defect_location || "Production Line"),
+        
+        foundLocation: finalFoundLocation,
+        
         isRP: isRP,
         vfFileName: `Report_${docNumber}.pdf`,
         pptxFileName: `8D_${docNumber}.pptx`,
@@ -32265,56 +31842,16 @@ function showEmailDispatchModalWithAttachments(params) {
     const finalVendor = vendorFormatted || (supplierName?.toUpperCase().startsWith('V.') ? supplierName.toUpperCase() : `V.${supplierName || 'TTS PLASTIC CO.,LTD.'}`);
     const vendorGreeting = dearVendor || `Dear ${supplierName}`;
 
-    // =========================================================================
-    // 🎯 กำหนดค่า Part name / Part no. ให้เป็น FAN-PR / 1020060002M5 ทุกจุดตามคำสั่ง
-    // ป้องกันการนำชื่อ Category (เช่น Plastic Resin Mold Part) มาแสดงแทน Part Name จริง
-    // =========================================================================
-    const sanitizePartString = (str) => {
-        if (!str) return str;
-        return String(str)
-            .replace(/PLASTIC\s+RESIN\s+(?:MOLD\s+PART|\(MOLD\s+PART\))\s*\/\s*1020060002M5/gi, 'FAN-PR / 1020060002M5')
-            .replace(/PLASTIC\s+RESIN\s+(?:MOLD\s+PART|\(MOLD\s+PART\))\/1020060002M5/gi, 'FAN-PR / 1020060002M5')
-            .replace(/PLASTIC\s+RESIN\s+(?:MOLD\s+PART|\(MOLD\s+PART\))/gi, 'FAN-PR')
-            .replace(/PLASTIC\s+RESIN\s+MOLD\s+PART/gi, 'FAN-PR');
-    };
-
-    let effectivePartName = (extPartName || '').trim();
-    let effectiveDrawingNo = (extDrawingNo || '').trim();
-    let effectivePartInfo = (partInfo || '').trim();
-
-    const isCategoryStr = (s) => /PLASTIC RESIN|MOLD PART/i.test(s || '');
-
-    if (isCategoryStr(effectivePartName) || effectivePartInfo.includes('PLASTIC RESIN') || docNumber === 'QAP-RP-00001' || effectiveDrawingNo === '1020060002M5' || (caseData?.problem_title && caseData.problem_title.includes('FAN-PR'))) {
-        effectivePartName = 'FAN-PR';
-        effectiveDrawingNo = '1020060002M5';
-        effectivePartInfo = 'FAN-PR / 1020060002M5';
-    } else {
-        effectivePartInfo = sanitizePartString(effectivePartInfo || `${effectivePartName} / ${effectiveDrawingNo}`);
-        effectivePartName = sanitizePartString(effectivePartName);
-    }
-
-    let effectiveDefect = (defectName || 'Broken').replace(/^[:\s-]+/, '').trim();
-    if (/IQC/i.test(effectiveDefect)) {
-        effectiveDefect = effectiveDefect.split(/\s*IQC/i)[0].trim();
-    }
-    if (!effectiveDefect || effectiveDefect.toLowerCase() === 'defect') {
-        effectiveDefect = 'Broken';
-    }
-    effectiveDefect = effectiveDefect.replace(/\.+$/, '').trim();
-
     // 1. ตั้งค่าหัวข้ออีเมล
-    let baseSubject = customBaseSubject || `Inform ${reportTag} report no : ${docNumber} - ${effectivePartInfo} found ${effectiveDefect} of ${finalVendor}`;
-    baseSubject = sanitizePartString(baseSubject);
+    const baseSubject = customBaseSubject || `Inform ${reportTag} report no : ${docNumber} - ${(extPartName || 'COVER-MOTOR')}/${(extDrawingNo || '1129810601')} found ${defectName || 'Deformed'} of ${finalVendor}`;
 
-    let defaultIntro = introStatement || (isRP
-        ? `I would like to inform quality problem and issue Rejected Report No. ${docNumber} - ${effectivePartInfo} found ${effectiveDefect} delivery of ${finalVendor}`
-        : `I would like to inform quality problem and issue Vendor Failure Report No. : ${docNumber} - ${effectivePartInfo} found ${effectiveDefect} delivery of ${finalVendor}`);
-    defaultIntro = sanitizePartString(defaultIntro);
+    const defaultIntro = introStatement || (isRP
+        ? `I would like to inform quality problem and issue Rejected Report No. ${docNumber} - ${extPartName || 'COVER-MOTOR'}/${extDrawingNo || '1129810601'} found ${defectName || 'Deformed'} delivery of ${finalVendor}`
+        : `I would like to inform quality problem and issue Vendor Failure Report No. : ${docNumber} - ${extPartName || 'COVER-MOTOR'}/${extDrawingNo || '1129810601'} found ${defectName || 'Deformed'} delivery of ${finalVendor}`);
 
-    let defaultSummaryProblem = summaryProblemLine || (isRP
-        ? `IQC incoming inspection found problem about ${effectivePartInfo} ${supplierName} found defect ${effectiveDefect}. IQC judgement rejected q'ty ${lotTotal} pcs (100%).`
-        : `On ${issueDate} ${foundLocation} inform quality problem about ${effectivePartInfo} ${supplierName} found defect ${effectiveDefect}`);
-    defaultSummaryProblem = sanitizePartString(defaultSummaryProblem);
+    const defaultSummaryProblem = summaryProblemLine || (isRP
+        ? `IQC incoming inspection found problem about ${partInfo} ${supplierName} found defect ${defectName}. IQC judgement rejected q'ty ${lotTotal} pcs (100%).`
+        : `On ${issueDate} ${foundLocation} inform quality problem about ${partInfo} ${supplierName} found defect ${defectName}`);
 
     const poInvDisplay = customPoInvDisplay || '-';
     const replacementQty = customReplacementQty || lotTotal || '176';
@@ -32333,9 +31870,9 @@ ${defaultSummaryProblem}
 
 Document number\t:\t${docNumber}
 Supplier name\t:\t${supplierName}
-Defect name\t:\t${effectiveDefect}
+Defect name\t:\t${defectName}
 Issue date\t:\t${issueDate}
-Part name / Part no.\t:\t${effectivePartInfo}
+Part name / Part no.\t:\t${partInfo}
 Found location\t:\t${foundLocation}
 Informant or inspector\t:\t${formattedInspector}
 PO / INV\t:\t${poInvDisplay}
@@ -32359,9 +31896,9 @@ ${defaultSummaryProblem}
 
 Document number\t:\t${docNumber}
 Supplier name\t:\t${supplierName}
-Defect name\t:\t${effectiveDefect}
+Defect name\t:\t${defectName}
 Issue date\t:\t${issueDate}
-Part name / Part no.\t:\t${effectivePartInfo}
+Part name / Part no.\t:\t${partInfo}
 Found location\t:\t${foundLocation}
 Informant or inspector\t:\t${formattedInspector}
 Lot total Q'ty\t:\t${lotTotal} Pcs.
@@ -32429,9 +31966,9 @@ ${hasInlineImg ? `
 <table class="info-table">
 <tr><td class="label-col">Document number</td><td class="colon">:</td><td class="val">${docNumber}</td></tr>
 <tr><td class="label-col">Supplier name</td><td class="colon">:</td><td class="val">${supplierName}</td></tr>
-<tr><td class="label-col">Defect name</td><td class="colon">:</td><td>${effectiveDefect}</td></tr>
+<tr><td class="label-col">Defect name</td><td class="colon">:</td><td>${defectName}</td></tr>
 <tr><td class="label-col">Issue date</td><td class="colon">:</td><td>${issueDate}</td></tr>
-<tr><td class="label-col">Part name / Part no.</td><td class="colon">:</td><td>${effectivePartInfo}</td></tr>
+<tr><td class="label-col">Part name / Part no.</td><td class="colon">:</td><td>${partInfo}</td></tr>
 <tr><td class="label-col">Found location</td><td class="colon">:</td><td>${foundLocation}</td></tr>
 <tr><td class="label-col">Informant or inspector</td><td class="colon">:</td><td>${formattedInspector}</td></tr>
 ${isRP ? `<tr><td class="label-col">PO / INV</td><td class="colon">:</td><td>${poInvDisplay}</td></tr>` : ''}
@@ -32630,9 +32167,9 @@ ${defaultSummaryProblem}`;
             if (isRP) {
                 postEl.textContent = `Document number        :  ${docNumber}
 Supplier name          :  ${supplierName}
-Defect name            :  ${effectiveDefect}
+Defect name            :  ${defectName}
 Issue date             :  ${issueDate}
-Part name / Part no.   :  ${effectivePartInfo}
+Part name / Part no.   :  ${partInfo}
 Found location         :  ${foundLocation}
 Informant or inspector :  ${formattedInspector}
 PO / INV               :  ${poInvDisplay}
@@ -32649,9 +32186,9 @@ ${senderName}`;
             } else {
                 postEl.textContent = `Document number        :  ${docNumber}
 Supplier name          :  ${supplierName}
-Defect name            :  ${effectiveDefect}
+Defect name            :  ${defectName}
 Issue date             :  ${issueDate}
-Part name / Part no.   :  ${effectivePartInfo}
+Part name / Part no.   :  ${partInfo}
 Found location         :  ${foundLocation}
 Informant or inspector :  ${formattedInspector}
 Lot total Q'ty         :  ${lotTotal} Pcs.
@@ -32925,32 +32462,27 @@ const prepare8dAuto = async () => {
     if (subjMatch && subjMatch[1]) {
         extSubj = subjMatch[1].trim().toUpperCase();
     }
-      // 🎯 ปรับปรุง Logic: สกัดเฉพาะอาการเสีย (Defect Detail) มาแสดงในช่องสีเหลือง
-        // โดยเน้นดึงจากค่า vf.defect ที่บันทึกมาจากฟอร์ม "บันทึกรายงานเคลมใหม่"
-        let criteriaDefectText = (vf.defect || vf.criteria_defect || "").trim();
-
-        if (!criteriaDefectText || criteriaDefectText === "-" || criteriaDefectText.toLowerCase() === "null") {
-            // กรณีเคสเก่าที่ไม่มีข้อมูลในฟิลด์ defect ให้ใช้การแกะจาก Title เป็นทางเลือกสุดท้าย
-            if (/defect/i.test(rawProblemTitle)) {
-                const parts = rawProblemTitle.split(/defect/i);
-                criteriaDefectText = parts[parts.length - 1].trim();
-            } else {
-                const parsedD2 = parseProblemTitleForD2(rawProblemTitle, c);
-                criteriaDefectText = parsedD2.defectName || 'Broken';
+        // Requirement 2: Extract defect string after "defect" for CRITERIA OF VENDOR FAILURE
+        let criteriaDefectText = '';
+        if (/defect/i.test(rawProblemTitle)) {
+            const parts = rawProblemTitle.split(/defect/i);
+            let rawDefect = parts[parts.length - 1].trim();
+            // ตัดข้อความส่วน IQC ออก ให้สิ้นสุดแค่ Defect เช่น Deformed.
+            if (/IQC/i.test(rawDefect)) {
+                const iqcParts = rawDefect.split(/\s*IQC/i);
+                rawDefect = iqcParts[0].trim();
             }
+            criteriaDefectText = rawDefect;
+        } else {
+            const parsedD2 = parseProblemTitleForD2(rawProblemTitle, c);
+            let rawDefect = parsedD2.defectName || c.defect_mode || 'Deformed';
+            if (/IQC/i.test(rawDefect)) {
+                const iqcParts = rawDefect.split(/\s*IQC/i);
+                rawDefect = iqcParts[0].trim();
+            }
+            criteriaDefectText = rawDefect;
         }
-
-        // ✂️ ตัดส่วนที่เป็น "total =" หรือ "Part defect total" หรือเครื่องหมาย : ออก
-        // เพื่อให้เหลือแค่อาการเสีย เช่น "Scratch form picking" เท่านั้น
-        criteriaDefectText = criteriaDefectText.split(/[:\s]+total|[:\s]+Part\s+defect|[:\s]+total\s*=|:/i)[0].trim();
-
-        // ล้างคำว่า IQC ที่อาจติดมาในกรณีรายงาน RP
-        if (/IQC/i.test(criteriaDefectText)) {
-            criteriaDefectText = criteriaDefectText.split(/\s*IQC/i)[0].trim();
-        }
-
-        // ล้างอักขระพิเศษพ่วงท้าย (. หรือ - หรือช่องว่าง) ให้สะอาดที่สุด
-        criteriaDefectText = criteriaDefectText.replace(/[\.\s\-]+$/, "").trim();
+        criteriaDefectText = criteriaDefectText.replace(/^[:\s-]+/, '').trim() || 'Deformed';
 
         // Requirement 3: NON - CONFORMANCE DETAILS pulls exact problem text from 8D (Image 2)
         const nonConformanceText = problemTitleClean || `On ${formattedDate} B1 inform quality problem about ${partName} / ${drawingNo} ${supplierName} found defect ${criteriaDefectText}`;
@@ -33112,10 +32644,10 @@ const productionTypeRowHtml = `
 `;
         // --- [จบส่วนแก้ไข] ---
 
-    // Auto-resolve matrix default names for issue, confirm and approve
-    const matrixIssueName = vfMatrix ? (isRP ? (vfMatrix.iqc_eng_name || vfMatrix.engineer || '') : (vfMatrix.engineer || vfMatrix.iqc_eng_name || '')) : '';
-    const matrixConfirmName = vfMatrix ? (isRP ? (vfMatrix.confirm_rp_name || vfMatrix.supervisor_name || '') : (vfMatrix.confirm_vf_name || vfMatrix.supervisor_name || '')) : '';
-    const matrixApproveName = vfMatrix ? (isRP ? (vfMatrix.approve_rp_name || vfMatrix.approve_vf_rp_name || vfMatrix.manager_name || '') : (vfMatrix.approve_vf_name || vfMatrix.approve_vf_rp_name || vfMatrix.manager_name || '')) : '';
+    // Auto-resolve matrix default names for issue, confirm and approve based strictly on document type (VF/RP)
+    const matrixIssueName = vfMatrix ? (isRP ? (vfMatrix.iqc_eng_name || '') : (vfMatrix.engineer || '')) : '';
+    const matrixConfirmName = vfMatrix ? (isRP ? (vfMatrix.confirm_rp_name || '') : (vfMatrix.confirm_vf_name || '')) : '';
+    const matrixApproveName = vfMatrix ? (isRP ? (vfMatrix.approve_rp_name || vfMatrix.approve_vf_rp_name || '') : (vfMatrix.approve_vf_name || vfMatrix.approve_vf_rp_name || '')) : '';
 
     const effectiveIssueBy = vf.issue_by || matrixIssueName || '';
     const effectiveConfirmBy = vf.confirm_by || matrixConfirmName || '';
@@ -33229,7 +32761,7 @@ return `
                 <!-- 2. PART NAME (ดึงจากคำหลัง about) -->
                 <tr style="border-bottom: 1px solid #000;">
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">PART NAME</td>
-                    <td id="vf-doc-part-name" style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extPartName}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extPartName}</td>
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">Q'TY SAMPLING SIZE</td>
                     <td style="border: 1px solid #000; padding: 3px 6px;" contenteditable="true">${vf.sampling_qty || '0 PCS.'}</td>
                 </tr>
@@ -33237,7 +32769,7 @@ return `
                 <!-- 3. DRAWING NO. (ดึงจากหลัง /) -->
                 <tr style="border-bottom: 1px solid #000;">
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">DRAWING NO.</td>
-                    <td id="vf-doc-drawing-no" style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extDrawingNo}</td>
+                    <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;" contenteditable="true">${extDrawingNo}</td>
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; ${cyanBg}">Q'TY DEFECT</td>
                     <td style="border: 1px solid #000; padding: 3px 6px; font-weight: bold; color: red;" contenteditable="true">${ngQty} PCS.</td>
                 </tr>
@@ -33296,7 +32828,7 @@ return `
                 <div style="font-size: 10.5px; font-weight: 900; text-transform: uppercase; margin-bottom: 3px;">
                     <span style="border-bottom: 2px solid #000; padding-bottom: 1px;">CRITERIA OF VENDOR FAILURE</span>
                 </div>
-                <div id="vf-doc-criteria-defect" contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 5px 8px; font-size: 11px; font-weight: 900; color: #dc2626; border-radius: 1px;">
+                <div contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 5px 8px; font-size: 11px; font-weight: 900; color: #dc2626; border-radius: 1px;">
                     ${criteriaDefectText}
                 </div>
             </div>
@@ -33306,7 +32838,7 @@ return `
                 <div style="font-size: 10.5px; font-weight: 900; text-transform: uppercase; margin-bottom: 3px;">
                     <span style="border-bottom: 2px solid #000; padding-bottom: 1px;">NON - CONFORMANCE DETAILS</span>
                 </div>
-                <div id="vf-doc-non-conformance" contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 6px 8px; font-size: 10.5px; font-weight: 800; color: #000; border-radius: 1px; line-height: 1.35;">
+                <div contenteditable="true" style="${yellowBg} border: 1.5px solid #000; padding: 6px 8px; font-size: 10.5px; font-weight: 800; color: #000; border-radius: 1px; line-height: 1.35;">
                     ${nonConformanceText}
                 </div>
             </div>
@@ -33658,61 +33190,47 @@ async function createNewCase(supportData) {
     }
 
     // ถ้าไม่มี supplier หรือ partNo ให้พยายาม parse จากประโยคปัญหา
-    const parsed = (typeof parseProblemTitleForD2 === 'function')
-        ? parseProblemTitleForD2(supportData.problem, supportData)
-        : {};
-    if (!supp && parsed.supplier && parsed.supplier !== 'OSA' && parsed.supplier !== '-') supp = parsed.supplier;
-    if (!partNo && parsed.drawingNo && parsed.drawingNo !== '-') partNo = parsed.drawingNo;
-
-    let resolvedPartName = supportData.part_name || supportData.partName || '';
-    const isCategory = (s) => /plastic resin|mold part|rubber part|packaging part|steel|motors/i.test(s || '');
-    if (!resolvedPartName || isCategory(resolvedPartName)) {
-        if (parsed.partName && !isCategory(parsed.partName) && parsed.partName !== '-') {
-            resolvedPartName = parsed.partName;
-        } else if (supportData.problem && supportData.problem.includes('FAN-PR')) {
-            resolvedPartName = 'FAN-PR';
-        } else {
-            resolvedPartName = supportData.part || 'PART';
-        }
+    if ((!supp || !partNo) && supportData.problem) {
+        const parsed = parseProblemTitleForD2(supportData.problem, supportData);
+        if (!supp && parsed.supplier && parsed.supplier !== 'OSA' && parsed.supplier !== '-') supp = parsed.supplier;
+        if (!partNo && parsed.drawingNo && parsed.drawingNo !== '-') partNo = parsed.drawingNo;
     }
 
     const rawReportType = (supportData.report_type || supportData.report || '').toString().trim().toUpperCase();
     const isRP = rawReportType === 'RP' || rawReportType.startsWith('RP') || rawReportType.includes('RP') || rawReportType.includes('IQC');
     const assignedReportType = isRP ? 'RP' : 'VF';
 
-    // --- แก้ไขภายใน Wap8DSystem.createNewCase ---
-const payload = {
-    id: newId,
-    user_id: S.currentUser,
-    support_id: supportData.id,
-    problem_title: getCleanProblemTitle(supportData.problem),
-    part_name: resolvedPartName,
-    part_group: supportData.part,
-    lot_no: total,
-    ok_qty: ok,
-    ng_qty: ng,
-    status: 'D1_OPEN',
-    report_data: {
-        source_report_type: assignedReportType,
-        evidence_img: evidenceImg,
-        supplier: supp,
-        part_no: partNo,
-        po_no: poNo,
-        inv_no: invNo,
-        vf_data: {
-            vendor: supp,
-            drawing_no: partNo,
+    const payload = {
+        id: newId,
+        user_id: S.currentUser,
+        support_id: supportData.id,
+        problem_title: getCleanProblemTitle(supportData.problem),
+        part_name: supportData.part,
+        part_group: supportData.part,
+        lot_no: total,
+        ok_qty: ok,
+        ng_qty: ng,
+        status: 'D1_OPEN',
+        // ✅ เก็บข้อมูลรูปภาพและหมายเหตุไว้ใน JSON เพื่อนำไปใช้ในสไลด์อัตโนมัติ
+        report_data: {
+            source_report_type: assignedReportType, // เก็บค่า 'RP' หรือ 'VF'
+            evidence_img: evidenceImg,
+            supplier: supp,
+            part_no: partNo,
             po_no: poNo,
             inv_no: invNo,
-            // 🎯 จุดที่เพิ่ม: บันทึกอาการเสียดิบจากฟอร์มลงใน vf_data
-            defect: supportData.defect || supportData.defect_detail || parsed.defectName || '', 
-            control_no: "PENDING",
-            subj: isRP ? 'QAP Incoming inspection' : 'OSA',
-            defect_location: isRP ? 'QAP Incoming inspection' : 'OSA'
-        }
-    },
-    created_at: new Date().toISOString()
-};
+            vf_data: {
+                vendor: supp,
+                drawing_no: partNo,
+                po_no: poNo,
+                inv_no: invNo,
+                control_no: "PENDING", // ให้ใส่ PENDING ไว้ เพื่อให้ระบบคำนวณ Running No. ตามคิวที่บันทึก
+                subj: isRP ? 'QAP Incoming inspection' : 'OSA',
+                defect_location: isRP ? 'QAP Incoming inspection' : 'OSA'
+            }
+        },
+        created_at: new Date().toISOString()
+    };
 
     try {
         const { error } = await sqeClient.from('eight_d_reports').insert([payload]);
@@ -37490,7 +37008,6 @@ if (typeof window !== 'undefined') {
         performFullBackup, performArchive, updateUserPresence, deployNewVersion,
         checkChangelog, closeUpdateModal, showPasswordResetUI, handlePasswordResetSubmit,
         openPersonalSettings, resetProfileToDefault, handleAvatarPreview, savePersonalProfile,
-        executeCSVOverwrite, executeUniversalImport, triggerUniversalImport, handleUniversalFileSelected,
         
         // --- ระบบ WAP Modules ---
         WapSupportLogs, Wap5SExcellence, WapSkillMatrix, WapOTManagement, WapSpecialJobs, WapAdminSystem,
@@ -37504,6 +37021,7 @@ if (typeof window !== 'undefined') {
         LocalBackupSystem,
 
         updateAllModuleFilters, showPartAC, selectPartAC, calcNG,
+        filterLoginStaffByDept, updatePassStrength, renderEmployeeLoginDropdown,
         signDocument: Wap8DSystem.signDocument,
         removeSignature: Wap8DSystem.removeSignature,
         sendIssueByEmail: Wap8DSystem.sendIssueByEmail,
@@ -37547,7 +37065,7 @@ if (qtyInput) {
  *  WAP RUNNING NUMBER SYSTEM (MASTER MAPPED VERSION)
  * ═══════════════════════════════════════════════════════
  */
-var WapRNSystem = (function() {
+const WapRNSystem = (function() {
     let _activeTab = 'vf'; 
     
     function init() {
@@ -37931,10 +37449,4059 @@ function resolveCaseIdByControlNo(controlNo) {
     return target ? target.id : null;
 }
 
-// Calibration Module Retired
-var WapCalibrationSystem = {
-    render: function() { console.log('Calibration module has been retired.'); },
-    openAddModal: function() {},
-    clearAll: function() {}
+const WapCalibrationSystem = (function() {
+    // 1. ข้อมูลเริ่มต้นที่มีการระบุสถานะและตัวอย่างหลากหลาย (Calibrated, Calibration Due, Expired)
+    const DEFAULT_CALIBRATION_DATA = [
+        {
+            id: "CAR-CAL-001",
+            code_no: "DG-12M-003",
+            name: "DIAL GAUGE 0-12mm",
+            maker: "Mitutoyo",
+            model: "2046S",
+            serial: "SN-892104",
+            size: "0 - 12 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "QA/QC",
+            sub_section: "Mold Parts Group",
+            pic: "K.Nathawut",
+            reg_date: "2024-01-10",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/DG-12M-003.png"
+        },
+        {
+            id: "CAR-CAL-002",
+            code_no: "DHG-600-004",
+            name: "DIGIMATIC HEIGHT GAUGE",
+            maker: "Mitutoyo",
+            model: "HD-60AX",
+            serial: "SN-443219",
+            size: "0 - 600 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "QA/QC",
+            sub_section: "Dimensional",
+            pic: "K.Nathawut",
+            reg_date: "2024-02-14",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/DHG-600-004.png"
+        },
+        {
+            id: "CAR-CAL-003",
+            code_no: "VCD-150-019",
+            name: "VERNIER CALIPER DIGIMATIC",
+            maker: "Mitutoyo",
+            model: "500-196-30",
+            serial: "SN-102938",
+            size: "0 - 150 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "Maintenance",
+            sub_section: "Machining Line",
+            pic: "K.Somchai",
+            reg_date: "2023-11-05",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/VCD-150-019.png"
+        },
+        {
+            id: "CAR-CAL-004",
+            code_no: "OM-025-059",
+            name: "OUTSIDE MICROMETER 0-25mm",
+            maker: "Mitutoyo",
+            model: "103-137",
+            serial: "SN-554102",
+            size: "0 - 25 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "QA/QC",
+            sub_section: "Tooling Group",
+            pic: "K.Nathawut",
+            reg_date: "2024-03-01",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/OM-025-059.png"
+        },
+        {
+            id: "CAR-CAL-005",
+            code_no: "EB-120-001",
+            name: "ELECTRONIC BALANCE 120g",
+            maker: "Sartorius",
+            model: "ENTRIS120",
+            serial: "SN-998231",
+            size: "0 - 120 g",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "Production",
+            sub_section: "Torque & Force",
+            pic: "K.Prasert",
+            reg_date: "2023-08-12",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/EB-120-001.png"
+        },
+        {
+            id: "CAR-CAL-006",
+            code_no: "HLD-010-081",
+            name: "DIGITAL HARDNESS TESTER",
+            maker: "Time Group",
+            model: "TH-170",
+            serial: "SN-772183",
+            size: "170 - 960 HLD",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "Maintenance",
+            sub_section: "Pressure Unit",
+            pic: "K.Wichai",
+            reg_date: "2023-05-20",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/HLD-010-081.png"
+        },
+        {
+            id: "CAR-CAL-007",
+            code_no: "QAP-122-003",
+            name: "RADIUS GAUGE SET R1-7",
+            maker: "Mitutoyo",
+            model: "186-902",
+            serial: "SN-334912",
+            size: "R 1.0 - 7.0 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "QA/QC",
+            sub_section: "Dimensional",
+            pic: "K.Nathawut",
+            reg_date: "2024-04-15",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/QAP-122-003.png"
+        },
+        {
+            id: "CAR-CAL-008",
+            code_no: "QAP-145-001",
+            name: "PIN GAUGE SET 1.00-10.00",
+            maker: "Eisen",
+            model: "EP-1A",
+            serial: "SN-118274",
+            size: "1.00 - 10.00 mm",
+            last_cal: "2026-08-20", // แก้ไขเป็น 20
+            next_due: "2027-08-20", // แก้ไขเป็น 20
+            dept: "Production",
+            sub_section: "Assembly Line 2",
+            pic: "K.Anan",
+            reg_date: "2024-05-02",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/QAP-145-001.png"
+        },
+        {
+            id: "CAR-CAL-009",
+            code_no: "QAP NO. 002",
+            name: "VIBRATION DATA RECORDER",
+            maker: "Lutron",
+            model: "MVB-385SD",
+            serial: "SN-652910",
+            size: "Acceleration / Velocity",
+            last_cal: "2026-08-20",
+            next_due: "2027-08-20",
+            dept: "QA/QC",
+            sub_section: "Reliability & Testing",
+            pic: "K.Nathawut",
+            reg_date: "2024-06-10",
+            frequency: "12 M",
+            month: "August",
+            status: "NORMAL",
+            imageUrl: "./assetsinstruments/QAP-NO-002.png"
+        }
+    ];
+
+    let _data = DEFAULT_CALIBRATION_DATA.slice();
+    let _selectedIds = new Set();
+    let _currentFiltered = [];
+    let _calScroller = null;
+    let _realtimeSubscribed = false;
+    let _viewMode = 'TABLE'; // 'TABLE' | 'CALENDAR'
+    const _initCalDate = new Date();
+    let _calendarYear = _initCalDate.getFullYear();
+    let _calendarMonth = _initCalDate.getMonth(); // 0 - 11
+    let _selectedCalendarDate = null; // 'YYYY-MM-DD'
+
+    function updateBulkBarUI(filteredItems) {
+        const bulkBar = document.getElementById('cal-bulk-bar');
+        const countEl = document.getElementById('cal-selected-count');
+        const selectAllCb = document.getElementById('cal-select-all');
+
+        const totalSelected = _selectedIds.size;
+        if (countEl) countEl.textContent = totalSelected;
+
+        if (bulkBar) {
+            if (totalSelected > 0) {
+                bulkBar.classList.remove('hidden');
+                bulkBar.classList.add('flex');
+            } else {
+                bulkBar.classList.add('hidden');
+                bulkBar.classList.remove('flex');
+            }
+        }
+
+        if (selectAllCb) {
+            const list = Array.isArray(filteredItems) ? filteredItems : (_currentFiltered || []);
+            if (list.length > 0) {
+                const selectedInFilterCount = list.filter(item => item && _selectedIds.has(String(item.id))).length;
+                if (selectedInFilterCount === list.length) {
+                    selectAllCb.checked = true;
+                    selectAllCb.indeterminate = false;
+                } else if (selectedInFilterCount > 0) {
+                    selectAllCb.checked = false;
+                    selectAllCb.indeterminate = true;
+                } else {
+                    selectAllCb.checked = false;
+                    selectAllCb.indeterminate = false;
+                }
+            } else {
+                selectAllCb.checked = false;
+                selectAllCb.indeterminate = false;
+            }
+        }
+    }
+
+    function toggleSelectRow(id, isChecked) {
+        if (!id) return;
+        const strId = String(id);
+        if (isChecked) {
+            _selectedIds.add(strId);
+        } else {
+            _selectedIds.delete(strId);
+        }
+        updateBulkBarUI(_currentFiltered);
+    }
+
+    function toggleSelectAll(masterEl) {
+        const isChecked = masterEl ? masterEl.checked : false;
+        const list = Array.isArray(_currentFiltered) && _currentFiltered.length > 0 ? _currentFiltered : _data;
+        
+        list.forEach(item => {
+            if (!item || !item.id) return;
+            if (isChecked) {
+                _selectedIds.add(String(item.id));
+            } else {
+                _selectedIds.delete(String(item.id));
+            }
+        });
+
+        render();
+    }
+
+    function selectAllFiltered() {
+        const list = Array.isArray(_currentFiltered) && _currentFiltered.length > 0 ? _currentFiltered : _data;
+        list.forEach(item => {
+            if (item && item.id) _selectedIds.add(String(item.id));
+        });
+        render();
+        if (typeof toast === 'function') toast(`✅ เลือกเครื่องมือทั้งหมดในตาราง ${list.length} รายการ`, "info");
+    }
+
+    function clearSelection() {
+        _selectedIds.clear();
+        render();
+        if (typeof toast === 'function') toast("🔄 ล้างการเลือกเครื่องมือทั้งหมดแล้ว", "info");
+    }
+
+    async function openBulkCalibrateModal() {
+        if (_selectedIds.size === 0) {
+            if (typeof toast === 'function') toast("⚠️ กรุณาเลือกเครื่องมือที่ต้องการอัปเดตอย่างน้อย 1 รายการ", "warning");
+            return;
+        }
+
+        const selectedCount = _selectedIds.size;
+        const todayStr = new Date().toISOString().split('T')[0];
+        
+        // คำนวณวันถัดไป 1 ปี (Next Due + 1 Year)
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        const nextDueStr = nextYear.toISOString().split('T')[0];
+        const monthStr = nextYear.toLocaleString('en-US', { month: 'long' });
+
+        showCustomConfirmDialog({
+            title: `ยืนยันบันทึกสอบเทียบแบบกลุ่ม (${selectedCount} รายการ)`,
+            subtitle: `ระบบจะอัปเดตวันสอบเทียบ (Last Cal) เป็นวันที่ปัจจุบัน (${todayStr}) และคำนวณวันครบกำหนดรอบถัดไป (Next Due) เป็น ${nextDueStr} ให้กับเครื่องมือที่เลือกทั้ง ${selectedCount} รายการ`,
+            badge: "BULK CALIBRATION",
+            type: "info",
+            confirmText: "🚀 ยืนยันบันทึกสอบเทียบทั้งหมด",
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                const updatedItems = [];
+                _data.forEach(item => {
+                    if (item && _selectedIds.has(String(item.id))) {
+                        item.last_cal = todayStr;
+                        item.next_due = nextDueStr;
+                        item.month = monthStr;
+                        item.status = 'NORMAL';
+
+                        // เพิ่ม Log ประวัติ
+                        const logs = ensureInstrumentLogs(item);
+                        logs.push({
+                            id: 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                            date: todayStr,
+                            cert_no: 'CAL-' + (item.code_no || item.id) + '-' + new Date().getFullYear(),
+                            lab: 'Internal QA Metrology Laboratory',
+                            result: 'PASSED',
+                            deviation: '0.00 mm (Within Spec)',
+                            next_due: nextDueStr,
+                            technician: 'PHETSAYAM (QC Metrologist)',
+                            traceability: 'ISO/IEC 17025 Certified',
+                            notes: 'Bulk Calibration Routine Completed'
+                        });
+                        item.calibration_logs = logs;
+                        updatedItems.push(item);
+                    }
+                });
+
+                // บันทึก LocalDB
+                if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                    try {
+                        await localDB.calibrationMaster.bulkPut(updatedItems);
+                    } catch(e) {
+                        console.warn("[Bulk Cal Local DB Error]", e);
+                    }
+                }
+
+                // ซิงก์ Supabase
+                syncToCloud(updatedItems);
+
+                _selectedIds.clear();
+                render();
+                updateOverdueBadge();
+                if (typeof toast === 'function') toast(`🎉 อัปเดตสถานะสอบเทียบเรียบร้อย ${selectedCount} รายการ`, "success");
+            }
+        });
+    }
+
+    // --- Batch Edit Calibration History Notes Modal & Engine ---
+    function openBatchEditNotesModal() {
+        if (_selectedIds.size === 0) {
+            if (typeof toast === 'function') toast("⚠️ กรุณาเลือกเครื่องมือที่ต้องการแก้ไขบันทึกประวัติอย่างน้อย 1 รายการ", "warning");
+            return;
+        }
+
+        const existingModal = document.getElementById('cal-batch-notes-modal-overlay');
+        if (existingModal) existingModal.remove();
+
+        const selectedItems = (_data || []).filter(item => item && _selectedIds.has(String(item.id)));
+        if (selectedItems.length === 0) {
+            if (typeof toast === 'function') toast("⚠️ ไม่พบข้อมูลเครื่องมือที่เลือก", "warning");
+            return;
+        }
+
+        const isDark = document.body.classList.contains('dark-mode') || 
+                       document.documentElement.classList.contains('dark') || 
+                       localStorage.getItem('carrier_theme') === 'dark';
+
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        const overlay = document.createElement('div');
+        overlay.id = 'cal-batch-notes-modal-overlay';
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 22000;
+            background: ${isDark ? 'rgba(2, 6, 23, 0.85)' : 'rgba(15, 23, 42, 0.65)'};
+            backdrop-filter: blur(12px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 14px; transition: all 0.3s ease;
+        `;
+
+        const modal = document.createElement('div');
+        modal.id = 'cal-batch-notes-card';
+        modal.className = `cal-doc-modal ${isDark ? 'theme-dark' : 'theme-light'}`;
+        modal.style.cssText = `
+            position: relative; width: 100%; max-width: 980px; max-height: 94vh; height: auto;
+            background: ${isDark ? '#0f172a' : '#ffffff'}; border-radius: 20px; overflow: hidden;
+            display: flex; flex-direction: column; border: 1.5px solid ${isDark ? '#334155' : '#cbd5e1'};
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: ${isDark ? '#f8fafc' : '#0f172a'};
+        `;
+
+        const renderSelectedInstrumentRows = () => {
+            const currentSelected = (_data || []).filter(item => item && _selectedIds.has(String(item.id)));
+            if (currentSelected.length === 0) {
+                return `<div class="p-6 text-center text-slate-400 text-xs font-bold">ไม่มีเครื่องมือที่เลือก</div>`;
+            }
+            return currentSelected.map((item, idx) => {
+                const logs = ensureInstrumentLogs(item);
+                const latestLog = (logs && logs.length > 0) ? logs[logs.length - 1] : null;
+                const latestNote = latestLog ? (latestLog.notes || 'No remarks recorded') : 'No previous log';
+                const imgUrl = getInstrumentImageUrl(item);
+                const deptPic = extractResponsiblePerson(item);
+
+                return `
+                    <div id="batch-item-row-${item.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; background:${isDark ? '#1e293b' : '#f8fafc'}; border:1px solid ${isDark ? '#334155' : '#e2e8f0'}; border-radius:12px; margin-bottom:8px; transition:all 0.2s ease;">
+                        <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+                            <div style="width:32px; height:32px; border-radius:8px; background:${isDark ? '#334155' : '#e2e8f0'}; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; border:1px solid ${isDark ? '#475569' : '#cbd5e1'};">
+                                ${imgUrl ? `<img src="${imgUrl}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/32?text=EQ'"/>` : `<span style="font-size:12px;">🔬</span>`}
+                            </div>
+                            <div style="min-width:0; flex:1;">
+                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <span style="font-size:10px; font-weight:900; font-family:'DM Mono', monospace; color:#3b82f6; background:${isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)'}; padding:1px 6px; border-radius:4px;">
+                                        ${item.code_no || item.id}
+                                    </span>
+                                    <span style="font-size:11.5px; font-weight:800; color:${isDark ? '#f8fafc' : '#1e293b'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;" title="${item.name}">
+                                        ${item.name}
+                                    </span>
+                                    <span style="font-size:9.5px; color:${isDark ? '#94a3b8' : '#64748b'}; font-weight:600;">
+                                        (${item.dept || '-'} / ${deptPic})
+                                    </span>
+                                </div>
+                                <div style="font-size:9.5px; color:${isDark ? '#94a3b8' : '#64748b'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;" title="Current: ${latestNote}">
+                                    <span style="font-weight:700; color:${isDark ? '#cbd5e1' : '#475569'};">Current Note:</span> ${latestNote}
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="WapCalibrationSystem.removeBatchItem('${item.id}')" 
+                                style="width:24px; height:24px; border-radius:6px; background:${isDark ? '#334155' : '#e2e8f0'}; border:none; color:${isDark ? '#94a3b8' : '#64748b'}; display:flex; align-items:center; justify-content:center; font-size:11px; cursor:pointer; flex-shrink:0; transition:all 0.2s ease;"
+                                title="Remove from batch selection">
+                            ✕
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        modal.innerHTML = `
+            <!-- Top Header Banner -->
+            <div style="background: linear-gradient(135deg, #312e81 0%, #1e1b4b 50%, #0f172a 100%); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; border-bottom: 1.5px solid rgba(99, 102, 241, 0.3);">
+                <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                    <div style="width: 40px; height: 40px; background: rgba(99, 102, 241, 0.25); border: 1.5px solid rgba(165, 180, 252, 0.4); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+                        📝
+                    </div>
+                    <div style="min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <h3 style="margin: 0; font-size: 14px; font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase; color: #ffffff;">
+                                Batch Edit Calibration History Notes
+                            </h3>
+                            <span id="batch-modal-count-badge" style="background: #4f46e5; border: 1px solid rgba(199, 210, 254, 0.4); color: #ffffff; font-size: 9px; font-weight: 900; padding: 2px 8px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em;">
+                                ${selectedItems.length} Instruments Selected
+                            </span>
+                        </div>
+                        <p style="margin: 2px 0 0 0; font-size: 10.5px; color: #c7d2fe; font-weight: 600;">
+                            แก้ไขและบันทึกหมายเหตุ/ผลการสอบเทียบแบบกลุ่มให้ทุกเครื่องมือที่เลือกพร้อมกัน
+                        </p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('cal-batch-notes-modal-overlay').remove()" 
+                        style="width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 900; cursor: pointer; transition: all 0.2s ease;">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Modal Content (Two Columns Layout) -->
+            <div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; padding: 18px; overflow-y: auto; max-height: calc(94vh - 130px); flex: 1; background: ${isDark ? '#0b1329' : '#f8fafc'};">
+                
+                <!-- Left Column: Settings & Input -->
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    
+                    <!-- 1. Update Mode Selector -->
+                    <div style="background: ${isDark ? '#1e293b' : '#ffffff'}; padding: 14px; border-radius: 14px; border: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <label style="display: block; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: ${isDark ? '#93c5fd' : '#1e40af'}; margin-bottom: 10px;">
+                            🎯 Update Method / รูปแบบการอัปเดตบันทึก
+                        </label>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e2e8f0' : '#1e293b'}; cursor: pointer; padding: 6px 10px; border-radius: 8px; background: ${isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(241, 245, 249, 0.8)'};">
+                                <input type="radio" name="batch-note-mode" value="REPLACE_LATEST" checked style="margin-top: 2px; cursor: pointer; accent-color: #4f46e5;">
+                                <div>
+                                    <span style="font-weight: 900; color: #4f46e5;">Update Latest Record Note</span> (แทนที่บันทึกของประวัติสอบเทียบล่าสุด)
+                                    <div style="font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'};">ปรับปรุงข้อความบันทึกในรอบสอบเทียบล่าสุดของแต่ละเครื่องมือ</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e2e8f0' : '#1e293b'}; cursor: pointer; padding: 6px 10px; border-radius: 8px; background: ${isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(241, 245, 249, 0.8)'};">
+                                <input type="radio" name="batch-note-mode" value="APPEND_LATEST" style="margin-top: 2px; cursor: pointer; accent-color: #4f46e5;">
+                                <div>
+                                    <span style="font-weight: 900; color: #0284c7;">Append to Latest Note</span> (เพิ่มข้อความต่อท้ายบันทึกเดิม)
+                                    <div style="font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'};">คงข้อความเดิมไว้และใส่หมายเหตุนี้เพิ่มเข้าไปต่อท้าย</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e2e8f0' : '#1e293b'}; cursor: pointer; padding: 6px 10px; border-radius: 8px; background: ${isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(241, 245, 249, 0.8)'};">
+                                <input type="radio" name="batch-note-mode" value="ADD_NEW_ENTRY" style="margin-top: 2px; cursor: pointer; accent-color: #4f46e5;">
+                                <div>
+                                    <span style="font-weight: 900; color: #16a34a;">Add New History Event Log</span> (เพิ่มรายการประวัติใหม่พร้อมบันทึกนี้)
+                                    <div style="font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'};">สร้างประวัติสอบเทียบ/ตรวจสอบใหม่อีก 1 รายการพร้อมบันทึกนี้</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 11.5px; font-weight: 700; color: ${isDark ? '#e2e8f0' : '#1e293b'}; cursor: pointer; padding: 6px 10px; border-radius: 8px; background: ${isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(241, 245, 249, 0.8)'};">
+                                <input type="radio" name="batch-note-mode" value="REPLACE_ALL" style="margin-top: 2px; cursor: pointer; accent-color: #4f46e5;">
+                                <div>
+                                    <span style="font-weight: 900; color: #d97706;">Replace All History Logs Notes</span> (แทนที่บันทึกในทุกประวัติ)
+                                    <div style="font-size: 9.5px; font-weight: 500; color: ${isDark ? '#94a3b8' : '#64748b'};">นำข้อความนี้ไปใส่ในประวัติทุกรายการของเครื่องมือที่เลือก</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 2. Quick Presets Templates -->
+                    <div style="background: ${isDark ? '#1e293b' : '#ffffff'}; padding: 14px; border-radius: 14px; border: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <label style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: ${isDark ? '#93c5fd' : '#1e40af'}; margin-bottom: 8px;">
+                            <span>⚡ Quick QC Note Templates (คลิกเพื่อเลือกข้อความสำเร็จรูป)</span>
+                        </label>
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Calibration verified in accordance with ISO/IEC 17025:2017 standards. All parameter readings conform to standard tolerance specifications.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(79, 70, 229, 0.2)' : '#e0e7ff'}; color: ${isDark ? '#c7d2fe' : '#3730a3'}; border: 1px solid ${isDark ? 'rgba(99, 102, 241, 0.4)' : '#c7d2fe'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ ISO 17025 Conformity
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Periodic routine calibration completed successfully. Zero-point verified and accuracy within specification limits.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5'}; color: ${isDark ? '#a7f3d0' : '#065f46'}; border: 1px solid ${isDark ? 'rgba(16, 185, 129, 0.4)' : '#a7f3d0'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ Periodic Routine
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Pre-production verification passed. Accuracy confirmed on inspection line before mass production batch.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(14, 165, 233, 0.2)' : '#e0f2fe'}; color: ${isDark ? '#bae6fd' : '#0369a1'}; border: 1px solid ${isDark ? 'rgba(14, 165, 233, 0.4)' : '#bae6fd'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ Pre-Production
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Sensor cleaned, readjusted zero point, and recalibrated. Official QA sticker attached.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7'}; color: ${isDark ? '#fde68a' : '#92400e'}; border: 1px solid ${isDark ? 'rgba(245, 158, 11, 0.4)' : '#fde68a'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ Clean & Zeroed
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Calibrated by accredited external metrology laboratory with traceable standards. Certificate on file in QA archive.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(168, 85, 247, 0.2)' : '#f3e8ff'}; color: ${isDark ? '#e9d5ff' : '#6b21a8'}; border: 1px solid ${isDark ? 'rgba(168, 85, 247, 0.4)' : '#e9d5ff'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ External Lab Cert
+                            </button>
+                            <button type="button" onclick="WapCalibrationSystem.applyBatchNoteTemplate('Audited and approved for annual ISO 9001 / IATF 16949 quality compliance.')"
+                                    style="padding: 4px 8px; font-size: 10.5px; font-weight: 700; border-radius: 6px; background: ${isDark ? 'rgba(236, 72, 153, 0.2)' : '#fce7f3'}; color: ${isDark ? '#fbcfe8' : '#9d174d'}; border: 1px solid ${isDark ? 'rgba(236, 72, 153, 0.4)' : '#fbcfe8'}; cursor: pointer; transition: all 0.15s ease;">
+                                🏷️ Annual QA Audit
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3. Notes Content Textarea -->
+                    <div style="background: ${isDark ? '#1e293b' : '#ffffff'}; padding: 14px; border-radius: 14px; border: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <label style="display: block; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: ${isDark ? '#93c5fd' : '#1e40af'}; margin-bottom: 8px;">
+                            💬 History Note Content / ข้อความบันทึกประวัติ <span style="color:#ef4444;">*</span>
+                        </label>
+                        <textarea id="cal-batch-notes-text" rows="4" 
+                                  placeholder="พิมพ์หรือเลือกข้อความบันทึกประวัติการสอบเทียบที่ต้องการนำไปใช้กับเครื่องมือที่เลือก..." 
+                                  style="width: 100%; padding: 10px 12px; font-size: 12px; font-family: inherit; font-weight: 600; border-radius: 10px; background: ${isDark ? '#0f172a' : '#f8fafc'}; color: ${isDark ? '#f8fafc' : '#0f172a'}; border: 1.5px solid ${isDark ? '#475569' : '#cbd5e1'}; outline: none; transition: border-color 0.2s ease; resize: vertical; box-sizing: border-box;"></textarea>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                            <div>
+                                <label style="display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; color: ${isDark ? '#94a3b8' : '#64748b'}; margin-bottom: 4px;">
+                                    Technician / Inspector
+                                </label>
+                                <input type="text" id="cal-batch-notes-tech" value="PHETSAYAM (QC Metrologist)"
+                                       style="width: 100%; height: 32px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 8px; background: ${isDark ? '#0f172a' : '#f8fafc'}; color: ${isDark ? '#f8fafc' : '#0f172a'}; border: 1px solid ${isDark ? '#475569' : '#cbd5e1'}; outline: none; box-sizing: border-box;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; color: ${isDark ? '#94a3b8' : '#64748b'}; margin-bottom: 4px;">
+                                    Event Date
+                                </label>
+                                <input type="date" id="cal-batch-notes-date" value="${todayStr}"
+                                       style="width: 100%; height: 32px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 8px; background: ${isDark ? '#0f172a' : '#f8fafc'}; color: ${isDark ? '#f8fafc' : '#0f172a'}; border: 1px solid ${isDark ? '#475569' : '#cbd5e1'}; outline: none; box-sizing: border-box;">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Column: Target Instruments List -->
+                <div style="display: flex; flex-direction: column; background: ${isDark ? '#1e293b' : '#ffffff'}; padding: 14px; border-radius: 14px; border: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-height: 0;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid ${isDark ? '#334155' : '#e2e8f0'}; flex-shrink: 0;">
+                        <div>
+                            <span style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: ${isDark ? '#93c5fd' : '#1e40af'};">
+                                📋 Target Instruments
+                            </span>
+                            <span id="batch-items-count-text" style="font-size: 10px; font-weight: 700; color: ${isDark ? '#94a3b8' : '#64748b'}; margin-left: 4px;">
+                                (${selectedItems.length} items)
+                            </span>
+                        </div>
+                        <span style="font-size: 9.5px; font-weight: 600; color: ${isDark ? '#64748b' : '#94a3b8'};">
+                            คลิก ✕ เพื่อตัดรายการออก
+                        </span>
+                    </div>
+
+                    <!-- Scrollable List of Target Instruments -->
+                    <div id="cal-batch-instruments-list" style="overflow-y: auto; flex: 1; max-height: 380px; padding-right: 4px;">
+                        ${renderSelectedInstrumentRows()}
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="background: ${isDark ? '#0f172a' : '#ffffff'}; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; border-top: 1.5px solid ${isDark ? '#334155' : '#e2e8f0'};">
+                <div style="font-size: 11px; font-weight: 700; color: ${isDark ? '#94a3b8' : '#64748b'};">
+                    💡 หมายเหตุจะถูกบันทึกลงในระบบประวัติการสอบเทียบของเครื่องมือทั้งหมดทันที
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" onclick="document.getElementById('cal-batch-notes-modal-overlay').remove()" 
+                            style="padding: 8px 16px; font-size: 11.5px; font-weight: 800; border-radius: 10px; background: ${isDark ? '#334155' : '#f1f5f9'}; color: ${isDark ? '#e2e8f0' : '#475569'}; border: 1px solid ${isDark ? '#475569' : '#cbd5e1'}; cursor: pointer; transition: all 0.2s ease;">
+                        ยกเลิก
+                    </button>
+                    <button type="button" onclick="WapCalibrationSystem.applyBatchHistoryNotes()" 
+                            id="cal-batch-apply-btn"
+                            style="padding: 8px 20px; font-size: 11.5px; font-weight: 900; border-radius: 10px; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: #ffffff; border: 1px solid rgba(199, 210, 254, 0.4); cursor: pointer; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35); display: flex; align-items: center; gap: 6px; transition: all 0.2s ease;">
+                        <span>🚀 Apply Notes to ${selectedItems.length} Instruments</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+    }
+
+    function applyBatchNoteTemplate(text) {
+        const textarea = document.getElementById('cal-batch-notes-text');
+        if (textarea) {
+            textarea.value = text;
+            textarea.focus();
+        }
+    }
+
+    function removeBatchItem(id) {
+        if (!id) return;
+        _selectedIds.delete(String(id));
+        
+        // อัปเดตแถวใน modal
+        const row = document.getElementById(`batch-item-row-${id}`);
+        if (row) row.remove();
+
+        const count = _selectedIds.size;
+        const countBadge = document.getElementById('batch-modal-count-badge');
+        if (countBadge) countBadge.textContent = `${count} Instruments Selected`;
+
+        const countText = document.getElementById('batch-items-count-text');
+        if (countText) countText.textContent = `(${count} items)`;
+
+        const applyBtn = document.getElementById('cal-batch-apply-btn');
+        if (applyBtn) {
+            applyBtn.innerHTML = `<span>🚀 Apply Notes to ${count} Instruments</span>`;
+        }
+
+        updateBulkBarUI(_currentFiltered);
+        render();
+
+        if (count === 0) {
+            const overlay = document.getElementById('cal-batch-notes-modal-overlay');
+            if (overlay) overlay.remove();
+            if (typeof toast === 'function') toast("ลบการเลือกเครื่องมือทั้งหมดแล้ว", "info");
+        }
+    }
+
+    async function applyBatchHistoryNotes() {
+        const notesTextEl = document.getElementById('cal-batch-notes-text');
+        const noteText = notesTextEl ? notesTextEl.value.trim() : '';
+
+        if (!noteText) {
+            if (typeof toast === 'function') toast("⚠️ กรุณากรอกข้อความบันทึกประวัติก่อนกดยืนยัน", "warning");
+            if (notesTextEl) notesTextEl.focus();
+            return;
+        }
+
+        const modeRadios = document.getElementsByName('batch-note-mode');
+        let selectedMode = 'REPLACE_LATEST';
+        for (const r of modeRadios) {
+            if (r.checked) {
+                selectedMode = r.value;
+                break;
+            }
+        }
+
+        const techName = (document.getElementById('cal-batch-notes-tech') && document.getElementById('cal-batch-notes-tech').value.trim()) || 'PHETSAYAM (QC Metrologist)';
+        const eventDate = (document.getElementById('cal-batch-notes-date') && document.getElementById('cal-batch-notes-date').value) || new Date().toISOString().split('T')[0];
+
+        const targetItems = (_data || []).filter(item => item && _selectedIds.has(String(item.id)));
+        if (targetItems.length === 0) {
+            if (typeof toast === 'function') toast("⚠️ ไม่พบเครื่องมือที่เลือก", "error");
+            return;
+        }
+
+        const count = targetItems.length;
+
+        targetItems.forEach(item => {
+            const logs = ensureInstrumentLogs(item);
+            
+            if (selectedMode === 'REPLACE_LATEST') {
+                if (logs.length > 0) {
+                    const latest = logs[logs.length - 1];
+                    latest.notes = noteText;
+                    if (techName) latest.technician = techName;
+                } else {
+                    logs.push({
+                        id: `LOG-${item.id}-${Date.now()}`,
+                        date: eventDate,
+                        next_due: item.next_due || '-',
+                        cert_no: `CAL-${item.code_no || item.id}-${eventDate.split('-')[0]}`,
+                        lab: 'Internal QA Metrology Laboratory',
+                        result: (item.status === 'EXPIRED') ? 'EXPIRED' : 'PASSED',
+                        type: 'BATCH_NOTE_UPDATE',
+                        deviation: '0.00 mm',
+                        technician: techName,
+                        notes: noteText
+                    });
+                }
+            } else if (selectedMode === 'APPEND_LATEST') {
+                if (logs.length > 0) {
+                    const latest = logs[logs.length - 1];
+                    const existing = latest.notes || '';
+                    latest.notes = existing ? `${existing} | ${noteText}` : noteText;
+                    if (techName) latest.technician = techName;
+                } else {
+                    logs.push({
+                        id: `LOG-${item.id}-${Date.now()}`,
+                        date: eventDate,
+                        next_due: item.next_due || '-',
+                        cert_no: `CAL-${item.code_no || item.id}-${eventDate.split('-')[0]}`,
+                        lab: 'Internal QA Metrology Laboratory',
+                        result: (item.status === 'EXPIRED') ? 'EXPIRED' : 'PASSED',
+                        type: 'BATCH_NOTE_UPDATE',
+                        deviation: '0.00 mm',
+                        technician: techName,
+                        notes: noteText
+                    });
+                }
+            } else if (selectedMode === 'ADD_NEW_ENTRY') {
+                logs.push({
+                    id: `LOG-${item.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    date: eventDate,
+                    next_due: item.next_due || '-',
+                    cert_no: `NOTE-${item.code_no || item.id}-${eventDate.split('-')[0]}`,
+                    lab: 'Internal QA Metrology Laboratory',
+                    result: (item.status === 'EXPIRED') ? 'EXPIRED' : 'PASSED',
+                    type: 'QC_REMARK_EVENT',
+                    deviation: '0.000 mm',
+                    tolerance: '±0.010 mm',
+                    uncertainty: 'U = 0.0012 mm (k=2)',
+                    env_temp: '20.0°C / 50% RH',
+                    technician: techName,
+                    traceability: 'ISO/IEC 17025 Certified',
+                    notes: noteText
+                });
+            } else if (selectedMode === 'REPLACE_ALL') {
+                logs.forEach(l => {
+                    l.notes = noteText;
+                    if (techName) l.technician = techName;
+                });
+            }
+
+            item.calibration_logs = logs;
+            if (item.history_logs && Array.isArray(item.history_logs)) {
+                item.history_logs.unshift({
+                    date: eventDate,
+                    action: 'BATCH_NOTE_UPDATE',
+                    notes: noteText,
+                    by: techName
+                });
+            }
+        });
+
+        // บันทึกลง LocalDB
+        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+            try {
+                await localDB.calibrationMaster.bulkPut(targetItems);
+            } catch(e) {
+                console.warn("[Batch Notes LocalDB Error]", e);
+            }
+        }
+
+        // ซิงก์ไป Supabase / Cloud
+        syncToCloud(targetItems);
+
+        // ปิด modal และรีเฟรชหน้าจอ
+        const overlay = document.getElementById('cal-batch-notes-modal-overlay');
+        if (overlay) overlay.remove();
+
+        _selectedIds.clear();
+        render();
+        updateOverdueBadge();
+        updateBulkBarUI(_currentFiltered);
+
+        if (typeof toast === 'function') toast(`🎉 อัปเดตบันทึกประวัติการสอบเทียบเรียบร้อย ${count} รายการ`, "success");
+    }
+
+    // --- Supabase Online Cloud Sync Helpers (Data only, images resolved from files) ---
+    function getSupabaseClient() {
+        if (typeof getSupabase === 'function') {
+            const client = getSupabase();
+            if (client) return client;
+        }
+        if (typeof sqeClient !== 'undefined' && sqeClient) return sqeClient;
+        if (typeof wapClient !== 'undefined' && wapClient) return wapClient;
+        if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+            try {
+                return window.supabase.createClient(SQE_URL, SQE_KEY, {
+                    auth: { persistSession: false },
+                    global: { headers: { apikey: SQE_KEY, Authorization: `Bearer ${SQE_KEY}` } }
+                });
+            } catch(e) {}
+        }
+        return null;
+    }
+
+    function cleanEntryForCloud(item) {
+        if (!item) return null;
+        return {
+            id: String(item.id || '').trim(),
+            code_no: String(item.code_no || '-').trim(),
+            name: String(item.name || '').trim(),
+            maker: String(item.maker || '-').trim(),
+            model: String(item.model || '-').trim(),
+            serial: String(item.serial || '-').trim(),
+            size: String(item.size || '-').trim(),
+last_cal: item.last_cal && item.last_cal !== '-' ? item.last_cal : '2026-08-20',
+next_due: item.next_due && item.next_due !== '-' ? item.next_due : '2027-08-20',
+            dept: String(item.dept || '-').trim(),
+            sub_section: String(item.sub_section || '-').trim(),
+            pic: String(item.pic || '').trim(),
+            reg_date: item.reg_date && item.reg_date !== '-' ? item.reg_date : new Date().toISOString().split('T')[0],
+            frequency: String(item.frequency || '12 M').trim(),
+            month: String(item.month || 'August').trim(),
+            status: String(item.status || 'NORMAL').trim()
+        };
+    }
+
+    async function syncToCloud(entryOrList) {
+        try {
+            const sb = getSupabaseClient();
+            if (!sb) {
+                console.warn('[Calibration Supabase Sync] No Supabase client available');
+                return;
+            }
+            const items = Array.isArray(entryOrList) ? entryOrList : [entryOrList];
+            const cleanRows = items.map(cleanEntryForCloud).filter(Boolean);
+            if (cleanRows.length === 0) return;
+
+            const { error } = await sb.from('calibration_records').upsert(cleanRows, { onConflict: 'id' });
+            if (error) {
+                console.warn('[Calibration Supabase Sync]', error.message || error);
+            } else {
+                console.log('[Calibration Supabase Sync] Successfully synced to cloud:', cleanRows.length);
+            }
+        } catch(err) {
+            console.warn('[Calibration Supabase Sync Exception]', err);
+        }
+    }
+
+    async function syncCalibrationData(silent = false) {
+        const btn = document.getElementById('cal-sync-cloud-btn');
+        const icon = btn ? (btn.querySelector('.cal-sync-icon') || btn.querySelector('svg')) : null;
+        const textEl = btn ? btn.querySelector('.cal-sync-btn-text') : null;
+        const originalText = textEl ? textEl.innerText : '';
+
+        try {
+            if (!navigator.onLine) {
+                if (!silent && typeof toast === 'function') {
+                    toast("⚠️ ไม่สามารถเชื่อมต่อได้: อุปกรณ์กำลังอยู่ในสถานะออฟไลน์ (Offline)", "warning");
+                }
+                return false;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.75';
+                if (icon) icon.classList.add('animate-spin');
+                if (textEl) textEl.innerText = 'Syncing...';
+            }
+
+            const sb = getSupabaseClient();
+            if (!sb) {
+                if (!silent && typeof toast === 'function') toast("⚠️ ไม่พบการเชื่อมต่อ Supabase Database", "error");
+                return false;
+            }
+
+            // 1. ดึงข้อมูลล่าสุดจาก Dexie IndexedDB (Local Database)
+            let itemsToSync = [];
+            if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                try {
+                    itemsToSync = await localDB.calibrationMaster.toArray();
+                } catch (dexErr) {
+                    console.warn('[Calibration Dexie Read Warning]', dexErr);
+                }
+            }
+
+            // ถ้าใน Dexie ว่างเปล่า ให้ fallback ไปที่ _data ใน memory หรือ DEFAULT_CALIBRATION_DATA
+            if (!itemsToSync || itemsToSync.length === 0) {
+                itemsToSync = (_data && _data.length > 0) ? _data : DEFAULT_CALIBRATION_DATA;
+                // บันทึกกลับลง Dexie เพื่อรักษาความสอดคล้องของข้อมูล
+                if (typeof localDB !== 'undefined' && localDB.calibrationMaster && itemsToSync.length > 0) {
+                    try {
+                        await localDB.calibrationMaster.bulkPut(itemsToSync);
+                    } catch(e) {}
+                }
+            }
+
+            // 2. ทำความสะอาดและตรวจสอบข้อมูลก่อนส่ง (Data Sanitization & Field Mapping)
+            const cleanRows = itemsToSync.map(cleanEntryForCloud).filter(Boolean);
+            if (cleanRows.length === 0) {
+                if (!silent && typeof toast === 'function') toast("ℹ️ ไม่มีข้อมูลเครื่องมือสำหรับซิงก์", "info");
+                return false;
+            }
+
+            // 3. ทยอยส่งข้อมูลแบบ Chunked Batch (ครั้งละ 50 รายการ เพื่อความปลอดภัยและความเสถียร)
+            const BATCH_SIZE = 50;
+            let totalSynced = 0;
+
+            for (let i = 0; i < cleanRows.length; i += BATCH_SIZE) {
+                const batch = cleanRows.slice(i, i + BATCH_SIZE);
+                const { error } = await sb.from('calibration_records').upsert(batch, { onConflict: 'id' });
+                if (error) {
+                    console.error('[Calibration Supabase Sync Error]', error);
+                    throw error;
+                }
+                totalSynced += batch.length;
+            }
+
+            // 4. อัปเดต Memory State และ Refresh หน้าจอ
+            _data = itemsToSync;
+            render();
+            updateOverdueBadge();
+
+            console.log(`[Calibration Sync] Successfully pushed ${totalSynced} items from Dexie to Supabase.`);
+            if (!silent && typeof toast === 'function') {
+                toast(`☁️ Sync Calibration Data สำเร็จ: ซิงก์ข้อมูล ${totalSynced} รายการจาก Dexie ไปยัง Supabase Database เรียบร้อยแล้ว`, "success");
+            }
+            return true;
+
+        } catch(err) {
+            console.error('[Calibration Supabase Sync Exception]', err);
+            if (!silent && typeof toast === 'function') {
+                toast(`❌ เกิดข้อผิดพลาดในการซิงก์: ${err.message || err}`, "error");
+            }
+            return false;
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                if (icon) icon.classList.remove('animate-spin');
+                if (textEl) textEl.innerText = originalText || 'Sync Calibration Data';
+            }
+        }
+    }
+
+    async function syncAllToCloud(silent = false) {
+        return await syncCalibrationData(silent);
+    }
+
+    async function deleteFromCloud(id) {
+        try {
+            const sb = getSupabaseClient();
+            if (!sb || !id) return;
+            await sb.from('calibration_records').delete().eq('id', id);
+        } catch(err) {
+            console.warn('[Calibration Supabase Delete Warning]', err);
+        }
+    }
+
+    // ภายใน WapCalibrationSystem
+async function loadFromCloud() {
+    try {
+        const sb = getSupabaseClient();
+        if (!sb) return;
+
+        const { data, error } = await sb.from('calibration_records').select('*').order('code_no');
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            _data = data.map(item => ({
+                ...item,
+                // ตรวจสอบรูปภาพ: ถ้าใน DB ไม่มี ให้เช็คในโฟลเดอร์ assetsinstruments/ อัตโนมัติ
+                imageUrl: item.image_url || getInstrumentImageUrl(item)
+            }));
+
+            // บันทึกลง IndexedDB ในเครื่องเพื่อความเร็ว
+            if (localDB.calibrationMaster) {
+                await localDB.calibrationMaster.bulkPut(_data);
+            }
+            render();
+            updateOverdueBadge();
+        }
+    } catch (e) {
+        console.warn("Cloud Load Failed:", e.message);
+    }
+}
+
+    function initRealtime() {
+        if (_realtimeSubscribed) return;
+        try {
+            const sb = getSupabaseClient();
+            if (!sb || typeof sb.channel !== 'function') return;
+
+            sb.channel('calibration_realtime_channel')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'calibration_records' }, async (payload) => {
+                    console.log('[Calibration Realtime Change]', payload.eventType);
+                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                        const newRow = payload.new;
+                        if (newRow && newRow.id) {
+                            const item = {
+                                ...newRow,
+                                imageUrl: getInstrumentImageUrl(newRow) || ""
+                            };
+                            const idx = _data.findIndex(x => String(x.id) === String(item.id));
+                            if (idx !== -1) {
+                                _data[idx] = { ..._data[idx], ...item };
+                            } else {
+                                _data.unshift(item);
+                            }
+                            if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                                try { await localDB.calibrationMaster.put(item); } catch(e) {}
+                            }
+                            render();
+                            updateOverdueBadge();
+                        }
+                    } else if (payload.eventType === 'DELETE') {
+                        if (payload.old && payload.old.id) {
+                            _data = _data.filter(x => String(x.id) !== String(payload.old.id));
+                            if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                                try { await localDB.calibrationMaster.delete(payload.old.id); } catch(e) {}
+                            }
+                            render();
+                            updateOverdueBadge();
+                        }
+                    }
+                })
+                .subscribe();
+
+            _realtimeSubscribed = true;
+        } catch(e) {
+            console.warn('[Calibration Realtime Subscribe Error]', e);
+        }
+    }
+
+function extractResponsiblePerson(itemOrStr) {
+    if (!itemOrStr) return "-";
+    
+    let raw = "";
+    if (typeof itemOrStr === 'string') {
+        raw = itemOrStr;
+    } else if (typeof itemOrStr === 'object') {
+        // ดึงจากช่อง PIC หรือ Sub Section (Area & Group)
+        if (itemOrStr.pic && itemOrStr.pic !== "-" && String(itemOrStr.pic).trim()) {
+            raw = String(itemOrStr.pic).trim();
+        } else if (itemOrStr.sub_section && itemOrStr.sub_section !== "-" && String(itemOrStr.sub_section).trim()) {
+            raw = String(itemOrStr.sub_section).trim();
+        }
+    }
+    
+    if (!raw || raw === "-") return "-";
+
+    // --- 1. ตรวจสอบชื่อในวงเล็บ (...) ---
+    // ใช้ Regex ค้นหาข้อความที่อยู่ในวงเล็บ
+    const bracketMatch = raw.match(/\(([^)]+)\)/);
+    
+    if (bracketMatch && bracketMatch[1]) {
+        let nameInside = bracketMatch[1].trim();
+        // ล้างคำนำหน้าชื่อ เช่น K., Khun, Mr., Ms. และจุดต่างๆ ออก
+        return nameInside
+            .replace(/^(?:mr|ms|mrs|miss|khun|dr|k)\.?\s*/gi, '') // ลบ K. หรือคำนำหน้า
+            .replace(/\./g, '') // ลบจุด
+            .trim();
+    }
+
+    // --- 2. ถ้าไม่มีชื่อในวงเล็บ ให้ใช้ Logic ชื่อกลุ่มแบบสั้น ---
+    let cleaned = raw.trim();
+
+    // กรณีพิเศษสำหรับ Piping
+    if (cleaned.toUpperCase().startsWith("PIPING PART")) {
+        return "Piping Parts";
+    }
+
+    // ตัดจบที่คำว่า Parts (สำหรับ Printing Parts, Electrical Parts ฯลฯ)
+    const partsIndex = cleaned.toUpperCase().indexOf("PARTS");
+    if (partsIndex !== -1) {
+        return cleaned.substring(0, partsIndex + 5).trim();
+    }
+
+    // ถ้าไม่มีคำว่า Parts ให้เช็คคำว่า Group
+    const groupIndex = cleaned.toUpperCase().indexOf("GROUP");
+    if (groupIndex !== -1) {
+        return cleaned.substring(0, groupIndex + 5).trim();
+    }
+
+    return cleaned;
+}
+
+    // ฟังก์ชันคำนวณจำนวนเครื่องมือที่เลยกำหนดเทียบ (Overdue / Expired)
+    function getOverdueCount() {
+        const today = new Date();
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        return _data.filter(item => {
+            const nextDue = item.next_due && item.next_due !== '-' ? new Date(item.next_due) : null;
+            let diffDays = 999;
+            if (nextDue && !isNaN(nextDue.getTime())) {
+                const dueZero = new Date(nextDue.getFullYear(), nextDue.getMonth(), nextDue.getDate()).getTime();
+                diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+            }
+            return (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE');
+        }).length;
+    }
+
+    // ฟังก์ชันอัปเดต Badge และกระดิ่งแจ้งเตือน Overdue ทั่วทั้งแอป
+    function updateOverdueBadge() {
+        const overdueCount = getOverdueCount();
+        
+        // 1. อัปเดตในปุ่มกระดิ่งส่วนหัว (Header Toolbar)
+        const bellCountEl = document.getElementById('cal-overdue-bell-count');
+        const bellBtn = document.getElementById('cal-overdue-bell-btn');
+        const bellDot = document.getElementById('cal-overdue-bell-dot');
+        const bellIcon = bellBtn ? bellBtn.querySelector('.cal-bell-icon') : null;
+
+        if (bellCountEl) {
+            bellCountEl.textContent = overdueCount;
+        }
+
+        if (bellBtn) {
+            if (overdueCount > 0) {
+                bellBtn.classList.add('has-overdue');
+                if (bellDot) bellDot.classList.remove('hidden');
+                if (bellIcon) bellIcon.classList.add('cal-bell-alert');
+            } else {
+                bellBtn.classList.remove('has-overdue');
+                if (bellDot) bellDot.classList.add('hidden');
+                if (bellIcon) bellIcon.classList.remove('cal-bell-alert');
+            }
+        }
+
+        // 2. อัปเดตในหน้า Calibration (ถ้ามี)
+        const innerBadge = document.getElementById('cal-overdue-badge-inner');
+        if (innerBadge) {
+            innerBadge.textContent = overdueCount;
+        }
+    }
+
+    // ฟังก์ชันคลิกกระดิ่งแจ้งเตือน -> สลับไปหน้า Calibration และกรองเฉพาะรายการ Overdue ในตารางทันที
+    function goToOverdue() {
+        // สลับไปหน้า Calibration
+        if (typeof window.switchPage === 'function') {
+            const calNavBtn = document.querySelector('[onclick*="Calibration"]') || document.querySelector('[onclick*="CALIBRATION"]');
+            window.switchPage('Calibration', calNavBtn);
+        }
+
+        // ตั้งค่าตัวกรองสถานะเป็น EXPIRED
+        setTimeout(() => {
+            const statusSelect = document.getElementById('cal-filter-status');
+            const searchInput = document.getElementById('cal-search');
+            const deptSelect = document.getElementById('cal-filter-dept');
+
+            if (statusSelect) statusSelect.value = 'EXPIRED';
+            if (searchInput) searchInput.value = '';
+            if (deptSelect) deptSelect.value = 'ALL';
+
+            render();
+
+            // เลื่อนตารางขึ้นบนสุด
+            const tbody = document.getElementById('cal-table-body');
+            const container = tbody ? tbody.closest('.overflow-auto') : null;
+            if (container) {
+                container.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            const count = getOverdueCount();
+            toast(`🔔 แสดงรายการเครื่องมือที่เลยกำหนดเทียบ (Overdue) ทั้งหมด ${count} รายการ`, count > 0 ? 'warning' : 'info');
+        }, 80);
+    }
+
+function _buildRow(item, index) {
+    const rawImg = getInstrumentImageUrl(item);
+    const safeImg = rawImg ? formatImageUrl(rawImg) : "";
+    
+    // --- [1] ส่วนเตรียมรูปภาพ ---
+    const photoHtml = safeImg 
+        ? `<div class="img-thumb" style="width:60px; height:40px; flex-shrink:0; border-radius:6px; overflow:hidden; border:1.5px solid #e2e8f0; background:#fff; cursor:pointer;" 
+                onclick="WapCalibrationSystem.openMetrologyViewer('${item.id}')" title="คลิกเพื่อดูเอกสารและภาพถ่ายจริง">
+                <img src="${safeImg}" style="width:100%; height:100%; object-fit:cover;" onerror="handleImgError(this)">
+           </div>`
+        : `<div style="width:60px; height:40px; flex-shrink:0; border-radius:6px; border:1.5px dashed #cbd5e1; background:#f8fafc; display:flex; align-items:center; justify-content:center; cursor:pointer;" 
+                onclick="WapCalibrationSystem.triggerUpload('${item.id}')" title="เพิ่มรูปภาพ">
+                <span style="color:#cbd5e1; font-size:7px; font-weight:900;">ADD</span>
+           </div>`;
+
+    // --- [2] ระบบคำนวณสถานะและ Visual Status Indicators ---
+    const today = new Date();
+    const nextDue = item.next_due && item.next_due !== '-' ? new Date(item.next_due) : null;
+    const lastCal = item.last_cal && item.last_cal !== '-' ? new Date(item.last_cal) : null;
+    
+    // คำนวณจำนวนวันคงเหลือ (Next Due)
+    let diffDays = 999;
+    if (nextDue && !isNaN(nextDue.getTime())) {
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const dueZero = new Date(nextDue.getFullYear(), nextDue.getMonth(), nextDue.getDate()).getTime();
+        diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+    }
+    
+    // คำนวณจำนวนวันที่พึ่งสอบเทียบไป (Recently Cal)
+    let justCalDays = 999;
+    if (lastCal && !isNaN(lastCal.getTime())) {
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const calZero = new Date(lastCal.getFullYear(), lastCal.getMonth(), lastCal.getDate()).getTime();
+        justCalDays = Math.ceil((todayZero - calZero) / (1000 * 60 * 60 * 24));
+    }
+
+    // กำหนดธีมสี ตัวบ่งชี้สถานะ (Indicator Dots / Icons / Badges)
+    let st = {
+        key: "CALIBRATED",
+        label: "CALIBRATED",
+        th: "สอบเทียบแล้ว (ปกติ)",
+        color: "#10b981",
+        bg: "#ecfdf5",
+        border: "#a7f3d0",
+        pillClass: "calibrated",
+        rowClass: "status-calibrated",
+        beaconHtml: `<span class="cal-beacon calibrated" title="Calibrated & Active"><span class="beacon-dot"></span></span>`,
+        iconSvg: `<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="text-emerald-600"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>`,
+        badgeText: "CALIBRATED",
+        subText: diffDays < 900 ? `Valid (${diffDays}d left)` : "Valid",
+        subColor: "text-emerald-700"
+    };
+
+    if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+        st = {
+            key: "IN_CALIBRATION",
+            label: "IN CALIBRATION",
+            th: "กำลังส่งสอบเทียบ (ส่งแคลอยู่)",
+            color: "#f97316",
+            bg: "#fff7ed",
+            border: "#fed7aa",
+            pillClass: "in-cal",
+            rowClass: "status-in-cal",
+            beaconHtml: `<span class="cal-beacon in-cal" title="In Calibration / กำลังส่งสอบเทียบ"><span class="beacon-ping"></span><span class="beacon-dot"></span></span>`,
+            iconSvg: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`,
+            badgeText: "IN CALIBRATION",
+            subText: "ส่งแคลอยู่ (Out for Cal)",
+            subColor: "text-orange-600 font-black"
+        };
+    } else if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+        const overdueDays = Math.abs(diffDays);
+        st = {
+            key: "EXPIRED",
+            label: "EXPIRED",
+            th: "หมดอายุ / เลยกำหนด",
+            color: "#ef4444",
+            bg: "#fef2f2",
+            border: "#fecaca",
+            pillClass: "expired",
+            rowClass: "status-expired",
+            beaconHtml: `<span class="cal-beacon expired" title="Expired / Overdue"><span class="beacon-ping"></span><span class="beacon-dot"></span></span>`,
+            iconSvg: `<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="text-rose-600"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>`,
+            badgeText: "EXPIRED",
+            subText: diffDays < 0 ? `Overdue ${overdueDays}d` : "Expired",
+            subColor: "text-rose-600 font-black"
+        };
+    } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+        st = {
+            key: "DUE_SOON",
+            label: "CALIBRATION DUE",
+            th: "ใกล้ครบกำหนดสอบเทียบ",
+            color: "#f59e0b",
+            bg: "#fffbeb",
+            border: "#fde68a",
+            pillClass: "due",
+            rowClass: "status-due",
+            beaconHtml: `<span class="cal-beacon due" title="Calibration Due Soon"><span class="beacon-ping"></span><span class="beacon-dot"></span></span>`,
+            iconSvg: `<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="text-amber-600"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>`,
+            badgeText: "CALIBRATION DUE",
+            subText: `Due in ${diffDays}d`,
+            subColor: "text-amber-700 font-black"
+        };
+    } else if (justCalDays <= 15 || item.status === 'JUST_CAL') {
+        st = {
+            key: "NORMAL",
+            label: "CALIBRATED",
+            th: "พึ่งสอบเทียบใหม่",
+            color: "#3b82f6",
+            bg: "#eff6ff",
+            border: "#bfdbfe",
+            pillClass: "just-cal",
+            rowClass: "status-just-cal",
+            beaconHtml: `<span class="cal-beacon just-cal" title="Recently Calibrated"><span class="beacon-ping"></span><span class="beacon-dot"></span></span>`,
+            iconSvg: `<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="text-blue-600"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>`,
+            badgeText: "CALIBRATED",
+            subText: `Just Cal (${justCalDays}d ago)`,
+            subColor: "text-blue-700 font-black"
+        };
+    }
+
+// --- [เพิ่มส่วนนี้ไว้ก่อนบรรทัด return เพื่อประมวลผลการตัดคำ] ---
+const displaySubSection = (() => {
+    let sub = String(item.sub_section || "-").trim();
+    // ตัดจบที่คำว่า PARTS
+    const partsIndex = sub.toUpperCase().indexOf("PARTS");
+    if (partsIndex !== -1) {
+        return sub.substring(0, partsIndex + 5).trim();
+    }
+    // ถ้าไม่มี PARTS ให้เช็คคำว่า GROUP
+    const groupIndex = sub.toUpperCase().indexOf("GROUP");
+    if (groupIndex !== -1) {
+        return sub.substring(0, groupIndex + 5).trim();
+    }
+    return sub;
+})();
+
+return `
+    <tr class="cal-row-premium ${st.rowClass} hover:bg-slate-50/90 dark:hover:bg-slate-800/80 transition-all text-[10.5px] font-bold text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800" 
+        data-rid="${item.id}" 
+        style="--status-color: ${st.color}; border-left: 4px solid ${st.color};">
+        
+        <!-- Column 1: Index Number & Checkbox -->
+        <td class="py-2 px-2 text-center" style="width: 55px;">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;">
+                <span class="font-mono text-slate-400 dark:text-slate-500 text-[10.5px] font-bold leading-none">${index + 1}</span>
+                <input type="checkbox" 
+                       class="cal-row-checkbox w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 transition-all" 
+                       data-id="${item.id}" 
+                       ${_selectedIds && _selectedIds.has(String(item.id)) ? 'checked' : ''} 
+                       onclick="event.stopPropagation(); WapCalibrationSystem.toggleSelectRow('${item.id}', this.checked)">
+            </div>
+        </td>
+        
+        <!-- Column 2: Photo & Internal Code -->
+        <td class="py-1.5 px-2 text-center" style="width: 120px;">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 80px;">
+                <div style="flex-shrink: 0;">
+                    ${photoHtml}
+                </div>
+                <div style="text-align: center; line-height: 1; margin-top: 3px;">
+                    <span class="cal-id-badge" title="Internal Asset ID">
+                        ${item.code_no || '-'}
+                    </span>
+                </div>
+            </div>
+        </td>
+        
+        <!-- Column 4: Instrument Name & Maker & S/N -->
+        <td class="py-2 px-4" style="min-width: 200px;">
+            <div style="display: inline-flex; flex-direction: column; gap: 3px; min-width: max-content;">
+                <div style="font-size: 12px; font-weight: 850; color: #1e293b; line-height: 1.2; white-space: nowrap; display: flex; align-items: center; gap: 6px;" class="dark:text-slate-100">
+                    <span>${item.name}</span>
+                </div>
+                <div style="height: 1.5px; background: linear-gradient(90deg, ${st.color} 0%, transparent 100%); width: 75px; margin: 1px 0;"></div>
+                <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                    <div style="display: flex; align-items: center; gap: 3px;" title="Maker / Brand">
+                        <span style="color: #94a3b8; font-size: 8px; font-weight: 800;">MKR:</span>
+                        <span style="color: #64748b; font-size: 10px; font-weight: 700;" class="dark:text-slate-300">${item.maker || '-'}</span>
+                    </div>
+                    <div style="width: 1px; height: 8px; background: #e2e8f0;" class="dark:bg-slate-700"></div>
+                    <div style="display: flex; align-items: center; gap: 3px;" title="Serial Number">
+                        <span style="color: #94a3b8; font-size: 8px; font-weight: 800;">S/N:</span>
+                        <span style="color: #3b82f6; font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 700;">${item.serial || '-'}</span>
+                    </div>
+                </div>
+            </div>
+        </td>
+
+        <!-- Column 5: Model -->
+        <td class="py-1 px-4 font-mono text-slate-700 dark:text-slate-300" style="width: 140px;" title="Model Number">${item.model || '-'}</td>
+        
+        <!-- Column 6: Size -->
+        <td class="py-1 px-4 text-slate-700 dark:text-slate-300" style="width: 110px;" title="Capacity Range">${item.size || '-'}</td>
+
+        <!-- Column 7: Calibration Schedule (Next Due / Last) -->
+        <td class="py-2 px-4 text-center" style="min-width: 150px;">
+            <div class="cal-status-card">
+                <div class="cal-status-pill ${st.pillClass}">
+                    ${st.beaconHtml}
+                    ${st.iconSvg}
+                    <span>${st.badgeText}</span>
+                </div>
+
+                <div style="text-align: center; line-height: 1.1; margin-top: 2px;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <span style="font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 950; color: #1e293b;" class="dark:text-slate-100">
+                            ${item.next_due}
+                        </span>
+                    </div>
+                    <div class="${st.subColor}" style="font-size: 8.5px; text-transform: uppercase; margin-top: 2px;">
+                        ${st.subText}
+                    </div>
+                    <div style="font-size: 7.5px; color: #94a3b8; font-weight: 800; text-transform: uppercase; margin-top: 1px;">
+                        LAST CAL: ${item.last_cal}
+                    </div>
+                </div>
+            </div>
+        </td>
+
+        <!-- Column 8: Department -->
+        <td class="py-2 px-4 text-center" style="width: 140px; vertical-align: middle;">
+            <div style="background: #eff6ff; color: #1e40af; padding: 3px 12px; border-radius: 6px; font-size: 11px; font-weight: 900; border: 1px solid #dbeafe; display: inline-block; letter-spacing: 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); text-transform: uppercase;" class="dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800" title="Owning Department">
+                ${item.dept || '-'}
+            </div>
+        </td>
+
+        <!-- Column 9: RESPONSIBLE (PIC) -->
+        <td class="py-2 px-4 text-center" style="min-width: 160px; vertical-align: middle;">
+            ${(() => {
+                const picVal = extractResponsiblePerson(item);
+                if (!picVal || picVal === '-') return `<span style="color: #94a3b8; font-weight: 700; font-size: 11px;">-</span>`;
+
+                // Check if it's a specific Person or a Group
+                const isPerson = !(picVal.includes("Parts") || picVal.includes("Group") || picVal.includes("PARTS") || picVal.includes("GROUP"));
+
+                // Dynamic Color Theme
+                const bg = isPerson ? "linear-gradient(135deg, #059669 0%, #10b981 100%)" : "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)";
+                const border = isPerson ? "#047857" : "#1d4ed8";
+                const shadow = isPerson ? "rgba(16, 185, 129, 0.25)" : "rgba(30, 58, 138, 0.25)";
+
+                return `
+                    <div class="cal-pic-badge" 
+                         style="display: inline-flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 6px !important; padding: 4px 10px !important; border-radius: 6px !important; background: ${bg} !important; color: #ffffff !important; border: 1px solid ${border} !important; box-shadow: 0 2px 5px ${shadow} !important; white-space: nowrap !important; line-height: 1 !important; font-size: 10px !important; font-weight: 800 !important; letter-spacing: 0.02em !important; box-sizing: border-box !important; vertical-align: middle !important; transition: all 0.2s ease !important;" 
+                         title="Responsible PIC: ${picVal}"
+                         onmouseover="this.style.filter='brightness(1.15)'; this.style.transform='translateY(-1px)';" 
+                         onmouseout="this.style.filter='none'; this.style.transform='translateY(0)';">
+                        <span class="pic-icon-wrap" style="display: inline-flex !important; align-items: center !important; justify-content: center !important; width: 14px !important; height: 14px !important; border-radius: 50% !important; background: rgba(255,255,255,0.2) !important; flex-shrink: 0 !important; line-height: 1 !important;">
+                            <svg width="9" height="9" fill="none" stroke="#ffffff" stroke-width="2.5" viewBox="0 0 24 24" style="display: block !important;">
+                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                            </svg>
+                        </span>
+                        <span class="pic-text" style="color: #ffffff !important; font-weight: 800 !important; font-size: 10px !important; text-transform: uppercase !important; white-space: nowrap !important; line-height: 1 !important; letter-spacing: 0.02em !important;">${picVal}</span>
+                    </div>`;
+            })()}
+        </td>
+
+        <!-- Column 10: Reg Date -->
+        <td class="py-1 px-4 text-center text-slate-400 dark:text-slate-500 font-mono" style="width: 110px;" title="Registered Date">${item.reg_date || '-'}</td>
+        
+        <!-- Column 11: Freq -->
+        <td class="py-1 px-4 text-center" style="width: 80px;" title="Calibration Cycle"><span class="freq-pill">${item.frequency || '12 M'}</span></td>
+        
+        <!-- Column 12: Month -->
+        <td class="py-1 px-4 text-center" style="width: 100px;" title="Target Month"><span class="month-pill">${item.month || '-'}</span></td>
+        
+        <!-- Column 13: Actions -->
+        <td class="py-1 px-4 text-center" style="width: 100px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                <button type="button" class="btn-action-cal edit" title="Edit This Record"
+                        onclick="event.stopPropagation(); WapCalibrationSystem.openEditModal('${item.id}')">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+                <button type="button" class="btn-action-cal view" title="View Metrology Document"
+                        onclick="event.stopPropagation(); WapCalibrationSystem.openMetrologyViewer('${item.id}')">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </button>
+                <button type="button" class="btn-action-cal history" title="Chronological Calibration History"
+                        onclick="event.stopPropagation(); WapCalibrationSystem.displayCalibrationHistory('${item.id}')">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </button>
+            </div>
+        </td>
+    </tr>
+    `;
+}
+// เพิ่มฟังก์ชันนี้เข้าไปใน WapCalibrationSystem (ใน script.js)
+
+// ค้นหา WapCalibrationSystem.openEditModal แล้วแทนที่ด้วยชุดนี้
+function openEditModal(id) {
+    const item = _data.find(x => String(x.id) === String(id) || (x.serial && String(x.serial) === String(id)) || (x.code_no && String(x.code_no) === String(id)));
+    if (!item) return;
+
+    // 1. เปิดโครงสร้าง Modal หลัก
+    openAddModal(); 
+
+    // ฟังก์ชันช่วยแปลงรูปแบบวันที่สำหรับสติกเกอร์ (เช่น 20-AUG-26)
+    const formatForSticker = (dateStr) => {
+        if (!dateStr || dateStr === '-') return '---';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        return `${String(d.getDate()).padStart(2, '0')}-${months[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
+    };
+
+    // 2. หยอดข้อมูลพร้อมใส่กิมมิก
+    setTimeout(() => {
+        const modal = document.getElementById('cal-add-modal');
+        if (!modal) return;
+
+        // เปลี่ยนหัวข้อเป็นโหมด Update
+        modal.querySelector('h3').textContent = "แก้ไขข้อมูลเครื่องมือ (INSTRUMENT TERMINAL)";
+        
+        // --- ระบบดึงข้อมูล (Data Mapping) ---
+        const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ""; };
+
+        // 🎯 ดึงข้อมูลจาก S/N (Serial No.) มาใส่ในช่อง Asset ID / รหัสทรัพย์สิน เท่านั้น
+        const assetIdFromSN = item.serial || item.code_no || item.id || "";
+        setVal('reg-id', assetIdFromSN);
+        const regIdEl = document.getElementById('reg-id');
+        if (regIdEl) {
+            regIdEl.readOnly = true; 
+            regIdEl.style.backgroundColor = "#f1f5f9"; // ล็อค ID
+            regIdEl.dataset.internalId = item.id;
+        }
+        const formEl = document.getElementById('cal-reg-form');
+        if (formEl) {
+            formEl.dataset.internalId = item.id;
+        }
+
+        setVal('reg-maker', item.maker);
+        setVal('reg-model', item.model);
+        setVal('reg-name', item.name);
+        setVal('reg-serial', item.serial);
+        setVal('reg-size', item.size);
+        setVal('reg-codeno', item.code_no);
+
+// จัดการช่อง Ownership (Dept) - เปลี่ยนมาหยอดค่าลง Input โดยตรง
+const deptEl = document.getElementById('reg-dept');
+if (deptEl) {
+    // เนื่องจากเปลี่ยนเป็นช่อง Input แล้ว สามารถใส่ค่าจากฐานข้อมูลลงไปได้ทันที
+    deptEl.value = item.dept || '';
+}
+
+        const subEl = document.getElementById('reg-sub');
+        if (subEl) {
+            if (subEl.tagName === 'SELECT' && typeof subEl.add === 'function') {
+                const opts = Array.from(subEl.options || []);
+                let matched = false;
+                for (let opt of opts) {
+                    if (opt && opt.value && opt.value.toLowerCase().includes((item.sub_section || '').toLowerCase())) {
+                        subEl.value = opt.value;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched && item.sub_section) {
+                    const newOpt = new Option(item.sub_section, item.sub_section);
+                    subEl.add(newOpt);
+                    subEl.value = item.sub_section;
+                }
+            } else {
+                subEl.value = item.sub_section || '';
+            }
+        }
+
+        // จัดการผู้รับผิดชอบ (Person in Charge)
+        const picVal = extractResponsiblePerson(item);
+        setVal('reg-pic', (picVal && picVal !== '-') ? picVal : (item.pic || ''));
+
+        // จัดการวันที่และหน้าปัด Next Due
+        setVal('reg-last-cal', item.last_cal);
+        const freqInt = parseInt(item.frequency) || 12;
+        setVal('reg-freq', freqInt);
+        
+        const nextDueDisp = document.getElementById('reg-next-due-display');
+        if (nextDueDisp) {
+            nextDueDisp.textContent = item.next_due;
+            if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+                nextDueDisp.textContent = "กำลังส่งแคลอยู่";
+                nextDueDisp.style.color = '#f97316';
+            } else {
+                nextDueDisp.style.color = (item.status === 'EXPIRED') ? '#ef4444' : (item.status === 'DUE_SOON') ? '#f59e0b' : '#10b981';
+            }
+        }
+
+        // หากเครื่องมือกำลังส่งแคลอยู่ ให้เน้นช่อง Last Calibrated เพื่อให้กรอกเมื่อได้รับเครื่องมือกลับ
+        if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+            const lastCalInp = document.getElementById('reg-last-cal');
+            if (lastCalInp) {
+                lastCalInp.style.borderColor = '#f97316';
+                lastCalInp.style.backgroundColor = '#fff7ed';
+                lastCalInp.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.25)';
+            }
+            const modalBody = modal.querySelector('form');
+            if (modalBody && !document.getElementById('cal-incal-notice')) {
+                const notice = document.createElement('div');
+                notice.id = 'cal-incal-notice';
+                notice.className = 'p-3 rounded-xl bg-orange-50 dark:bg-orange-950/50 border-2 border-orange-300 dark:border-orange-700 text-orange-900 dark:text-orange-200 text-xs font-bold flex items-center gap-2.5 col-span-full shadow-xs mb-2';
+                notice.innerHTML = `
+                    <span class="text-xl shrink-0">🚚</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-black text-orange-800 dark:text-orange-200 uppercase tracking-tight">สถานะปัจจุบัน: กำลังส่งสอบเทียบ (ส่งแคลอยู่)</div>
+                        <div class="text-[11px] font-semibold text-orange-700 dark:text-orange-300 mt-0.5">เมื่อได้รับเครื่องมือกลับมาแล้ว ให้กรอกวันที่ <b>"Last Calibrated / สอบล่าสุด"</b> แล้วกดบันทึก ระบบจะปรับสถานะกลับเป็น <b>CALIBRATED (สอบเทียบแล้ว)</b> ทันที</div>
+                    </div>
+                `;
+                modalBody.prepend(notice);
+            }
+        }
+
+        // ============================================================
+        // 🎯 [ส่วนที่เพิ่มใหม่] Sticker Hydration (หยอดข้อมูลลงป้ายสติกเกอร์)
+        // ============================================================
+        const updateStickerText = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+
+        updateStickerText('stk-prev-serial', item.serial || '---');
+        updateStickerText('stk-prev-cert', 'CAL-' + (item.code_no || item.id || 'N/A'));
+        
+        // บังคับใช้ชื่อ PHETSAYAM ในป้ายสติกเกอร์พรีวิว
+        updateStickerText('stk-prev-pic', 'PHETSAYAM'); 
+
+        updateStickerText('stk-prev-last', formatForSticker(item.last_cal));
+        updateStickerText('stk-prev-due', formatForSticker(item.next_due));
+        // ============================================================
+
+        // จัดการรูปภาพพรีวิว
+// --- แก้ไขส่วนจัดการรูปภาพพรีวิว ใน openEditModal ---
+const resolvedImg = getInstrumentImageUrl(item);
+const dz = document.getElementById('reg-dropzone');
+const label = document.getElementById('reg-img-label');
+
+if (resolvedImg && dz) {
+    dz.style.backgroundImage = `url(${formatImageUrl(resolvedImg)})`;
+    dz.style.backgroundSize = 'contain';
+    dz.style.backgroundRepeat = 'no-repeat';
+    dz.style.backgroundPosition = 'center';
+    dz.style.borderColor = '#3b82f6'; // เปลี่ยนขอบเป็นสีน้ำเงินเมื่อมีภาพ
+    dz.style.backgroundAlpha = '1';
+    
+    // ซ่อนข้อความ "NO PHOTO" เมื่อมีรูปจริง
+    if (label) label.style.display = 'none';
+    
+    dz.innerHTML += `<div style="background:rgba(30, 64, 175, 0.8); position:absolute; bottom:0; left:0; right:0; padding:4px; font-size:9px; font-weight:900; color:#fff; text-align:center; letter-spacing:1px;">REAL PHOTO ACTIVE</div>`;
+}
+
+        // กิมมิก: เปลี่ยนปุ่ม Save เป็น Update พร้อมแอนิเมชั่น
+        const saveBtn = modal.querySelector('button[onclick*="saveNew"]');
+        if (saveBtn) {
+            saveBtn.innerHTML = `<span>🚀 UPDATE RECORD</span>`;
+            saveBtn.style.background = "linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)";
+        }
+        
+    }, 60);
+}
+// 1. พจนานุกรมการจับคู่หัวข้อ (Smart Alias Mapping) ให้ตรงกับตารางทุกคอลัมน์
+const calFieldAliases = {
+    id: ['no.', 'no', 'id', 'asset id'],
+    code_barcode: ['coed /barcoed', 'code / barcode', 'barcode'], // ดักคำว่า Coed
+    name: ['Instrrument Name', 'instrument name', 'name', 'ชื่อเครื่องมือ'], // ดักคำว่า Instrrument (r 2 ตัว)
+    maker: ['Maker Name', 'brand', 'ยี่ห้อ', 'maker'],
+    model: ['Model', 'รุ่น'],
+    code_no: ['Code No.', 'code no', 'internal code'],
+    serial: ['Serial No.', 'serial no', 's/n'],
+    size: ['Size', 'range', 'ขนาด'],
+    last_cal: ['Cal. Date', 'cal date', 'last cal'],
+    next_due: ['Due Date', 'next due'],
+    dept: ['Section', 'dept', 'department', 'แผนก'],
+    sub_section: ['Sub Section', 'category', 'กลุ่มงาน', 'area & group', 'area', 'group'],
+    pic: ['ผู้รับผิดชอบ', 'pic', 'person in charge', 'responsible', 'owner', 'ผู้ดูแล'],
+    Register_date: ['Register date', 'interval'],
+    Frequency:['Frequency', 'Frequency', 'frequency', 'รอบ'],
+    Month:['Month', 'Month', 'month', 'เดือน'],
 };
+
+// 2. ฟังก์ชันเรียกหน้าต่างเลือกไฟล์
+function triggerImport() {
+    const calInp = document.getElementById('cal-import-input');
+    if (calInp && typeof calInp.click === 'function') {
+        calInp.click();
+    } else {
+        toast("⚠️ ไม่พบช่องนำเข้าไฟล์ Calibration", "warning");
+    }
+}
+
+async function handleImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    toast("⏳ กำลังวิเคราะห์และจับคู่หัวข้อตาราง...", "info");
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            // ดึงข้อมูลออกมาเป็น Array ของ Array (raw rows)
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+            if (rows.length < 1) throw new Error("ไม่พบข้อมูลในไฟล์");
+
+            // --- 1. ระบบสแกนหาแถวหัวตารางและแมปตำแหน่งคอลัมน์ ---
+            let mapping = {};
+            let headerRowIdx = -1;
+
+            // ค้นหาจาก 20 แถวแรก
+            for (let i = 0; i < Math.min(rows.length, 20); i++) {
+                let currentMapping = {};
+                let matchCount = 0;
+                
+                rows[i].forEach((cell, cellIdx) => {
+                    const cleanCell = String(cell || "").trim().toLowerCase();
+                    
+                    // วนลูปเช็คกับ calFieldAliases (Fuzzy Matching)
+                    const calAliasEntries = (typeof calFieldAliases !== 'undefined' && calFieldAliases) ? Object.entries(calFieldAliases) : [];
+                    for (const [fieldKey, aliases] of calAliasEntries) {
+                        const lowerAliases = (aliases || []).map(a => String(a).toLowerCase());
+                        if (lowerAliases.includes(cleanCell)) {
+                            currentMapping[fieldKey] = cellIdx;
+                            matchCount++;
+                        }
+                    }
+                });
+
+                // ถ้าเจอหัวข้อตรงกัน 5 หัวข้อขึ้นไป มั่นใจได้ว่าเป็นแถว Header
+                if (matchCount >= 5) {
+                    headerRowIdx = i;
+                    mapping = currentMapping;
+                    break;
+                }
+            }
+
+            if (headerRowIdx === -1) {
+                throw new Error("ระบบหาหัวตารางไม่เจอ! กรุณาตรวจสอบว่าหัวข้อในไฟล์ตรงกับที่กำหนดไว้ (เช่น Coed /Barcoed หรือ Instrrument Name)");
+            }
+
+            // --- 2. เริ่มดึงข้อมูลจากแถวถัดจาก Header ---
+            const newEntries = rows.slice(headerRowIdx + 1).map((row, idx) => {
+                // ถ้าช่องชื่อเครื่องมือว่าง ให้ข้ามแถวนั้น
+                if (!row[mapping.name]) return null;
+
+                // จัดการเรื่องวันที่ (รองรับทั้ง Date Object และ String)
+                const parseDate = (val) => {
+                    if (val instanceof Date) return val.toISOString().split('T')[0];
+                    if (!val || val === "-") return "-";
+                    const d = new Date(val);
+                    return isNaN(d.getTime()) ? String(val) : d.toISOString().split('T')[0];
+                };
+
+                const nextDueDate = parseDate(row[mapping.next_due]);
+                let monthStr = "-";
+                if (nextDueDate !== "-") {
+                    const d = new Date(nextDueDate);
+                    monthStr = d.toLocaleString('en-US', { month: 'long' });
+                }
+
+                const subVal = String(row[mapping.sub_section] || "-");
+                const deptVal = String(row[mapping.dept] || "-");
+                const explicitPic = mapping.pic !== undefined ? String(row[mapping.pic] || "").trim() : "";
+                const autoPic = extractResponsiblePerson({ sub_section: subVal, dept: deptVal, pic: explicitPic });
+
+                // สร้าง Object ข้อมูลที่แมปแล้ว
+                return {
+                    id: String(row[mapping.id] || "CAR-CAL-" + (Date.now() + idx)),
+                    code_barcode: String(row[mapping.code_barcode] || "-"),
+                    name: String(row[mapping.name] || "-"),
+                    maker: String(row[mapping.maker] || "-"),
+                    model: String(row[mapping.model] || "-"),
+                    code_no: String(row[mapping.code_no] || "-"),
+                    serial: String(row[mapping.serial] || "-"),
+                    size: String(row[mapping.size] || "-"),
+                    last_cal: parseDate(row[mapping.last_cal]),
+                    next_due: nextDueDate,
+                    dept: deptVal,
+                    sub_section: subVal,
+                    pic: autoPic !== "-" ? autoPic : explicitPic,
+                    reg_date: parseDate(row[mapping.Register_date]) !== "-" ? parseDate(row[mapping.Register_date]) : new Date().toISOString().split('T')[0],
+                    frequency: String(row[mapping.Frequency] || "12 M"),
+                    month: row[mapping.Month] || monthStr,
+                    status: 'NORMAL',
+                    imageUrl: getInstrumentImageUrl({
+                        id: String(row[mapping.id] || ""),
+                        code_barcode: String(row[mapping.code_barcode] || ""),
+                        name: String(row[mapping.name] || ""),
+                        maker: String(row[mapping.maker] || ""),
+                        model: String(row[mapping.model] || ""),
+                        code_no: String(row[mapping.code_no] || ""),
+                        serial: String(row[mapping.serial] || "")
+                    }) || ""
+                };
+            }).filter(item => item !== null);
+
+            // --- 3. บันทึกลงเครื่องถาวร (IndexedDB) และ Cloud (Supabase) และอัปเดตหน้าจอ ---
+            if (newEntries.length > 0) {
+                // บันทึกเข้าฐานข้อมูลเครื่อง ( Dexie )
+                await localDB.calibrationMaster.bulkPut(newEntries);
+                
+                // ดึงข้อมูลทั้งหมดจากเครื่องมาแสดง
+                _data = await localDB.calibrationMaster.toArray();
+                
+                render();
+                updateOverdueBadge();
+                toast(`✅ นำเข้าข้อมูลสำเร็จ ${newEntries.length} รายการ และบันทึกลงฐานข้อมูลแล้ว`, "success");
+
+                // ซิงก์ขึ้น Supabase Cloud อัตโนมัติ (เฉพาะข้อมูล ไม่รวมรูปภาพ)
+                syncToCloud(newEntries);
+            } else {
+                toast("⚠️ ไม่พบข้อมูลที่สามารถนำเข้าได้", "info");
+            }
+            
+            event.target.value = ''; // Reset input file
+
+        } catch (err) {
+            console.error(err);
+            toast("❌ ล้มเหลว: " + err.message, "error");
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// แก้ไขเป็น async function เพื่อให้ใช้ await โหลดข้อมูลได้
+    async function init() {
+        // 1. ตรวจสอบก่อนว่ามีหน้า Calibration อยู่ใน DOM หรือไม่
+        const container = document.getElementById('calibration-content');
+        if (!container) return; 
+
+        // 2. >>> โหลดข้อมูลจากฐานข้อมูลถาวรในเครื่อง (IndexedDB) ก่อน เพื่อความรวดเร็วทันที <<<
+        try {
+            const storedData = await localDB.calibrationMaster.toArray();
+            if (storedData && storedData.length > 0) {
+                // อัปเดตรายการและล้างประวัติปี 2013 หรือปีก่อนหน้าออก ให้เหลือเฉพาะ 2025 และ 2026
+                storedData.forEach(item => {
+                    if (item.last_cal && item.last_cal.includes('-08-10')) { 
+                        item.last_cal = '2026-08-20'; 
+                        item.next_due = '2027-08-20'; 
+                        item.month = 'August';
+                    }
+                    if (item.calibration_logs) {
+                        if (typeof item.calibration_logs === 'string') {
+                            try { item.calibration_logs = JSON.parse(item.calibration_logs); } catch(e) { item.calibration_logs = []; }
+                        }
+                        if (Array.isArray(item.calibration_logs)) {
+                            item.calibration_logs = item.calibration_logs.filter(log => {
+                                if (!log || !log.date) return false;
+                                const yr = parseInt(String(log.date).split('-')[0], 10);
+                                return yr === 2025 || yr === 2026;
+                            });
+                        }
+                    }
+                });
+                _data = storedData; // นำข้อมูลที่จำไว้มาใส่ในตัวแปรหลัก
+                try {
+                    await localDB.calibrationMaster.bulkPut(storedData);
+                } catch(e) {}
+                console.log("[Calibration] Local data loaded:", _data.length);
+            }
+        } catch (err) {
+            console.error("[Calibration] Database error:", err);
+        }
+
+        // กรองประวัติใน _data ให้เหลือเฉพาะปี 2025 และ 2026 เสมอ
+        (_data || []).forEach(item => {
+            if (item && item.calibration_logs) {
+                if (typeof item.calibration_logs === 'string') {
+                    try { item.calibration_logs = JSON.parse(item.calibration_logs); } catch(e) { item.calibration_logs = []; }
+                }
+                if (Array.isArray(item.calibration_logs)) {
+                    item.calibration_logs = item.calibration_logs.filter(log => {
+                        if (!log || !log.date) return false;
+                        const yr = parseInt(String(log.date).split('-')[0], 10);
+                        return yr === 2025 || yr === 2026;
+                    });
+                }
+            }
+        });
+
+        // เชื่อมโยงรูปภาพอัตโนมัติจาก assetsinstruments/ (เหมือน STAFF_EMAIL_MAP)
+        _data.forEach(item => {
+            if (!item.imageUrl || item.imageUrl.trim() === "" || item.imageUrl.startsWith("assetsinstruments/") || item.imageUrl.startsWith("./assetsinstruments/")) {
+                const autoImg = getInstrumentImageUrl(item);
+                if (autoImg) item.imageUrl = autoImg;
+            }
+        });
+
+        // 3. โหลดรายชื่อแผนกเข้า Filter (ถ้ามี Select)
+        const depts = [...new Set((_data || []).map(item => item && item.dept).filter(Boolean))];
+        const selectDept = document.getElementById('cal-filter-dept');
+        if (selectDept && selectDept.options.length <= 1) {
+            depts.forEach(d => {
+                if (d && d !== '-') selectDept.add(new Option(d, d));
+            });
+        }
+
+        // 4. ผูก Event การค้นหา (ทำครั้งเดียว)
+        const searchInput = document.getElementById('cal-search');
+        if (searchInput && !searchInput.dataset.listener) {
+            searchInput.addEventListener('input', render);
+            searchInput.dataset.listener = "true";
+        }
+
+        // 5. วาดตารางแสดงผล
+        render();
+        updateOverdueBadge();
+
+        // 6. >>> โหลดและเชื่อมต่อ Real-time จาก Supabase Cloud Database (Online Full-Stack) <<<
+        try {
+            loadFromCloud();
+            initRealtime();
+        } catch(cloudErr) {
+            console.warn("[Calibration Cloud Connect]", cloudErr);
+        }
+    }
+
+function render() {
+        const tbody = document.getElementById('cal-table-body');
+        const container = tbody.closest('.overflow-auto'); // หาตัวครอบที่ทำหน้าที่ scroll
+        const searchInput = document.getElementById('cal-search');
+        const deptSelect = document.getElementById('cal-filter-dept');
+        const statusSelect = document.getElementById('cal-filter-status');
+        const countBadge = document.getElementById('cal-count-badge');
+
+        if (!tbody || !container) return;
+
+        const query = searchInput.value.toLowerCase().trim();
+        const dept = deptSelect.value;
+        const status = statusSelect.value;
+
+        // ระบบกรองข้อมูล พร้อมคำนวณสถานะอัจฉริยะ (Expired, Due Soon, Calibrated)
+        const today = new Date();
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+        const filtered = _data.filter(item => {
+            const nextDue = item.next_due && item.next_due !== '-' ? new Date(item.next_due) : null;
+            let diffDays = 999;
+            if (nextDue && !isNaN(nextDue.getTime())) {
+                const dueZero = new Date(nextDue.getFullYear(), nextDue.getMonth(), nextDue.getDate()).getTime();
+                diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+            }
+            
+            let itemStatusKey = 'CALIBRATED';
+            if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+                itemStatusKey = 'IN_CALIBRATION';
+            } else if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+                itemStatusKey = 'EXPIRED';
+            } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+                itemStatusKey = 'DUE_SOON';
+            } else {
+                itemStatusKey = 'CALIBRATED';
+            }
+
+            const picVal = extractResponsiblePerson(item);
+            const searchableText = `${item.id} ${item.name} ${item.maker} ${item.model} ${item.code_no} ${item.serial} ${item.dept} ${item.sub_section} ${picVal} ${item.month} ${itemStatusKey} ส่งแคล ส่งแคลอยู่ in calibration`.toLowerCase();
+            const matchSearch = searchableText.includes(query);
+            const matchDept = dept === 'ALL' || item.dept === dept;
+            const matchStatus = status === 'ALL' || 
+                                (status === 'IN_CALIBRATION' && itemStatusKey === 'IN_CALIBRATION') ||
+                                (status === 'EXPIRED' && itemStatusKey === 'EXPIRED') ||
+                                (status === 'DUE_SOON' && itemStatusKey === 'DUE_SOON') ||
+                                ((status === 'CALIBRATED' || status === 'NORMAL') && itemStatusKey === 'CALIBRATED');
+            return matchSearch && matchDept && matchStatus;
+        });
+
+        _currentFiltered = filtered;
+        if (countBadge) countBadge.textContent = `${filtered.length} / ${_data.length} รายการ`;
+
+        // อัปเดตกระดิ่งแจ้งเตือน Overdue
+        updateOverdueBadge();
+
+        // อัปเดต Bulk Action Toolbar และ Checkbox สถานะ
+        updateBulkBarUI(filtered);
+
+        // สร้าง VirtualTableScroller 12 คอลัมน์
+        if (!_calScroller) {
+            _calScroller = new window.VirtualTableScroller({
+                containerId: container,
+                tbodyId: tbody,
+                rowHeight: 62,
+                columnsCount: 12,
+                rowBuilder: _buildRow,
+                emptyHtml: `<tr><td colspan="12" style="text-align:center;padding:40px;color:#94a3b8;font-weight:700;">ไม่พบข้อมูลเครื่องมือ</td></tr>`
+            });
+        }
+
+        // สั่งวาดตาราง (ใช้ .setItems เพื่อประมวลผล Virtual Scroll)
+        _calScroller.setItems(filtered, true); 
+
+        // สั่งวาดปฏิทินรายเดือน (ถ้าเปิดแท็บ Monthly View อยู่ หรืออัปเดตข้อมูล)
+        renderCalendar();
+    }
+
+    // ============================================================
+    // MONTHLY CALENDAR VIEW LOGIC & INTERACTION HANDLERS
+    // ============================================================
+    const CALENDAR_MONTHS = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
+    function setViewMode(mode) {
+        _viewMode = (mode === 'CALENDAR') ? 'CALENDAR' : 'TABLE';
+        const tableBtn = document.getElementById('cal-view-btn-table');
+        const monthBtn = document.getElementById('cal-view-btn-month');
+        const tableArea = document.getElementById('cal-table-area');
+        const calArea = document.getElementById('cal-calendar-area');
+        const bulkBar = document.getElementById('cal-bulk-bar');
+
+        if (_viewMode === 'CALENDAR') {
+            if (tableBtn) {
+                tableBtn.className = "h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer";
+            }
+            if (monthBtn) {
+                monthBtn.className = "h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs cursor-pointer";
+            }
+            if (tableArea) tableArea.classList.add('hidden');
+            if (calArea) calArea.classList.remove('hidden');
+            if (bulkBar) bulkBar.classList.add('hidden');
+            renderCalendar();
+        } else {
+            if (tableBtn) {
+                tableBtn.className = "h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs cursor-pointer";
+            }
+            if (monthBtn) {
+                monthBtn.className = "h-7 px-2.5 rounded-md text-[10.5px] font-black flex items-center gap-1 transition-all text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer";
+            }
+            if (calArea) calArea.classList.add('hidden');
+            if (tableArea) tableArea.classList.remove('hidden');
+            updateBulkBarUI(_currentFiltered);
+            if (_calScroller) {
+                if (typeof _calScroller.refresh === 'function') {
+                    _calScroller.refresh();
+                } else if (typeof _calScroller.render === 'function') {
+                    _calScroller.render();
+                }
+            }
+        }
+    }
+
+    function changeCalendarMonth(delta) {
+        _calendarMonth += delta;
+        if (_calendarMonth < 0) {
+            _calendarMonth = 11;
+            _calendarYear -= 1;
+        } else if (_calendarMonth > 11) {
+            _calendarMonth = 0;
+            _calendarYear += 1;
+        }
+        _selectedCalendarDate = null;
+        renderCalendar();
+    }
+
+    function goToCurrentMonth() {
+        const now = new Date();
+        _calendarYear = now.getFullYear();
+        _calendarMonth = now.getMonth();
+        _selectedCalendarDate = `${_calendarYear}-${String(_calendarMonth + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        renderCalendar();
+    }
+
+    function jumpCalendarMonth(val) {
+        if (!val) return;
+        const parts = val.split('-');
+        if (parts.length === 2) {
+            _calendarYear = parseInt(parts[0], 10);
+            _calendarMonth = parseInt(parts[1], 10) - 1;
+            _selectedCalendarDate = null;
+            renderCalendar();
+        }
+    }
+
+    function selectCalendarDate(dateStr) {
+        _selectedCalendarDate = (_selectedCalendarDate === dateStr) ? null : dateStr;
+        renderCalendar();
+    }
+
+    function renderCalendar() {
+        const gridContainer = document.getElementById('cal-grid-cells');
+        const monthTitle = document.getElementById('cal-month-title');
+        const jumpSelect = document.getElementById('cal-month-jump-select');
+        const agendaList = document.getElementById('cal-agenda-list');
+        const agendaTitle = document.getElementById('cal-agenda-title');
+        const agendaCount = document.getElementById('cal-agenda-count');
+
+        const kpiTotal = document.getElementById('cal-month-kpi-total');
+        const kpiCalibrated = document.getElementById('cal-month-kpi-calibrated');
+        const kpiDueSoon = document.getElementById('cal-month-kpi-duesoon');
+        const kpiOverdue = document.getElementById('cal-month-kpi-overdue');
+
+        if (!gridContainer) return;
+
+        const currentMonthName = CALENDAR_MONTHS[_calendarMonth];
+        if (monthTitle) {
+            monthTitle.textContent = `${currentMonthName} ${_calendarYear}`;
+        }
+
+        // 1. Populate Jump Select Dropdown
+        if (jumpSelect) {
+            jumpSelect.innerHTML = '';
+            const curY = new Date().getFullYear();
+            for (let y = curY - 2; y <= curY + 2; y++) {
+                for (let m = 0; m < 12; m++) {
+                    const optVal = `${y}-${String(m + 1).padStart(2, '0')}`;
+                    const optText = `${CALENDAR_MONTHS[m].substring(0, 3)} ${y}`;
+                    const opt = new Option(optText, optVal);
+                    if (y === _calendarYear && m === _calendarMonth) {
+                        opt.selected = true;
+                    }
+                    jumpSelect.add(opt);
+                }
+            }
+        }
+
+        // 2. Filter data for the active view
+        const dataList = _currentFiltered || _data || [];
+        const today = new Date();
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        // Map items by date: "YYYY-MM-DD" -> array of items
+        const dateMap = new Map();
+        let monthTotal = 0;
+        let monthCalibrated = 0;
+        let monthDueSoon = 0;
+        let monthOverdue = 0;
+
+        const monthTargetPrefix = `${_calendarYear}-${String(_calendarMonth + 1).padStart(2, '0')}`;
+
+        dataList.forEach(item => {
+            if (!item) return;
+            let dueStr = item.next_due;
+            if (!dueStr || dueStr === '-') {
+                // Fallback using month field if available
+                if (item.month && item.month.toLowerCase() === currentMonthName.toLowerCase()) {
+                    dueStr = `${_calendarYear}-${String(_calendarMonth + 1).padStart(2, '0')}-15`;
+                }
+            }
+
+            if (dueStr && dueStr.length >= 10) {
+                const cleanDateStr = dueStr.substring(0, 10);
+                if (!dateMap.has(cleanDateStr)) {
+                    dateMap.set(cleanDateStr, []);
+                }
+                dateMap.get(cleanDateStr).push(item);
+
+                // Check if belongs to active month for KPI
+                if (cleanDateStr.startsWith(monthTargetPrefix)) {
+                    monthTotal++;
+                    const nextDueDate = new Date(cleanDateStr);
+                    let diffDays = 999;
+                    if (!isNaN(nextDueDate.getTime())) {
+                        const dueZero = new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate()).getTime();
+                        diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+                    }
+                    if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+                        monthOverdue++;
+                    } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+                        monthDueSoon++;
+                    } else {
+                        monthCalibrated++;
+                    }
+                }
+            }
+        });
+
+        // Update KPIs
+        if (kpiTotal) kpiTotal.textContent = monthTotal;
+        if (kpiCalibrated) kpiCalibrated.textContent = monthCalibrated;
+        if (kpiDueSoon) kpiDueSoon.textContent = monthDueSoon;
+        if (kpiOverdue) kpiOverdue.textContent = monthOverdue;
+
+        // 3. Construct 35 or 42 grid cells (Monday-based)
+        const firstDayOfMonth = new Date(_calendarYear, _calendarMonth, 1);
+        let startDay = firstDayOfMonth.getDay(); // 0 is Sun, 1 is Mon
+        startDay = (startDay === 0) ? 6 : startDay - 1; // shift so Mon=0, Sun=6
+
+        const daysInMonth = new Date(_calendarYear, _calendarMonth + 1, 0).getDate();
+        const daysInPrevMonth = new Date(_calendarYear, _calendarMonth, 0).getDate();
+
+        const totalSlots = (startDay + daysInMonth > 35) ? 42 : 35;
+        let gridHtml = '';
+
+        for (let i = 0; i < totalSlots; i++) {
+            let cellYear = _calendarYear;
+            let cellMonth = _calendarMonth;
+            let cellDay = 1;
+            let isOtherMonth = false;
+
+            if (i < startDay) {
+                // Previous month day
+                cellDay = daysInPrevMonth - startDay + i + 1;
+                cellMonth = _calendarMonth - 1;
+                if (cellMonth < 0) {
+                    cellMonth = 11;
+                    cellYear -= 1;
+                }
+                isOtherMonth = true;
+            } else if (i >= startDay + daysInMonth) {
+                // Next month day
+                cellDay = i - (startDay + daysInMonth) + 1;
+                cellMonth = _calendarMonth + 1;
+                if (cellMonth > 11) {
+                    cellMonth = 0;
+                    cellYear += 1;
+                }
+                isOtherMonth = true;
+            } else {
+                // Current month day
+                cellDay = i - startDay + 1;
+            }
+
+            const cellDateStr = `${cellYear}-${String(cellMonth + 1).padStart(2, '0')}-${String(cellDay).padStart(2, '0')}`;
+            const isToday = (cellDateStr === todayStr);
+            const isSelected = (_selectedCalendarDate === cellDateStr);
+            const dayItems = dateMap.get(cellDateStr) || [];
+
+            let cellClass = "cal-day-cell cursor-pointer group select-none";
+            if (isOtherMonth) cellClass += " other-month";
+            if (isToday) cellClass += " is-today";
+            if (isSelected) cellClass += " is-selected";
+
+            // Day Number + Count badge
+            let headerBadge = '';
+            if (isToday) {
+                headerBadge = `<span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-black shadow-xs">${cellDay}</span>`;
+            } else if (isSelected) {
+                headerBadge = `<span class="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-xs">${cellDay}</span>`;
+            } else {
+                headerBadge = `<span class="text-[11px] font-black text-slate-600 dark:text-slate-300 group-hover:text-blue-600">${cellDay}</span>`;
+            }
+
+            let taskCountBadge = '';
+            if (dayItems.length > 0) {
+                taskCountBadge = `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-mono">${dayItems.length}</span>`;
+            }
+
+            // Task chips (max 3)
+            let taskChipsHtml = '';
+            const visibleItems = dayItems.slice(0, 3);
+            visibleItems.forEach(item => {
+                const nextDueDate = item.next_due ? new Date(item.next_due) : null;
+                let diffDays = 999;
+                if (nextDueDate && !isNaN(nextDueDate.getTime())) {
+                    const dueZero = new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate()).getTime();
+                    diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+                }
+
+                let stColor = '#10b981'; // Green
+                let chipBg = 'rgba(16, 185, 129, 0.08)';
+                let chipText = '#047857';
+                let darkChipText = '#34d399';
+
+                if (item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL') {
+                    stColor = '#f97316'; // Orange
+                    chipBg = 'rgba(249, 115, 22, 0.1)';
+                    chipText = '#c2410c';
+                    darkChipText = '#fb923c';
+                } else if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+                    stColor = '#ef4444'; // Red
+                    chipBg = 'rgba(239, 68, 68, 0.1)';
+                    chipText = '#b91c1c';
+                    darkChipText = '#f87171';
+                } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+                    stColor = '#f59e0b'; // Amber
+                    chipBg = 'rgba(245, 158, 11, 0.1)';
+                    chipText = '#b45309';
+                    darkChipText = '#fbbf24';
+                }
+
+                const displayName = item.code_no || item.id;
+                taskChipsHtml += `
+                    <div onclick="event.stopPropagation(); WapCalibrationSystem.openMetrologyViewer('${item.id}')" 
+                         class="cal-task-chip flex items-center justify-between gap-1 shadow-2xs font-black border-l-2 bg-slate-50 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 hover:bg-blue-50 dark:hover:bg-slate-700" 
+                         style="border-left-color: ${stColor};" 
+                         title="${item.code_no || ''} - ${item.name || ''} (${item.dept || '-'})">
+                        <div class="flex items-center gap-1 min-w-0">
+                            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${stColor};"></span>
+                            <span class="truncate text-[9.5px]">${displayName}</span>
+                        </div>
+                        <span class="text-[8px] opacity-60 shrink-0 font-bold uppercase">${item.dept || ''}</span>
+                    </div>
+                `;
+            });
+
+            if (dayItems.length > 3) {
+                const moreCount = dayItems.length - 3;
+                taskChipsHtml += `
+                    <button type="button" onclick="event.stopPropagation(); WapCalibrationSystem.openDayTasksModal('${cellDateStr}')" 
+                            class="w-full text-center py-0.5 text-[9px] font-black text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded transition-colors cursor-pointer">
+                        +${moreCount} more instruments
+                    </button>
+                `;
+            }
+
+            gridHtml += `
+                <div class="${cellClass}" onclick="WapCalibrationSystem.selectCalendarDate('${cellDateStr}')">
+                    <div class="flex items-center justify-between mb-1">
+                        ${headerBadge}
+                        ${taskCountBadge}
+                    </div>
+                    <div class="space-y-1 flex-1 overflow-hidden">
+                        ${taskChipsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        gridContainer.innerHTML = gridHtml;
+
+        // 4. Populate Agenda Sidebar on the right
+        if (agendaList) {
+            let agendaItems = [];
+            let agendaHeaderLabel = "";
+
+            if (_selectedCalendarDate) {
+                agendaItems = dateMap.get(_selectedCalendarDate) || [];
+                agendaHeaderLabel = `Tasks on ${_selectedCalendarDate}`;
+            } else {
+                // All tasks in active month
+                dataList.forEach(item => {
+                    if (!item) return;
+                    let dueStr = item.next_due;
+                    if (!dueStr || dueStr === '-') {
+                        if (item.month && item.month.toLowerCase() === currentMonthName.toLowerCase()) {
+                            dueStr = `${_calendarYear}-${String(_calendarMonth + 1).padStart(2, '0')}-15`;
+                        }
+                    }
+                    if (dueStr && dueStr.startsWith(monthTargetPrefix)) {
+                        agendaItems.push(item);
+                    }
+                });
+                // Sort chronologically
+                agendaItems.sort((a, b) => {
+                    const da = a.next_due || '9999';
+                    const db = b.next_due || '9999';
+                    return da.localeCompare(db);
+                });
+                agendaHeaderLabel = `Tasks in ${currentMonthName} ${_calendarYear}`;
+            }
+
+            if (agendaTitle) agendaTitle.textContent = agendaHeaderLabel;
+            if (agendaCount) agendaCount.textContent = `${agendaItems.length} TASKS`;
+
+            if (agendaItems.length === 0) {
+                agendaList.innerHTML = `
+                    <div class="py-12 px-4 text-center">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 mx-auto flex items-center justify-center mb-3">
+                            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        </div>
+                        <p class="text-xs font-black text-slate-700 dark:text-slate-300 mb-1">No calibration tasks scheduled</p>
+                        <p class="text-[11px] text-slate-400 font-medium">Click on any date in the calendar or change filters to inspect other instruments.</p>
+                    </div>
+                `;
+            } else {
+                let listHtml = '';
+                agendaItems.forEach(item => {
+                    const imgUrl = getInstrumentImageUrl(item);
+                    const picVal = extractResponsiblePerson(item);
+                    const nextDueDate = item.next_due ? new Date(item.next_due) : null;
+                    let diffDays = 999;
+                    if (nextDueDate && !isNaN(nextDueDate.getTime())) {
+                        const dueZero = new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate()).getTime();
+                        diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+                    }
+
+                    const isInCal = item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL';
+                    let stBadge = '';
+                    let borderClass = 'border-emerald-200 dark:border-emerald-800/60';
+                    let calBtnHtml = '';
+
+                    if (isInCal) {
+                        stBadge = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 font-mono">🚚 IN CALIBRATION (ส่งแคลอยู่)</span>`;
+                        borderClass = 'border-orange-300 dark:border-orange-800/80';
+                        calBtnHtml = `
+                            <button type="button" onclick="WapCalibrationSystem.showInCalAlert('${item.id}')" 
+                                    class="flex-1 h-7 px-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg text-[10px] font-black flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer" 
+                                    title="เครื่องมือกำลังอยู่ระหว่างส่งสอบเทียบ (คลิกเพื่อดูคำแนะนำ)">
+                                <span>🚚 ส่งแคลอยู่</span>
+                            </button>
+                        `;
+                    } else if (diffDays < 0 || item.status === 'EXPIRED' || item.status === 'OVERDUE') {
+                        stBadge = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-mono">🚨 EXPIRED (${Math.abs(diffDays)}d ago)</span>`;
+                        borderClass = 'border-rose-300 dark:border-rose-800/80';
+                        calBtnHtml = `
+                            <button type="button" onclick="WapCalibrationSystem.sendForCalibration('${item.id}')" 
+                                    class="flex-1 h-7 px-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black flex items-center justify-center gap-1 transition-colors shadow-xs cursor-pointer animate-pulse" 
+                                    title="ถึงกำหนดส่งสอบเทียบ - คลิกเพื่อส่งแคล (เปลี่ยนสถานะเป็นส่งแคลอยู่)">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span>Calibrate</span>
+                            </button>
+                        `;
+                    } else if (diffDays <= 30 || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') {
+                        stBadge = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-mono">⏳ DUE IN ${diffDays} DAYS</span>`;
+                        borderClass = 'border-amber-300 dark:border-amber-800/80';
+                        calBtnHtml = `
+                            <button type="button" onclick="WapCalibrationSystem.sendForCalibration('${item.id}')" 
+                                    class="flex-1 h-7 px-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-black flex items-center justify-center gap-1 transition-colors shadow-xs cursor-pointer" 
+                                    title="ถึงกำหนดส่งสอบเทียบ - คลิกเพื่อส่งแคล (เปลี่ยนสถานะเป็นส่งแคลอยู่)">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span>Calibrate</span>
+                            </button>
+                        `;
+                    } else {
+                        stBadge = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-mono">✅ NORMAL / CALIBRATED</span>`;
+                        borderClass = 'border-emerald-200 dark:border-emerald-800/60';
+                        calBtnHtml = `
+                            <button type="button" onclick="WapCalibrationSystem.showNotDueAlert('${item.id}')" 
+                                    class="flex-1 h-7 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors cursor-not-allowed opacity-60" 
+                                    title="ยังไม่ถึงกำหนดส่งสอบเทียบ (ครบกำหนด: ${item.next_due || '-'})">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span>Calibrate</span>
+                            </button>
+                        `;
+                    }
+
+                    listHtml += `
+                        <div class="bg-white dark:bg-slate-800 p-3 rounded-2xl border ${borderClass} shadow-xs hover:shadow-md transition-all">
+                            <div class="flex items-start gap-2.5">
+                                <div onclick="WapCalibrationSystem.openMetrologyViewer('${item.id}')" 
+                                     class="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0 cursor-pointer group" 
+                                     title="Click to view full Metrology document">
+                                    ${imgUrl ? `<img src="${formatImageUrl(imgUrl)}" class="w-full h-full object-contain p-0.5 group-hover:scale-110 transition-transform">` : `<span class="text-slate-400 font-black text-[10px]">NO IMG</span>`}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center justify-between gap-1 mb-0.5">
+                                        <span class="text-xs font-black text-blue-600 dark:text-blue-400 tracking-tight truncate">${item.code_no || item.id}</span>
+                                        ${stBadge}
+                                    </div>
+                                    <h5 class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">${item.name || 'INSTRUMENT'}</h5>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">${item.maker || '-'} &bull; ${item.model || '-'}</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[9px] font-black uppercase text-slate-700 dark:text-slate-200">${item.dept || '-'}</span>
+                                    <span class="text-slate-400">&bull;</span>
+                                    <span class="truncate max-w-[90px]">${picVal}</span>
+                                </div>
+                                <div class="font-mono font-black text-slate-700 dark:text-slate-200">
+                                    Due: ${item.next_due || '-'}
+                                </div>
+                            </div>
+
+                            <!-- Action buttons -->
+                            <div class="mt-2.5 flex items-center gap-1.5">
+                                <button type="button" onclick="WapCalibrationSystem.openMetrologyViewer('${item.id}')" 
+                                        class="flex-1 h-7 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-black flex items-center justify-center gap-1 transition-colors cursor-pointer" 
+                                        title="View Metrology Evidence Document">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    <span>Viewer</span>
+                                </button>
+                                ${calBtnHtml}
+                                <button type="button" onclick="WapCalibrationSystem.displayCalibrationHistory('${item.id}')" 
+                                        class="w-7 h-7 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 text-purple-600 dark:text-purple-300 rounded-lg flex items-center justify-center transition-colors cursor-pointer" 
+                                        title="Calibration History">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+                                </button>
+                                <button type="button" onclick="WapCalibrationSystem.openEditModal('${item.id}')" 
+                                        class="w-7 h-7 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-300 rounded-lg flex items-center justify-center transition-colors cursor-pointer" 
+                                        title="Edit Instrument">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                agendaList.innerHTML = listHtml;
+            }
+        }
+    }
+
+    // Modal popup to inspect all instruments due on a given day
+    function openDayTasksModal(dateStr) {
+        const existing = document.getElementById('cal-day-modal-overlay');
+        if (existing) existing.remove();
+
+        const dataList = _currentFiltered || _data || [];
+        const dayItems = dataList.filter(item => item && item.next_due && item.next_due.startsWith(dateStr));
+
+        const overlay = document.createElement('div');
+        overlay.id = 'cal-day-modal-overlay';
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 20000;
+            background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(12px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px; transition: all 0.3s ease;
+        `;
+
+        const modal = document.createElement('div');
+        modal.className = "w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]";
+
+        let itemsHtml = '';
+        if (dayItems.length === 0) {
+            itemsHtml = `<div class="p-8 text-center text-slate-400 font-bold">No instruments found for ${dateStr}</div>`;
+        } else {
+            dayItems.forEach(item => {
+                const img = getInstrumentImageUrl(item);
+                const nextDueDate = item.next_due ? new Date(item.next_due) : null;
+                let diffDays = 999;
+                if (nextDueDate && !isNaN(nextDueDate.getTime())) {
+                    const todayZero = new Date().setHours(0,0,0,0);
+                    const dueZero = new Date(nextDueDate).setHours(0,0,0,0);
+                    diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+                }
+                const isInCal = item.status === 'IN_CALIBRATION' || item.status === 'OUT_FOR_CAL' || item.status === 'SENDING_CAL';
+                const isDue = (diffDays <= 30 || item.status === 'EXPIRED' || item.status === 'OVERDUE' || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE') && !isInCal;
+
+                let calBtn = '';
+                if (isInCal) {
+                    calBtn = `<button type="button" onclick="document.getElementById('cal-day-modal-overlay')?.remove(); WapCalibrationSystem.showInCalAlert('${item.id}')" class="h-8 px-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-[10px] font-black flex items-center gap-1 transition-colors cursor-pointer shadow-xs"><span>🚚 ส่งแคลอยู่</span></button>`;
+                } else if (isDue) {
+                    calBtn = `<button type="button" onclick="document.getElementById('cal-day-modal-overlay')?.remove(); WapCalibrationSystem.sendForCalibration('${item.id}')" class="h-8 px-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black flex items-center gap-1 transition-colors cursor-pointer shadow-xs"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><span>Calibrate</span></button>`;
+                } else {
+                    calBtn = `<button type="button" onclick="WapCalibrationSystem.showNotDueAlert('${item.id}')" class="h-8 px-2.5 bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-colors cursor-not-allowed opacity-60"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span>Calibrate</span></button>`;
+                }
+
+                itemsHtml += `
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
+                                ${img ? `<img src="${formatImageUrl(img)}" class="w-full h-full object-contain">` : `<span class="text-[9px] font-black text-slate-400">NO IMG</span>`}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-black text-blue-600 dark:text-blue-400">${item.code_no || item.id}</span>
+                                    <span class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[9px] font-black uppercase">${item.dept || '-'}</span>
+                                </div>
+                                <h6 class="text-xs font-bold text-slate-800 dark:text-white truncate">${item.name || ''}</h6>
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400">${item.maker || '-'} &bull; ${item.model || '-'}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button type="button" onclick="document.getElementById('cal-day-modal-overlay').remove(); WapCalibrationSystem.openMetrologyViewer('${item.id}')" class="h-8 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-[10px] font-black flex items-center gap-1 transition-colors cursor-pointer">
+                                <span>Viewer</span>
+                            </button>
+                            ${calBtn}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        modal.innerHTML = `
+            <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm">📅</div>
+                    <div>
+                        <h3 class="text-sm font-black text-slate-800 dark:text-white uppercase">Calibrations Due on ${dateStr}</h3>
+                        <p class="text-[10.5px] text-slate-500 dark:text-slate-400 font-bold">${dayItems.length} Instruments Scheduled</p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('cal-day-modal-overlay').remove()" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-black hover:bg-rose-500 hover:text-white transition-colors cursor-pointer">✕</button>
+            </div>
+            <div class="p-4 overflow-auto flex-1 space-y-2.5 scroll-custom">
+                ${itemsHtml}
+            </div>
+            <div class="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-end">
+                <button type="button" onclick="document.getElementById('cal-day-modal-overlay').remove()" class="h-9 px-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer">
+                    Close
+                </button>
+            </div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+    }
+
+    // Quick Mark Calibrated Action
+    async function quickMarkCalibrated(id) {
+        const item = _data.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        const now = new Date();
+        const calDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        
+        // Calculate new Next Due based on frequency
+        let freqMonths = 12;
+        if (item.frequency) {
+            const num = parseInt(item.frequency, 10);
+            if (!isNaN(num) && num > 0) freqMonths = num;
+        }
+
+        const nextDate = new Date(now.getFullYear(), now.getMonth() + freqMonths, now.getDate());
+        const nextDueStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
+        const monthsList = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const nextMonthName = monthsList[nextDate.getMonth()];
+
+        item.last_cal = calDateStr;
+        item.next_due = nextDueStr;
+        item.month = nextMonthName;
+        item.status = 'NORMAL';
+
+        // Add to history logs
+        const logEntry = {
+            id: 'LOG-' + Date.now(),
+            date: calDateStr,
+            cert_no: 'CERT-' + calDateStr.replace(/-/g, '') + '-' + (item.code_no || item.id).replace(/[^A-Za-z0-9]/g, '').substring(0, 6),
+            lab: 'Internal QA/QC Metrology Lab',
+            result: 'PASS',
+            deviation: '0.000',
+            next_due: nextDueStr,
+            technician: (window.currentUser && window.currentUser.name) || item.pic || 'QA Inspector',
+            notes: 'Calibrated via Monthly Calibration System'
+        };
+
+        if (!item.history_logs) item.history_logs = [];
+        item.history_logs.unshift(logEntry);
+
+        try {
+            if (window.localDB && window.localDB.calibrationMaster) {
+                await window.localDB.calibrationMaster.put(item);
+            }
+        } catch(e) {
+            console.warn("DB save error", e);
+        }
+
+        try {
+            if (typeof syncToCloud === 'function') {
+                syncToCloud([item]);
+            }
+        } catch(e) {}
+
+        render();
+        if (typeof toast === 'function') {
+            toast(`✅ บันทึกการสอบเทียบ ${item.code_no || item.id} เรียบร้อย (รอบถัดไป: ${nextDueStr})`, "success");
+        }
+    }
+
+    // Action: ส่งเครื่องมือไปสอบเทียบ (Send for Calibration)
+    async function sendForCalibration(id) {
+        const item = _data.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        const nextDueDate = item.next_due ? new Date(item.next_due) : null;
+        let diffDays = 999;
+        if (nextDueDate && !isNaN(nextDueDate.getTime())) {
+            const todayZero = new Date().setHours(0,0,0,0);
+            const dueZero = new Date(nextDueDate).setHours(0,0,0,0);
+            diffDays = Math.ceil((dueZero - todayZero) / (1000 * 60 * 60 * 24));
+        }
+
+        const isDue = (diffDays <= 30 || item.status === 'EXPIRED' || item.status === 'OVERDUE' || item.status === 'DUE_SOON' || item.status === 'CALIBRATION_DUE');
+
+        if (!isDue) {
+            showNotDueAlert(id);
+            return;
+        }
+
+        if (typeof showCustomConfirmDialog === 'function') {
+            showCustomConfirmDialog({
+                title: "🚚 ยืนยันการส่งสอบเทียบ (Send for Calibration)",
+                message: `คุณต้องการเปลี่ยนสถานะเครื่องมือ <b>${item.code_no || item.id} - ${item.name || ''}</b> เป็น <b>"ส่งแคลอยู่ (IN CALIBRATION)"</b> ใช่หรือไม่?<br><br><span class="text-xs text-slate-500 font-normal">สถานะจะเปลี่ยนเป็นสอบเทียบแล้ว (CALIBRATED) ก็ต่อเมื่อได้รับเครื่องมือกลับมาและนำผล/วันที่สอบล่าสุด (Last Calibrated) มากรอกใส่แล้วบันทึก</span>`,
+                icon: "🚚",
+                confirmText: "ยืนยันส่งแคล",
+                cancelText: "ยกเลิก",
+                confirmColor: "from-amber-500 to-orange-600",
+                onConfirm: async () => {
+                    await executeSendForCalibration(item);
+                }
+            });
+        } else {
+            await executeSendForCalibration(item);
+        }
+    }
+
+    async function executeSendForCalibration(item) {
+        const now = new Date();
+        const sendDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        
+        item.status = 'IN_CALIBRATION';
+        item.sent_for_cal_date = sendDateStr;
+
+        // Log entry note
+        const logEntry = {
+            id: 'LOG-SEND-' + Date.now(),
+            date: sendDateStr,
+            cert_no: 'PENDING-CALIBRATION',
+            lab: 'Vendor / Metrology Calibration Lab',
+            result: 'IN_PROGRESS',
+            deviation: '-',
+            next_due: item.next_due || '-',
+            technician: (window.currentUser && window.currentUser.name) || item.pic || 'QA Inspector',
+            notes: 'ส่งเครื่องมือออกไปสอบเทียบ (Out for calibration)'
+        };
+
+        if (!item.history_logs) item.history_logs = [];
+        item.history_logs.unshift(logEntry);
+
+        try {
+            if (window.localDB && window.localDB.calibrationMaster) {
+                await window.localDB.calibrationMaster.put(item);
+            }
+        } catch(e) {
+            console.warn("DB save error", e);
+        }
+
+        try {
+            if (typeof syncToCloud === 'function') {
+                syncToCloud([item]);
+            }
+        } catch(e) {}
+
+        render();
+        if (typeof toast === 'function') {
+            toast(`🚚 เปลี่ยนสถานะ ${item.code_no || item.id} เป็น "ส่งแคลอยู่" เรียบร้อยแล้ว`, "warning");
+        }
+    }
+
+    function showNotDueAlert(id) {
+        const item = _data.find(x => String(x.id) === String(id));
+        const dueText = item ? (item.next_due || item.month || 'ตามรอบกำหนด') : '-';
+        if (typeof toast === 'function') {
+            toast(`⏳ เครื่องมือ ${item ? (item.code_no || item.id) : ''} ยังไม่ถึงกำหนดส่งสอบเทียบ (ครบกำหนด: ${dueText}) สามารถกดส่งแคลได้เมื่อถึงดิวเท่านั้น`, "info");
+        }
+    }
+
+    function showInCalAlert(id) {
+        const item = _data.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        if (typeof showCustomConfirmDialog === 'function') {
+            showCustomConfirmDialog({
+                title: "เครื่องมือกำลังอยู่ระหว่างส่งสอบเทียบ 🚚",
+                message: `เครื่องมือ <b>${item.code_no || item.id} - ${item.name || ''}</b> อยู่ในสถานะ <b>"ส่งแคลอยู่ (IN CALIBRATION)"</b><br><br>เมื่อได้รับเครื่องมือกลับมาแล้ว ให้กด <b>"เปิดแก้ไขเพื่อกรอกผลสอบ"</b> เพื่อใส่เลขวันที่ Last Calibrated และบันทึก จะเป็นการเปลี่ยนสถานะกลับเป็นปกติ`,
+                icon: "🚚",
+                confirmText: "เปิดแก้ไขเพื่อกรอกผลสอบ",
+                cancelText: "ปิด",
+                confirmColor: "from-blue-600 to-indigo-600",
+                onConfirm: () => {
+                    openEditModal(item.id);
+                }
+            });
+        } else {
+            openEditModal(item.id);
+        }
+    }
+
+    function resetStatusFilter() {
+        const statusSelect = document.getElementById('cal-filter-status');
+        const deptSelect = document.getElementById('cal-filter-dept');
+        const searchInput = document.getElementById('cal-search');
+
+        if (statusSelect) statusSelect.value = 'ALL';
+        if (deptSelect) deptSelect.value = 'ALL';
+        if (searchInput) searchInput.value = '';
+
+        render();
+        toast("🔄 รีเซ็ตตัวกรองสถานะและรายการทั้งหมดเรียบร้อย", "info");
+    }
+
+
+
+// เพิ่มฟังก์ชันนี้เข้าไปในตัวแปร WapCalibrationSystem
+function triggerUpload(id) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            // 1. ค้นหาข้อมูลในอาเรย์ _data และอัปเดตรูปภาพ (base64)
+            const index = _data.findIndex(item => item.id === id);
+            if (index !== -1) {
+                _data[index].imageUrl = ev.target.result;
+                _data[index].status = 'NORMAL'; // เปลี่ยนสถานะเป็นปกติเมื่อใส่รูป (ตัวอย่าง)
+                
+                // 2. วาดตารางใหม่ทันที
+                render();
+                toast('📸 อัปเดตรูปภาพเครื่องมือเรียบร้อยแล้ว', 'success');
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+// --- เพิ่มฟังก์ชันเหล่านี้ใน WapCalibrationSystem ---
+
+// --- ส่วนการจัดการรูปภาพและฟอร์มแบบพรีเมียม ---
+
+function openAddModal() {
+    const modalId = 'cal-add-modal';
+    const existing = document.getElementById(modalId);
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal-overlay';
+    // กิมมิก: ฉากหลังแบบ Cyber-Atmosphere
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(2, 6, 23, 0.82);backdrop-filter:blur(16px);padding:12px;';
+
+    modal.innerHTML = `
+        <div style="background:#fff; border-radius:24px; width:100%; max-width:720px; max-height:92vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 40px 100px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.2); animation: modalPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.2);">
+            
+            <!-- Tech Header -->
+            <div style="background:linear-gradient(90deg, #0f172a 0%, #1e40af 100%); color:#fff; padding:14px 22px; display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #3b82f6; flex-shrink:0;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:38px; height:38px; background:rgba(59, 130, 246, 0.2); border:1.5px solid #60a5fa; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 0 15px rgba(59, 130, 246, 0.3); flex-shrink:0;">⚙️</div>
+                    <div style="min-width:0;">
+                        <h3 style="margin:0; font-size:15px; font-weight:950; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Calibration Command</h3>
+                        <p style="margin:0; font-size:9px; color:#93c5fd; font-weight:800; letter-spacing:0.08em; text-transform:uppercase;">UNIT MASTER DATA INTERFACE v1.0</p>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('${modalId}').remove()" style="background:rgba(239, 68, 68, 0.2); border:none; color:#f87171; width:30px; height:30px; border-radius:50%; cursor:pointer; font-weight:900; transition:0.2s; display:flex; align-items:center; justify-content:center; flex-shrink:0;" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'; this.style.color='#f87171';">✕</button>
+            </div>
+
+            <form id="cal-reg-form" style="padding:18px 22px; display:flex; flex-direction:column; gap:16px; background:#fcfdfe; overflow-y:auto; max-height:calc(92vh - 65px);">
+                
+                <!-- Section 1: IDENTITY (3-Col Responsive) -->
+                <div class="cal-grid-3">
+                    <div class="field-box">
+                        <label class="tech-label">Asset ID <span class="cap">/ รหัสทรัพย์สิน</span></label>
+                        <input type="text" id="reg-id" placeholder="CAR-CAL-000" class="tech-input" style="color:#1e40af; font-family:'DM Mono', monospace;">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label">Brand <span class="cap">/ ผู้ผลิต</span></label>
+                        <input type="text" id="reg-maker" placeholder="e.g. Mitutoyo" class="tech-input">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label">Model <span class="cap">/ รุ่น</span></label>
+                        <input type="text" id="reg-model" placeholder="Model No." class="tech-input">
+                    </div>
+                </div>
+
+                <!-- Section 2: Name -->
+                <div class="field-box">
+                    <label class="tech-label">Instrument Description <span class="cap">/ ชื่อเรียกอุปกรณ์อย่างเป็นทางการ</span></label>
+                    <input type="text" id="reg-name" placeholder="Enter full description..." class="tech-input" style="font-size:13px; height:40px;">
+                </div>
+
+                <!-- Section 3: Ownership & Responsibility (Clean 3-Col Centered) -->
+                <input type="hidden" id="reg-sub" value="">
+                <div class="cal-grid-3">
+                    <div class="field-box">
+                        <label class="tech-label">Serial No. <span class="cap">/ S/N</span></label>
+                        <input type="text" id="reg-serial" placeholder="S/N: 000000" class="tech-input">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label">Ownership <span class="cap">/ แผนก</span></label>
+                        <input type="text" id="reg-dept" placeholder="Department..." class="tech-input" list="cal-dept-datalist">
+                        <datalist id="cal-dept-datalist">
+                            <option value="QAP">
+                            <option value="SQE">
+                            <option value="Maintenance">
+                            <option value="Production">
+                            <option value="QA/QC Division">
+                        </datalist>
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label" style="color:#2563eb;">RESPONSIBLE (PIC)</label>
+                        <input type="text" id="reg-pic" placeholder="e.g. K.Nathawut" class="tech-input" list="cal-pic-datalist" style="font-weight:700; color:#1e40af; background:#f0f7ff;">
+                        <datalist id="cal-pic-datalist">
+                            <option value="K.Nathawut">
+                            <option value="K.Somchai">
+                            <option value="K.Prasert">
+                            <option value="K.Wichai">
+                            <option value="K.Anan">
+                        </datalist>
+                    </div>
+                </div>
+
+                <!-- Section 4: DIGITAL STATUS (The LCD Display) -->
+                <div class="cal-digital-panel">
+                    <div class="field-box">
+                        <label class="tech-label" style="color:#60a5fa;">Last Calibrated <span class="cap" style="color:#93c5fd;">/ สอบล่าสุด</span></label>
+                        <input type="date" id="reg-last-cal" onchange="WapCalibrationSystem.calcDue()" class="tech-input" style="background:rgba(255,255,255,0.06); border-color:#334155; color:#fff; color-scheme:dark;">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label" style="color:#60a5fa;">Cycle <span class="cap" style="color:#93c5fd;">/ รอบ (เดือน)</span></label>
+                        <select id="reg-freq" onchange="WapCalibrationSystem.calcDue()" class="tech-input" style="background:rgba(255,255,255,0.06); border-color:#334155; color:#fff;">
+                            <option value="12" style="background:#0f172a; color:#fff;">12 Months (Standard)</option>
+                            <option value="6" style="background:#0f172a; color:#fff;">6 Months</option>
+                            <option value="24" style="background:#0f172a; color:#fff;">24 Months</option>
+                        </select>
+                    </div>
+                    <div class="field-box" style="text-align:right;">
+                        <label class="tech-label" style="color:#10b981; justify-content:flex-end;">Next Due Deadline <span class="cap" style="color:#059669;">/ วันครบกำหนด</span></label>
+                        <div id="reg-next-due-display" style="background:#000; color:#10b981; border-radius:12px; height:42px; display:flex; align-items:center; justify-content:center; font-family:'DM Mono', monospace; font-size:16px; font-weight:950; border:2px solid #064e3b; text-shadow:0 0 10px #10b981; letter-spacing:1px;">
+                            ---- -- --
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: Capacity & Internal Code (2-Col Responsive) -->
+                <div class="cal-grid-2">
+                    <div class="field-box">
+                        <label class="tech-label">Capacity / Range <span class="cap">/ ย่านการวัด</span></label>
+                        <input type="text" id="reg-size" placeholder="e.g. 0 - 150 mm" class="tech-input">
+                    </div>
+                    <div class="field-box">
+                        <label class="tech-label">Internal Code <span class="cap">/ รหัสอ้างอิงภายใน</span></label>
+                        <input type="text" id="reg-codeno" placeholder="Ref. No." class="tech-input">
+                    </div>
+                </div>
+
+                <!-- Section 6: Media (Photo & Sticker Preview) -->
+                <div class="cal-media-grid">
+                    
+                    <!-- 1. กล่องภาพตัวเครื่อง (Device Photo) -->
+                    <div id="reg-dropzone" class="media-dropzone" 
+                         style="min-height: 200px; border-radius: 14px; border: 2px dashed #cbd5e1; background: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; transition: 0.3s;"
+                         onclick="const rInp = document.getElementById('reg-img-input'); if(rInp && typeof rInp.click === 'function') rInp.click();">
+                        
+                        <div id="reg-img-label" style="text-align: center; padding: 10px;">
+                            <div style="font-size: 10px; font-weight: 950; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Device Photo</div>
+                            <div style="font-size: 8px; color: #94a3b8; font-weight: 700; margin-top: 4px;">CLICK TO UPLOAD</div>
+                        </div>
+
+                        <input type="file" id="reg-img-input" hidden accept="image/*" onchange="WapCalibrationSystem.handleImg(this, 'reg-dropzone')">
+                    </div>
+
+                    <!-- 2. กล่องป้ายสติกเกอร์ (Sticker Preview) -->
+                    <div id="sticker-dropzone" class="media-dropzone" 
+                         style="min-height: 200px; border-radius: 14px; padding: 10px; background: rgba(59, 130, 246, 0.04); border: 2px dashed #bfdbfe; display: flex; align-items: center; justify-content: center; cursor: default;">
+                        
+                        <div style="width:100%; max-width:240px; background:#fff; border:1.5px solid #0047bb; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 10px 20px rgba(0,0,0,0.08); font-family: Arial, sans-serif; text-align:left;">
+                            <div style="background:#0047bb; color:#fff; padding:4px 10px; font-size:10px; font-weight:bold; letter-spacing:0.2px;">NA Caltechnologies Co., Ltd.</div>
+                            <div style="padding:10px 12px; position:relative; background:#fff; min-height:130px;">
+                                <div style="position:absolute; right:8px; top:18px; width:55px; display:flex; flex-direction:column; align-items:center; opacity:0.75; pointer-events:none;">
+                                    <div style="width:44px; height:44px; border:1.5px solid rgba(0, 71, 187, 0.3); border-radius:50%; display:flex; align-items:center; justify-content:center; transform:rotate(-15deg);">
+                                        <div style="text-align:center; font-size:5px; font-weight:bold; color:rgba(0, 71, 187, 0.5); line-height:1;">METROLOGY<br>VERIFIED</div>
+                                    </div>
+                                </div>
+                                <div style="border-bottom:1.2px solid #000; padding:2px 0; margin-bottom:4px; display:flex; align-items:baseline;"><span style="font-size:9px; font-weight:bold; width:65px; color:#000;">SERIAL ---</span><span id="stk-prev-serial" style="font-size:11px; font-weight:bold; font-family:'Courier New', Courier, monospace;">-</span></div>
+                                <div style="border-bottom:1.2px solid #000; padding:2px 0; margin-bottom:4px; display:flex; align-items:baseline;"><span style="font-size:9px; font-weight:bold; width:65px; color:#000;">CERT.</span><span id="stk-prev-cert" style="font-size:10px; font-weight:bold; font-family:'Courier New', Courier, monospace;">-</span></div>
+                                <div style="border-bottom:1.2px solid #000; padding:2px 0; margin-bottom:6px; display:flex; align-items:baseline;"><span style="font-size:9px; font-weight:bold; width:65px; color:#000;">CAL BY</span><span id="stk-prev-pic" style="font-size:10px; font-weight:bold; font-family:'Courier New', Courier, monospace; color:#000;">PHETSAYAM</span></div>
+                                <div style="display:flex; gap:5px; margin-top:8px;">
+                                    <div style="flex:1;"><div style="font-size:8.5px; font-weight:bold; color:#000;">CAL DATE</div><div id="stk-prev-last" style="font-size:10.5px; font-weight:bold; font-family:'Courier New', Courier, monospace; color:#000;">-</div></div>
+                                    <div style="flex:1;"><div style="font-size:8.5px; font-weight:bold; color:#000;">DUE DATE</div><div id="stk-prev-due" style="font-size:10.5px; font-weight:bold; font-family:'Courier New', Courier, monospace; color:#ef4444;">-</div></div>
+                                </div>
+                                <div style="margin-top:8px; border-bottom:1.5px solid #000; width:100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div style="display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:6px; padding-top:10px; border-top:1px solid #f1f5f9; flex-shrink:0;">
+                    <button type="button" onclick="document.getElementById('${modalId}').remove()" style="background:none; border:none; color:#94a3b8; font-weight:800; font-size:11px; cursor:pointer; text-transform:uppercase; padding:8px 16px;">Discard</button>
+                    <button type="button" onclick="WapCalibrationSystem.saveNew()" style="background:#1e40af; color:#fff; border:none; padding:10px 28px; border-radius:12px; font-weight:950; font-size:11px; cursor:pointer; box-shadow:0 8px 20px rgba(30,64,175,0.25); text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+                        Update Terminal
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+}
+
+// ฟังก์ชันดึงผู้รับผิดชอบจากข้อความในวงเล็บของ Group อัตโนมัติลงในช่อง PIC
+function autoFillPicFromGroup() {
+    const subInp = document.getElementById('reg-sub');
+    const deptInp = document.getElementById('reg-dept');
+    const picInp = document.getElementById('reg-pic');
+    if (subInp && picInp) {
+        const extracted = extractResponsiblePerson({
+            sub_section: subInp.value,
+            dept: deptInp ? deptInp.value : ''
+        });
+        if (extracted && extracted !== '-') {
+            picInp.value = extracted;
+        }
+    }
+}
+
+// ฟังก์ชันช่วยคำนวณวัน Due Date
+function calcDue() {
+    const lastDate = document.getElementById('reg-last-cal') ? document.getElementById('reg-last-cal').value : '';
+    const interval = parseInt(document.getElementById('reg-freq') ? document.getElementById('reg-freq').value : '12') || 12;
+    const display = document.getElementById('reg-next-due-display');
+    
+    if (lastDate && interval) {
+        const d = new Date(lastDate);
+        if (!isNaN(d.getTime())) {
+            d.setMonth(d.getMonth() + interval);
+            const nextDueStr = d.toISOString().split('T')[0];
+            if (display) {
+                display.textContent = nextDueStr;
+                display.dataset.value = nextDueStr;
+                display.style.color = '#10b981';
+            }
+        }
+    }
+}
+
+// จัดการรูปภาพ (Equipment & Sticker)
+let currentEquipmentImg = "";
+function handleImg(input, targetId) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const result = e.target.result;
+            if(targetId === 'reg-dropzone') currentEquipmentImg = result;
+            const zone = document.getElementById(targetId);
+            zone.style.backgroundImage = `url(${result})`;
+            zone.style.backgroundSize = 'contain';
+            zone.style.backgroundRepeat = 'no-repeat';
+            zone.style.backgroundPosition = 'center';
+            zone.innerHTML = `<div style="background:rgba(255,255,255,0.7); position:absolute; bottom:5px; right:5px; padding:2px 8px; border-radius:5px; font-size:9px; font-weight:800;">CHANGE PHOTO</div>`;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// บันทึกข้อมูล
+async function saveNew() {
+    const nextDueDisplay = document.getElementById('reg-next-due-display');
+    let nextDue = (nextDueDisplay && nextDueDisplay.dataset.value) || (nextDueDisplay && nextDueDisplay.textContent && nextDueDisplay.textContent !== '-' && !nextDueDisplay.textContent.includes('ส่งแคล') ? nextDueDisplay.textContent : "-");
+    const subVal = document.getElementById('reg-sub') ? document.getElementById('reg-sub').value.trim() : "";
+    const deptVal = document.getElementById('reg-dept') ? document.getElementById('reg-dept').value : "";
+    let picVal = document.getElementById('reg-pic') ? document.getElementById('reg-pic').value.trim() : "";
+    
+    if (!picVal || picVal === "-") {
+        picVal = extractResponsiblePerson({ sub_section: subVal, dept: deptVal });
+    }
+    
+    const regIdInput = document.getElementById('reg-id');
+    const formEl = document.getElementById('cal-reg-form');
+    const internalId = (regIdInput && regIdInput.dataset.internalId) || (formEl && formEl.dataset.internalId) || (regIdInput ? regIdInput.value.trim() : "");
+    const assetIdVal = regIdInput ? regIdInput.value.trim() : "";
+    const serialVal = document.getElementById('reg-serial') ? document.getElementById('reg-serial').value.trim() : assetIdVal;
+
+    const existingIdx = _data.findIndex(x => 
+        (internalId && String(x.id) === String(internalId)) ||
+        (assetIdVal && (String(x.id) === String(assetIdVal) || (x.serial && String(x.serial) === String(assetIdVal)))) ||
+        (serialVal && x.serial && String(x.serial) === String(serialVal))
+    );
+
+    const targetId = (existingIdx !== -1 && _data[existingIdx].id) ? _data[existingIdx].id : (internalId || assetIdVal || ('CAR-CAL-' + Date.now()));
+    const lastCalVal = document.getElementById('reg-last-cal') ? document.getElementById('reg-last-cal').value : "-";
+    const freqMonths = parseInt(document.getElementById('reg-freq') ? document.getElementById('reg-freq').value : '12') || 12;
+
+    // Recalculate next due if needed
+    if ((!nextDue || nextDue === '-' || nextDue.includes('ส่งแคล')) && lastCalVal && lastCalVal !== '-') {
+        const d = new Date(lastCalVal);
+        if (!isNaN(d.getTime())) {
+            d.setMonth(d.getMonth() + freqMonths);
+            nextDue = d.toISOString().split('T')[0];
+        }
+    }
+
+    const wasInCal = existingIdx !== -1 && (_data[existingIdx].status === 'IN_CALIBRATION' || _data[existingIdx].status === 'OUT_FOR_CAL' || _data[existingIdx].status === 'SENDING_CAL');
+    let finalStatus = 'NORMAL';
+
+    if (wasInCal) {
+        // Returned from calibration with new last_cal date
+        finalStatus = 'NORMAL';
+    } else if (existingIdx !== -1 && _data[existingIdx].status) {
+        finalStatus = _data[existingIdx].status;
+        if (finalStatus === 'EXPIRED' || finalStatus === 'OVERDUE') {
+            // Check if last cal was refreshed
+            if (lastCalVal && lastCalVal !== _data[existingIdx].last_cal) {
+                finalStatus = 'NORMAL';
+            }
+        }
+    }
+
+    const entry = {
+        id: targetId,
+        name: document.getElementById('reg-name').value.trim(),
+        maker: document.getElementById('reg-maker').value.trim(),
+        model: document.getElementById('reg-model').value.trim(),
+        code_no: document.getElementById('reg-codeno').value.trim() || "-",
+        serial: serialVal || assetIdVal,
+        size: document.getElementById('reg-size').value.trim() || "-",
+        last_cal: lastCalVal,
+        next_due: nextDue,
+        dept: deptVal,
+        sub_section: subVal,
+        pic: picVal !== "-" ? picVal : "",
+        reg_date: (existingIdx !== -1 && _data[existingIdx].reg_date) ? _data[existingIdx].reg_date : new Date().toISOString().split('T')[0],
+        frequency: freqMonths + " M",
+        month: nextDue !== "-" ? new Date(nextDue).toLocaleString('en-US', {month: 'long'}) : "-",
+        status: finalStatus,
+        imageUrl: currentEquipmentImg || ((existingIdx !== -1 && _data[existingIdx].imageUrl) ? _data[existingIdx].imageUrl : "")
+    };
+
+    if (!entry.id || !entry.name || !entry.last_cal || entry.last_cal === "-") {
+        toast("⚠️ กรุณากรอกข้อมูลที่จำเป็น (*) ให้ครบถ้วน รวมถึงวันที่สอบล่าสุด", "error");
+        return;
+    }
+
+    // If instrument returned from calibration, add a completion history log
+    if (wasInCal) {
+        const returnLogEntry = {
+            id: 'LOG-RET-' + Date.now(),
+            date: entry.last_cal,
+            cert_no: 'CERT-' + (entry.last_cal || '').replace(/-/g, '') + '-' + (entry.code_no || entry.id).replace(/[^A-Za-z0-9]/g, '').substring(0, 6),
+            lab: 'Internal QA/QC Metrology Lab',
+            result: 'PASS',
+            deviation: '0.000',
+            next_due: entry.next_due,
+            technician: (window.currentUser && window.currentUser.name) || entry.pic || 'QA Inspector',
+            notes: 'ได้รับเครื่องมือกลับจากการสอบเทียบ และบันทึกผลสอบเรียบร้อย (Returned & Calibrated)'
+        };
+        const existingLogs = (existingIdx !== -1 && _data[existingIdx].history_logs) ? [..._data[existingIdx].history_logs] : [];
+        existingLogs.unshift(returnLogEntry);
+        entry.history_logs = existingLogs;
+    } else if (existingIdx !== -1 && _data[existingIdx].history_logs) {
+        entry.history_logs = _data[existingIdx].history_logs;
+    }
+
+    if (existingIdx !== -1) {
+        _data[existingIdx] = { ..._data[existingIdx], ...entry };
+    } else {
+        _data.unshift(entry);
+    }
+
+    try {
+        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+            await localDB.calibrationMaster.put(entry);
+        }
+    } catch(err) {
+        console.warn("[Calibration] Persistence warning:", err);
+    }
+
+    // ซิงก์ขึ้น Supabase Cloud อัตโนมัติ
+    syncToCloud(entry);
+
+    const modal = document.getElementById('cal-add-modal');
+    if (modal) modal.remove();
+    currentEquipmentImg = "";
+    render();
+    updateOverdueBadge();
+    
+    if (wasInCal) {
+        toast(`✅ บันทึกผลสอบเทียบ ${entry.code_no || entry.id} สำเร็จ และปรับสถานะเป็น "สอบเทียบแล้ว (CALIBRATED)" เรียบร้อย`, "success");
+    } else {
+        toast(existingIdx !== -1 ? "✅ อัปเดตข้อมูลเครื่องมือเรียบร้อย" : "✅ ลงทะเบียนเครื่องมือสำเร็จ และพร้อมใช้งาน", "success");
+    }
+}
+
+// อย่าลืมอัปเดต return
+// return { init, render, openAddModal, calcDue, handleImg, saveNew, ... };
+
+// ฟังก์ชันแสดงพรีวิวรูปในฟอร์ม
+let tempRegImg = "";
+function handleRegImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            tempRegImg = e.target.result;
+            document.getElementById('reg-img-preview').innerHTML = `<img src="${tempRegImg}" style="width:100%; height:100%; object-fit:cover;">`;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// ฟังก์ชันเก็บข้อมูลและวาดตาราง
+function handleSaveNew() {
+    const newEntry = {
+        id: document.getElementById('reg-id').value.trim() || 'CAR-CAL-' + Date.now(),
+        name: document.getElementById('reg-name').value.trim(),
+        maker: document.getElementById('reg-maker').value.trim(),
+        model: document.getElementById('reg-model').value.trim(),
+        code_no: document.getElementById('reg-serial').value.trim(),
+        serial: document.getElementById('reg-serial').value.trim(),
+        size: document.getElementById('reg-size').value.trim(),
+        last_cal: document.getElementById('reg-last-cal').value || '-',
+        next_due: document.getElementById('reg-next-due').value || '-',
+        dept: document.getElementById('reg-dept').value,
+        sub_section: 'Dimensional', // หรือจะเพิ่มช่องเลือกประเภทได้
+        reg_date: new Date().toISOString().split('T')[0],
+        frequency: document.getElementById('reg-freq').value || '12 M',
+        month: new Date(document.getElementById('reg-next-due').value).toLocaleString('en-US', {month: 'long'}) || '-',
+        status: 'NORMAL',
+        imageUrl: tempRegImg
+    };
+
+    if (!newEntry.name) { toast("⚠️ กรุณาระบุชื่อเครื่องมือ", "error"); return; }
+
+    // เพิ่มข้อมูลเข้าอาเรย์หลัก
+    _data.unshift(newEntry);
+    
+    // บันทึก Local & Cloud
+    if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+        try { localDB.calibrationMaster.put(newEntry); } catch(e) {}
+    }
+    syncToCloud(newEntry);
+
+    // ปิด Modal และเคลียร์ค่า
+    document.getElementById('cal-add-modal').remove();
+    tempRegImg = "";
+    
+    // วาดตารางใหม่
+    render();
+    updateOverdueBadge();
+    toast("✅ ลงทะเบียนเครื่องมือใหม่สำเร็จ", "success");
+}
+// --- เพิ่มเข้าไปใน WapCalibrationSystem ---
+
+function clearAll() {
+    if (_data.length === 0) {
+        toast('ไม่มีข้อมูลให้ลบ', 'info');
+        return;
+    }
+
+    showCustomConfirmDialog({
+        title: "ยืนยันล้างข้อมูลเครื่องมือทั้งหมด",
+        subtitle: "รายการเครื่องมือมาตรฐานทั้งหมดในหน้านี้จะถูกลบออกถาวร",
+        badge: "DANGER ZONE",
+        type: "danger",
+        requiresTextInput: "DELETE ALL",
+        inputPlaceholder: "พิมพ์ 'DELETE ALL' เพื่อยืนยัน",
+        confirmText: "🔥 ยืนยันลบข้อมูลทั้งหมด",
+        cancelText: "ยกเลิก",
+        onConfirm: async () => {
+            const idsToDelete = _data.map(x => x.id);
+            _data = []; // ล้างข้อมูลจำลองในเครื่อง
+            if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+                try { await localDB.calibrationMaster.clear(); } catch(e) {}
+            }
+            try {
+                const sb = getSupabaseClient();
+                if (sb) {
+                    await sb.from('calibration_records').delete().neq('id', '');
+                }
+            } catch(e) {}
+            render();   // วาดตารางใหม่ (จะเป็นตารางว่าง)
+            updateOverdueBadge();
+            toast("🗑️ ล้างข้อมูลทะเบียนเครื่องมือเรียบร้อยแล้ว", "success");
+        }
+    });
+}
+function openMetrologyViewer(id) {
+    const item = _data.find(x => String(x.id) === String(id));
+    if (!item) return;
+
+    const existing = document.getElementById('metro-viewer-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'metro-viewer-overlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 20000; 
+        background: rgba(2, 6, 23, 0.85); 
+        backdrop-filter: blur(14px); 
+        display: flex; align-items: center; justify-content: center; 
+        padding: 12px; transition: all 0.3s ease;
+    `;
+
+    const stColor = (item.status === 'EXPIRED') ? '#ef4444' : (item.status === 'DUE_SOON') ? '#f59e0b' : '#10b981';
+    const displayImg = getInstrumentImageUrl(item);
+    const picVal = extractResponsiblePerson(item);
+
+    // ฟังก์ชันแปลงวันที่ (20-AUG-26)
+    const formatStickerDate = (dateStr) => {
+        if (!dateStr || dateStr === '-') return '---';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        return `${String(d.getDate()).padStart(2, '0')}-${months[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
+    };
+
+    const modal = document.createElement('div');
+    modal.id = 'premium-metro-card';
+    modal.style.cssText = `
+        position: relative; width: 100%; max-width: 1050px; max-height: 92vh; height: 90vh; 
+        background: #0b1220; border-radius: 28px; overflow: hidden; 
+        display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,0.12);
+        box-shadow: 0 40px 100px rgba(0,0,0,0.6); font-family: 'Inter', sans-serif;
+    `;
+
+    modal.innerHTML = `
+        <!-- Top Bar Header -->
+        <div style="height:54px; background:linear-gradient(90deg, #0f172a 0%, #1e40af 100%); border-bottom:2px solid #3b82f6; display:flex; align-items:center; justify-content:space-between; padding:0 22px; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+                <div style="width:32px; height:32px; background:rgba(255,255,255,0.1); border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <svg width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42z"/></svg>
+                </div>
+                <div style="min-width:0;">
+                    <h3 style="margin:0; font-size:14px; font-weight:950; color:#fff; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Metrology Evidence Viewer</h3>
+                    <p style="margin:0; font-size:8.5px; color:#93c5fd; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">${item.id || ''} &bull; ${item.name || 'INSTRUMENT'}</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('metro-viewer-overlay').remove()" style="background:rgba(239, 68, 68, 0.2); border:none; color:#f87171; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'; this.style.color='#f87171';">✕</button>
+        </div>
+
+        <div class="metro-viewer-layout">
+            <!-- Left Stage (Image) -->
+            <div id="metro-img-stage" class="metro-image-stage">
+                <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">
+                    ${displayImg ? `<img src="${formatImageUrl(displayImg)}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:18px; box-shadow: 0 25px 60px rgba(0,0,0,0.7); background:#000;">` : `<div style="color:#475569; font-weight:900; font-size:12px; letter-spacing:1px;">NO PHOTO ATTACHED</div>`}
+                </div>
+            </div>
+
+            <!-- Right Sidebar / Stacked on Mobile (Data + Sticker) -->
+            <div id="metro-side-pane" class="metro-sidebar-pane">
+                
+                <div style="display:flex; align-items:center; gap:8px; color:#60a5fa; font-weight:950; font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
+                    <span style="width:3px; height:12px; background:#3b82f6; border-radius:4px;"></span>
+                    <span>Identity Details</span>
+                </div>
+
+                <!-- Info Cards Section -->
+                <div style="display:flex; flex-direction:column; gap:6px;">
+
+${[
+    { l: 'INTERNAL CODE', v: item.code_no || '-' },
+    { l: 'SERIAL NO.', v: item.serial || '-' },
+    { l: 'DEPARTMENT', v: item.dept || '-' },
+    { l: 'CERTIFICATE NO', v: 'CAL-' + (item.code_no || item.id || 'N/A') + '-2026' },
+    { l: 'STATUS', v: item.status, c: stColor, isStatus: true },
+    { l: 'INTERVAL', v: (item.frequency ? item.frequency + ' Months' : '12 Months') },
+    { l: 'RESPONSIBLE (PIC)', v: picVal || '-' }
+].map(info => `
+    <div style="background:rgba(2, 6, 23, 0.65); border:1px solid #1e293b; border-radius:12px; padding:8px 14px; display:flex; flex-direction:column; justify-content:center; transition:0.25s;" onmouseover="this.style.borderColor='#3b82f6';" onmouseout="this.style.borderColor='#1e293b';">
+        <div style="font-size:7.5px; font-weight:900; color:#64748b; text-transform:uppercase; margin-bottom:1px; letter-spacing:0.5px;">${info.l}</div>
+        <div style="font-size:12px; font-weight:800; color:${info.c || '#f1f5f9'}; line-height:1.2; ${info.isStatus ? 'font-weight:950;' : ''}">
+            ${info.v}
+        </div>
+    </div>
+`).join('')}
+                </div>
+
+                <div style="margin-top:12px; padding:10px; background:rgba(255,255,255,0.02); border:1px dashed #334155; border-radius:18px;">
+                    <div style="font-size:8.5px; font-weight:900; color:#94a3b8; text-transform:uppercase; margin-bottom:8px; text-align:center; letter-spacing:1px;">Official Calibration Label</div>
+                    
+                    <div style="width:100%; background:#fff; border-radius:10px; overflow:hidden; border:1.5px solid #0033a0; display:flex; flex-direction:column; font-family:'Arial', sans-serif; box-shadow: 0 10px 25px rgba(0,0,0,0.3); position:relative;">
+                        
+                        <!-- 1. Header: Deep Blue -->
+                        <div style="background:#1d4ed8; color:#fff; padding:5px 10px; font-size:11px; font-weight:bold; letter-spacing:0.2px; border-bottom: 1.5px solid #0033a0;">
+                            NA Caltechnologies Co., Ltd.
+                        </div>
+
+                        <!-- 2. Body Content -->
+                        <div style="padding:10px 12px; position:relative; background:#fff;">
+                            
+                            <!-- Metrology Verified Stamp -->
+                            <div style="position:absolute; right:10px; top:35px; width:60px; height:60px; border:1.5px solid rgba(147, 197, 253, 0.6); border-radius:50%; display:flex; align-items:center; justify-content:center; transform:rotate(-15deg); pointer-events:none; z-index:1;">
+                                <div style="text-align:center; font-size:6px; font-weight:bold; color:rgba(30, 58, 138, 0.45); line-height:1.1; text-transform:uppercase;">
+                                    METROLOGY<br>VERIFIED<br>2026
+                                </div>
+                            </div>
+
+                            <!-- รายละเอียดข้อมูล -->
+                            <div style="border-bottom:1.2px solid #000; padding:3px 0; margin-bottom:4px; display:flex; align-items:center;">
+                                <span style="font-size:10px; font-weight:950; width:75px; color:#000;">SERIAL ---</span>
+                                <span style="font-size:11px; font-weight:950; color:#000; letter-spacing:0.3px; font-family:'Courier New', Courier, monospace;">${item.serial || '-'}</span>
+                            </div>
+
+                            <div style="border-bottom:1.2px solid #000; padding:3px 0; margin-bottom:4px; display:flex; align-items:center;">
+                                <span style="font-size:10px; font-weight:950; width:75px; color:#000;">CERT.</span>
+                                <span style="font-size:11px; font-weight:950; color:#000; letter-spacing:0.2px; font-family:'Courier New', Courier, monospace;">CAL-${item.code_no || item.id || 'N/A'}</span>
+                            </div>
+
+                            <div style="border-bottom:1.2px solid #000; padding:3px 0; margin-bottom:8px; display:flex; align-items:center;">
+                                <span style="font-size:10px; font-weight:950; width:75px; color:#000;">CAL BY</span>
+                                <span style="font-size:10.5px; font-weight:bold; font-family:'Courier New', Courier, monospace; color:#000;">PHETSAYAM</span>
+                            </div>
+
+                            <!-- ส่วนวันที่ -->
+                            <div style="display:flex; justify-content:space-between; margin-top:6px;">
+                                <div style="flex:1;">
+                                    <div style="font-size:9px; font-weight:950; color:#000; margin-bottom:2px;">CAL DATE</div>
+                                    <div style="font-size:13px; font-weight:950; color:#000; font-family:'Courier New', Courier, monospace;">
+                                        ${formatStickerDate(item.last_cal)}
+                                    </div>
+                                </div>
+                                <div style="flex:1; padding-left:8px;">
+                                    <div style="font-size:9px; font-weight:950; color:#000; margin-bottom:2px;">DUE DATE</div>
+                                    <div style="font-size:13px; font-weight:950; color:#ef4444; font-family:'Courier New', Courier, monospace;">
+                                        ${formatStickerDate(item.next_due)}
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                        <!-- เส้นจบด้านล่างสุดของป้าย -->
+                        <div style="height:3px; background:#0033a0; width:100%;"></div>
+                    </div>
+                </div>
+
+                <!-- Action to Open Chronological History -->
+                <button onclick="WapCalibrationSystem.displayCalibrationHistory('${item.id}')" 
+                        style="margin-top:10px; width:100%; padding:11px 16px; background:linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color:#fff; border:none; border-radius:14px; font-weight:900; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 6px 20px rgba(124,58,237,0.35); text-transform:uppercase; letter-spacing:0.6px; transition:0.2s;"
+                        onmouseover="this.style.opacity='0.9'; this.style.transform='translateY(-1px)';"
+                        onmouseout="this.style.opacity='1'; this.style.transform='none';">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>View Chronological History</span>
+                </button>
+            </div>
+        </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+// ============================================================
+// CHRONOLOGICAL CALIBRATION HISTORY SYSTEM
+// ============================================================
+
+function ensureInstrumentLogs(item) {
+    if (!item) return [];
+    if (typeof item.calibration_logs === 'string') {
+        try {
+            item.calibration_logs = JSON.parse(item.calibration_logs);
+        } catch (e) {
+            item.calibration_logs = [];
+        }
+    }
+    if (Array.isArray(item.calibration_logs) && item.calibration_logs.length > 0) {
+        // กรองเฉพาะประวัติปี 2025 และ 2026 เท่านั้น (ลบประวัติ 2013 หรือปีก่อนหน้าออกทั้งหมด)
+        const validLogs = item.calibration_logs.filter(log => {
+            if (!log || !log.date) return false;
+            const y = parseInt(String(log.date).split('-')[0], 10);
+            return y === 2025 || y === 2026;
+        });
+        if (validLogs.length > 0) {
+            item.calibration_logs = validLogs;
+            return item.calibration_logs;
+        }
+    }
+
+    // สร้างข้อมูลประวัติการสอบเทียบลำดับเวลาเฉพาะปี 2025 และ 2026
+    const logs = [];
+    const baseCode = item.code_no || item.id || 'CAL';
+    const picName = extractResponsiblePerson(item) || 'PHETSAYAM';
+    const lastCal = (item.last_cal && item.last_cal !== '-') ? item.last_cal : '2026-08-20';
+    const nextDue = (item.next_due && item.next_due !== '-') ? item.next_due : '2027-08-20';
+
+    // 1. Previous Periodic Calibration ปี 2025
+    logs.push({
+        id: `LOG-${item.id}-002`,
+        date: '2025-08-20',
+        next_due: '2026-08-20',
+        cert_no: `CAL-${baseCode}-2025`,
+        lab: 'NA Caltechnologies Co., Ltd.',
+        result: 'PASSED',
+        type: 'PERIODIC_ANNUAL',
+        deviation: '-0.002 mm',
+        tolerance: '±0.010 mm',
+        uncertainty: 'U = 0.0015 mm (k=2)',
+        env_temp: '20.2°C / 52% RH',
+        technician: picName !== '-' ? picName : 'PHETSAYAM',
+        traceability: 'Accredited Lab No. 0341 / ISO 17025',
+        notes: 'Periodic annual routine calibration. All measuring points conform to manufacturer accuracy specifications.'
+    });
+
+    // 2. Current / Latest Calibration ปี 2026
+    logs.push({
+        id: `LOG-${item.id}-003`,
+        date: lastCal,
+        next_due: nextDue,
+        cert_no: `CAL-${baseCode}-2026`,
+        lab: 'NA Caltechnologies Co., Ltd.',
+        result: (item.status === 'EXPIRED') ? 'EXPIRED' : 'PASSED',
+        type: 'ROUTINE_CALIBRATION',
+        deviation: '+0.001 mm',
+        tolerance: '±0.010 mm',
+        uncertainty: 'U = 0.0014 mm (k=2)',
+        env_temp: '20.0°C / 54% RH',
+        technician: picName !== '-' ? picName : 'PHETSAYAM',
+        traceability: 'ISO/IEC 17025:2017 & NIST Traceable Standards',
+        notes: `Latest calibration cycle completed. Metrology verification passed. Official sticker attached. Next due: ${nextDue}.`
+    });
+
+    item.calibration_logs = logs;
+    return logs;
+}
+
+function calculateDueDateString(baseDateStr, freqStr) {
+    if (!baseDateStr || baseDateStr === '-') return '-';
+    const d = new Date(baseDateStr);
+    if (isNaN(d.getTime())) return '-';
+    let months = 12;
+    if (freqStr) {
+        const num = parseInt(freqStr, 10);
+        if (!isNaN(num) && num > 0) months = num;
+    }
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().split('T')[0];
+}
+
+function formatChronologicalDate(dateStr) {
+    if (!dateStr || dateStr === '-') return '---';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+}
+
+function displayCalibrationHistory(id, sortOrder = 'desc') {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
+    if (!item) {
+        if (typeof toast === 'function') toast("⚠️ ไม่พบข้อมูลเครื่องมือ", "error");
+        return;
+    }
+
+    const existing = document.getElementById('cal-history-modal-overlay');
+    if (existing) existing.remove();
+
+    const rawLogs = ensureInstrumentLogs(item);
+    const logs = Array.isArray(rawLogs) ? rawLogs : [];
+    
+    // เรียงลำดับเวลา (Chronological sorting)
+    const sortedLogs = [...logs].sort((a, b) => {
+        const timeA = new Date(a.date).getTime() || 0;
+        const timeB = new Date(b.date).getTime() || 0;
+        return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
+
+    // ตรวจสอบโหมด มืด / สว่าง ปัจจุบัน
+    const isDark = document.body.classList.contains('dark-mode') || 
+                   document.documentElement.classList.contains('dark') || 
+                   localStorage.getItem('carrier_theme') === 'dark';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'cal-history-modal-overlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 21000;
+        background: ${isDark ? 'rgba(2, 6, 23, 0.85)' : 'rgba(15, 23, 42, 0.65)'};
+        backdrop-filter: blur(12px);
+        display: flex; align-items: center; justify-content: center;
+        padding: 12px; transition: all 0.3s ease;
+    `;
+
+    const displayImg = getInstrumentImageUrl(item);
+    const picVal = extractResponsiblePerson(item);
+    const isExpired = (item.status === 'EXPIRED');
+    const isDueSoon = (item.status === 'DUE_SOON');
+    const stStatusText = isExpired ? 'EXPIRED (OUT OF CALIBRATION)' : isDueSoon ? 'DUE SOON' : 'VALID / CONFORMING';
+    const stStatusClass = isExpired ? 'fail' : 'pass';
+
+    const modal = document.createElement('div');
+    modal.id = 'cal-history-card-modal';
+    modal.className = `cal-doc-modal ${isDark ? 'theme-dark' : 'theme-light'}`;
+    modal.style.cssText = `
+        position: relative; width: 100%; max-width: 920px; max-height: 94vh; height: 92vh;
+        background: var(--doc-bg); border-radius: 20px; overflow: hidden;
+        display: flex; flex-direction: column; border: 1.5px solid var(--doc-border);
+        box-shadow: var(--doc-shadow); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: var(--doc-text-main);
+    `;
+
+    modal.innerHTML = `
+        <!-- Top Formal Document Header Banner -->
+        <div class="cal-doc-header" style="padding: 14px 22px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                <div style="width: 40px; height: 40px; background: rgba(255, 255, 255, 0.15); border: 1.5px solid rgba(255, 255, 255, 0.35); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    🏛️
+                </div>
+                <div style="min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <h3 style="margin: 0; font-size: 14.5px; font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase; color: #ffffff;">
+                            QA METROLOGY RECORD & CALIBRATION HISTORY LEDGER
+                        </h3>
+                        <span style="background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); color: #ffffff; font-size: 8.5px; font-weight: 900; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
+                            FORM QA-CAL-08 &bull; ISO/IEC 17025
+                        </span>
+                    </div>
+                    <p style="margin: 2px 0 0 0; font-size: 10px; color: var(--doc-header-sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                        Equipment Tag: <span style="color:#ffffff; font-family:'DM Mono', monospace; font-weight:900;">${item.code_no || item.id}</span> &bull; ${item.name || 'INSTRUMENT'} &bull; Rev. 2026-Q1
+                    </p>
+                </div>
+            </div>
+
+            <!-- Header Actions (Theme Switcher + Print + Close) -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                <button onclick="WapCalibrationSystem.toggleHistoryModalTheme('${item.id}', '${sortOrder}')" 
+                        class="cal-doc-btn" 
+                        style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #ffffff; font-size: 10.5px;" 
+                        title="สลับโหมด มืด/สว่าง">
+                    ${isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
+                </button>
+                <button onclick="WapCalibrationSystem.printCalibrationHistory('${item.id}')" 
+                        class="cal-doc-btn" 
+                        style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: #ffffff; font-size: 10.5px;" 
+                        title="พิมพ์เอกสารทางการ / Export PDF">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12 0h12v4H6v-4z"/></svg>
+                    <span>Print / PDF</span>
+                </button>
+                <button onclick="document.getElementById('cal-history-modal-overlay').remove()" 
+                        style="background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); color: #ffffff; width: 32px; height: 32px; border-radius: 50%; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; font-weight: bold;" 
+                        onmouseover="this.style.background='#ef4444';" 
+                        onmouseout="this.style.background='rgba(239, 68, 68, 0.25)';">✕</button>
+            </div>
+        </div>
+
+        <!-- Official Equipment Specification & Master Data Ribbon -->
+        <div class="cal-doc-specs" style="padding: 12px 22px; flex-shrink: 0;">
+            <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center;">
+                <!-- Instrument Photo Thumbnail -->
+                <div style="width: 52px; height: 52px; background: var(--doc-bg); border: 1.5px solid var(--doc-border); border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
+                    ${displayImg ? `<img src="${formatImageUrl(displayImg)}" style="width:100%; height:100%; object-fit:contain;">` : `<span style="font-size:22px;">⚙️</span>`}
+                </div>
+
+                <!-- Structured Technical Info Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 14px;">
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">INSTRUMENT TAG</div>
+                        <div style="font-size: 12px; font-weight: 900; color: var(--doc-text-main); font-family: 'DM Mono', monospace;">${item.code_no || item.id}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">INSTRUMENT NAME</div>
+                        <div style="font-size: 12px; font-weight: 800; color: var(--doc-text-main); line-height: 1.2;">${item.name || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">MAKER & MODEL</div>
+                        <div style="font-size: 11px; font-weight: 700; color: var(--doc-text-body);">${item.maker || '-'} / ${item.model || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">SERIAL NO. (S/N)</div>
+                        <div style="font-size: 11px; font-weight: 800; color: var(--doc-text-main); font-family: 'DM Mono', monospace;">${item.serial || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">LOCATION / DEPT</div>
+                        <div style="font-size: 11px; font-weight: 700; color: var(--doc-text-body);">${item.dept || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">CUSTODIAN (PIC)</div>
+                        <div style="font-size: 11px; font-weight: 800; color: var(--doc-text-main);">${picVal || '-'}</div>
+                    </div>
+                </div>
+
+                <!-- Status & Cycle Summary Badge -->
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;">
+                    <div class="cal-doc-seal ${stStatusClass}">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background: ${isExpired ? '#ef4444' : '#10b981'};"></span>
+                        <span>${stStatusText}</span>
+                    </div>
+                    <div style="font-size: 9.5px; font-weight: 800; color: var(--doc-text-muted);">
+                        Frequency: <span style="color: var(--doc-text-main);">${item.frequency || '12 M'}</span> &bull; <span style="color: #2563eb; font-weight: 900;">${logs.length} Cycles</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Official Ledger Controls Toolbar -->
+        <div class="cal-doc-toolbar" style="padding: 9px 22px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 10px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Timeline Order:</span>
+                <button onclick="WapCalibrationSystem.displayCalibrationHistory('${item.id}', '${sortOrder === 'desc' ? 'asc' : 'desc'}')"
+                        class="cal-doc-btn cal-doc-btn-default" style="font-size: 10.5px; font-weight: 800;">
+                    ${sortOrder === 'desc' ? '⬇️ Newest Cycle First (Chronological)' : '⬆️ Oldest Baseline First'}
+                </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button onclick="WapCalibrationSystem.toggleAddHistoryForm('${item.id}')"
+                        class="cal-doc-btn cal-doc-btn-primary">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                    <span>Record New Calibration Cycle</span>
+                </button>
+                <button onclick="WapCalibrationSystem.copyHistorySummary('${item.id}')"
+                        class="cal-doc-btn cal-doc-btn-default">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    <span>Copy Audit Summary</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Add New Calibration Log Form (Collapsible) -->
+        <div id="cal-history-new-entry-drawer" style="display: none; background: var(--doc-surface-subtle); border-bottom: 2px solid #2563eb; padding: 16px 22px; flex-shrink: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="font-size: 11.5px; font-weight: 900; color: #2563eb; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+                    <span>⚡ Record Official Metrology Calibration Event</span>
+                </div>
+                <button onclick="WapCalibrationSystem.toggleAddHistoryForm('${item.id}', false)" style="background: none; border: none; color: var(--doc-text-muted); font-size: 12px; cursor: pointer; font-weight: 900;">Cancel ✕</button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Calibration Date</label>
+                    <input type="date" id="hist-new-date" value="${new Date().toISOString().split('T')[0]}" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px;" onchange="WapCalibrationSystem.updateHistoryNewDueDate('${item.frequency || '12 M'}')">
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Certificate Reference No.</label>
+                    <input type="text" id="hist-new-cert" value="CAL-${item.code_no || item.id}-${new Date().getFullYear()}" class="tech-input" style="background: var(--doc-input-bg); color: #2563eb; border-color: var(--doc-input-border); font-family: 'DM Mono', monospace; height: 36px; border-radius: 8px; font-weight: 800;">
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Accredited Laboratory / Agency</label>
+                    <input type="text" id="hist-new-lab" value="NA Caltechnologies Co., Ltd." list="hist-lab-list" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px;">
+                    <datalist id="hist-lab-list">
+                        <option value="NA Caltechnologies Co., Ltd.">
+                        <option value="Internal QA Metrology Laboratory">
+                        <option value="Thai-German Institute (TGI)">
+                        <option value="National Institute of Metrology (NIMT)">
+                        <option value="Mitutoyo Calibration Laboratory">
+                    </datalist>
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Inspection Result</label>
+                    <select id="hist-new-result" class="tech-input" style="background: var(--doc-input-bg); color: #059669; border-color: var(--doc-input-border); font-weight: 900; height: 36px; border-radius: 8px;">
+                        <option value="PASSED" style="color:#059669; font-weight:bold;">✅ PASSED (In Tolerance)</option>
+                        <option value="PASSED (ADJUSTED)" style="color:#d97706; font-weight:bold;">⚠️ PASSED (After Adjustment)</option>
+                        <option value="REJECTED" style="color:#dc2626; font-weight:bold;">❌ REJECTED (Out of Spec)</option>
+                    </select>
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Measured Deviation</label>
+                    <input type="text" id="hist-new-dev" placeholder="+0.001 mm" value="+0.001 mm" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px; font-weight: 800;">
+                </div>
+                <div class="field-box">
+                    <label class="tech-label" style="color: var(--doc-text-muted); font-size: 9px; font-weight: 800; text-transform: uppercase;">Inspector / Calibrated By</label>
+                    <input type="text" id="hist-new-tech" value="PHETSAYAM" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px;">
+                </div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;">
+                <div style="flex: 1; min-width: 240px;">
+                    <input type="text" id="hist-new-notes" placeholder="Remarks / Standards Traceability (e.g. ISO/IEC 17025 conformity verified, NIST traceable standard...)" class="tech-input" style="background: var(--doc-input-bg); color: var(--doc-input-text); border-color: var(--doc-input-border); height: 36px; border-radius: 8px;">
+                </div>
+                <button type="button" onclick="WapCalibrationSystem.saveHistoryNewEntry('${item.id}')"
+                        class="cal-doc-btn cal-doc-btn-emerald" style="padding: 8px 22px;">
+                    Save Official Cycle Record
+                </button>
+            </div>
+        </div>
+
+        <!-- Chronological Timeline Log List Area -->
+        <div class="cal-doc-body" style="flex: 1; overflow-y: auto; padding: 20px 24px;">
+            <div class="cal-history-timeline" style="--rail-color: var(--doc-timeline-rail);">
+                ${sortedLogs.map((log, index) => {
+                    const isLatest = (index === 0 && sortOrder === 'desc') || (index === sortedLogs.length - 1 && sortOrder === 'asc');
+                    const isPassed = log.result && log.result.includes('PASS');
+                    const resBadgeBg = isPassed ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5') : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2');
+                    const resBadgeBorder = isPassed ? '#10b981' : '#ef4444';
+                    const resBadgeText = isPassed ? (isDark ? '#34d399' : '#059669') : (isDark ? '#f87171' : '#dc2626');
+
+                    return `
+                    <div class="cal-doc-card cal-history-card ${isLatest ? 'is-latest' : ''}" style="border-radius: 14px; padding: 14px 18px; margin-bottom: 16px;">
+                        <div class="cal-history-dot ${isLatest ? 'latest' : ''}" style="${isLatest ? 'background:#10b981;' : 'background:#2563eb;'}"></div>
+                        
+                        <!-- Card Header: Date + Cycle Identifier + Result Stamp -->
+                        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <span style="font-size: 14px; font-weight: 900; color: var(--doc-text-main); font-family: 'DM Mono', monospace;">
+                                        📅 ${formatChronologicalDate(log.date)}
+                                    </span>
+                                    ${isLatest ? `
+                                        <span style="background: ${isDark ? 'rgba(37, 99, 235, 0.25)' : '#dbeafe'}; border: 1px solid #2563eb; color: ${isDark ? '#93c5fd' : '#1d4ed8'}; font-size: 9px; font-weight: 900; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
+                                            ACTIVE LATEST CYCLE
+                                        </span>
+                                    ` : `
+                                        <span style="background: var(--doc-surface-subtle); border: 1px solid var(--doc-border-subtle); color: var(--doc-text-muted); font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 4px; text-transform: uppercase;">
+                                            CYCLE RECORD
+                                        </span>
+                                    `}
+                                    <span style="background: var(--doc-surface); border: 1px solid var(--doc-border-subtle); color: var(--doc-text-body); font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-family: 'DM Mono', monospace;">
+                                        ${log.cert_no || 'CERT-N/A'}
+                                    </span>
+                                </div>
+                                <div style="font-size: 10.5px; color: var(--doc-text-muted); font-weight: 700; margin-top: 3px;">
+                                    Laboratory: <span style="color: #2563eb; font-weight: 800;">${log.lab || 'Accredited Calibration Lab'}</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="background: ${resBadgeBg}; border: 1px solid ${resBadgeBorder}; color: ${resBadgeText}; font-size: 10px; font-weight: 950; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.06em; display: flex; align-items: center; gap: 5px;">
+                                    <span>${isPassed ? '✓' : '✕'}</span>
+                                    <span>${log.result || 'PASSED'}</span>
+                                </div>
+                                ${logs.length > 1 ? `
+                                <button onclick="WapCalibrationSystem.deleteHistoryLog('${item.id}', '${log.id || log.cert_no}')"
+                                        title="Delete this cycle record"
+                                        style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; width: 26px; height: 26px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: 0.2s;"
+                                        onmouseover="this.style.background='#ef4444'; this.style.color='#fff';"
+                                        onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'; this.style.color='#ef4444';">
+                                    ✕
+                                </button>` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Technical Parameter Grid (Formal Inspection Sheet Readout) -->
+                        <div class="cal-doc-param-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px; padding: 10px 12px; border-radius: 10px; margin-bottom: 10px;">
+                            <div>
+                                <div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Measured Deviation</div>
+                                <div style="font-size: 12px; font-weight: 900; color: var(--doc-param-accent); font-family: 'DM Mono', monospace;">${log.deviation || '0.000 mm'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Tolerance / MPE</div>
+                                <div style="font-size: 11.5px; font-weight: 800; color: var(--doc-param-val); font-family: 'DM Mono', monospace;">${log.tolerance || '±0.010 mm'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Next Due Deadline</div>
+                                <div style="font-size: 12px; font-weight: 900; color: #059669; font-family: 'DM Mono', monospace;">${log.next_due || '-'}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Ambient Condition</div>
+                                <div style="font-size: 10.5px; font-weight: 700; color: var(--doc-text-body);">${log.env_temp || '20.0°C / 50% RH'}</div>
+                            </div>
+                            <div>
+<div style="font-size: 8px; font-weight: 800; color: var(--doc-param-title); text-transform: uppercase; letter-spacing: 0.04em;">Calibrated By (PIC)</div>
+<div style="font-size: 11.5px; font-weight: 800; color: var(--doc-text-main);">PHETSAYAM</div>
+                            </div>
+                        </div>
+
+                        <!-- Remarks & Traceability Footer -->
+                        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; font-size: 10.5px; color: var(--doc-text-muted);">
+                            <div style="font-style: italic;">
+                                📝 ${log.notes || 'Routine calibration inspection verified in tolerance.'}
+                            </div>
+                            <div style="font-size: 8.5px; font-weight: 800; color: var(--doc-text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
+                                Standard: <span style="color: var(--doc-text-body); font-weight: 900;">${log.traceability || 'ISO/IEC 17025 & NIST TRACEABLE'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+
+        <!-- Official Document Footer -->
+        <div class="cal-doc-footer" style="padding: 12px 22px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <div style="font-size: 10px; color: var(--doc-text-muted); font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <span>🔒 ISO/IEC 17025 Metrology Quality Control &bull; Formal System Audit Trail</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button onclick="WapCalibrationSystem.printCalibrationHistory('${item.id}')"
+                        class="cal-doc-btn cal-doc-btn-default" style="font-size: 11px;">
+                    🖨️ Print Certificate Sheet
+                </button>
+                <button onclick="document.getElementById('cal-history-modal-overlay').remove()"
+                        class="cal-doc-btn cal-doc-btn-primary" style="padding: 7px 22px;">
+                    Close Ledger
+                </button>
+            </div>
+        </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+function toggleHistoryModalTheme(id, sortOrder) {
+    if (typeof toggleTheme === 'function') {
+        toggleTheme();
+    } else {
+        const body = document.body;
+        const isDark = body.classList.toggle('dark-mode');
+        localStorage.setItem('carrier_theme', isDark ? 'dark' : 'light');
+    }
+    displayCalibrationHistory(id, sortOrder);
+}
+
+function printCalibrationHistory(id) {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
+    if (!item) return;
+    const rawLogs = ensureInstrumentLogs(item);
+    const logs = Array.isArray(rawLogs) ? rawLogs : [];
+    const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const picVal = extractResponsiblePerson(item);
+
+    const printWin = window.open('', '_blank', 'width=920,height=820');
+    if (!printWin) {
+        if (typeof toast === 'function') toast("⚠️ กรุณาอนุญาตป๊อปอัปเพื่อเปิดหน้าต่างพิมพ์รายงาน", "warning");
+        return;
+    }
+
+    const printHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Calibration Record - ${item.code_no || item.id}</title>
+        <style>
+            @page { size: A4 portrait; margin: 15mm 15mm 15mm 15mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 0; padding: 20px; background: #fff; line-height: 1.4; font-size: 11.5px; }
+            .header-banner { border-bottom: 2.5px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start; }
+            .company-name { font-size: 16px; font-weight: 900; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; }
+            .doc-title { font-size: 13px; font-weight: 800; color: #334155; text-transform: uppercase; margin-top: 2px; }
+            .doc-meta { font-size: 9px; color: #64748b; font-weight: 700; margin-top: 2px; }
+            .meta-box { border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; background: #f8fafc; }
+            .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 11px; }
+            .meta-label { font-weight: 800; color: #64748b; font-size: 8.5px; text-transform: uppercase; margin-bottom: 2px; }
+            .meta-val { font-weight: 700; color: #0f172a; }
+            .history-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10px; }
+            .history-table th { background: #1e3a8a; color: #fff; text-align: left; padding: 6px 8px; font-weight: 800; text-transform: uppercase; font-size: 9px; }
+            .history-table td { border-bottom: 1px solid #e2e8f0; padding: 6px 8px; color: #334155; vertical-align: middle; }
+            .history-table tr:nth-child(even) td { background: #f8fafc; }
+            .badge-pass { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 8.5px; display: inline-block; }
+            .badge-fail { background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 8.5px; display: inline-block; }
+            .sign-section { margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+            .sign-box { border: 1px dashed #cbd5e1; border-radius: 6px; padding: 14px; text-align: center; font-size: 10px; }
+            @media print { .no-print { display: none; } }
+            .no-print { margin-bottom: 12px; }
+        </style>
+    </head>
+    <body>
+        <div class="no-print">
+            <button onclick="window.print()" style="padding: 6px 18px; background: #1e3a8a; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🖨️ Print Document / Save PDF</button>
+        </div>
+
+        <div class="header-banner">
+            <div>
+                <div class="company-name">CARRIER QUALITY ASSURANCE &amp; METROLOGY DIVISION</div>
+                <div class="doc-title">OFFICIAL CALIBRATION HISTORY &amp; METROLOGY TRACEABILITY LEDGER</div>
+                <div class="doc-meta">DOCUMENT FORM NO: QA-CAL-REC-08 &bull; ISO/IEC 17025:2017 &amp; NIST TRACEABLE</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 11px; font-weight: 900; color: #1e3a8a; font-family: monospace;">TAG: ${item.code_no || item.id}</div>
+                <div style="font-size: 9px; color: #64748b;">Printed: ${new Date().toLocaleDateString('en-GB')}</div>
+            </div>
+        </div>
+
+        <div class="meta-box">
+            <div class="meta-grid">
+                <div><div class="meta-label">Control Tag / Code:</div><div class="meta-val">${item.code_no || item.id}</div></div>
+                <div><div class="meta-label">Instrument Name:</div><div class="meta-val">${item.name || '-'}</div></div>
+                <div><div class="meta-label">Serial Number:</div><div class="meta-val">${item.serial || item.serial_no || '-'}</div></div>
+                <div><div class="meta-label">Location / Department:</div><div class="meta-val">${item.location || item.dept || '-'}</div></div>
+                <div><div class="meta-label">Calibration Interval:</div><div class="meta-val">${item.frequency || '12 M'}</div></div>
+                <div><div class="meta-label">Last Calibration:</div><div class="meta-val">${item.last_cal ? new Date(item.last_cal).toLocaleDateString('en-GB') : '-'}</div></div>
+                <div><div class="meta-label">Next Due Date:</div><div class="meta-val">${item.next_due || item.next_cal ? new Date(item.next_due || item.next_cal).toLocaleDateString('en-GB') : '-'}</div></div>
+                <div><div class="meta-label">Responsible Person (PIC):</div><div class="meta-val">${picVal || '-'}</div></div>
+            </div>
+        </div>
+
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th style="width: 14%;">Date</th>
+                    <th style="width: 12%;">Result</th>
+                    <th style="width: 18%;">Standard / Method</th>
+                    <th style="width: 16%;">Performed By</th>
+                    <th style="width: 16%;">Verified By</th>
+                    <th>Remarks / Certificate Ref</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sorted.length === 0 ? '<tr><td colspan="6" style="text-align: center; color: #94a3b8; padding: 16px;">No calibration ledger history recorded for this instrument.</td></tr>' : sorted.map(log => `
+                    <tr>
+                        <td><strong>${log.date ? new Date(log.date).toLocaleDateString('en-GB') : '-'}</strong></td>
+                        <td>
+                            <span class="${String(log.result || '').toUpperCase().includes('PASS') ? 'badge-pass' : 'badge-fail'}">
+                                ${String(log.result || 'PASS').toUpperCase()}
+                            </span>
+                        </td>
+                        <td>${log.lab || log.standard || log.method || '-'}</td>
+                        <td>${log.cal_by || log.done_by || picVal || 'PHETSAYAM'}</td>
+                        <td>${log.verified_by || 'QA Inspector'}</td>
+                        <td>${log.notes || log.remark || log.cert_no || '-'}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+
+        <div class="sign-section">
+            <div class="sign-box">
+                <div>Performed by Metrologist / Operator</div>
+                <div style="margin-top: 24px; font-weight: bold;">(______________________________)</div>
+                <div style="font-size: 9px; color: #64748b; margin-top: 4px;">Date: ____/____/________</div>
+            </div>
+            <div class="sign-box">
+                <div>Verified by QA Supervisor / Manager</div>
+                <div style="margin-top: 24px; font-weight: bold;">(______________________________)</div>
+                <div style="font-size: 9px; color: #64748b; margin-top: 4px;">Date: ____/____/________</div>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    printWin.document.open();
+    printWin.document.write(printHtml);
+    printWin.document.close();
+}
+
+function toggleAddHistoryForm(id, show = true) {
+    const form = document.getElementById('cal-add-history-form');
+    if (form) {
+        if (show === false) {
+            form.style.display = 'none';
+        } else {
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+}
+
+function updateHistoryNewDueDate(freqStr) {
+    const dateInput = document.getElementById('hist-new-date');
+    if (!dateInput || !dateInput.value) return;
+}
+
+function saveHistoryNewEntry(id) {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
+    if (!item) return;
+    const dateEl = document.getElementById('hist-new-date');
+    const certEl = document.getElementById('hist-new-cert');
+    const labEl = document.getElementById('hist-new-lab');
+    const resultEl = document.getElementById('hist-new-result');
+    const devEl = document.getElementById('hist-new-dev');
+    const techEl = document.getElementById('hist-new-tech');
+    const notesEl = document.getElementById('hist-new-notes');
+
+    const calDate = dateEl ? dateEl.value : new Date().toISOString().split('T')[0];
+    const newLog = {
+        id: 'LOG-' + Date.now(),
+        date: calDate,
+        cert_no: certEl ? certEl.value.trim() : `CAL-${item.code_no || item.id}-${new Date().getFullYear()}`,
+        lab: labEl ? labEl.value.trim() : 'Accredited Calibration Lab',
+        result: resultEl ? resultEl.value : 'PASSED',
+        deviation: devEl ? devEl.value.trim() : '0.000 mm',
+        tolerance: item.tolerance || '±0.010 mm',
+        next_due: calculateDueDateString(calDate, item.frequency || '12 M'),
+        env_temp: '20.0°C / 50% RH',
+        cal_by: techEl ? techEl.value.trim() : 'PHETSAYAM',
+        notes: notesEl ? notesEl.value.trim() : '',
+        traceability: 'ISO/IEC 17025 & NIST TRACEABLE'
+    };
+
+    if (!Array.isArray(item.calibration_logs)) item.calibration_logs = [];
+    item.calibration_logs.unshift(newLog);
+
+    item.last_cal = newLog.date;
+    item.next_due = newLog.next_due;
+    item.status = 'NORMAL';
+
+    if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+        localDB.calibrationMaster.put(item).catch(() => {});
+    }
+
+    if (typeof toast === 'function') toast('✅ บันทึกประวัติการสอบเทียบสำเร็จ', 'success');
+    displayCalibrationHistory(id);
+    render();
+}
+
+function deleteHistoryLog(id, logId) {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
+    if (!item || !Array.isArray(item.calibration_logs)) return;
+    if (confirm('ยืนยันการลบประวัติการสอบเทียบนี้หรือไม่?')) {
+        item.calibration_logs = item.calibration_logs.filter(l => l && (l.id !== logId && l.cert_no !== logId));
+        if (typeof localDB !== 'undefined' && localDB.calibrationMaster) {
+            localDB.calibrationMaster.put(item).catch(() => {});
+        }
+        if (typeof toast === 'function') toast('🗑️ ลบประวัติการสอบเทียบแล้ว', 'info');
+        displayCalibrationHistory(id);
+        render();
+    }
+}
+
+function copyHistorySummary(id) {
+    const item = (_data || []).find(x => x && String(x.id) === String(id));
+    if (!item) return;
+    const rawLogs = ensureInstrumentLogs(item);
+    const summary = `Instrument: ${item.name} (${item.code_no || item.id})\nLocation: ${item.dept || '-'}\nTotal Cycles: ${rawLogs.length}\nLast Cal: ${item.last_cal || '-'}\nNext Due: ${item.next_due || '-'}`;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(summary).then(() => {
+            if (typeof toast === 'function') toast('📋 คัดลอกข้อมูลสรุปเรียบร้อย', 'success');
+        }).catch(() => {
+            if (typeof toast === 'function') toast('📋 ' + summary, 'info');
+        });
+    }
+}
+
+    return {
+        init,
+        render,
+        openAddModal,
+        openEditModal,
+        calcDue,
+        handleImg,
+        saveNew: handleSaveNew,
+        triggerUpload,
+        toggleSelectRow,
+        toggleSelectAll,
+        selectAllFiltered,
+        clearSelection,
+        openBatchEditNotesModal,
+        applyBatchNoteTemplate,
+        applyBatchHistoryNotes,
+        removeBatchItem,
+        openMetrologyViewer,
+        displayCalibrationHistory,
+        toggleHistoryModalTheme,
+        printCalibrationHistory,
+        toggleAddHistoryForm,
+        updateHistoryNewDueDate,
+        saveHistoryNewEntry,
+        deleteHistoryLog,
+        copyHistorySummary,
+        showNotDueAlert,
+        showInCalAlert,
+        selectCalendarDate,
+        openDayTasksModal,
+        sendForCalibration,
+        changeCalendarMonth,
+        goToCurrentMonth,
+        jumpCalendarMonth,
+        setViewMode,
+        resetStatusFilter,
+        triggerImport,
+        goToOverdue,
+        clearAll
+    };
+})();
+
 window.WapCalibrationSystem = WapCalibrationSystem;

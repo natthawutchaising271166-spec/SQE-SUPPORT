@@ -16855,11 +16855,15 @@ body.dark-mode .evidence-preview-btn.btn-download:hover,
 }
 
 .evidence-stitched-preview {
-    border-radius: 8px;
+    border-radius: 12px;
     background: #ffffff;
-    border: 1px dashed #cbd5e1;
-    padding: 6px;
+    border: 1.5px dashed #cbd5e1;
+    padding: 8px;
     transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 body.dark-mode .evidence-stitched-preview,
@@ -16867,5 +16871,179 @@ body.dark-mode .evidence-stitched-preview,
     background: #1e293b;
     border-color: #475569;
 }
+
+/* Evidence Floating Action Toolbar */
+.evidence-toolbar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #0f172a;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 999px;
+    padding: 5px 10px;
+    margin-top: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 15px rgba(56, 189, 248, 0.15);
+    z-index: 10;
+    flex-wrap: wrap;
+}
+
+.evidence-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.08);
+    color: #f1f5f9;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    line-height: 1.2;
+    user-select: none;
+}
+
+.evidence-tool-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.evidence-tool-btn:active {
+    transform: translateY(0) scale(0.97);
+}
+
+.evidence-tool-btn.btn-change-image:hover {
+    border-color: rgba(56, 189, 248, 0.8);
+    background: rgba(56, 189, 248, 0.25);
+    color: #38bdf8;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+}
+
+.evidence-tool-btn.btn-annotate:hover {
+    border-color: rgba(245, 158, 11, 0.8);
+    background: rgba(245, 158, 11, 0.28);
+    color: #fbbf24;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+.evidence-tool-btn.btn-rotate:hover {
+    border-color: rgba(56, 189, 248, 0.8);
+    background: rgba(56, 189, 248, 0.25);
+    color: #bae6fd;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+}
+
+.evidence-tool-btn.btn-zoom:hover {
+    border-color: rgba(96, 165, 250, 0.8);
+    background: rgba(96, 165, 250, 0.28);
+    color: #dbeafe;
+    box-shadow: 0 0 12px rgba(96, 165, 250, 0.4);
+}
+
+.evidence-tool-btn.btn-delete:hover {
+    border-color: rgba(239, 68, 68, 0.8);
+    background: rgba(239, 68, 68, 0.32);
+    color: #fecaca;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+
+/* Multi Grid Slot Cards */
+.evidence-multi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+    gap: 8px;
+    width: 100%;
+}
+
+.evidence-multi-slot {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    border: 1.5px dashed #cbd5e1;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.evidence-multi-slot:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.evidence-multi-slot.has-image {
+    border-style: solid;
+    border-color: #10b981;
+}
+
+/* Quick Remark Helper Buttons & Chips */
+.quick-remark-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #1e40af;
+    background: #dbeafe;
+    border: 1px solid #93c5fd;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.quick-remark-btn:hover {
+    background: #bfdbfe;
+    color: #1e3a8a;
+    transform: translateY(-1px);
+}
+
+.quick-remark-chips-wrap {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin: 2px 0 4px;
+}
+
+.quick-remark-chip {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #475569;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.quick-remark-chip:hover {
+    color: #0f172a;
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    transform: translateY(-1px);
+}
+
+.quick-remark-chip.active {
+    color: #1d4ed8;
+    background: #eff6ff;
+    border-color: #60a5fa;
+    font-weight: 800;
+}
+
 
 
