@@ -33081,6 +33081,7 @@ return `
             _currentSlide++;
             renderSlide();
             _rehydrateUI();
+            fitSlideToContainer();
         }
     }
 
@@ -33090,6 +33091,7 @@ return `
             _currentSlide--;
             renderSlide();
             _rehydrateUI();
+            fitSlideToContainer();
         }
     }
 
@@ -35531,11 +35533,39 @@ container.innerHTML = '<div style="padding:40px; text-align:center; color:#64748
         updateExportAndEmailButtons();
         const d2 = c ? (c.d2_data || {}) : {};
 
+        const presContainer = document.getElementById('eight-d-presentation-container');
+        if (presContainer) {
+            presContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+                background: #cbd5e1;
+                width: 100%;
+                height: 100%;
+                padding: 16px;
+                box-sizing: border-box;
+                position: relative;
+            `;
+        }
+
+        const slideWrapper = document.getElementById('eight-d-slide-wrapper');
+        if (slideWrapper) {
+            slideWrapper.style.cssText = `
+                position: relative;
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: auto;
+            `;
+        }
+
         // ล้างค่าเก่าและตั้งค่า Container หลักให้เป็น Flex Column ความสูงเต็ม
         container.innerHTML = '';
         container.style.cssText = `
             width: 960px;
-            height: 680px;
+            height: 600px;
             box-sizing: border-box; 
             display: flex; 
             flex-direction: column; 
@@ -36818,7 +36848,20 @@ else if (_currentSlide === 15) {
             slide.style.margin = '0 auto';
             slide.style.height = 'auto';
             slide.style.transform = 'none';
+            slide.style.position = 'relative';
+            slide.style.top = 'auto';
+            slide.style.left = 'auto';
             return;
+        }
+
+        if (container) {
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.justifyContent = 'center';
+            container.style.overflow = 'hidden';
+            container.style.padding = '16px';
+            container.style.boxSizing = 'border-box';
+            container.style.position = 'relative';
         }
 
         const availW = Math.max(100, container.clientWidth - 32);
@@ -36831,13 +36874,25 @@ else if (_currentSlide === 15) {
         const scaleY = availH / baseH;
         const scale = Math.min(scaleX, scaleY);
 
-        wrapper.style.width = `${Math.round(baseW * scale)}px`;
-        wrapper.style.height = `${Math.round(baseH * scale)}px`;
+        const scaledW = Math.round(baseW * scale);
+        const scaledH = Math.round(baseH * scale);
+
+        wrapper.style.width = `${scaledW}px`;
+        wrapper.style.height = `${scaledH}px`;
+        wrapper.style.margin = 'auto';
+        wrapper.style.position = 'relative';
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.justifyContent = 'center';
+        wrapper.style.flexShrink = '0';
 
         slide.style.width = `${baseW}px`;
         slide.style.height = `${baseH}px`;
         slide.style.transform = `scale(${scale})`;
         slide.style.transformOrigin = 'top left';
+        slide.style.position = 'absolute';
+        slide.style.top = '0';
+        slide.style.left = '0';
         if (_currentSlide === 5) adjustD4ConnectorLine();
     }
 
