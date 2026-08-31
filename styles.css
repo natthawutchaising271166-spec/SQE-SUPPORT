@@ -8615,11 +8615,69 @@ body.dark-mode .dock-item:hover .dock-label {
     }
 }
 
-/* เอฟเฟกต์เมื่อช่อง Input เป็น Valid (นีออนสีเขียว) */
-.form-input.valid {
-    background: #ecfdf5;
+/* ==========================================================================
+   ✨ เอฟเฟกต์กรอบสีเขียวนีออน (Green Glow Effect) เมื่อมีข้อมูลในทุกสถานการณ์
+   ========================================================================== */
+.form-input.valid,
+.form-input.field-glow-filled,
+.form-textarea.valid,
+.form-textarea.field-glow-filled,
+.form-select.valid,
+.form-select.field-glow-filled,
+.field-glow-filled,
+input.valid,
+textarea.valid,
+select.valid,
+input.field-glow-filled,
+textarea.field-glow-filled,
+select.field-glow-filled {
     border-color: #10b981 !important;
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.15) !important;
+    border-width: 1.5px !important;
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25), 0 0 10px rgba(16, 185, 129, 0.12) !important;
+    background-color: rgba(16, 185, 129, 0.035) !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+}
+
+/* กรณี Focus เมื่อมีข้อมูลแล้ว ให้ขอบนีออนสีเขียวสว่างคมชัดยิ่งขึ้น */
+.form-input.valid:focus,
+.form-input.field-glow-filled:focus,
+.form-textarea.valid:focus,
+.form-textarea.field-glow-filled:focus,
+.form-select.valid:focus,
+.form-select.field-glow-filled:focus,
+.field-glow-filled:focus {
+    border-color: #059669 !important;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35), 0 0 14px rgba(16, 185, 129, 0.22) !important;
+    background-color: rgba(16, 185, 129, 0.05) !important;
+}
+
+/* โหมดมืด (Dark Mode) */
+body.dark-mode .form-input.valid,
+body.dark-mode .form-input.field-glow-filled,
+body.dark-mode .form-textarea.valid,
+body.dark-mode .form-textarea.field-glow-filled,
+body.dark-mode .form-select.valid,
+body.dark-mode .form-select.field-glow-filled,
+body.dark-mode .field-glow-filled,
+body.dark .form-input.valid,
+body.dark .form-input.field-glow-filled,
+body.dark .form-textarea.valid,
+body.dark .form-textarea.field-glow-filled,
+body.dark .form-select.valid,
+body.dark .form-select.field-glow-filled,
+body.dark .field-glow-filled {
+    border-color: #10b981 !important;
+    border-width: 1.5px !important;
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.35), 0 0 12px rgba(16, 185, 129, 0.2) !important;
+    background-color: rgba(16, 185, 129, 0.08) !important;
+}
+
+/* ส่วนรูปภาพหลักฐานและคอนเทนเนอร์เมื่อแนบรูปสำเร็จ */
+#evidence-section-container.field-glow-filled,
+#img-dropzone.field-glow-filled,
+#evidence-stitched-preview-box.field-glow-filled {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25), 0 0 12px rgba(16, 185, 129, 0.12) !important;
     background-color: rgba(16, 185, 129, 0.02) !important;
 }
 /* สไตล์ของพาร์ทจำลองที่จะบิน */
@@ -16502,1095 +16560,312 @@ table thead th {
     vertical-align: middle;
 }
 
-/* ปรับสีตอนเอาเมาส์ไปวางให้สว่างและเนียนขึ้นเหมือนกันทุกตาราง */
-.data-table thead th:hover,
-.support-table thead th:hover,
-.s5-cyber-table thead th:hover,
-.sj-premium-table thead th:hover,
-.ot-premium-table thead th:hover,
-table thead th:hover {
-    background-color: #e2e8f0 !important;
-    color: #1e293b !important;
-    transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-/* ==========================================================================
-   8D REPORT HEADER OVERRIDE
-   (กู้คืนสีน้ำเงินอ่อนและสไตล์ดั้งเดิมให้กับตารางในสไลด์ 8D)
-   ========================================================================== */
-#eight-d-slide-content table thead th {
-    /* 1. คืนค่าพื้นหลังสีน้ำเงินอ่อน (Light Blue) */
-    background: #99badd !important;
-    background-color: #99badd !important;
-    
-    /* 2. คืนค่าตัวหนังสือสีดำ และปรับขนาดให้พอดีกับฟอร์ม */
-    color: #000000 !important;
-    font-size: 13px !important;
-    font-weight: 900 !important;
-    
-    /* 3. คืนค่าเส้นขอบสีดำรอบด้านแบบสไตล์กระดาษ */
-    border: 1.2px solid #000000 !important;
-    
-    /* 4. คืนค่าระยะห่างและความสูงเดิม */
-    height: auto !important;
-    padding: 6px 5px !important;
-    letter-spacing: 0 !important;
-}
-
-/* แก้ไขกรณี "SUPPLIER NAME MEMBER" ที่ต้องเป็นตัวหนังสือสีแดง */
-#eight-d-slide-content table.supplier-table thead th,
-#eight-d-slide-content thead th[colspan="3"]:nth-child(1) {
-    /* เราจะไปบังคับใน JS อีกทีเพื่อให้แม่นยำ 100% แต่ใส่ตรงนี้ไว้กันเหนียว */
-}
-
-/* สไตล์สำหรับรายการที่กำลังถูกเลือกผ่านคีย์บอร์ด */
-.ac-item.active {
-    background-color: #eff6ff !important; /* สีน้ำเงินอ่อน */
-    color: #2563eb !important;           /* ตัวหนังสือสีน้ำเงินเข้ม */
-    font-weight: 800 !important;
-    border-left: 4px solid #2563eb;     /* เพิ่มขีดด้านข้างให้เห็นชัด */
-}
-
-/* คอนเทนเนอร์ของดรอปดาวน์ใน Modal */
+/* ============================================================
+   MODAL & AUTO-COMPLETE DROPDOWNS (ALWAYS ON TOP & CRISP STYLING)
+   ============================================================ */
 .modal-ac-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    z-index: 20005;
-    background: #ffffff;
-    border: 2px solid #38bdf8;
-    border-radius: 12px;
-    box-shadow: 0 12px 28px -4px rgba(14, 165, 233, 0.22), 0 6px 16px -2px rgba(15, 23, 42, 0.08);
-    max-height: 260px;
-    width: 320px;
-    max-width: 94vw;
-    overflow-y: auto;
-    overflow-x: hidden;
-    margin-top: 4px;
-}
-
-/* รายการแต่ละแถว */
-.modal-ac-item {
-    padding: 8px 12px;
-    font-size: 11.5px;
-    font-weight: 600;
-    color: #334155;
-    cursor: pointer;
-    border-bottom: 1px solid #f8fafc;
-    transition: all 0.15s ease-out;
-}
-
-.modal-ac-item:last-child { border-bottom: none; }
-
-/* สถานะเมื่อใช้ปุ่มลูกศรเลือก หรือเอาเมาส์วาง */
-.modal-ac-item.active, .modal-ac-item:hover {
-    background-color: #f0f7ff !important;
-    color: #0f172a !important;
-    border-left: 4px solid #0284c7 !important;
-}
-
-/* ==========================================================
-   SUPPORT & CLAIM FORM VALIDATION HIGHLIGHT EFFECTS
-   ========================================================== */
-
-/* Green Glow: Activated for filled / completed fields */
-.field-glow-filled {
-  border-color: #10b981 !important;
-  background-color: #f0fdf4 !important;
-  box-shadow: 0 0 0 2.5px rgba(16, 185, 129, 0.3) !important;
-  transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s !important;
-}
-
-body.dark-mode .field-glow-filled,
-body.dark .field-glow-filled {
-  background-color: rgba(16, 185, 129, 0.15) !important;
-  border-color: #34d399 !important;
-  box-shadow: 0 0 0 2.5px rgba(52, 211, 153, 0.35) !important;
-}
-
-/* Soft Yellow / Amber Glow: Activated for operational action/pending fields that need review */
-.field-glow-pending {
-  border-color: #f59e0b !important;
-  background-color: #fffbeb !important;
-  box-shadow: 0 0 0 2.5px rgba(245, 158, 11, 0.28) !important;
-  transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s !important;
-}
-
-body.dark-mode .field-glow-pending,
-body.dark .field-glow-pending {
-  background-color: rgba(245, 158, 11, 0.18) !important;
-  border-color: #fbbf24 !important;
-  box-shadow: 0 0 0 2.5px rgba(251, 191, 36, 0.32) !important;
-}
-
-/* Red Error Pulse: Only when required submit fails */
-@keyframes pulseErrorGlow {
-  0% {
-    border-color: #f87171 !important;
-    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.25), 0 0 8px rgba(244, 63, 94, 0.15) !important;
-  }
-  50% {
-    border-color: #e11d48 !important;
-    box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.35), 0 0 14px rgba(225, 29, 72, 0.25) !important;
-  }
-  100% {
-    border-color: #f87171 !important;
-    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.25), 0 0 8px rgba(244, 63, 94, 0.15) !important;
-  }
-}
-
-.field-glow-error {
-  border-color: #f87171 !important;
-  background-color: #fff1f2 !important;
-  animation: pulseErrorGlow 1.8s infinite ease-in-out !important;
-  transition: border-color 0.25s, box-shadow 0.25s, background-color 0.25s !important;
-}
-
-body.dark-mode .field-glow-error,
-body.dark .field-glow-error {
-  background-color: rgba(225, 29, 72, 0.2) !important;
-  border-color: #fb7185 !important;
-}
-
-/* Custom Responsive Table & Ultra-Clear Image Display Optimization */
-img, svg {
-  max-width: 100%;
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
-}
-
-.table-responsive,
-.table-wrapper,
-.overflow-x-auto,
-div[class*="overflow-x"] {
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
-  scrollbar-width: thin;
-}
-
-/* Crisp & Responsive Image Previews Across Devices */
-.img-thumb img,
-.modal-overlay img,
-#user-avatar img,
-.lightbox-img {
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
-  object-fit: cover;
-  border-radius: 6px;
-}
-
-/* Ensure smooth touch scrolling and full visibility for older & newer mobile screens */
-@media (max-width: 768px) {
-  table {
-    min-width: 600px;
-  }
-  .table-responsive, .overflow-x-auto {
-    width: 100%;
-    display: block;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-/* Print Optimization for Vendor Failure Report (A4 Fit) */
-@media print {
-  body * {
-    visibility: hidden !important;
-  }
-  #vf-paper-doc, #vf-paper-doc * {
-    visibility: visible !important;
-  }
-  #vf-paper-doc {
     position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-  }
-  @page {
-    size: A4 portrait;
-    margin: 5mm;
-  }
+    top: calc(100% + 4px) !important;
+    max-height: 290px !important;
+    overflow-y: auto !important;
+    background: #ffffff !important;
+    border: 1.5px solid #3b82f6 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 20px 40px -4px rgba(15, 23, 42, 0.3), 0 0 16px rgba(59, 130, 246, 0.2) !important;
+    z-index: 9999999 !important;
+    display: none;
+}
+
+body.dark-mode .modal-ac-dropdown,
+[data-theme="dark"] .modal-ac-dropdown {
+    background: #1e293b !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 20px 40px -4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(59, 130, 246, 0.3) !important;
+}
+
+body.dark-mode .modal-ac-item,
+[data-theme="dark"] .modal-ac-item {
+    color: #f1f5f9 !important;
+    border-bottom-color: #334155 !important;
+}
+
+body.dark-mode .modal-ac-item:hover,
+[data-theme="dark"] .modal-ac-item:hover,
+body.dark-mode .modal-ac-item.active,
+[data-theme="dark"] .modal-ac-item.active {
+    background: #0f172a !important;
+    color: #60a5fa !important;
+}
+
+.ac-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    min-width: 220px;
+    max-height: 250px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1.5px solid #3b82f6;
+    border-radius: 10px;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.2);
+    z-index: 999999 !important;
+    display: none;
+}
+
+.ac-dropdown.open {
+    display: block;
+}
+
+.ac-item {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1e293b;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.ac-item:hover, .ac-item.active {
+    background: #eff6ff;
+    color: #2563eb;
+    font-weight: 700;
 }
 
 /* ============================================================
-   EVIDENCE SECTION & QUICK REMARK TEMPLATES - ULTRA REFINED STYLING
+   📸 EVIDENCE MODE SWITCHER (SEGMENTED PILL TAB CONTROLS)
    ============================================================ */
-.evidence-section-container {
-  transition: all 0.25s ease;
+.evidence-mode-switcher {
+    display: flex !important;
+    background: #e2e8f0 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 12px !important;
+    padding: 4px !important;
+    gap: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+body.dark-mode .evidence-mode-switcher,
+[data-theme="dark"] .evidence-mode-switcher {
+    background: #1e293b !important;
+    border-color: #334155 !important;
 }
 
 .evidence-mode-tab-btn {
-  flex: 1;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 10.5px;
-  font-weight: 800;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
+    flex: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    padding: 8px 14px !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    border: 1.5px solid transparent !important;
+    color: #64748b !important;
+    background: transparent !important;
+    cursor: pointer !important;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    user-select: none !important;
+    text-align: center !important;
+    white-space: nowrap !important;
 }
 
-.evidence-mode-tab-btn:hover {
-  color: #1e293b;
-  background: rgba(255, 255, 255, 0.6);
+.evidence-mode-tab-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.6) !important;
+    color: #1e293b !important;
+}
+
+body.dark-mode .evidence-mode-tab-btn:hover:not(.active),
+[data-theme="dark"] .evidence-mode-tab-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: #e2e8f0 !important;
 }
 
 .evidence-mode-tab-btn.active {
-  background: #ffffff;
-  color: #0f172a;
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    background: #ffffff !important;
+    color: #2563eb !important;
+    border-color: #93c5fd !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+    font-weight: 800 !important;
 }
 
-.dark .evidence-mode-tab-btn:hover {
-  color: #f1f5f9;
-  background: rgba(30, 41, 59, 0.5);
+body.dark-mode .evidence-mode-tab-btn.active,
+[data-theme="dark"] .evidence-mode-tab-btn.active {
+    background: #0f172a !important;
+    color: #60a5fa !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
-.dark .evidence-mode-tab-btn.active {
-  background: #1e293b;
-  color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+.evidence-mode-tab-btn .tab-badge {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    padding: 2px 6px !important;
+    border-radius: 5px !important;
+    background: #cbd5e1 !important;
+    color: #334155 !important;
+    transition: all 0.18s ease !important;
 }
 
-/* Single Evidence Preview Container */
-.evidence-single-preview-wrap {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 0;
+.evidence-mode-tab-btn.active .tab-badge {
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
 }
 
-.evidence-single-preview-wrap img {
-  max-height: 175px;
-  max-width: 100%;
-  border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-  display: block;
-  object-fit: contain;
-  cursor: zoom-in;
-  transition: transform 0.2s ease;
+body.dark-mode .evidence-mode-tab-btn .tab-badge,
+[data-theme="dark"] .evidence-mode-tab-btn .tab-badge {
+    background: #334155 !important;
+    color: #94a3b8 !important;
 }
 
-.evidence-single-preview-wrap img:hover {
-  transform: scale(1.015);
+body.dark-mode .evidence-mode-tab-btn.active .tab-badge,
+[data-theme="dark"] .evidence-mode-tab-btn.active .tab-badge {
+    background: rgba(37, 99, 235, 0.25) !important;
+    color: #93c5fd !important;
 }
 
-/* Evidence Floating Action Toolbar */
-.evidence-toolbar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  background: #0f172a;
-  background: rgba(15, 23, 42, 0.9);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 999px;
-  padding: 4px 8px;
-  margin-top: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  z-index: 10;
-  flex-wrap: wrap;
-}
-
-.evidence-tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 800;
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.08);
-  color: #f1f5f9;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
-  line-height: 1.2;
-}
-
-.evidence-tool-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  transform: translateY(-1px);
-}
-
-.evidence-tool-btn.btn-annotate:hover {
-  border-color: rgba(245, 158, 11, 0.7);
-  background: rgba(245, 158, 11, 0.25);
-  color: #fef08a;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
-}
-
-.evidence-tool-btn.btn-rotate:hover {
-  border-color: rgba(56, 189, 248, 0.7);
-  background: rgba(56, 189, 248, 0.25);
-  color: #e0f2fe;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
-}
-
-.evidence-tool-btn.btn-zoom:hover {
-  border-color: rgba(59, 130, 246, 0.7);
-  background: rgba(59, 130, 246, 0.25);
-  color: #dbeafe;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.35);
-}
-
-.evidence-tool-btn.btn-delete:hover {
-  border-color: rgba(239, 68, 68, 0.7);
-  background: rgba(239, 68, 68, 0.3);
-  color: #fee2e2;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
-}
-
-.evidence-preview-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  font-size: 10.5px;
-  font-weight: 800;
-  color: #ffffff;
-  background: #2563eb;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
-}
-
-.evidence-preview-btn:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
-}
-
-.evidence-preview-btn.btn-download {
-  background: #059669;
-  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
-}
-
-.evidence-preview-btn.btn-download:hover {
-  background: #047857;
-  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.35);
-}
-
-/* Multi Grid Slot Cards */
-.evidence-multi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
-  gap: 8px;
-  width: 100%;
-}
-
-.evidence-multi-slot {
-  position: relative;
-  aspect-ratio: 1 / 1;
-  border-radius: 10px;
-  border: 1.5px dashed #cbd5e1;
-  background: #f8fafc;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.evidence-multi-slot:hover {
-  border-color: #3b82f6;
-  background: #eff6ff;
-}
-
-.evidence-multi-slot.has-image {
-  border-style: solid;
-  border-color: #10b981;
-}
-
-/* Stitched Composite Wrap */
-.evidence-stitched-preview {
-  background: #ffffff;
-  border: 1.5px dashed #cbd5e1;
-  border-radius: 12px;
-  padding: 8px;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Quick Remark Helper Buttons & Chips */
-.quick-remark-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 800;
-  color: #1e40af;
-  background: #dbeafe;
-  border: 1px solid #93c5fd;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.quick-remark-btn:hover {
-  background: #bfdbfe;
-  color: #1e3a8a;
-  transform: translateY(-1px);
-}
-
-.quick-remark-chips-wrap {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
-  margin: 2px 0 4px;
-}
-
-.quick-remark-chip {
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 9.5px;
-  font-weight: 700;
-  color: #475569;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.quick-remark-chip:hover {
-  color: #0f172a;
-  background: #f1f5f9;
-  border-color: #94a3b8;
-  transform: translateY(-1px);
-}
-
-.quick-remark-chip.active {
-  color: #1d4ed8;
-  background: #eff6ff;
-  border-color: #60a5fa;
-  font-weight: 800;
-}
-/* สไตล์สำหรับหน้าต่างวาดรูป */
-.annotator-modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 15000;
-    background: rgba(15, 23, 42, 0.9);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.annotator-container {
-    width: 95%;
-    height: 90%;
-    background: white;
-    border-radius: 20px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.annotator-header {
-    padding: 15px;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: space-between;
-}
-/* เพิ่มเติมตาม class names ใน script.js */
 /* ============================================================
-   🎨 QC EVIDENCE ANNOTATOR UI - PREMIUM STYLING
+   ✨ AUTO-STITCHED COMPOSITE PREVIEW & ACTION CONTROLS
    ============================================================ */
-
-/* 1. หน้าต่าง Overlay พื้นหลัง */
-.annotator-modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 15000;
-    background: rgba(15, 23, 42, 0.9); /* สีน้ำเงินเข้มโปร่งแสง */
-    backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    font-family: 'Inter', 'Prompt', sans-serif;
-}
-
-/* 2. ตัวคอนเทนเนอร์หลัก */
-.annotator-container {
-    width: 98vw;
-    height: 95vh;
-    background: #f8fafc;
-    border-radius: 24px;
+.evidence-stitched-wrap {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* 3. ส่วนหัว (Header) */
-.annotator-header {
-    padding: 16px 24px;
-    background: white;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.annotator-header-left { display: flex; align-items: center; gap: 15px; }
-.annotator-header-icon { font-size: 24px; }
-.annotator-title { font-weight: 800; color: #1e293b; font-size: 16px; }
-.annotator-subtitle { font-size: 12px; color: #64748b; margin-top: 2px; }
-
-/* 4. แถบเครื่องมือลอย (Floating Toolbar) */
-.annotator-floating-toolbar-wrap {
-    display: flex;
-    justify-content: center;
-    padding: 15px;
-    background: #f1f5f9;
-}
-
-.annotator-floating-toolbar {
-    background: #1e293b; /* แถบสีเข้ม */
-    padding: 8px;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
     gap: 8px;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-}
-
-.annotator-pill-group {
-    display: flex;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 4px;
-    border-radius: 14px;
-    gap: 2px;
-}
-
-/* 5. ปุ่มกดในแถบเครื่องมือ */
-.annotator-pill-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    border: none;
-    background: transparent;
-    color: #94a3b8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.annotator-pill-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
-}
-
-.annotator-pill-btn.active {
-    background: #3b82f6; /* สีฟ้าเมื่อเลือก */
-    color: white;
-    box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
-}
-
-/* 6. พื้นที่แสดงรูปภาพ (Viewport) */
-.annotator-canvas-viewport {
-    flex: 1;
-    overflow: hidden;
-    position: relative;
-    background: #cbd5e1; /* พื้นหลังสีเทาเพื่อให้เห็นขอบรูป */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: crosshair;
-}
-
-.annotator-stage {
-    display: inline-block;
-    box-shadow: 0 0 40px rgba(0,0,0,0.2);
-    background: white;
-    line-height: 0;
-}
-
-/* 7. ปุ่มปิดและบันทึก */
-.annotator-header-btn {
-    padding: 10px 20px;
-    border-radius: 12px;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-}
-
-.btn-close-modal {
-    background: #f1f5f9;
-    color: #64748b;
-}
-
-.btn-save-modal {
-    background: #2563eb;
-    color: white;
-    margin-left: 10px;
-    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
-}
-
-.btn-save-modal:hover { background: #1d4ed8; transform: translateY(-1px); }
-
-/* 8. แถบความช่วยเหลือด้านล่าง */
-.annotator-bottom-help {
-    padding: 10px;
-    background: white;
-    display: flex;
-    justify-content: center;
-}
-
-.help-pill {
-    background: #eff6ff;
-    color: #1e40af;
-    padding: 6px 16px;
-    border-radius: 99px;
-    font-size: 11px;
-    font-weight: 600;
-}
-
-/* 9. ตัวเลือกสี (Color Palette) */
-.annotator-color-popover {
-    position: absolute;
-    bottom: 60px;
-    background: white;
-    padding: 10px;
-    border-radius: 15px;
-    display: flex;
-    gap: 8px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    border: 1px solid #e2e8f0;
-}
-
-.color-swatch {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 2px solid transparent;
-}
-
-.color-swatch.active { border-color: #3b82f6; transform: scale(1.1); }
-/* ============================================================
-   🌌 QC ANNOTATOR - CYBER DARK EDITION (PREMIUM UI)
-   ============================================================ */
-
-/* 1. พื้นหลังหน้าจอ (Blur Overlay) */
-.annotator-modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 15000;
-    background: rgba(2, 6, 23, 0.85); /* Deep Midnight */
-    backdrop-filter: blur(12px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    font-family: 'Inter', 'Prompt', sans-serif;
-}
-
-/* 2. ตัวกล่องเครื่องมือ (Compact Container) */
-.annotator-container {
-    width: 90vw;
-    max-width: 1100px; /* ปรับให้เล็กลง ไม่เต็มจอเกินไป */
-    height: 85vh;
-    background: #0f172a; /* Slate 900 */
-    border-radius: 28px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: relative;
-    border: 1px solid rgba(56, 189, 248, 0.2); /* ขอบฟ้าบางๆ */
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.6), 
-                0 0 20px rgba(30, 64, 175, 0.2);
-}
-
-/* กิมมิก: แสงเรืองที่มุมกล่อง */
-.annotator-container::before {
-    content: "";
-    position: absolute;
-    top: -50px;
-    right: -50px;
-    width: 150px;
-    height: 150px;
-    background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
-    pointer-events: none;
-}
-
-/* 3. ส่วนหัว (Modern Header) */
-.annotator-header {
-    padding: 16px 28px;
-    background: rgba(15, 23, 42, 0.8);
-    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.annotator-title { 
-    font-weight: 800; 
-    color: #f8fafc; 
-    font-size: 15px; 
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-}
-
-.annotator-subtitle { 
-    font-size: 11px; 
-    color: #94a3b8; 
-    margin-top: 3px; 
-}
-
-/* 4. แถบเครื่องมือลอยแบบ Glassmorphism (Floating Toolbar) */
-.annotator-floating-toolbar-wrap {
-    display: flex;
-    justify-content: center;
-    padding: 12px;
-    position: absolute;
-    top: 80px;
-    width: 100%;
-    z-index: 10;
-    pointer-events: none; /* เพื่อให้คลิกทะลุไปหาภาพได้ยกเว้นตัวปุ่ม */
-}
-
-.annotator-floating-toolbar {
-    pointer-events: auto;
-    background: rgba(30, 41, 59, 0.7); /* ทรานสเปอเรนต์ */
-    backdrop-filter: blur(16px);
-    padding: 6px;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
-}
-
-/* กลุ่มปุ่มกด */
-.annotator-pill-group {
-    display: flex;
-    gap: 3px;
-    padding-right: 8px;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.annotator-pill-group:last-child { border-right: none; }
-
-/* ปุ่มกดสไตล์นีออน */
-.annotator-pill-btn {
-    width: 34px;
-    height: 34px;
-    border-radius: 12px;
-    border: none;
-    background: transparent;
-    color: #94a3b8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.annotator-pill-btn:hover {
-    background: rgba(56, 189, 248, 0.1);
-    color: #38bdf8;
-}
-
-.annotator-pill-btn.active {
-    background: #2563eb;
-    color: white;
-    box-shadow: 0 0 15px rgba(37, 99, 235, 0.5);
-}
-
-/* 5. พื้นที่ทำงาน (Viewport) */
-.annotator-canvas-viewport {
-    flex: 1;
-    background: #020617; /* พื้นหลังมืดสนิท */
-    background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 0); /* กิมมิก: ลายจุด Grid */
-    background-size: 24px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-
-/* ตัวภาพ (Stage) */
-.annotator-stage {
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 4px;
-}
-
-/* 6. ปุ่มควบคุมด้านขวาบน (Header Buttons) */
-.annotator-header-btn {
-    padding: 8px 18px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-close-modal {
-    background: rgba(255, 255, 255, 0.05);
-    color: #94a3b8;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-.btn-close-modal:hover { background: rgba(225, 29, 72, 0.1); color: #fb7185; }
-
-.btn-save-modal {
-    background: linear-gradient(135deg, #2563eb, #0891b2);
-    color: white;
-    border: none;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-}
-.btn-save-modal:hover { 
-    transform: translateY(-1px); 
-    box-shadow: 0 6px 15px rgba(37, 99, 235, 0.5); 
-}
-
-/* 7. แถบสถานะด้านล่าง */
-.annotator-bottom-help {
-    padding: 12px;
-    background: rgba(15, 23, 42, 0.9);
-    border-top: 1px solid rgba(51, 65, 85, 0.5);
-    display: flex;
-    justify-content: center;
-}
-
-.help-pill {
-    background: rgba(56, 189, 248, 0.05);
-    color: #7dd3fc;
-    padding: 5px 16px;
-    border-radius: 10px;
-    font-size: 10px;
-    font-weight: 500;
-    border: 1px solid rgba(56, 189, 248, 0.1);
-}
-
-/* 8. ตัวเลือกสีแบบพรีเมียม */
-.annotator-color-popover {
-    position: absolute;
-    top: 50px; /* เด้งลงมาจาก Toolbar */
-    background: #1e293b;
-    padding: 12px;
-    border-radius: 18px;
-    display: flex;
-    gap: 10px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.color-swatch {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    cursor: pointer;
-    border: 2px solid rgba(255,255,255,0.1);
-    transition: transform 0.2s;
-}
-.color-swatch:hover { transform: scale(1.2); }
-.color-swatch.active { border-color: white; box-shadow: 0 0 10px currentColor; }
-.evidence-add-slot {
-    width: 100%;
-    height: 120px;
-    border: 2px dashed #cbd5e1; /* เส้นประ */
-    border-radius: 16px;
+    margin-top: 4px;
     background: #f8fafc;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-}
-
-.evidence-add-slot:hover {
-    background: #eff6ff;
-    border-color: #3b82f6;
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.1);
-}
-
-.add-slot-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    color: #64748b;
-    transition: color 0.3s;
-}
-
-.evidence-add-slot:hover .add-slot-content {
-    color: #2563eb; /* เปลี่ยนสีไอคอนและตัวหนังสือเมื่อ hover */
-}
-
-.add-label {
-    font-size: 13px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-}
-
-.add-status {
-    font-size: 11px;
-    font-weight: 500;
-    opacity: 0.7;
-    background: #e2e8f0;
-    padding: 2px 10px;
-    border-radius: 99px;
-    transition: all 0.3s;
-}
-
-.evidence-add-slot:hover .add-status {
-    background: #dbeafe;
-    opacity: 1;
-}
-/* ปรับขนาดส่วนสถานะให้เล็กลงและดูคลีนขึ้น */
-.add-status {
-    font-size: 9px;           /* ลดขนาดตัวอักษรลง */
-    font-weight: 600;         /* ให้ตัวหนานิดหน่อยเพื่อให้ยังอ่านง่าย */
-    color: #64748b;           /* สีเทา Slate */
-    background: #f1f5f9;      /* สีพื้นหลังจางๆ */
-    padding: 1px 8px;         /* ลดความสูงของแคปซูลลง */
-    border-radius: 6px;       /* ปรับมุมให้มนพอดีๆ */
-    margin-top: 2px;          /* ลดระยะห่างจากไอคอนด้านบน */
-    display: inline-block;
-    border: 1px solid #e2e8f0; /* เพิ่มขอบบางๆ ให้ดูมีมิติ */
-    transition: all 0.2s;
-}
-
-/* เอฟเฟกต์ตอน Hover (ให้กล่องภาพรวมเปลี่ยนสี) */
-.evidence-add-slot:hover .add-status {
-    background: #dbeafe;      /* เปลี่ยนเป็นสีฟ้าจางๆ */
-    color: #2563eb;
-    border-color: #bfdbfe;
-}
-/* --- Improved Multi-Image Upload Styles --- */
-.evidence-multi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 12px;
-    padding: 10px 0;
-}
-
-.evidence-thumb-card {
-    position: relative;
-    aspect-ratio: 4/3;
+    border: 1.5px solid #cbd5e1;
     border-radius: 12px;
-    overflow: hidden;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-}
-
-.evidence-thumb-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-.evidence-thumb-card img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-/* ลายเซ็นปุ่มควบคุมบนรูปภาพ */
-.evidence-thumb-actions {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    display: flex;
-    gap: 4px;
-    opacity: 0; /* ซ่อนไว้ก่อน จะโชว์ตอน Hover */
-    transition: opacity 0.2s ease;
-}
-
-.evidence-thumb-card:hover .evidence-thumb-actions {
-    opacity: 1;
-}
-
-.evidence-control-btn {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 12px;
-    backdrop-filter: blur(4px);
-    color: white;
-}
-
-.btn-rot { background: rgba(59, 130, 246, 0.8); }
-.btn-del { background: rgba(239, 68, 68, 0.8); }
-
-.evidence-thumb-badge {
-    position: absolute;
-    bottom: 5px;
-    left: 5px;
-    background: rgba(15, 23, 42, 0.7);
-    color: white;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-}
-
-/* ช่องเพิ่มรูปภาพ (Add Slot) */
-.evidence-add-slot {
-    aspect-ratio: 4/3;
-    border-radius: 12px;
-    border: 2px dashed #cbd5e1;
-    background: #f8fafc;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: #64748b;
+    padding: 10px 12px;
     transition: all 0.2s ease;
 }
 
-.evidence-add-slot:hover {
-    background: #eff6ff;
-    border-color: #3b82f6;
-    color: #2563eb;
+body.dark-mode .evidence-stitched-wrap,
+[data-theme="dark"] .evidence-stitched-wrap {
+    background: #0f172a;
+    border-color: #334155;
 }
+
+.evidence-composite-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.evidence-composite-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: #166534;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 7px;
+    padding: 4px 9px;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.02em;
+}
+
+body.dark-mode .evidence-composite-title,
+[data-theme="dark"] .evidence-composite-title {
+    background: rgba(22, 101, 52, 0.25);
+    border-color: rgba(74, 222, 128, 0.3);
+    color: #4ade80;
+}
+
+.evidence-composite-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.evidence-preview-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    white-space: nowrap;
+    user-select: none;
+    border: 1px solid transparent;
+}
+
+.evidence-preview-btn.btn-zoom {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+}
+
+.evidence-preview-btn.btn-zoom:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    color: #1e40af;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
+}
+
+.evidence-preview-btn.btn-download {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #15803d;
+}
+
+.evidence-preview-btn.btn-download:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #166534;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(22, 163, 74, 0.15);
+}
+
+body.dark-mode .evidence-preview-btn.btn-zoom,
+[data-theme="dark"] .evidence-preview-btn.btn-zoom {
+    background: rgba(37, 99, 235, 0.18);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #93c5fd;
+}
+
+body.dark-mode .evidence-preview-btn.btn-zoom:hover,
+[data-theme="dark"] .evidence-preview-btn.btn-zoom:hover {
+    background: rgba(37, 99, 235, 0.3);
+    border-color: #60a5fa;
+    color: #ffffff;
+}
+
+body.dark-mode .evidence-preview-btn.btn-download,
+[data-theme="dark"] .evidence-preview-btn.btn-download {
+    background: rgba(22, 101, 52, 0.2);
+    border-color: rgba(74, 222, 128, 0.35);
+    color: #86efac;
+}
+
+body.dark-mode .evidence-preview-btn.btn-download:hover,
+[data-theme="dark"] .evidence-preview-btn.btn-download:hover {
+    background: rgba(22, 101, 52, 0.35);
+    border-color: #4ade80;
+    color: #ffffff;
+}
+
+.evidence-stitched-preview {
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    padding: 6px;
+    transition: all 0.2s ease;
+}
+
+body.dark-mode .evidence-stitched-preview,
+[data-theme="dark"] .evidence-stitched-preview {
+    background: #1e293b;
+    border-color: #475569;
+}
+
+

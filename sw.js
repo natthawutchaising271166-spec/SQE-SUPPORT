@@ -1,5 +1,5 @@
 // Service Worker for SQE Portal & WAP System with Table Data Caching
-const CACHE_NAME = 'sqe-portal-v1.1.0'; // ปรับเวอร์ชันเล็กน้อยเพื่อทดสอบ
+const CACHE_NAME = 'sqe-portal-v1.1.2'; 
 const DATA_CACHE_NAME = 'sqe-table-data-v1';
 const IMAGE_CACHE_NAME = 'sqe-images-v1';
 
@@ -8,30 +8,24 @@ const STATIC_URLS = [
   './index.html',
   './styles.css',
   './script.js',
+  './apple-touch-icon-180.png',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-512.png',
   './manifest.json'
 ];
 
-// --- [จุดสำคัญที่เพิ่ม 1: รับข้อความสั่งข้ามสถานะ Waiting] ---
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting(); // บังคับให้ Service Worker ตัวใหม่ทำงานทันที
-  }
-});
-
 // ติดตั้ง Service Worker
 self.addEventListener('install', event => {
-  // บังคับให้ตัวใหม่เข้าสู่สถานะพร้อมทำงานทันที
-  self.skipWaiting(); 
-  
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      console.log('[SW] Caching static assets');
       return cache.addAll(STATIC_URLS);
     })
   );
 });
 
-// Activate: ลบ Cache เก่า และเข้าควบคุมหน้าเว็บทันที
+// Activate: ลบ Cache เก่าทั้งหมด
 self.addEventListener('activate', event => {
   const currentCaches = [CACHE_NAME, DATA_CACHE_NAME, IMAGE_CACHE_NAME];
   event.waitUntil(
@@ -44,21 +38,21 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    }).then(() => {
-      // --- [จุดสำคัญที่เพิ่ม 2: เข้าควบคุมคลุมทุก Tab ทันที] ---
-      return self.clients.claim(); 
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
-// --- ส่วน fetch ยังคงเดิมตามที่คุณเขียนไว้ ---
+// ตรวจสอบและประมวลผลการ Fetch ข้อมูล
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
 
-  if (request.method !== 'GET') return;
+  // ข้าม Request ที่ไม่ใช่ GET (POST, PUT, DELETE ให้ผ่านเครือข่ายปกติ)
+  if (request.method !== 'GET') {
+    return;
+  }
 
-  // 1. แคชข้อมูลตารางจาก Supabase
+  // 1. แคชข้อมูลตารางจาก Supabase (REST API Table Data): Network-First พร้อม fallback ไปยัง Data Cache เมื่อออฟไลน์
   if (url.hostname.endsWith('.supabase.co') && url.pathname.includes('/rest/v1/')) {
     event.respondWith(
       fetch(request)
@@ -70,8 +64,21 @@ self.addEventListener('fetch', event => {
           return networkResponse;
         })
         .catch(async () => {
+          console.log('[SW] Network offline, serving cached table data:', request.url);
           const cachedResponse = await caches.match(request);
-          return cachedResponse || new Response(JSON.stringify([]), {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // หากพารามิเตอร์ URL ต่างกันเล็กน้อย ค้นหาข้อมูลตารางจาก Cache ที่ตรงกับ Base Endpoint
+          const cache = await caches.open(DATA_CACHE_NAME);
+          const keys = await cache.keys();
+          for (const key of keys) {
+            if (key.url.split('?')[0] === request.url.split('?')[0]) {
+              const matched = await cache.match(key);
+              if (matched) return matched;
+            }
+          }
+          return new Response(JSON.stringify([]), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
           });
@@ -80,24 +87,66 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 2. แคชรูปภาพ
-  if (request.destination === 'image' || url.pathname.match(/\.(png|jpg|jpeg|gif|svg|webp|ico)$/i)) {
+  // 2. แคชรูปภาพและรูปหลักฐาน (Supabase Storage หรือไฟล์รูปภาพ): Stale-While-Revalidate / Cache-First
+  if (
+    request.destination === 'image' ||
+    url.pathname.match(/\.(png|jpg|jpeg|gif|svg|webp|ico)$/i) ||
+    (url.hostname.endsWith('.supabase.co') && url.pathname.includes('/storage/v1/object/'))
+  ) {
     event.respondWith(
-      caches.match(request).then(cached => {
-        return cached || fetch(request).then(res => {
-          if (res && res.ok) {
-            const resClone = res.clone();
-            caches.open(IMAGE_CACHE_NAME).then(cache => cache.put(request, resClone));
+      caches.match(request).then(cachedResponse => {
+        if (cachedResponse) {
+          fetch(request).then(networkResponse => {
+            if (networkResponse && networkResponse.ok) {
+              caches.open(IMAGE_CACHE_NAME).then(cache => cache.put(request, networkResponse));
+            }
+          }).catch(() => {});
+          return cachedResponse;
+        }
+
+        return fetch(request).then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            const responseClone = networkResponse.clone();
+            caches.open(IMAGE_CACHE_NAME).then(cache => cache.put(request, responseClone));
           }
-          return res;
+          return networkResponse;
+        }).catch(() => {
+          return new Response('', { status: 404 });
         });
       })
     );
     return;
   }
 
-  // 3. ไฟล์หลัก App Shell
+  // 3. ไฟล์หลัก App Shell (script.js, styles.css, index.html): Network-First
+  if (
+    url.origin === location.origin &&
+    (url.pathname.endsWith('script.js') || url.pathname.endsWith('styles.css') || url.pathname.endsWith('index.html') || url.pathname === '/')
+  ) {
+    event.respondWith(
+      fetch(request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // 4. ทั่วไป: Cache-First
   event.respondWith(
-    fetch(request).catch(() => caches.match(request))
+    caches.match(request).then(cachedResponse => {
+      return cachedResponse || fetch(request).then(networkResponse => {
+        if (networkResponse && networkResponse.ok && url.origin === location.origin) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
+        }
+        return networkResponse;
+      });
+    })
   );
 });

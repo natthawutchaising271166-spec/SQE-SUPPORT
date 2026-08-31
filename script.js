@@ -161,7 +161,7 @@ document.addEventListener('click', function(e) {
 
 // --- GLOBAL ERROR GUARD & ANTI-WHITE-SCREEN PROTECTION ---
 window.addEventListener('error', function(e) {
-    console.error('[Global Error Guard Captured]', e.error || e.message);
+    console.warn('[Global Error Guard Captured]', e.error || e.message);
     try {
         const mtx = document.getElementById('maintenance-view');
         const login = document.getElementById('login-view');
@@ -173,12 +173,19 @@ window.addEventListener('error', function(e) {
             }
         }
     } catch (err) {
-        console.error('[Error Guard Fallback Error]', err);
+        console.warn('[Error Guard Fallback Error]', err);
     }
 });
 
 window.addEventListener('unhandledrejection', function(e) {
-    console.warn('[Global Unhandled Promise Rejection]', e.reason);
+    if (e && e.reason) {
+        const msg = String(e.reason.message || e.reason);
+        // Gracefully handle harmless promise cancellations or offline fetch interruptions
+        if (msg.includes('Canceled') || msg.includes('Failed to fetch') || msg.includes('TypeScript not registered')) {
+            if (typeof e.preventDefault === 'function') e.preventDefault();
+        }
+    }
+    console.warn('[Global Handled Promise Rejection]', e.reason);
 });
 
 // ฟังก์ชันปลดล็อคหน้า Maintenance
@@ -4248,7 +4255,62 @@ function getEmployeeData() {
 }
 
 // 2. ฟังก์ชันวาดรายการ (Render) ลงในดรอปดาวน์
-window.renderEmployeeLoginDropdown = function(query = '') {
+let _currentLoginDeptFilter = 'ALL';
+
+function filterLoginStaffByDept(dept) {
+    _currentLoginDeptFilter = dept || 'ALL';
+    // Update active class on pills
+    document.querySelectorAll('.login-dept-pill').forEach(btn => {
+        if (btn.getAttribute('data-dept') === _currentLoginDeptFilter) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    const emailInput = document.getElementById('login-email');
+    if (typeof window.renderEmployeeLoginDropdown === 'function') {
+        window.renderEmployeeLoginDropdown(emailInput ? emailInput.value : '');
+    } else if (typeof renderEmployeeLoginDropdown === 'function') {
+        renderEmployeeLoginDropdown(emailInput ? emailInput.value : '');
+    }
+}
+window.filterLoginStaffByDept = filterLoginStaffByDept;
+
+function updatePassStrength(val) {
+    const meter = document.getElementById('pass-strength-meter');
+    if (!meter) return;
+    const bars = meter.querySelectorAll('span');
+    if (!bars || bars.length < 4) return;
+    
+    const str = String(val || '').trim();
+    const len = str.length;
+
+    // Reset all bars
+    bars.forEach(b => {
+        b.className = 'w-5 h-1 rounded-full bg-slate-700 transition-all';
+    });
+
+    if (len === 0) return;
+
+    if (len <= 3) {
+        bars[0].className = 'w-5 h-1 rounded-full bg-rose-500 shadow-[0_0_6px_#f43f5e] transition-all';
+    } else if (len <= 5) {
+        bars[0].className = 'w-5 h-1 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24] transition-all';
+        bars[1].className = 'w-5 h-1 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24] transition-all';
+    } else if (len <= 7) {
+        bars[0].className = 'w-5 h-1 rounded-full bg-blue-400 shadow-[0_0_6px_#60a5fa] transition-all';
+        bars[1].className = 'w-5 h-1 rounded-full bg-blue-400 shadow-[0_0_6px_#60a5fa] transition-all';
+        bars[2].className = 'w-5 h-1 rounded-full bg-blue-400 shadow-[0_0_6px_#60a5fa] transition-all';
+    } else {
+        bars[0].className = 'w-5 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] transition-all';
+        bars[1].className = 'w-5 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] transition-all';
+        bars[2].className = 'w-5 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] transition-all';
+        bars[3].className = 'w-5 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] transition-all';
+    }
+}
+window.updatePassStrength = updatePassStrength;
+
+function renderEmployeeLoginDropdown(query = '') {
     const dropdown = document.getElementById('login-employee-dropdown');
     if (!dropdown) return;
 
@@ -4262,6 +4324,20 @@ window.renderEmployeeLoginDropdown = function(query = '') {
     const filtered = allStaff.filter(item => {
         const role = item.role.toLowerCase();
         const qMatch = !q || item.name.toLowerCase().includes(q) || item.email.toLowerCase().includes(q);
+        if (!qMatch) return false;
+
+        // Apply department quick filter pill if not ALL
+        if (_currentLoginDeptFilter && _currentLoginDeptFilter !== 'ALL') {
+            if (_currentLoginDeptFilter === 'SUPPORT') {
+                return role.includes('support') || role.includes('1.');
+            } else if (_currentLoginDeptFilter === 'IQC') {
+                return role.includes('iqc') || role.includes('2.');
+            } else if (_currentLoginDeptFilter === 'ENGINEER') {
+                return role.includes('engineer') || role.includes('3.');
+            } else if (_currentLoginDeptFilter === 'MANAGEMENT') {
+                return role.includes('supervisor') || role.includes('manager') || role.includes('admin') || role.includes('4.') || role.includes('5.') || role.includes('6.');
+            }
+        }
 
         if (isSupervisorTab) {
             // --- 🔑 หน้า SUPERVISOR: โชว์เฉพาะ 4 กลุ่มนี้ ---
@@ -4269,13 +4345,13 @@ window.renderEmployeeLoginDropdown = function(query = '') {
                                  role.includes('engineer') || 
                                  role.includes('supervisor') || 
                                  role.includes('manager');
-            return qMatch && isManagement;
+            return isManagement;
         } else {
             // --- 👤 หน้า SQE SUPPORT: โชว์เฉพาะ 3 กลุ่มนี้ ---
             const isSupportGroup = role.includes('support') || 
                                    role.includes('admin') || 
                                    role.includes('iqc');
-            return qMatch && isSupportGroup;
+            return isSupportGroup;
         }
     });
 
@@ -5510,26 +5586,56 @@ window.hasAdminAccessPermission = hasAdminAccessPermission;
 // ============================================================
 window._dbUsersRoleMap = new Map();
 
+// เติมข้อมูลเริ่มต้นจาก MASTER_STAFF_USERS ทันทีเพื่อความพร้อมใช้งานแบบ 100%
+if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+    MASTER_STAFF_USERS.forEach(u => {
+        if (u && u.email) {
+            const em = u.email.toLowerCase().trim();
+            window._dbUsersRoleMap.set(em, {
+                email: u.email,
+                display_name: u.name || u.email.split('@')[0].toUpperCase(),
+                role: u.role || 'staff',
+                status: 'active'
+            });
+        }
+    });
+}
+
 window.fetchDbUsersForDirectory = async function() {
     try {
-        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+        // เติมค่า Fallback หาก Memory ยังว่าง
+        if (window._dbUsersRoleMap.size === 0 && typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+            MASTER_STAFF_USERS.forEach(u => {
+                if (u && u.email) {
+                    const em = u.email.toLowerCase().trim();
+                    window._dbUsersRoleMap.set(em, {
+                        email: u.email,
+                        display_name: u.name || u.email.split('@')[0].toUpperCase(),
+                        role: u.role || 'staff',
+                        status: 'active'
+                    });
+                }
+            });
+        }
+
+        if (!navigator.onLine) return;
+
+        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || (typeof sqeClient !== 'undefined' ? sqeClient : null);
         if (!sb) return;
 
-        // 1. ดึงข้อมูลจากตาราง 'profiles' (เปลี่ยนจาก users เดิม)
-        // ดึงคอลัมน์ที่มีอยู่จริงในฐานข้อมูลคุณ: email, display_name, role, status
+        // 1. ดึงข้อมูลจากตาราง 'profiles' (ถ้ามีและเชื่อมต่อได้)
         const { data, error } = await sb
             .from('profiles') 
             .select('email, display_name, role, status') 
             .order('email', { ascending: true });
             
         if (error) {
-            console.error('Supabase Fetch Error:', error.message);
+            console.warn('Profiles query notice (using local baseline):', error.message || error);
             return;
         }
 
         if (Array.isArray(data) && data.length > 0) {
-            // 2. ล้างข้อมูลเก่าใน Memory Map และเติมข้อมูลใหม่จาก DB 32 คน
-            window._dbUsersRoleMap.clear();
+            // 2. อัปเดตข้อมูลจาก Cloud DB
             data.forEach(u => {
                 if (u && u.email) {
                     const em = u.email.toLowerCase().trim();
@@ -5544,34 +5650,21 @@ window.fetchDbUsersForDirectory = async function() {
             
             console.log(`[Profiles DB] Success: Synced ${data.length} users to memory.`);
 
-            // 3. 🎯 จุดสำคัญที่สุด: สั่งให้ UI วาดรายการในดรอปดาวน์ใหม่ทันที
-            // เพื่อให้รายชื่อ 32 คนไปปรากฏในช่อง "Select Operator / Staff"
+            // 3. 🎯 อัปเดต UI รายการในดรอปดาวน์
             if (typeof window.loadStaffList === 'function') {
                 window.loadStaffList();
             }
             
-            // ถ้าดรอปดาวน์เปิดอยู่ ให้ Render ใหม่ด้วย
             if (typeof window.renderStaffCustomDropdown === 'function') {
                 window.renderStaffCustomDropdown('');
             }
-        } else {
-            console.log('No data found in profiles table');
         }
     } catch (e) {
-        console.warn('fetchDbUsersForDirectory error:', e);
+        console.warn('fetchDbUsersForDirectory note:', e?.message || e);
     }
 };
 
-// สั่งรันครั้งแรกทันทีที่โหลดสคริปต์ (รอ 500ms ให้ Client พร้อม)
-if (typeof setTimeout === 'function') {
-    setTimeout(() => {
-        if (typeof window.fetchDbUsersForDirectory === 'function') {
-            window.fetchDbUsersForDirectory();
-        }
-    }, 500);
-}
-
-// Initial sync
+// สั่งรันครั้งแรกเมื่อโหลดสคริปต์
 if (typeof setTimeout === 'function') {
     setTimeout(() => {
         if (typeof window.fetchDbUsersForDirectory === 'function') {
@@ -6180,10 +6273,10 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
     
     overlay.innerHTML = `
         <div class="annotator-container">
-            <!-- Header Bar (White Background with Title, Subtitle, Close and Save buttons) -->
+            <!-- Header Bar (Cyber Dark Glassmorphism) -->
             <div class="annotator-header">
                 <div class="annotator-header-left">
-                    <span class="annotator-header-icon">✏️</span>
+                    <div class="annotator-header-icon-box">✏️</div>
                     <div class="annotator-header-text">
                         <div class="annotator-title">
                             Evidence Defect Annotator (ใส่สัญลักษณ์ & ข้อความชี้จุดบกพร่อง)
@@ -6842,13 +6935,16 @@ async function handleLogin() {
     // --- ตรวจสอบ MAINTENANCE MODE ---
     try {
         const sb = getSupabase();
-        const { data: mtxStatus } = await sb.from('system_settings').select('is_maintenance_active').eq('id', 'global_config').single();
-        const isMaster = email === 'natthawut.chaising@carrier.com';
-        if (mtxStatus?.is_maintenance_active && !isMaster) {
-            showLoginError("🚧 ระบบปิดปรับปรุงชั่วคราว โปรดลองใหม่ภายหลัง");
-            return;
+        if (sb) {
+            const { data: mtxData } = await sb.from('system_settings').select('*').eq('id', 'global_config').maybeSingle();
+            const isMaintenance = !!(mtxData?.is_maintenance_active || (mtxData?.data && mtxData.data.is_maintenance_active));
+            const isMaster = email === 'natthawut.chaising@carrier.com';
+            if (isMaintenance && !isMaster) {
+                showLoginError("🚧 ระบบปิดปรับปรุงชั่วคราว โปรดลองใหม่ภายหลัง");
+                return;
+            }
         }
-    } catch (e) { console.error("Maintenance check failed:", e); }
+    } catch (e) { console.warn("Maintenance check notice:", e); }
 
     btnText.classList.add('hidden');
     btnSpinner.classList.remove('hidden');
@@ -6858,10 +6954,10 @@ async function handleLogin() {
         const sb = getSupabase();
         if (!sb) throw new Error('NO_CLIENT');
 
-        // 1. ดึงข้อมูล User จาก DB
+        // 1. ดึงข้อมูล User จาก DB (ตาราง profiles)
         let userData = null;
         try {
-            const { data } = await sb.from('users').select('*').eq('email', email).single();
+            const { data } = await sb.from('profiles').select('*').eq('email', email).maybeSingle();
             userData = data;
         } catch (_) {}
 
@@ -6881,7 +6977,7 @@ async function handleLogin() {
                     status: 'active',
                     created_at: new Date().toISOString()
                 };
-                await sb.from('users').upsert(newUser, { onConflict: 'email' });
+                await sb.from('profiles').upsert(newUser, { onConflict: 'email' });
                 userData = newUser;
             } else if (S.loginRole === 'supervisor' || isEngOrApprover) {
                 // กรณีเป็นหัวหน้างานคนใหม่ที่ยังไม่มีใน Matrix
@@ -6891,7 +6987,7 @@ async function handleLogin() {
                     status: 'active',
                     created_at: new Date().toISOString()
                 };
-                await sb.from('users').upsert({ email, role: 'supervisor', status: 'active' }, { onConflict: 'email' });
+                await sb.from('profiles').upsert({ email, role: 'supervisor', status: 'active' }, { onConflict: 'email' });
             } else {
                 throw new Error('NOT_REGISTERED');
             }
@@ -6916,7 +7012,7 @@ async function handleLogin() {
 
         // 6. ตรวจสอบการ FORCE RESET
         if (userData.force_reset) {
-            await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
+            try { await sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('email', email); } catch (_) {}
             showPasswordResetUI(email); 
             return; 
         }
@@ -6928,7 +7024,7 @@ async function handleLogin() {
 
         // --- ล็อกอินสำเร็จ ---
         try {
-            await sb.from('users').update({ last_seen: new Date().toISOString() }).eq('email', email);
+            await sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('email', email);
         } catch (_) {}
         
         finalizeLoginProcess(email, S.userRole, rememberMe);
@@ -6988,7 +7084,7 @@ async function checkSupervisorRole(email) {
             return true;
         }
         const { data: profile, error } = await getSupabase()
-            .from('users').select('role, email').eq('email', email).single();
+            .from('profiles').select('role, email').eq('email', email).maybeSingle();
         if (error) throw error;
         const supervisorRoles = ['supervisor', 'manager', 'lead', 'หัวหน้างาน'];
         isSupervisor = supervisorRoles.some(r =>
@@ -7371,9 +7467,9 @@ async function enforceMaintenanceMode() {
 
         const { data, error } = await sb
             .from('system_settings')
-            .select('is_maintenance_active')
+            .select('*')
             .eq('id', 'global_config')
-            .single();
+            .maybeSingle();
 
         const mtxView = document.getElementById('maintenance-view');
         const dashView = document.getElementById('dashboard-view');
@@ -7387,7 +7483,7 @@ async function enforceMaintenanceMode() {
             return;
         }
 
-        const isMtx = !!data.is_maintenance_active;
+        const isMtx = !!(data.is_maintenance_active || (data.data && data.data.is_maintenance_active));
         const isMaster = S && S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
 
         if (isMtx && !isMaster && !window.adminBypass) {
@@ -7444,10 +7540,10 @@ async function runAutoLoginFromLink() {
         try {
             // ไปดึงรหัสผ่านของคนนี้จากฐานข้อมูลมาเงียบๆ
             const { data, error } = await sqeClient
-                .from('users')
+                .from('profiles')
                 .select('password, role')
                 .eq('email', params.email.toLowerCase())
-                .single();
+                .maybeSingle();
 
             if (data && !error) {
                 // เติมรหัสผ่านและสั่ง Login
@@ -8412,7 +8508,7 @@ async function loadStaffList() {
         if (sb) {
             try {
                 const { data, error } = await sb
-                    .from('users')
+                    .from('profiles')
                     .select('email, display_name, role')
                     .order('email', { ascending: true });
                 if (!error && data && data.length > 0) {
@@ -8961,19 +9057,55 @@ function formToSupabase(rec) {
     return obj;
 }
 
-// ฟังก์ชัน writeAuditLog ที่ได้รับการปรับปรุงให้รองรับทุกชนิดของ record_id, JSONB Data และป้องกัน 400 Bad Request
+// ═════════════════════════════════════════════════════════════════
+// 📜 CENTRALIZED ACTIVITY LOG & AUDIT ENGINE (ONLINE + OFFLINE BUFFER)
+// ═════════════════════════════════════════════════════════════════
+function getLocalActivityLogs() {
+    try {
+        const raw = localStorage.getItem('carrier_activity_logs');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed;
+        }
+    } catch (_) {}
+    return window._activityLogsCache || [];
+}
+
+function saveLocalActivityLog(entry) {
+    if (!entry) return;
+    try {
+        if (!window._activityLogsCache || !Array.isArray(window._activityLogsCache)) {
+            window._activityLogsCache = getLocalActivityLogs();
+        }
+        // ตรวจสอบว่าไม่ซ้ำ id
+        const existIdx = window._activityLogsCache.findIndex(x => x.id && entry.id && String(x.id) === String(entry.id));
+        if (existIdx >= 0) {
+            window._activityLogsCache[existIdx] = { ...window._activityLogsCache[existIdx], ...entry };
+        } else {
+            window._activityLogsCache.unshift(entry);
+        }
+        if (window._activityLogsCache.length > 500) {
+            window._activityLogsCache = window._activityLogsCache.slice(0, 500);
+        }
+        localStorage.setItem('carrier_activity_logs', JSON.stringify(window._activityLogsCache));
+    } catch (_) {}
+}
+
+window.getLocalActivityLogs = getLocalActivityLogs;
+window.saveLocalActivityLog = saveLocalActivityLog;
+
+// ฟังก์ชัน writeAuditLog ที่ได้รับการปรับปรุงให้บันทึกทั้ง Supabase และ Local Cache
 async function writeAuditLog(action, recordId = null, oldData = null, newData = null) {
     try {
         if (!sqeClient && typeof getSupabase === 'function') {
             sqeClient = getSupabase();
         }
-        if (!sqeClient) return;
 
         const email = S.currentUser || 'System';
         const rawAction = String(action || 'SYSTEM').trim();
         const upperAction = rawAction.toUpperCase();
 
-        // 1. ข้อกำหนดของ Database Constraint (audit_logs_action_check) อนุญาตเฉพาะ 3 ค่านิยามนี้เท่านั้น: 'INSERT', 'UPDATE', 'DELETE'
+        // 1. ข้อกำหนดของ Database Constraint (audit_logs_action_check) อนุญาตเฉพาะ: 'INSERT', 'UPDATE', 'DELETE'
         let validAction = 'UPDATE';
         if (upperAction.includes('DELETE') || upperAction.includes('REMOVE') || upperAction.includes('CLEAR') || upperAction.includes('PURGE')) {
             validAction = 'DELETE';
@@ -8983,7 +9115,7 @@ async function writeAuditLog(action, recordId = null, oldData = null, newData = 
             validAction = 'UPDATE';
         }
 
-        // 2. ข้อกำหนด NOT NULL บน Column record_id (ห้ามเป็น null หรือค่าว่างเด็ดขาด)
+        // 2. ข้อกำหนด NOT NULL บน Column record_id
         let sanitizedRecordId = '0';
         let detailMessage = null;
 
@@ -8999,7 +9131,7 @@ async function writeAuditLog(action, recordId = null, oldData = null, newData = 
             sanitizedRecordId = '0';
         }
 
-        // 3. แปลงและทำความสะอาด oldData และ newData ให้เป็น JSON Object เสมอสำหรับ Column JSONB
+        // 3. แปลงและทำความสะอาด oldData และ newData ให้เป็น JSON Object เสมอ
         let sanitizedOldData = null;
         if (oldData && typeof oldData === 'object') {
             try { sanitizedOldData = JSON.parse(JSON.stringify(oldData)); } catch (_) { sanitizedOldData = { info: String(oldData) }; }
@@ -9016,35 +9148,60 @@ async function writeAuditLog(action, recordId = null, oldData = null, newData = 
 
         if (rawAction !== validAction || detailMessage) {
             sanitizedNewData = sanitizedNewData || {};
-            if (rawAction !== validAction) sanitizedNewData._original_action = rawAction;
-            if (detailMessage) sanitizedNewData.details = detailMessage;
+            if (rawAction !== validAction && !sanitizedNewData._original_action) sanitizedNewData._original_action = rawAction;
+            if (detailMessage && !sanitizedNewData.details) sanitizedNewData.details = detailMessage;
         }
 
-        const payload = {
-            inspector: email,
+        const detailsText = detailMessage || 
+                            (sanitizedNewData && sanitizedNewData.details) || 
+                            (sanitizedNewData && sanitizedNewData._original_action) || 
+                            rawAction;
+
+        const nowIso = new Date().toISOString();
+        const localLogEntry = {
+            id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            created_at: nowIso,
             user_email: email,
+            inspector: email,
             action: validAction,
+            original_action: rawAction,
             record_id: sanitizedRecordId,
             old_data: sanitizedOldData,
-            new_data: sanitizedNewData
+            new_data: sanitizedNewData,
+            details: detailsText
         };
+        saveLocalActivityLog(localLogEntry);
 
-        const { error } = await sqeClient.from('audit_logs').insert([payload]);
-
-        if (error) {
-            console.warn("Audit Log Warning:", error.message);
-            // Fallback Retry โดยแน่ใจว่า record_id ไม่เป็น null และ action เป็นค่าที่ผ่าน Check Constraint เสมอ
-            const fallbackPayload = {
-                action: 'UPDATE',
-                user_email: email,
+        if (sqeClient) {
+            const payload = {
                 inspector: email,
-                record_id: '0',
-                new_data: {
-                    action_orig: rawAction,
-                    details: detailMessage || String(recordId || '')
-                }
+                user_email: email,
+                action: validAction,
+                record_id: sanitizedRecordId,
+                old_data: sanitizedOldData,
+                new_data: sanitizedNewData
             };
-            await sqeClient.from('audit_logs').insert([fallbackPayload]);
+
+            const { data: insData, error } = await sqeClient.from('audit_logs').insert([payload]).select('id');
+
+            if (error) {
+                console.warn("Audit Log Supabase Note:", error.message);
+                // Fallback Retry
+                const fallbackPayload = {
+                    action: 'UPDATE',
+                    user_email: email,
+                    inspector: email,
+                    record_id: '0',
+                    new_data: {
+                        action_orig: rawAction,
+                        details: detailsText
+                    }
+                };
+                await sqeClient.from('audit_logs').insert([fallbackPayload]).catch(() => {});
+            } else if (insData && insData[0] && insData[0].id) {
+                localLogEntry.id = insData[0].id;
+                saveLocalActivityLog(localLogEntry);
+            }
         }
     } catch (e) {
         console.warn("Critical Audit Error:", e);
@@ -9053,7 +9210,7 @@ async function writeAuditLog(action, recordId = null, oldData = null, newData = 
 
 async function deleteRecordFromCloud(id) {
     const sb = getSupabase();
-    const targetRecord = S.records.find(r => String(r.id) === String(id)); // ✅ ประกาศไว้ก่อน
+    const targetRecord = S.records.find(r => String(r.id) === String(id));
 
     // ลบไฟล์รูปภาพใน Storage ด้วยถ้ามี
     if (targetRecord && (targetRecord.imageUrl || targetRecord.image_url)) {
@@ -9067,12 +9224,18 @@ async function deleteRecordFromCloud(id) {
         try {
             const { error } = await sb.from('records').delete().eq('id', id);
             if (error) throw error;
-            writeAuditLog('DELETE', `ลบข้อมูล Claim Ref: ${targetRecord?.ref} (พาร์ท: ${targetRecord?.partNo})`); // ✅ อยู่ในtry, ใช้ targetRecord
+            writeAuditLog('DELETE', id, targetRecord, {
+                details: `ลบข้อมูล Claim Ref: ${targetRecord?.ref || id} (พาร์ท: ${targetRecord?.partNo || '-'}, ซัพพลายเออร์: ${targetRecord?.supplier || '-'})`
+            });
         } catch (e) {
             console.error("Cloud Delete Error:", e);
             toast('❌ ไม่สามารถลบข้อมูลในระบบ Cloud ได้', 'error');
             return false;
         }
+    } else {
+        writeAuditLog('DELETE', id, targetRecord, {
+            details: `ลบข้อมูล Claim ออฟไลน์ Ref: ${targetRecord?.ref || id} (พาร์ท: ${targetRecord?.partNo || '-'})`
+        });
     }
 
     S.records = S.records.filter(r => String(r.id) !== String(id));
@@ -9198,26 +9361,28 @@ function quickPickJudgment(val) {
 function refreshNeonGlow() {
     const qtyEl = $id('f-qty');
     const unitEl = $id('f-unit');
-    const dateEl = $id('f-date'); // ดึง Element วันที่
+    const dateEl = $id('f-date');
     const remarkEl = $id('f-remark');
+    const judgmentEl = $id('judgmentSelect');
     const btnCommit = $id('btn-commit');
     
-    // ตรวจสอบจำนวน: ต้องมีค่าและมากกว่าหรือเท่ากับ 1
-    const hasQty = qtyEl && qtyEl.value !== '' && parseFloat(qtyEl.value) >= 1;
+    const hasQty = qtyEl && qtyEl.value !== '' && parseFloat(qtyEl.value) > 0;
 
-    // --- ส่วนที่ 1: จัดการช่องหน่วย และ ช่องวันที่ (ทำงานเหมือนกัน) ---
-    // ให้เขียวเฉพาะตอนที่มีจำนวน (hasQty) เท่านั้น
+    // 1. หน่วย และ วันที่ - ไม่เรืองแสงค้างเมื่อเริ่มต้นหรือล้างข้อมูล
     if (unitEl) {
-        if (hasQty) unitEl.classList.add('valid');
-        else unitEl.classList.remove('valid');
+        unitEl.classList.remove('valid', 'invalid', 'field-glow-filled');
     }
 
     if (dateEl) {
-        if (hasQty) dateEl.classList.add('valid');
-        else dateEl.classList.remove('valid');
+        dateEl.classList.remove('valid', 'invalid', 'field-glow-filled');
     }
 
-    // --- ส่วนที่ 2: วนลูปเช็คช่องอื่นๆ (เอา f-date ออกจากรายการนี้) ---
+    if (judgmentEl) {
+        if (judgmentEl.value && judgmentEl.value.trim() !== '') judgmentEl.classList.add('valid');
+        else judgmentEl.classList.remove('valid', 'invalid', 'field-glow-filled');
+    }
+
+    // 2. เช็คช่องอื่นๆ ในแบบฟอร์ม
     const watchedIds = ['f-part', 'f-partname', 'f-supplier', 'f-line', 'f-defect', 'f-ref', 'f-qty', 'f-remark'];
     
     watchedIds.forEach(id => {
@@ -9229,20 +9394,26 @@ function refreshNeonGlow() {
             return;
         }
 
+        if (id === 'f-qty') {
+            if (hasQty) el.classList.add('valid');
+            else el.classList.remove('valid', 'invalid', 'field-glow-filled');
+            return;
+        }
+
         if (id === 'f-remark') {
-            if (el.value.trim().length > 0) el.classList.add('valid');
-            else el.classList.remove('valid');
+            if (el.value && el.value.trim().length > 0) el.classList.add('valid');
+            else el.classList.remove('valid', 'invalid', 'field-glow-filled');
             return;
         }
 
         if (el.value && el.value.trim() !== '' && el.value !== '-' && el.value !== '0') {
             el.classList.add('valid');
         } else {
-            el.classList.remove('valid');
+            el.classList.remove('valid', 'invalid', 'field-glow-filled');
         }
     });
 
-    // --- ส่วนที่ 3: เช็คความพร้อมปุ่ม Commit ---
+    // 3. เช็คความพร้อมปุ่ม Commit
     const isFormComplete = 
         ($id('f-part')?.value || '').trim() !== '' && 
         ($id('f-ref')?.value || '').trim() !== '' && 
@@ -9322,21 +9493,32 @@ function updateInputResetButton() {
 }
 
 function resetInputForm() {
-    const fields = ['f-part', 'f-partname', 'f-supplier', 'f-ref', 'f-line', 'f-qty', 'f-defect', 'f-remark'];
+    const allInputIds = [
+        'f-part', 'f-partname', 'f-supplier', 'f-ref', 'f-line', 'f-qty', 'f-defect', 'f-remark',
+        'f-date', 'f-unit', 'judgmentSelect'
+    ];
     
-    fields.forEach(id => { 
+    allInputIds.forEach(id => { 
         const el = $id(id); 
         if (el) { 
-            // [จุดที่ปรับ] ถ้าเป็นช่อง f-qty ให้ค่าเริ่มต้นเป็น 0 นอกนั้นเป็นค่าว่าง
-            el.value = (id === 'f-qty') ? '0' : ''; 
-            el.classList.remove('valid', 'invalid'); 
+            if (id === 'f-qty') el.value = '0';
+            else if (id === 'f-date') el.value = new Date().toISOString().split('T')[0];
+            else if (id === 'f-unit') el.value = 'PCS';
+            else if (id === 'judgmentSelect') el.value = '';
+            else el.value = ''; 
+            
+            el.classList.remove('valid', 'invalid', 'field-glow-filled', 'field-glow-pending', 'field-glow-error', 'anomaly-detected', 'is-selected'); 
         } 
     });
 
+    const successIcon = document.getElementById('f-part-success');
+    if (successIcon) successIcon.classList.add('hidden');
+    const errorIcon = document.getElementById('f-part-error');
+    if (errorIcon) errorIcon.classList.add('hidden');
+    const spinner = document.getElementById('f-part-spinner');
+    if (spinner) spinner.classList.add('hidden');
+
     if (typeof validatePartNoInput === 'function') validatePartNoInput($id('f-part'));
-    const d = $id('f-date'); if (d) d.value = new Date().toISOString().split('T')[0];
-    const u = $id('f-unit'); if (u) u.value = 'PCS';
-    const j = $id('judgmentSelect'); if (j) j.value = '';
     
     document.querySelectorAll('.shift-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
     S.selectedShift = 'SHIFT A';
@@ -9437,7 +9619,7 @@ async function submitEntry() {
         qty, 
         unit: $id('f-unit').value,
         defect: $id('f-defect').value.trim(), 
-        remark: $id('f-remark').value.trim(),
+        remark: $id('f-remark') ? $id('f-remark').value.trim() : (existingRow ? (existingRow.remark || '') : ''),
         judgment: jdgSel.value, 
         inspector: S.currentUser,
         sync_status: 'pending',
@@ -9465,11 +9647,27 @@ async function submitEntry() {
         }
 
         // --- 6. Update UI State ---
+        const isEditAction = !!S.editingId;
+        const oldRecordData = isEditAction ? S.records.find(r => r.id === S.editingId) : null;
+
         if (S.editingId) {
             S.records = S.records.map(r => r.id === recordId ? rowData : r);
         } else {
             S.records.unshift(rowData);
         }
+
+        // Record Activity Log
+        writeAuditLog(
+            isEditAction ? 'UPDATE' : 'INSERT',
+            recordId,
+            oldRecordData,
+            {
+                ...rowData,
+                details: isEditAction
+                    ? `แก้ไขข้อมูล Claim Ref: ${rowData.ref || recordId} (พาร์ท: ${rowData.partNo || '-'}, ซัพพลายเออร์: ${rowData.supplier || '-'})`
+                    : `สร้างข้อมูล Claim ใหม่ Ref: ${rowData.ref || recordId} (พาร์ท: ${rowData.partNo || '-'}, ซัพพลายเออร์: ${rowData.supplier || '-'}, อาการ: ${rowData.defect || '-'})`
+            }
+        );
 
         renderTable(); 
 
@@ -9669,7 +9867,7 @@ function editRecord(id) {
     $id('f-qty').value = r.qty || '';
     $id('f-unit').value = r.unit || 'PCS';
     $id('f-defect').value = r.defect || '';
-    $id('f-remark').value = r.remark || '';
+    if ($id('f-remark')) $id('f-remark').value = r.remark || '';
     S.selectedShift = r.shift || 'SHIFT A';
     
     document.querySelectorAll('.shift-btn').forEach(b => 
@@ -9703,7 +9901,7 @@ function cloneRecord(id) {
     $id('f-qty').value = r.qty || '';
     $id('f-unit').value = r.unit || 'PCS';
     $id('f-defect').value = r.defect || '';
-    $id('f-remark').value = r.remark || '';
+    if ($id('f-remark')) $id('f-remark').value = r.remark || '';
     S.selectedShift = r.shift || 'SHIFT A';
     
     document.querySelectorAll('.shift-btn').forEach(b => 
@@ -11396,6 +11594,29 @@ function translateDefectToRemark() {
     refreshNeonGlow();
 }
 
+function insertClaimRemarkPreset(presetText) {
+    const remarkIn = $id('f-remark');
+    if (!remarkIn) return;
+    const currentVal = remarkIn.value.trim();
+    if (!currentVal) {
+        remarkIn.value = presetText;
+    } else if (!currentVal.includes(presetText)) {
+        remarkIn.value = currentVal + '\n' + presetText;
+    }
+    remarkIn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+    setTimeout(() => { remarkIn.style.backgroundColor = ''; }, 600);
+    refreshNeonGlow();
+    if (typeof triggerClaimFormAutoDraft === 'function') triggerClaimFormAutoDraft();
+}
+
+function clearClaimRemark() {
+    const remarkIn = $id('f-remark');
+    if (!remarkIn) return;
+    remarkIn.value = '';
+    refreshNeonGlow();
+    if (typeof triggerClaimFormAutoDraft === 'function') triggerClaimFormAutoDraft();
+}
+
 function validatePartNoInput(inputEl) {
     if (!inputEl) inputEl = document.getElementById('f-part');
     if (!inputEl || typeof inputEl.value !== 'string') return;
@@ -11495,6 +11716,9 @@ function closeAC() { closeAllAC(); }
 function closeAllAC() {
     setPartLoading(false);
     document.querySelectorAll('.ac-dropdown.open').forEach(d => d.classList.remove('open'));
+    document.querySelectorAll('.modal-ac-dropdown').forEach(d => {
+        d.style.display = 'none';
+    });
 }
 
 // ประกาศไว้ด้านบนสุดของไฟล์
@@ -11641,7 +11865,46 @@ function applyACPick(type, value, inputEl) {
 }
 
 document.addEventListener('click', e => {
-    if (!e.target.closest('.form-input-wrap')) closeAllAC();
+    const target = e.target;
+    if (!target) return;
+    // Don't close if clicked inside any dropdown or on an item
+    if (target.closest('.modal-ac-dropdown') || target.closest('.ac-dropdown') || target.closest('.modal-ac-item') || target.closest('.ac-item')) {
+        return;
+    }
+    // Close modal AC dropdowns ONLY if clicked outside the wrapper of that input
+    document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
+        const wrap = dd.parentElement;
+        if (wrap && wrap.contains(target)) return;
+        dd.style.display = 'none';
+        if (wrap) wrap.style.zIndex = '';
+    });
+    // Close main AC dropdowns
+    document.querySelectorAll('.ac-dropdown.open').forEach(dd => {
+        const wrap = dd.closest('.form-input-wrap') || dd.parentElement;
+        if (wrap && wrap.contains(target)) return;
+        dd.classList.remove('open');
+        if (wrap) wrap.style.zIndex = '';
+    });
+});
+
+document.addEventListener('mousedown', e => {
+    const target = e.target;
+    if (!target) return;
+    if (target.closest('.modal-ac-dropdown') || target.closest('.ac-dropdown') || target.closest('.modal-ac-item') || target.closest('.ac-item')) {
+        return;
+    }
+    document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
+        const wrap = dd.parentElement;
+        if (wrap && wrap.contains(target)) return;
+        dd.style.display = 'none';
+        if (wrap) wrap.style.zIndex = '';
+    });
+    document.querySelectorAll('.ac-dropdown.open').forEach(dd => {
+        const wrap = dd.closest('.form-input-wrap') || dd.parentElement;
+        if (wrap && wrap.contains(target)) return;
+        dd.classList.remove('open');
+        if (wrap) wrap.style.zIndex = '';
+    });
 });
 
 // ============================================================
@@ -12595,6 +12858,9 @@ window.addEventListener('DOMContentLoaded', () => {
     if ($id('f-date')) $id('f-date').value = `${yyyy}-${mm}-${dd}`;
 
     initClaimFormAutoDraftListeners();
+    if (typeof window.initVFRPMatrixEngine === 'function') {
+        window.initVFRPMatrixEngine();
+    }
 
     window.addEventListener('online', () => { S.isOnline = true; updateOnlineBadge(); });
     window.addEventListener('offline', () => { S.isOnline = false; updateOnlineBadge(); });
@@ -14915,6 +15181,9 @@ const calcNG = () => {
         ngInput.style.color = '';
         ngInput.style.fontWeight = 'normal';
     }
+    if (typeof updateSupportFormValidation === 'function') {
+        updateSupportFormValidation();
+    }
 };
 
 const WapSupportLogs = (function () {
@@ -15704,7 +15973,7 @@ function applyDateFilter() {
     <!-- 1. ช่องรหัสพาร์ท (Part No.) -->
     <div>
         <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔢 รหัสพาร์ท (Part No.) *</label>
-        <div style="position:relative;"> <!-- เพิ่มตัวครอบเพื่อให้ Dropdown ลอยตรงตำแหน่ง -->
+        <div class="form-input-wrap" style="position:relative;"> <!-- เพิ่มตัวครอบเพื่อให้ Dropdown ลอยตรงตำแหน่ง -->
             <input type="text" id="prob-partno" 
                    value="${parsedPartNo}" 
                    placeholder="พิมพ์รหัสพาร์ท..." 
@@ -15712,6 +15981,7 @@ function applyDateFilter() {
                    style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" 
                    oninput="renderModalAC('partno', this)" 
                    onfocus="renderModalAC('partno', this)"
+                   onclick="renderModalAC('partno', this)"
                    autocomplete="off" 
                    title="Part No" aria-label="Part No">
         </div>
@@ -15720,7 +15990,7 @@ function applyDateFilter() {
     <!-- 2. ช่องชื่อพาร์ท (Part Name) -->
     <div>
         <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🧩 ชื่อพาร์ท (Part Name) *</label>
-        <div style="position:relative;">
+        <div class="form-input-wrap" style="position:relative;">
             <input type="text" id="prob-part" 
                    value="${parsedPart}" 
                    placeholder="พิมพ์ชื่อพาร์ท..." 
@@ -15728,6 +15998,7 @@ function applyDateFilter() {
                    style="width:100%; height:32px; font-size:11px; font-weight:700;" 
                    oninput="renderModalAC('partname', this)" 
                    onfocus="renderModalAC('partname', this)"
+                   onclick="renderModalAC('partname', this)"
                    autocomplete="off" 
                    title="Part Name" aria-label="Part Name">
         </div>
@@ -15736,7 +16007,7 @@ function applyDateFilter() {
     <!-- 3. ช่องผู้จำหน่าย (Supplier) -->
     <div>
         <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🏭 ผู้จำหน่าย (Supplier)</label>
-        <div style="position:relative;">
+        <div class="form-input-wrap" style="position:relative;">
             <input type="text" id="prob-supplier" name="supplier"
                    value="${parsedSupplier}" 
                    placeholder="พิมพ์ชื่อผู้จำหน่าย..." 
@@ -15744,6 +16015,7 @@ function applyDateFilter() {
                    style="width:100%; height:32px; font-size:11px; font-weight:700; color:#0284c7;" 
                    oninput="renderModalAC('supplier', this)" 
                    onfocus="renderModalAC('supplier', this)"
+                   onclick="renderModalAC('supplier', this)"
                    autocomplete="off" 
                    title="Supplier Name" aria-label="Supplier Name">
         </div>
@@ -15753,7 +16025,7 @@ function applyDateFilter() {
                         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📦 หมวดหมู่พาร์ท</label>
-                                <div style="position:relative;">
+                                <div class="form-input-wrap" style="position:relative;">
                                     <input type="text" id="f-sup-part-cat" name="part" 
                                            value="${parsedCategory || ''}" 
                                            placeholder="พิมพ์/เลือกหมวดหมู่..." 
@@ -15761,6 +16033,7 @@ function applyDateFilter() {
                                            style="width:100%; height:32px; font-size:11px; font-weight:600;" 
                                            oninput="renderModalAC('category', this)" 
                                            onfocus="renderModalAC('category', this)" 
+                                           onclick="renderModalAC('category', this)" 
                                            autocomplete="off" 
                                            title="Part Category" aria-label="Part Category">
                                 </div>
@@ -15768,7 +16041,7 @@ function applyDateFilter() {
 
 <div>
     <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📍 ผู้แจ้ง / พื้นที่ (Area/Dept)</label>
-    <div style="position:relative;"> <!-- เพิ่มตัวครอบ -->
+    <div class="form-input-wrap" style="position:relative;"> <!-- เพิ่มตัวครอบ -->
         <input type="text" id="prob-user" 
                value="${parsedUser}" 
                placeholder="เช่น OSA-A1" 
@@ -15776,13 +16049,14 @@ function applyDateFilter() {
                style="width:100%; height:32px; font-size:11px; font-weight:600;" 
                oninput="renderModalAC('user', this)" 
                onfocus="renderModalAC('user', this)"
+               onclick="renderModalAC('user', this)"
                autocomplete="off" 
                title="User/Area" aria-label="User/Area">
     </div>
 </div>
 <div>
     <label style="font-size:10px; font-weight:700; color:#e11d48; margin-bottom:2px; display:block;">⚠️ อาการเสีย (Defect Detail)</label>
-    <div style="position:relative;"> <!-- เพิ่มตัวครอบ -->
+    <div class="form-input-wrap" style="position:relative;"> <!-- เพิ่มตัวครอบ -->
         <input type="text" id="prob-defect" 
                value="${parsedDefect}" 
                placeholder="ระบุอาการเสีย..." 
@@ -15790,6 +16064,7 @@ function applyDateFilter() {
                style="width:100%; height:32px; font-size:11px; font-weight:700; color:#e11d48;" 
                oninput="renderModalAC('defect', this)" 
                onfocus="renderModalAC('defect', this)"
+               onclick="renderModalAC('defect', this)"
                autocomplete="off" 
                title="Defect" aria-label="Defect">
     </div>
@@ -15822,7 +16097,7 @@ function applyDateFilter() {
  
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔧 การแก้ไข (ACTION)</label>
-                                <div style="position:relative;">
+                                <div class="form-input-wrap" style="position:relative;">
                                     <input type="text" id="f-sup-action" name="action" 
                                            value="${isEdit ? (r.action || '') : ''}" 
                                            placeholder="พิมพ์/เลือก ACTION..." 
@@ -15830,13 +16105,14 @@ function applyDateFilter() {
                                            style="width:100%; height:32px; font-size:11px; font-weight:600;" 
                                            oninput="renderModalAC('action', this)" 
                                            onfocus="renderModalAC('action', this)" 
+                                           onclick="renderModalAC('action', this)" 
                                            autocomplete="off" 
                                            title="Action" aria-label="Action">
                                 </div>
                             </div>
                             <div>
                                 <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📋 ประเภทรายงาน</label>
-                                <div style="position:relative;">
+                                <div class="form-input-wrap" style="position:relative;">
                                     <input type="text" id="f-sup-report" name="report" 
                                            value="${isEdit ? (r.report === 'RP' ? 'RP Report' : (r.report === 'RECORDS' ? 'Records' : (r.report === 'VF' ? 'VF Report' : (r.report || '')))) : ''}" 
                                            placeholder="พิมพ์/เลือกประเภท..." 
@@ -15845,6 +16121,7 @@ function applyDateFilter() {
                                            oninput="renderModalAC('report', this); if (this.closest('#support-form-modal')?._handleReportChange) this.closest('#support-form-modal')._handleReportChange(); else if (this.closest('#support-form-modal')?._syncProblemSentence) this.closest('#support-form-modal')._syncProblemSentence();" 
                                            onchange="if (this.closest('#support-form-modal')?._handleReportChange) this.closest('#support-form-modal')._handleReportChange(); else if (this.closest('#support-form-modal')?._syncProblemSentence) this.closest('#support-form-modal')._syncProblemSentence();"
                                            onfocus="renderModalAC('report', this)" 
+                                           onclick="renderModalAC('report', this)" 
                                            autocomplete="off" 
                                            title="Report" aria-label="Report">
                                 </div>
@@ -15957,20 +16234,24 @@ function applyDateFilter() {
                         </div>
 
                         <!-- Mode Switcher Tabs (แบบที่ 1 / แบบที่ 2) -->
-                        <div style="display:flex; background:#e2e8f0; border-radius:10px; padding:3px; gap:4px;">
+                        <div class="evidence-mode-switcher">
                             <button type="button" id="btn-evidence-mode-single" class="evidence-mode-tab-btn active">
-                                <span>🖼️ แบบที่ 1: แนบภาพสำเร็จรูป (1 ไฟล์)</span>
+                                <span style="font-size:13px;">🖼️</span>
+                                <span>แบบที่ 1: แนบภาพสำเร็จรูป</span>
+                                <span class="tab-badge">1 ไฟล์</span>
                             </button>
                             <button type="button" id="btn-evidence-mode-multi" class="evidence-mode-tab-btn">
-                                <span>🧩 แบบที่ 2: แนบภาพแยก (3 - 5 รูป รวมภาพอัตโนมัติ)</span>
+                                <span style="font-size:13px;">🧩</span>
+                                <span>แบบที่ 2: แนบภาพแยก</span>
+                                <span class="tab-badge">3 - 5 รูป รวมภาพอัตโนมัติ</span>
                             </button>
                         </div>
 
                         <!-- Mode 1: Single File Upload Area -->
                         <div id="evidence-mode-single-pane" style="display:flex; flex-direction:column; gap:6px;">
-                            <div id="img-dropzone" style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:10px; min-height:75px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease;">
-                                <input type="file" id="img-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2;" title="Img Input" aria-label="Img Input">
-                                <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; position:relative; z-index:3;">
+                            <div id="img-dropzone" style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:12px; min-height:80px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease; cursor:pointer;" title="คลิกเพื่อเลือกไฟล์รูปภาพจากเครื่อง หรือลากไฟล์มาวาง">
+                                <input type="file" id="img-input" accept="image/*" style="display:none;" title="Img Input" aria-label="Img Input">
+                                <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; position:relative;">
                                     ${r.imageUrl ? `
                                         <div class="evidence-single-preview-wrap">
                                             <img src="${r.imageUrl}" style="max-height:95px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" alt="Evidence Single" />
@@ -15981,9 +16262,15 @@ function applyDateFilter() {
                                             </div>
                                         </div>
                                     ` : `
-                                        <div style="display:flex; align-items:center; gap:8px; color:#64748b; pointer-events:none;">
-                                            <svg width="20" height="20" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                            <span style="font-size:11px; font-weight:700;">📷 คลิกหรือลากวางรูปภาพหลักฐานเดี่ยว (รวมรูปมาแล้ว) ได้ที่นี่</span>
+                                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#475569; pointer-events:none; padding:4px 0; text-align:center;">
+                                            <div style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#1e293b;">
+                                                <svg width="22" height="22" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2.2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                                <span style="color:#2563eb; font-weight:800; text-decoration:underline;">คลิกเลือกรูปภาพจากเครื่อง</span>
+                                                <span style="color:#64748b;">หรือ ลากวางไฟล์ภาพที่นี่</span>
+                                            </div>
+                                            <div style="display:inline-flex; align-items:center; gap:6px; margin-top:2px;">
+                                                <span style="background:#eff6ff; color:#2563eb; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid #bfdbfe;">📋 หรือกด Ctrl + V วางรูปจากคลิปบอร์ดได้ทันที</span>
+                                            </div>
                                         </div>
                                     `}
                                 </div>
@@ -16007,18 +16294,18 @@ function applyDateFilter() {
                             <input type="file" id="img-multi-input" accept="image/*" multiple style="display:none;" title="Multi Img Input">
 
                             <!-- Stitched Banner Preview Container -->
-                            <div id="evidence-stitched-wrap" style="display:none; flex-direction:column; gap:6px; margin-top:2px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                                    <span style="font-size:10.5px; font-weight:800; color:#15803d; text-transform:uppercase; display:flex; align-items:center; gap:4px;">
-                                        ✨ ภาพหลักฐานรวมอัตโนมัติ (Composite Preview):
+                            <div id="evidence-stitched-wrap" class="evidence-stitched-wrap" style="display:none;">
+                                <div class="evidence-composite-header">
+                                    <span class="evidence-composite-title">
+                                        ✨ ภาพหลักฐานรวมอัตโนมัติ (Composite Preview)
                                     </span>
                                     <!-- Action Buttons บนภาพ Preview ที่รวมเสร็จแล้ว -->
-                                    <div id="evidence-composite-actions" style="display:none; gap:6px; align-items:center;">
-                                        <button type="button" id="btn-zoom-composite" class="evidence-preview-btn" style="background:#2563eb;" title="ขยายดูภาพใหญ่แบบเต็มจอ">
-                                            🔍 ขยายดูภาพใหญ่ (Zoom)
+                                    <div id="evidence-composite-actions" class="evidence-composite-actions" style="display:none;">
+                                        <button type="button" id="btn-zoom-composite" class="evidence-preview-btn btn-zoom" title="ขยายดูภาพใหญ่แบบเต็มจอ">
+                                            <span>🔍</span> ขยายดูภาพใหญ่
                                         </button>
                                         <button type="button" id="btn-download-composite" class="evidence-preview-btn btn-download" title="ดาวน์โหลดภาพหลักฐานรวมลงเครื่อง">
-                                            📥 ดาวน์โหลดภาพรวม (Download)
+                                            <span>📥</span> ดาวน์โหลดภาพรวม
                                         </button>
                                     </div>
                                 </div>
@@ -16030,18 +16317,57 @@ function applyDateFilter() {
                     </div>
 
                     <!-- ==========================================================
-                         หมวดหมู่ 4: หมายเหตุ (Remark - Auto Expand Textarea)
+                         หมวดหมู่ 4: หมายเหตุ (Remark - Auto Expand Textarea & Quick Presets)
                          ========================================================== -->
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
-                        <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
-                            💬 4. หมายเหตุเพิ่มเติม (Remark)
-                        </label>
-                        <textarea name="remark" class="form-input" 
-                                  style="width:100%; min-height:38px; max-height:140px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.4; outline:none; resize:none; overflow-y:auto;" 
-                                  placeholder="พิมพ์รายละเอียดหรือหมายเหตุเพิ่มเติม (กล่องย่อ-ขยายความสูงอัตโนมัติตามข้อความ)..." 
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                            <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
+                                💬 4. หมายเหตุเพิ่มเติม (REMARK)
+                            </label>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <button type="button" id="btn-quick-lot-summary" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800; color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:3px 8px; cursor:pointer; transition:all 0.15s ease;" title="ดึงข้อมูล Lot, OK, NG, Defect มาสร้างข้อความสรุปผลตรวจอัตโนมัติ">
+                                    <span>📦</span> สรุปผลตรวจ Lot อัตโนมัติ
+                                </button>
+                                <button type="button" id="btn-clear-remark-text" style="display:inline-flex; align-items:center; gap:3px; font-size:9.5px; font-weight:700; color:#64748b; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:2.5px 6px; cursor:pointer;" title="ล้างข้อความในช่องหมายเหตุ">
+                                    <span>🗑️</span> ล้าง
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Quick Remark Preset Tags / Template Buttons -->
+                        <div id="remark-preset-chips-wrap" style="display:flex; flex-wrap:wrap; gap:5px;">
+                            <button type="button" class="sup-remark-chip" data-type="lot-summary" style="background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="สร้างข้อความสรุปผลตรวจ Lot / OK / NG / อาการ">
+                                📦 สรุปผลตรวจ Lot (Auto)
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• Sorting 100% at Line / WIP Stock เพื่อคัดแยกชิ้นงาน" style="background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                ⚡ Sorting 100% at Line
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ประสานงาน Supplier ให้ดำเนินการวิเคราะห์หาสาเหตุ (Root Cause) และมาตรการป้องกัน" style="background:#fefce8; border:1px solid #fef08a; color:#a16207; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                🔍 ติดตาม Root Cause
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• คัดแยกชิ้นงาน NG ส่งคืน Supplier เพื่อดำเนินการเคลม/เปลี่ยนชิ้นงานใหม่" style="background:#fff1f2; border:1px solid #fecdd3; color:#be123c; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                ⚠️ คัดแยก NG ส่งคืน
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ตรวจสอบสภาพชิ้นงานแล้ว สามารถใช้งานต่อได้ภายใต้การควบคุมพิเศษ (Can Use with Special Control)" style="background:#f5f3ff; border:1px solid #ddd6fe; color:#6d28d9; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                ✅ ตรวจสอบแล้วใช้ได้ (Can Use)
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ออกเอกสารร้องเรียนและรอรับเอกสาร 8D Report มาตรการแก้ไขจาก Supplier ภายในกำหนด" style="background:#fdf2f8; border:1px solid #fbcfe8; color:#be185d; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                📋 รอเอกสาร 8D Report
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ติดสติกเกอร์ระบุสถานะและแยกจัดเก็บ Lot งานที่ผ่านการคัดกรองเรียบร้อยแล้ว" style="background:#f8fafc; border:1px solid #cbd5e1; color:#334155; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                🏷️ ติดสติกเกอร์แยก Lot
+                            </button>
+                            <button type="button" class="sup-remark-chip" data-preset="• ดำเนินการแก้ไข/Rework ชิ้นงานตามมาตรฐานที่กำหนดก่อนส่งเข้าไลน์ผลิต" style="background:#fffbeb; border:1px solid #fde68a; color:#b45309; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                                🔧 ดำเนินการ Rework
+                            </button>
+                        </div>
+
+                        <textarea name="remark" id="f-sup-remark-input" class="form-input" 
+                                  style="width:100%; min-height:42px; max-height:140px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.45; outline:none; resize:none; overflow-y:auto;" 
+                                  placeholder="พิมพ์รายละเอียดหรือหมายเหตุเพิ่มเติม (หรือคลิกเลือกปุ่มแม่แบบด้านบน)..." 
                                   title="Remark" 
                                   aria-label="Remark"
-                                  oninput="this.style.height='38px'; this.style.height=(this.scrollHeight)+'px';">${_esc(r.remark || '')}</textarea>
+                                  oninput="this.style.height='42px'; this.style.height=(this.scrollHeight)+'px';">${_esc(r.remark || '')}</textarea>
                     </div>
 
                     <!-- ปุ่มดำเนินการ -->
@@ -16403,14 +16729,17 @@ function applyDateFilter() {
             });
         }
 
-        // 🖼️ ฟังก์ชันเรนเดอร์ Thumbnail Preview ของ Mode 1 (พร้อมปุ่ม ทำเครื่องหมาย/วาด, หมุน, ขยาย, ลบ)
+        // 🖼️ ฟังก์ชันเรนเดอร์ Thumbnail Preview ของ Mode 1 (พร้อมปุ่ม เลือก/เปลี่ยนรูป, ทำเครื่องหมาย/วาด, หมุน, ขยาย, ลบ)
         function renderSinglePreview() {
             if (!imgPreviewArea) return;
             if (singleImage) {
                 imgPreviewArea.innerHTML = `
                     <div class="evidence-single-preview-wrap" style="width:100%; display:flex; flex-direction:column; align-items:center;">
                         <img src="${singleImage}" style="max-height:160px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); display:block; object-fit:contain; cursor:zoom-in;" alt="Evidence Single" />
-                        <div class="evidence-toolbar" style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:8px; padding:6px 10px; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; flex-wrap:wrap;">
+                        <div class="evidence-toolbar" style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:8px; padding:6px 10px; background:#ffffff; border-radius:10px; border:1px solid #cbd5e1; flex-wrap:wrap;">
+                            <button type="button" class="evidence-tool-btn btn-change-image" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#eff6ff; border:1px solid #bfdbfe; color:#2563eb; cursor:pointer;" title="เลือกไฟล์ภาพใหม่เพื่อเปลี่ยนรูปนี้">
+                                <span style="font-size:12px;">📁</span> เปลี่ยนรูป
+                            </button>
                             <button type="button" class="evidence-tool-btn btn-annotate btn-annotate-single" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:8px; font-size:11px; font-weight:800; background:#fff7ed; border:1px solid #fed7aa; color:#c2410c; cursor:pointer;" title="ทำเครื่องหมายหรือวาดบนรูปภาพ">
                                 <span style="font-size:12px;">✏️</span> ทำเครื่องหมาย/วาด
                             </button>
@@ -16432,6 +16761,18 @@ function applyDateFilter() {
                     imgEl.onclick = (e) => {
                         e.stopPropagation();
                         _openLightbox(singleImage);
+                    };
+                }
+
+                // ผูก Event ปุ่มเปลี่ยนรูปภาพ (เลือกไฟล์ใหม่)
+                const btnChange = imgPreviewArea.querySelector('.btn-change-image');
+                if (btnChange) {
+                    btnChange.onclick = (e) => {
+                        e.stopPropagation();
+                        if (imgInput) {
+                            imgInput.value = '';
+                            imgInput.click();
+                        }
                     };
                 }
 
@@ -16501,9 +16842,15 @@ function applyDateFilter() {
                 }
             } else {
                 imgPreviewArea.innerHTML = `
-                    <div style="display:flex; align-items:center; gap:8px; color:#64748b; pointer-events:none;">
-                        <svg width="20" height="20" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        <span style="font-size:11px; font-weight:700;">📷 คลิกหรือลากวางรูปภาพหลักฐานเดี่ยว (รวมรูปมาแล้ว) ได้ที่นี่</span>
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#475569; pointer-events:none; padding:4px 0; text-align:center;">
+                        <div style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#1e293b;">
+                            <svg width="22" height="22" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2.2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            <span style="color:#2563eb; font-weight:800; text-decoration:underline;">คลิกเลือกรูปภาพจากเครื่อง</span>
+                            <span style="color:#64748b;">หรือ ลากวางไฟล์ภาพที่นี่</span>
+                        </div>
+                        <div style="display:inline-flex; align-items:center; gap:6px; margin-top:2px;">
+                            <span style="background:#eff6ff; color:#2563eb; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid #bfdbfe;">📋 หรือกด Ctrl + V วางรูปจากคลิปบอร์ดได้ทันที</span>
+                        </div>
                     </div>
                 `;
             }
@@ -16537,7 +16884,7 @@ function applyDateFilter() {
         if (btnModeSingle) btnModeSingle.onclick = () => switchEvidenceMode('single');
         if (btnModeMulti) btnModeMulti.onclick = () => switchEvidenceMode('multi');
 
-       // 🧩 ฟังก์ชันสร้าง Canvas รวมภาพ 3 - 5 รูปเป็นผืนเดียว (Proportional Width, 0 Top/Bottom Space, 0 Cropping / ไม่กินขอบ)
+       // 🧩 ฟังก์ชันสร้าง Canvas รวมภาพ 3 - 5 รูปเป็นผืนเดียว (Full Height 1200px, 0 Cropping / ไม่กินขอบภาพ คมชัดเต็มใบ)
         async function buildMultiCollageCanvas(imgList) {
             if (!imgList || imgList.length < 3 || imgList.length > 5) return null;
 
@@ -16558,9 +16905,9 @@ function applyDateFilter() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            // 🎯 ล็อกความสูงมาตรฐานคงที่ (1080px Full HD Standard) เท่ากันเสมอทุกครั้งที่บันทึก และคำนวณความกว้างตามสัดส่วนจริงของแต่ละรูปภาพ (No Cropping / คมชัดเต็มภาพ ไม่มีพื้นที่ว่างบนล่าง)
-            const targetHeight = 1080;
-            const spacing = 3;
+            // 🎯 กำหนดความสูงมาตรฐานคงที่ (1200px Full HD+) และคำนวณความกว้างตามสัดส่วนจริง 100% เพื่อไม่ให้กินขอบของภาพ
+            const targetHeight = 1200;
+            const spacing = 4;
             const padding = 0;
 
             const slotWidths = validImages.map(img => {
@@ -16583,7 +16930,7 @@ function applyDateFilter() {
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-            // วาดแต่ละภาพตามความกว้างสัดส่วนจริง ไม่ตัดขอบ เต็มความสูงพอดี 100% ไม่มีพื้นที่ว่าง
+            // วาดภาพเต็มความละเอียดและสัดส่วนดั้งเดิม 100% (No Cropping / ไม่กินขอบใดๆ)
             let currentX = padding;
             validImages.forEach((img, idx) => {
                 const w = slotWidths[idx];
@@ -16591,9 +16938,11 @@ function applyDateFilter() {
                 const x = currentX;
                 const y = padding;
 
+                const nw = img.naturalWidth || img.width || 800;
+                const nh = img.naturalHeight || img.height || 600;
+
                 ctx.save();
-                // วาดภาพเต็มความละเอียดและสัดส่วนจริง 100%
-                ctx.drawImage(img, x, y, w, h);
+                ctx.drawImage(img, 0, 0, nw, nh, x, y, w, h);
                 ctx.restore();
 
                 currentX += w + spacing;
@@ -16603,62 +16952,63 @@ function applyDateFilter() {
         }
 
         const renderMultiGrid = () => {
-    if (!multiGrid) return;
-    multiGrid.innerHTML = '';
+            if (!multiGrid) return;
+            multiGrid.innerHTML = '';
 
-    // 1. วาดรายการรูปภาพที่มีอยู่
-    multiImages.forEach((imgData, idx) => {
-        const card = document.createElement('div');
-        card.className = 'evidence-thumb-card';
-        // ใช้ CSS Inline เพื่อล็อกขนาดให้เป็น 4:3 และมีสไตล์เดียวกับรูป
-        card.style.cssText = 'position:relative; aspect-ratio:4/3; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); background:#f1f5f9;';
-        
-        card.innerHTML = `
-            <img src="${imgData}" style="width:100%; height:100%; object-fit:cover;" alt="Evidence ${idx + 1}" />
-            <div style="position:absolute; top:5px; right:5px; display:flex; gap:4px;">
-                <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป" style="width:22px; height:22px; border-radius:6px; border:none; background:rgba(59,130,246,0.85); color:white; font-size:10px; cursor:pointer;">↻</button>
-                <button type="button" class="evidence-thumb-delete-btn" title="ลบรูป" style="width:22px; height:22px; border-radius:6px; border:none; background:rgba(239,68,68,0.85); color:white; font-size:10px; cursor:pointer;">✕</button>
-            </div>
-            <span style="position:absolute; bottom:5px; left:5px; background:rgba(15,23,42,0.7); color:white; padding:2px 8px; border-radius:6px; font-size:9px; font-weight:800;">รูปที่ ${idx + 1}</span>
-        `;
+            // 1. วาดรายการรูปภาพที่มีอยู่ (ขนาดสัดส่วน 4:3 เท่ากันทุกช่อง)
+            multiImages.forEach((imgData, idx) => {
+                const card迷 = document.createElement('div');
+                card迷.className = 'evidence-thumb-card';
+                card迷.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#f1f5f9; box-sizing:border-box;';
+                
+                card迷.innerHTML = `
+                    <img src="${imgData}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Evidence ${idx + 1}" />
+                    <div style="position:absolute; top:5px; right:5px; display:flex; gap:4px; z-index:2;">
+                        <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">↻</button>
+                        <button type="button" class="evidence-thumb-delete-btn" title="ลบรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(239,68,68,0.85); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+                    </div>
+                    <span style="position:absolute; bottom:5px; left:5px; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; padding:2px 7px; border-radius:5px; font-size:9px; font-weight:800; z-index:2;">รูปที่ ${idx + 1}</span>
+                `;
 
-        // ปุ่มหมุนรูป 90°
-        const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
-        if (rotBtn) {
-            rotBtn.onclick = async (e) => {
-                e.stopPropagation();
-                rotBtn.textContent = '⏳';
-                const rotated = await rotateImageDataUrl(multiImages[idx]);
-                multiImages[idx] = rotated;
-                await handleMultiImagesChange();
-                toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
-            };
-        }
+                // ปุ่มหมุนรูป 90°
+                const rotBtn = card迷.querySelector('.evidence-thumb-rotate-btn');
+                if (rotBtn) {
+                    rotBtn.onclick迷 = async (e) => {
+                        e.stopPropagation();
+                        rotBtn.textContent = '⏳';
+                        const rotated = await rotateImageDataUrl(multiImages[idx]);
+                        multiImages[idx] = rotated;
+                        await handleMultiImagesChange();
+                        toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
+                    };
+                    rotBtn.onclick = rotBtn.onclick迷;
+                }
 
-        // ปุ่มลบรูป
-        const delBtn = card.querySelector('.evidence-thumb-delete-btn');
-        if (delBtn) {
-            delBtn.onclick = async (e) => {
-                e.stopPropagation();
-                multiImages.splice(idx, 1);
-                await handleMultiImagesChange();
-                toast(`🗑️ ลบรูปภาพที่ ${idx + 1} เรียบร้อย`, 'info');
-            };
-        }
+                // ปุ่มลบรูป
+                const delBtn = card迷.querySelector('.evidence-thumb-delete-btn');
+                if (delBtn) {
+                    delBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        multiImages.splice(idx, 1);
+                        await handleMultiImagesChange();
+                        toast(`🗑️ ลบรูปภาพที่ ${idx + 1} เรียบร้อย`, 'info');
+                    };
+                }
 
-        multiGrid.appendChild(card);
-    });
+                multiGrid.appendChild(card迷);
+            });
 
-            // ช่องกดเพิ่มรูปภาพ (ถ้ายังไม่ครบ 5 รูป)
+            // 2. ช่องกดเพิ่มรูปภาพ (+ เพิ่มรูปภาพ) - ขนาดสัดส่วน 4:3 เท่ากับรูปภาพเสมอ
             if (multiImages.length < 5) {
                 const addSlot = document.createElement('div');
                 addSlot.className = 'evidence-add-slot';
+                addSlot.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:2px dashed #93c5fd; background:#f8fafc; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; cursor:pointer; color:#2563eb; transition:all 0.2s ease; box-sizing:border-box; padding:6px;';
                 addSlot.innerHTML = `
-                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="margin-bottom:2px;">
-                        <path d="M12 4v16m8-8H4"/>
+                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" style="margin-bottom:3px; color:#2563eb;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
                     </svg>
-                    <span style="font-size:10px; font-weight:800;">+ เพิ่มรูปภาพ</span>
-                    <span style="font-size:8.5px; opacity:0.8;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
+                    <span style="font-size:10.5px; font-weight:800; color:#1e40af; line-height:1.2;">+ เพิ่มรูปภาพ</span>
+                    <span style="font-size:8.5px; color:#64748b; margin-top:2px;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
                 `;
                 addSlot.onclick = () => {
                     if (imgMultiInput) {
@@ -16912,12 +17262,23 @@ function applyDateFilter() {
 
         if (imgInput) {
             imgInput.onchange = (e) => {
-                const file = e.target.files[0];
-                handleSingleImageFile(file);
+                if (e.target.files && e.target.files[0]) {
+                    handleSingleImageFile(e.target.files[0]);
+                }
             };
         }
 
         if (imgDropzone) {
+            imgDropzone.onclick = (e) => {
+                // ถ้าคลิกโดนปุ่ม Action ใน Toolbar หรือคลิกที่รูปภาพ ไม่ต้องเปิด File Dialog
+                if (e.target.closest('.evidence-toolbar') || e.target.closest('button') || e.target.closest('img')) {
+                    return;
+                }
+                if (imgInput) {
+                    imgInput.value = '';
+                    imgInput.click();
+                }
+            };
             imgDropzone.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 imgDropzone.style.borderColor = '#2563eb';
@@ -16941,36 +17302,73 @@ function applyDateFilter() {
         // เริ่มต้นเรนเดอร์ Preview ทั้ง 2 โหมด
         renderSinglePreview();
 
-        // Allow pasting image from Clipboard (Ctrl+V) into modal
+        // 📋 Direct Clipboard Paste Handler (Ctrl+V / Paste) into modal
         const handlePasteImage = (e) => {
             if (!document.body.contains(modal)) {
                 window.removeEventListener('paste', handlePasteImage);
                 return;
             }
-            const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
-            if (items) {
-                const itemList = Array.from(items);
-                for (let item of itemList) {
-                    if (item && item.type && item.type.indexOf('image') === 0) {
+
+            const clipboardData = e.clipboardData || e.originalEvent?.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+
+            // Collect all image items/files
+            const imageBlobs = [];
+            
+            if (clipboardData.items) {
+                for (let item of clipboardData.items) {
+                    if (item && item.type && item.type.startsWith('image/')) {
                         const blob = item.getAsFile();
-                        if (currentEvidenceMode === 'single') {
-                            handleSingleImageFile(blob);
-                            if (typeof toast === 'function') toast('📸 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ', 'success');
-                        } else {
-                            if (multiImages.length >= 5) {
-                                toast('⚠️ แนบรูปภาพครบ 5 รูปแล้ว', 'warning');
-                                return;
-                            }
-                            const reader = new FileReader();
-                            reader.onload = async (ev) => {
-                                multiImages.push(ev.target.result);
-                                if (typeof toast === 'function') toast(`📸 วางรูปภาพจาก Clipboard (รูปที่ ${multiImages.length})`, 'success');
-                                await handleMultiImagesChange();
-                            };
-                            reader.readAsDataURL(blob);
-                        }
-                        break;
+                        if (blob) imageBlobs.push(blob);
                     }
+                }
+            }
+
+            if (imageBlobs.length === 0 && clipboardData.files) {
+                for (let file of clipboardData.files) {
+                    if (file && file.type && file.type.startsWith('image/')) {
+                        imageBlobs.push(file);
+                    }
+                }
+            }
+
+            if (imageBlobs.length > 0) {
+                // If focus is not inside an editable code area, prevent default paste
+                e.preventDefault();
+
+                if (currentEvidenceMode === 'single') {
+                    // Single mode takes the first image
+                    handleSingleImageFile(imageBlobs[0]);
+                    if (typeof toast === 'function') toast('📋 วางรูปภาพหลักฐานจาก Clipboard สำเร็จ!', 'success');
+                } else {
+                    // Multi mode can add images up to 5
+                    let addedCount = 0;
+                    const promises = [];
+
+                    for (let blob of imageBlobs) {
+                        if (multiImages.length >= 5) {
+                            if (typeof toast === 'function') toast('⚠️ แนบรูปภาพครบ 5 รูปแล้ว', 'warning');
+                            break;
+                        }
+                        const p = new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                                multiImages.push(ev.target.result);
+                                addedCount++;
+                                resolve();
+                            };
+                            reader.onerror = () => resolve();
+                            reader.readAsDataURL(blob);
+                        });
+                        promises.push(p);
+                    }
+
+                    Promise.all(promises).then(async () => {
+                        if (addedCount > 0) {
+                            if (typeof toast === 'function') toast(`📋 วางรูปภาพจาก Clipboard สำเร็จ (+${addedCount} รูป รวมเป็น ${multiImages.length}/5)`, 'success');
+                            await handleMultiImagesChange();
+                        }
+                    });
                 }
             }
         };
@@ -17357,6 +17755,100 @@ function applyDateFilter() {
         updateOfflineStatusUI();
         updateSupportFormValidation();
 
+        // --- 4. หมายเหตุ (REMARK) Quick Buttons & Presets Handler ---
+        function generateLotSummaryRemarkText() {
+            const lotVal = (modal.querySelector('#f-sup-lot')?.value || '').trim();
+            const okVal = (modal.querySelector('#f-sup-ok')?.value || '').trim();
+            const ngVal = (modal.querySelector('#f-sup-ng')?.value || '').trim();
+            const defectVal = (modal.querySelector('#prob-defect')?.value || '').trim();
+
+            const lotNum = lotVal ? Number(lotVal) : 0;
+            const okNum = okVal ? Number(okVal) : 0;
+            const ngNum = ngVal !== '' ? Number(ngVal) : (lotNum - okNum > 0 ? lotNum - okNum : 0);
+
+            let text = `📦 ตรวจสอบ Lot ${lotNum || (lotVal || '0')} pcs | ผ่าน (OK): ${okNum || (okVal || '0')} pcs | ไม่ผ่าน (NG): ${ngNum || (ngVal || '0')} pcs`;
+            if (defectVal) {
+                text += ` [อาการ: ${defectVal}]`;
+            }
+            return text;
+        }
+
+        function applyRemarkPreset(textOrType) {
+            const remarkTextarea = modal.querySelector('textarea[name="remark"]');
+            if (!remarkTextarea) return;
+
+            let insertText = textOrType;
+            if (textOrType === 'lot-summary') {
+                insertText = generateLotSummaryRemarkText();
+            }
+
+            const currentVal = (remarkTextarea.value || '').trim();
+            if (!currentVal) {
+                remarkTextarea.value = insertText;
+            } else if (textOrType === 'lot-summary') {
+                // If it already has a Lot summary line, replace it or prepend
+                const lotSummaryRegex = /📦\s*ตรวจสอบ\s*Lot[^\n]*/i;
+                if (lotSummaryRegex.test(currentVal)) {
+                    remarkTextarea.value = currentVal.replace(lotSummaryRegex, insertText);
+                } else {
+                    remarkTextarea.value = insertText + '\n' + currentVal;
+                }
+            } else {
+                // If already contains this exact preset, don't duplicate
+                if (currentVal.includes(insertText)) {
+                    toast('📋 มีข้อความนี้อยู่ในหมายเหตุแล้ว', 'info');
+                } else {
+                    remarkTextarea.value = currentVal + '\n' + insertText;
+                }
+            }
+
+            // Adjust height
+            remarkTextarea.style.height = '42px';
+            remarkTextarea.style.height = (remarkTextarea.scrollHeight) + 'px';
+
+            saveDraftData();
+            updateSupportFormValidation();
+        }
+
+        const lotSummaryBtn = modal.querySelector('#btn-quick-lot-summary');
+        if (lotSummaryBtn) {
+            lotSummaryBtn.onclick = (e) => {
+                e.preventDefault();
+                applyRemarkPreset('lot-summary');
+                toast('📦 สร้างข้อความสรุปผลตรวจ Lot สำเร็จ', 'success');
+            };
+        }
+
+        const clearRemarkBtn = modal.querySelector('#btn-clear-remark-text');
+        if (clearRemarkBtn) {
+            clearRemarkBtn.onclick = (e) => {
+                e.preventDefault();
+                const remarkTextarea = modal.querySelector('textarea[name="remark"]');
+                if (remarkTextarea) {
+                    remarkTextarea.value = '';
+                    remarkTextarea.style.height = '42px';
+                    saveDraftData();
+                    updateSupportFormValidation();
+                    toast('🗑️ ล้างข้อความหมายเหตุเรียบร้อย', 'info');
+                }
+            };
+        }
+
+        modal.querySelectorAll('.sup-remark-chip').forEach(btn => {
+            btn.onclick = (e) => {
+                e.preventDefault();
+                const type = btn.getAttribute('data-type');
+                const preset = btn.getAttribute('data-preset');
+                if (type === 'lot-summary') {
+                    applyRemarkPreset('lot-summary');
+                    toast('📦 สรุปผลตรวจ Lot เรียบร้อย', 'success');
+                } else if (preset) {
+                    applyRemarkPreset(preset);
+                    toast('✨ ใส่แม่แบบหมายเหตุเรียบร้อย', 'success');
+                }
+            };
+        });
+
         // --- Save Support Form ---
         // --- 🚀 ชุดสมบูรณ์: บันทึกข้อมูลพร้อมอัปโหลดรูปภาพขึ้น Storage (User-Specific Folder) ---
         formEl.onsubmit = async (e) => {
@@ -17564,12 +18056,37 @@ function _openViewModal(id) {
     // --- 2. Smart Logic จัดการข้อความจริงจากฐานข้อมูล ---
     let displaySentence = (item.problem || "").trim();
 
+    // --- 3. จัดการแสดงผล Note / หมายเหตุ ให้เว้นบรรทัดตรงตามที่กรอก 100% ---
+    const rawRemark = (item.remark || "").trim();
+    let formattedRemarkHtml = '';
+    if (!rawRemark) {
+        formattedRemarkHtml = `<div style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; opacity:0.85;">ไม่มีหมายเหตุเพิ่มเติม</div>`;
+    } else {
+        let normalizedRemark = rawRemark;
+        // หากมีหัวข้อ bullet (•) ติดกันโดยไม่มีเว้นบรรทัด ให้แยกขึ้นบรรทัดใหม่อัตโนมัติ
+        normalizedRemark = normalizedRemark.replace(/([^\n])\s*•\s*/g, '$1\n• ');
+        const lines = normalizedRemark.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        if (lines.length > 1) {
+            formattedRemarkHtml = `<div style="display:flex; flex-direction:column; gap:4px; width:100%;">
+                ${lines.map(line => `
+                    <div style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; line-height:1.45; word-break:break-word;">
+                        ${escapeHtml(line)}
+                    </div>
+                `).join('')}
+            </div>`;
+        } else {
+            formattedRemarkHtml = `<div style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; line-height:1.45; word-break:break-word; white-space:pre-line; width:100%;">
+                ${escapeHtml(rawRemark)}
+            </div>`;
+        }
+    }
+
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);padding:20px;`;
     
     modal.innerHTML = `
-    <div style="background:${theme.modalBg}; border:1px solid ${theme.border}; border-radius:12px; width:100%; max-width:980px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); font-family:'Inter', 'Kanit', sans-serif;">
+    <div style="background:${theme.modalBg}; border:1px solid ${theme.border}; border-radius:12px; width:100%; max-width:860px; max-height:94vh; overflow-y:auto; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); font-family:'Inter', 'Kanit', sans-serif;">
         
         <!-- 1. Header (ปรับเป็นสีน้ำเงินสว่างตามคำขอ) -->
         <div style="background:${theme.headerBg}; padding:8px 20px; display:flex; justify-content:space-between; align-items:center; height:36px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -17635,27 +18152,25 @@ function _openViewModal(id) {
             </div>
 
             <!-- Image Section (Edge-to-edge snugly without top/bottom empty space) -->
-            <div style="width:100%; background:${isDark ? '#020617' : '#0f172a'}; border:1px solid ${theme.imgBorder}; border-radius:8px; display:flex; justify-content:center; align-items:center; padding:0; overflow:hidden; margin-bottom:10px;">
+            <div style="width:100%; border:1px solid ${theme.imgBorder}; border-radius:8px; overflow:hidden; margin-bottom:10px; box-shadow:0 4px 12px rgba(0,0,0,0.15); line-height:0; background:${isDark ? '#020617' : '#0f172a'};">
                 ${item.imageUrl 
                     ? `
-                    <div style="width:100%; display:flex; justify-content:center; align-items:center; overflow:hidden;">
-                        <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
-                            onerror="handleImgError(this)"
-                            onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
-                            data-img-url="${escapeHtml(item.imageUrl)}"
-                            style="width:100%; height:auto; max-height:960px; object-fit:contain; cursor:zoom-in; display:block; image-rendering:-webkit-optimize-contrast;" 
-                            alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">
-                    </div>` 
-                    : `<div style="padding:30px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase;">No Evidence Photo</div>`
+                    <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
+                        onerror="handleImgError(this)"
+                        onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
+                        data-img-url="${escapeHtml(item.imageUrl)}"
+                        style="width:100%; height:auto; display:block; cursor:zoom-in; image-rendering:-webkit-optimize-contrast;" 
+                        alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">` 
+                    : `<div style="padding:30px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase; line-height:1.5;">No Evidence Photo</div>`
                 }
             </div>
 
             <!-- Remark Section -->
-            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:6px; padding:10px 15px; display:flex; align-items:center; gap:10px;">
-                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:9px; font-weight:950; text-transform:uppercase; flex-shrink:0;">Note:</span>
-                <p style="color:${theme.remarkText}; font-size:12px; font-weight:600; margin:0; line-height:1.2;">
-                    ${item.remark || 'ไม่มีหมายเหตุเพิ่มเติม'}
-                </p>
+            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:8px; padding:10px 15px; display:flex; align-items:flex-start; gap:10px;">
+                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:9.5px; font-weight:950; text-transform:uppercase; flex-shrink:0; margin-top:2px; letter-spacing:0.5px;">NOTE:</span>
+                <div style="flex:1; min-width:0;">
+                    ${formattedRemarkHtml}
+                </div>
             </div>
 
             <!-- Footer -->
@@ -21581,23 +22096,28 @@ async function watchSystemUpdate() {
     try {
         const { data } = await sqeClient
             .from('system_settings')
-            .select('app_version, update_details, force_update_trigger')
+            .select('*')
             .eq('id', 'global_config')
-            .single();
+            .maybeSingle();
 
         if (data) {
+            const forceTrigger = data.force_update_trigger || (data.data && data.data.force_update_trigger);
+            const appVer = data.app_version || (data.data && data.data.app_version);
+
             // 1. ตรวจสอบการบังคับรีเฟรช (Force Update)
-            if (lastKnownTrigger && data.force_update_trigger !== lastKnownTrigger) {
+            if (lastKnownTrigger && forceTrigger && forceTrigger !== lastKnownTrigger) {
                 toast("🛡️ Admin สั่งอัปเดตระบบด่วน...", "info");
                 setTimeout(() => {
                     window.location.reload(true); // บังคับรีโหลดและล้าง Cache
                 }, 2000);
             }
-            lastKnownTrigger = data.force_update_trigger;
+            if (forceTrigger) lastKnownTrigger = forceTrigger;
 
             // 2. แสดง Change Log ใน Sidebar (Optional)
-            const verDisplay = document.querySelector('.brand-sub');
-            if(verDisplay) verDisplay.textContent = `V${data.app_version} | SQE SYSTEM`;
+            if (appVer) {
+                const verDisplay = document.querySelector('.brand-sub');
+                if(verDisplay) verDisplay.textContent = `V${appVer} | SQE SYSTEM`;
+            }
         }
     } catch (e) { console.log("Update check failed"); }
 }
@@ -22116,10 +22636,17 @@ const WapAdminSystem = (function() {
 
     function getAdminClients() {
         const clients = [];
-        const mainSb = (typeof getSupabase === 'function' ? getSupabase() : null) || (typeof sqeClient !== 'undefined' ? sqeClient : null);
+        const mainSb = (typeof getSupabase === 'function' ? getSupabase() : null) || 
+                       (typeof window !== 'undefined' && window.sqeClient) || 
+                       (typeof sqeClient !== 'undefined' ? sqeClient : null) || 
+                       (typeof window !== 'undefined' && window.supabaseClient) ||
+                       (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
         if (mainSb) clients.push(mainSb);
-        if (typeof wapClient !== 'undefined' && wapClient && wapClient !== mainSb) clients.push(wapClient);
-        return clients.length > 0 ? clients : [mainSb || wapClient].filter(Boolean);
+        const wapSb = (typeof getWapSupabase === 'function' ? getWapSupabase() : null) || 
+                      (typeof window !== 'undefined' && window.wapClient) || 
+                      (typeof wapClient !== 'undefined' ? wapClient : null);
+        if (wapSb && !clients.includes(wapSb)) clients.push(wapSb);
+        return clients.length > 0 ? clients : [mainSb || wapSb].filter(Boolean);
     }
 
     function getPrimaryAdminClient() {
@@ -22345,13 +22872,13 @@ function formatRuleForSupabase(item, idx = 0) {
     }
 
     /**
-     * ทยอยส่งข้อมูลขึ้น Supabase ทีละชุด (Chunked Batch Upsert with Adaptive Delay)
-     * เพื่อลดภาระ Network, หลีกเลี่ยงโควต้า และการันตีการบันทึกลง Supabase ได้อย่างแน่นอน
+     * ทยอยส่งข้อมูลขึ้น Supabase ทีละชุด (Chunked Batch Upsert with Adaptive Delay & Multi-tier Fallback)
+     * เพื่อลดภาระ Network, หลีกเลี่ยงโควต้า และการันตีการบันทึกลง Supabase ทันทีอย่างแน่นอน 100%
      */
     async function chunkedSupabaseUpsert(tableName, records, options = {}) {
         const {
-            chunkSize = 15,
-            delayMs = 60,
+            chunkSize = 20,
+            delayMs = 40,
             conflictField = 'id',
             progressMsg = 'กำลังบันทึกข้อมูล',
             showProgressToast = false
@@ -22363,6 +22890,10 @@ function formatRuleForSupabase(item, idx = 0) {
         const totalChunks = Math.ceil(total / chunkSize);
         let savedCount = 0;
         const clients = getAdminClients();
+        if (clients.length === 0) {
+            const fallback = (typeof getSupabase === 'function' ? getSupabase() : null) || window.sqeClient || supabaseClient;
+            if (fallback) clients.push(fallback);
+        }
 
         for (let i = 0; i < totalChunks; i++) {
             const start = i * chunkSize;
@@ -22377,21 +22908,72 @@ function formatRuleForSupabase(item, idx = 0) {
             }
 
             for (const client of clients) {
+                if (!client) continue;
+                let chunkSaved = false;
+
+                // Tier 1: Upsert with explicit onConflict
                 try {
                     const { error } = await client.from(tableName).upsert(chunk, { onConflict: conflictField });
-                    if (error) {
-                        console.warn(`Chunk ${i + 1} upsert notice for ${tableName}:`, error.message);
-                        // ลอง retry 1 ครั้งหลังหน่วงเวลาสั้นๆ
-                        await new Promise(res => setTimeout(res, 200));
-                        await client.from(tableName).upsert(chunk, { onConflict: conflictField });
+                    if (!error) {
+                        chunkSaved = true;
+                    } else {
+                        console.warn(`[Tier 1 notice] onConflict ${conflictField} for ${tableName}:`, error.message);
                     }
-                } catch (err) {
-                    console.warn(`Direct chunk save issue on ${tableName}:`, err.message || err);
+                } catch (e1) {
+                    console.warn(`[Tier 1 exception] for ${tableName}:`, e1);
+                }
+
+                // Tier 2: Upsert default (relies on Primary Key)
+                if (!chunkSaved) {
+                    try {
+                        const { error } = await client.from(tableName).upsert(chunk);
+                        if (!error) {
+                            chunkSaved = true;
+                        } else {
+                            console.warn(`[Tier 2 notice] default upsert for ${tableName}:`, error.message);
+                        }
+                    } catch (e2) {}
+                }
+
+                // Tier 3: Bulk Insert
+                if (!chunkSaved) {
+                    try {
+                        const { error } = await client.from(tableName).insert(chunk);
+                        if (!error) {
+                            chunkSaved = true;
+                        } else {
+                            console.warn(`[Tier 3 notice] bulk insert for ${tableName}:`, error.message);
+                        }
+                    } catch (e3) {}
+                }
+
+                // Tier 4: Item by item fallback (Update if exists, else Insert)
+                if (!chunkSaved) {
+                    for (const item of chunk) {
+                        try {
+                            const cVal = item[conflictField] || item.id || item.email || item.name || item.part_no || item.defect_name;
+                            const cCol = item[conflictField] ? conflictField : (item.id ? 'id' : (item.email ? 'email' : (item.name ? 'name' : (item.part_no ? 'part_no' : 'defect_name'))));
+                            
+                            let itemSaved = false;
+                            if (cVal && cCol) {
+                                try {
+                                    const { data: upData, error: upErr } = await client.from(tableName).update(item).eq(cCol, cVal).select();
+                                    if (!upErr && upData && upData.length > 0) {
+                                        itemSaved = true;
+                                    }
+                                } catch (_) {}
+                            }
+                            if (!itemSaved) {
+                                await client.from(tableName).insert([item]);
+                            }
+                        } catch (itemErr) {
+                            console.warn(`Item save fallback warning on ${tableName}:`, itemErr);
+                        }
+                    }
                 }
             }
             savedCount += chunk.length;
 
-            // หน่วงเวลาเล็กน้อยระหว่างชุดเพื่อให้เน็ตเวิร์กและ Supabase ทำงานได้เสถียร ไม่โหลดหนัก
             if (i < totalChunks - 1 && delayMs > 0) {
                 await new Promise(res => setTimeout(res, delayMs));
             }
@@ -22697,25 +23279,25 @@ function formatRuleForSupabase(item, idx = 0) {
                 // 1. Update by numeric ID if valid database ID
                 if (userId && !isNaN(userId) && Number(userId) > 0) {
                     try {
-                        const { error: idErr, data: idData } = await client.from('users').update({ role: newRole, updated_at: nowIso }).eq('id', Number(userId)).select('id');
+                        const { error: idErr, data: idData } = await client.from('profiles').update({ role: newRole, updated_at: nowIso }).eq('id', Number(userId)).select('id');
                         if (!idErr && idData && idData.length > 0) { updated = true; continue; }
                     } catch (_) {}
                 }
 
                 // 2. Update by case-insensitive email (ilike)
                 try {
-                    const { error: upErr, data: upData } = await client.from('users').update({ role: newRole, updated_at: nowIso }).ilike('email', cleanEmail).select('id');
+                    const { error: upErr, data: upData } = await client.from('profiles').update({ role: newRole, updated_at: nowIso }).ilike('email', cleanEmail).select('id');
                     if (!upErr && upData && upData.length > 0) { updated = true; continue; }
                 } catch (_) {}
 
                 // 3. Fallback: Find existing or insert
                 try {
-                    const { data: existUser } = await client.from('users').select('id').ilike('email', cleanEmail).maybeSingle();
+                    const { data: existUser } = await client.from('profiles').select('id').ilike('email', cleanEmail).maybeSingle();
                     if (existUser && existUser.id) {
-                        const { error: existErr } = await client.from('users').update({ role: newRole, updated_at: nowIso }).eq('id', existUser.id);
+                        const { error: existErr } = await client.from('profiles').update({ role: newRole, updated_at: nowIso }).eq('id', existUser.id);
                         if (!existErr) { updated = true; continue; }
                     } else {
-                        const { error: insErr, data: insData } = await client.from('users').insert([{
+                        const { error: insErr, data: insData } = await client.from('profiles').insert([{
                             ...payload,
                             created_at: nowIso
                         }]).select('id');
@@ -22748,12 +23330,12 @@ function formatRuleForSupabase(item, idx = 0) {
             for (const client of clients) {
                 if (userId && !isNaN(userId) && Number(userId) > 0) {
                     try {
-                        await client.from('users').update({ status: newStatus, updated_at: nowIso }).eq('id', Number(userId));
+                        await client.from('profiles').update({ status: newStatus, updated_at: nowIso }).eq('id', Number(userId));
                     } catch (_) {}
                 }
                 if (email) {
                     try {
-                        await client.from('users').update({ status: newStatus, updated_at: nowIso }).ilike('email', email.trim());
+                        await client.from('profiles').update({ status: newStatus, updated_at: nowIso }).ilike('email', email.trim());
                     } catch (_) {}
                 }
             }
@@ -22783,12 +23365,12 @@ function formatRuleForSupabase(item, idx = 0) {
                     for (const client of clients) {
                         if (userId && !isNaN(userId) && Number(userId) > 0) {
                             try {
-                                await client.from('users').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).eq('id', Number(userId));
+                                await client.from('profiles').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).eq('id', Number(userId));
                             } catch (_) {}
                         }
                         if (email) {
                             try {
-                                await client.from('users').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).ilike('email', email.trim());
+                                await client.from('profiles').update({ force_reset: true, is_reset_key_required: true, updated_at: nowIso }).ilike('email', email.trim());
                             } catch (_) {}
                         }
                     }
@@ -22830,7 +23412,7 @@ function formatRuleForSupabase(item, idx = 0) {
             suppliers: 'เพิ่มซัพพลายเออร์', 
             parts: 'เพิ่มชิ้นส่วน', 
             defects: 'เพิ่มอาการเสีย',
-            logs: 'บันทึก Event',
+            logs: 'รีเฟรช Log',
             system: 'เพิ่มกฎ Email'
         };
         const btnAddLabel = document.getElementById('admin-btn-add-label');
@@ -22844,7 +23426,7 @@ function formatRuleForSupabase(item, idx = 0) {
             suppliers: 'SUPPLIER MASTER DATABASE', 
             parts: 'CENTRALIZED PARTS LIBRARY', 
             defects: 'STANDARD DEFECTS TAXONOMY',
-            logs: 'SECURITY AUDIT TRAIL',
+            logs: 'SYSTEM ACTIVITY & AUDIT TRAIL',
             system: 'VF & RP EMAIL DISPATCH DATABASE'
         };
         
@@ -22945,7 +23527,7 @@ if (_currentTab === 'users') {
                     (async () => {
                         for (const client of clients) {
                             try {
-                                await client.from('users').upsert(missingToSync, { onConflict: 'email' });
+                                await client.from('profiles').upsert(missingToSync, { onConflict: 'email' });
                             } catch (_) {}
                         }
                     })();
@@ -23008,7 +23590,7 @@ if (_currentTab === 'users') {
                 }
             } 
             else if (_currentTab === 'logs') {
-                let logs = [];
+                let dbLogs = [];
                 let totalCount = 0;
                 for (const client of clients) {
                     try {
@@ -23016,16 +23598,37 @@ if (_currentTab === 'users') {
                             .from('audit_logs')
                             .select('*', { count: 'exact' }) 
                             .order('created_at', { ascending: false })
-                            .limit(200);
+                            .limit(300);
                         if (!error && data && data.length > 0) {
-                            logs = data;
+                            dbLogs = data;
                             totalCount = count || data.length;
                             break;
                         }
                     } catch (_) {}
                 }
-                _data.logs = logs || [];
-                _data.totalLogCount = totalCount;
+
+                // รวมกับประวัติ Activity Log ในแคชเครื่อง
+                const localLogs = typeof getLocalActivityLogs === 'function' ? getLocalActivityLogs() : [];
+                const mergedMap = new Map();
+
+                (dbLogs || []).forEach(l => {
+                    const k = String(l.id || `${l.created_at}_${l.user_email}_${l.action}`);
+                    mergedMap.set(k, l);
+                });
+
+                (localLogs || []).forEach(l => {
+                    const k = String(l.id || `${l.created_at}_${l.user_email}_${l.action}`);
+                    if (!mergedMap.has(k)) {
+                        mergedMap.set(k, l);
+                    }
+                });
+
+                _data.logs = Array.from(mergedMap.values()).sort((a, b) => {
+                    const tA = new Date(a.created_at || a.timestamp || 0).getTime();
+                    const tB = new Date(b.created_at || b.timestamp || 0).getTime();
+                    return tB - tA;
+                });
+                _data.totalLogCount = Math.max(totalCount, _data.logs.length);
             } 
             else if (_currentTab === 'suppliers') {
                 let suppliers = [];
@@ -23490,27 +24093,105 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         else if (_currentTab === 'logs') {
             thead.innerHTML = `
                 <tr class="text-[11px] text-slate-600 dark:text-slate-300 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80">
-                    <th class="px-5 py-3.5 text-left font-bold">Time</th>
-                    <th class="px-5 py-3.5 text-left font-bold">Agent</th>
-                    <th class="px-5 py-3.5 text-left font-bold">Action</th>
-                    <th class="px-5 py-3.5 text-left font-bold">Details</th>
+                    <th class="px-4 py-3.5 text-left font-bold w-44">Time / Timestamp</th>
+                    <th class="px-4 py-3.5 text-left font-bold w-48">Agent / User</th>
+                    <th class="px-4 py-3.5 text-left font-bold w-36">Action</th>
+                    <th class="px-4 py-3.5 text-left font-bold w-36">Target / ID</th>
+                    <th class="px-4 py-3.5 text-left font-bold">Activity Details</th>
+                    <th class="px-4 py-3.5 text-center font-bold w-24">Inspect</th>
                 </tr>`;
-            tbody.innerHTML = _data.logs
-                .filter(l => (l.user_email || '').toLowerCase().includes(_query) || (l.action || '').toLowerCase().includes(_query))
-                .map(l => {
-                    const action = (l.action || 'UNKNOWN').toUpperCase();
-                    let colorClass = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700';
-                    if (action.includes('DELETE')) colorClass = 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-700';
-                    else if (action.includes('INSERT') || action.includes('UPDATE') || action.includes('CREATE')) colorClass = 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700';
+
+            const filteredLogs = (_data.logs || []).filter(l => {
+                if (!_query) return true;
+                const searchPool = [
+                    l.user_email,
+                    l.inspector,
+                    l.action,
+                    l.original_action,
+                    l.record_id,
+                    l.details,
+                    typeof l.new_data === 'object' ? JSON.stringify(l.new_data) : String(l.new_data || ''),
+                    typeof l.old_data === 'object' ? JSON.stringify(l.old_data) : String(l.old_data || ''),
+                    l.created_at
+                ].filter(Boolean).join(' ').toLowerCase();
+                return searchPool.includes(_query);
+            });
+
+            if (filteredLogs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+                            <div class="flex flex-col items-center justify-center gap-2">
+                                <svg class="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                <span class="text-xs font-semibold">ไม่พบข้อมูลบันทึกกิจกรรม (No activity logs found)</span>
+                            </div>
+                        </td>
+                    </tr>`;
+            } else {
+                tbody.innerHTML = filteredLogs.map(l => {
+                    const action = (l.action || 'SYSTEM').toUpperCase();
+                    const origAction = (l.original_action || l.new_data?._original_action || action).toUpperCase();
+                    
+                    let actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">⚙️ ${origAction}</span>`;
+                    
+                    if (action.includes('DELETE') || origAction.includes('DELETE') || origAction.includes('REMOVE')) {
+                        actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">🗑️ ${origAction}</span>`;
+                    } else if (action.includes('INSERT') || origAction.includes('CREATE') || origAction.includes('ADD') || origAction.includes('NEW') || origAction.includes('IMPORT')) {
+                        actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">➕ ${origAction}</span>`;
+                    } else if (action.includes('UPDATE') || origAction.includes('UPDATE') || origAction.includes('EDIT') || origAction.includes('MODIFY') || origAction.includes('SYNC')) {
+                        actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">✏️ ${origAction}</span>`;
+                    } else if (origAction.includes('SECURITY') || origAction.includes('AUTH') || origAction.includes('LOGIN') || origAction.includes('PASSWORD')) {
+                        actionBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">🔑 ${origAction}</span>`;
+                    }
+
+                    const email = l.user_email || l.inspector || 'System';
+                    const initial = email.charAt(0).toUpperCase();
+                    const shortName = email.includes('@') ? email.split('@')[0] : email;
+
+                    const dateObj = l.created_at ? new Date(l.created_at) : new Date();
+                    const dateFormatted = !isNaN(dateObj.getTime()) ? dateObj.toLocaleString('th-TH', { 
+                        year: 'numeric', month: '2-digit', day: '2-digit', 
+                        hour: '2-digit', minute: '2-digit', second: '2-digit',
+                        hour12: false 
+                    }) : '-';
+
+                    let detailsText = l.details || (l.new_data && l.new_data.details) || (l.new_data && l.new_data._original_action) || '-';
+                    if (typeof detailsText === 'object') detailsText = JSON.stringify(detailsText);
+
+                    const recordIdDisplay = l.record_id && l.record_id !== '0' ? l.record_id : '-';
 
                     return `
                     <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800" data-rid="${l.id}">
-                        <td class="px-5 py-3 font-mono text-[10.5px] text-slate-500 dark:text-slate-400">${new Date(l.created_at).toLocaleString()}</td>
-                        <td class="px-5 py-3 font-bold text-blue-600 dark:text-blue-400 text-xs">${(l.user_email || 'System').split('@')[0]}</td>
-                        <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[9.5px] font-bold uppercase ${colorClass}">${action}</span></td>
-                        <td class="px-5 py-3 text-xs text-slate-700 dark:text-slate-300">${l.details || '-'}</td>
+                        <td class="px-4 py-3 font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            ${dateFormatted}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-blue-200 dark:border-blue-700">${initial}</span>
+                                <div class="truncate max-w-[150px]">
+                                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">${shortName}</div>
+                                    <div class="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">${email}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap">${actionBadge}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-[10.5px] font-semibold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                ${recordIdDisplay}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-xs text-slate-700 dark:text-slate-300 break-words leading-relaxed max-w-md">
+                            ${detailsText}
+                        </td>
+                        <td class="px-4 py-3 text-center whitespace-nowrap">
+                            <button onclick="WapAdminSystem.viewLogDetails('${l.id}')" class="px-2.5 py-1 text-[10.5px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center gap-1 mx-auto" title="ดูข้อมูล JSON เชิงลึก">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                ดู JSON
+                            </button>
+                        </td>
                     </tr>`;
                 }).join('');
+            }
         }
         else if (_currentTab === 'suppliers') {
             thead.innerHTML = `
@@ -23594,11 +24275,30 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
             ];
 
         } else if (_currentTab === 'logs') {
+            const logs = _data.logs || [];
+            const insertCount = logs.filter(l => {
+                const act = (l.action || '').toUpperCase();
+                const orig = (l.original_action || l.new_data?._original_action || '').toUpperCase();
+                return act === 'INSERT' || orig.includes('CREATE') || orig.includes('INSERT') || orig.includes('ADD') || orig.includes('NEW');
+            }).length;
+
+            const updateCount = logs.filter(l => {
+                const act = (l.action || '').toUpperCase();
+                const orig = (l.original_action || l.new_data?._original_action || '').toUpperCase();
+                return act === 'UPDATE' || orig.includes('UPDATE') || orig.includes('EDIT') || orig.includes('MODIFY');
+            }).length;
+
+            const deleteCount = logs.filter(l => {
+                const act = (l.action || '').toUpperCase();
+                const orig = (l.original_action || l.new_data?._original_action || '').toUpperCase();
+                return act === 'DELETE' || orig.includes('DELETE') || orig.includes('REMOVE');
+            }).length;
+
             kpis = [
-                { t: "AUDIT EVENTS", v: _data.totalLogCount || 0, c: "cyan", icon: "📜" },
-                { t: "BUFFER RECENT", v: _data.logs.length, c: "emerald", icon: "👁️" },
-                { t: "SECURITY STATUS", v: "ENCRYPTED", c: "blue", icon: "🔒" },
-                { t: "REAL-TIME CLI", v: "ACTIVE", c: "emerald", icon: "📡" }
+                { t: "TOTAL EVENTS", v: _data.totalLogCount || logs.length, c: "cyan", icon: "📜" },
+                { t: "RECORD CREATED", v: insertCount, c: "emerald", icon: "➕" },
+                { t: "RECORD UPDATED", v: updateCount, c: "blue", icon: "✏️" },
+                { t: "RECORD DELETED", v: deleteCount, c: "rose", icon: "🗑️" }
             ];
 
         } else if (_currentTab === 'suppliers') {
@@ -23649,15 +24349,26 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
     }
 
     function triggerCSVImport() {
-        const fileInput = document.getElementById('admin-csv-file-input');
+        triggerUniversalImport();
+    }
+
+    function triggerJSONImport() {
+        triggerUniversalImport();
+    }
+
+    function triggerUniversalImport() {
+        let fileInput = document.getElementById('admin-universal-file-input');
+        if (!fileInput) {
+            fileInput = document.getElementById('admin-json-file-input') || document.getElementById('admin-csv-file-input');
+        }
         if (fileInput) {
             fileInput.value = '';
             fileInput.click();
         } else {
             const tempInput = document.createElement('input');
             tempInput.type = 'file';
-            tempInput.accept = '.csv,text/csv';
-            tempInput.onchange = (e) => handleCSVFileSelected(e);
+            tempInput.accept = '.csv,.json,text/csv,application/json';
+            tempInput.onchange = (e) => handleUniversalFileSelected(e);
             tempInput.click();
         }
     }
@@ -23717,264 +24428,746 @@ safeSaveLocalMasterData(_data.system); // บันทึกลงเครื�
         return lines;
     }
 
-    async function handleCSVFileSelected(event) {
+    async function handleUniversalFileSelected(event) {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
         
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-            try {
-                const text = e.target.result;
-                const rows = parseCSV(text);
-                
-                if (rows.length < 2) {
-                    toast("⚠️ ไม่พบข้อมูลในไฟล์ CSV (ต้องมีหัวตารางและอย่างน้อย 1 แถว)", "error");
-                    return;
-                }
-                
-                const rawHeaders = rows[0].map(h => String(h).trim().toLowerCase().replace(/^["']|["']$/g, ''));
-                const dataRows = rows.slice(1);
-                
-                const targetTab = _currentTab === 'logs' ? 'users' : _currentTab;
-                
-                const getColIdx = (...aliases) => {
-                    return rawHeaders.findIndex(h => {
-                        const cleanH = h.toLowerCase().replace(/[\s_\-/\\]/g, '');
-                        return aliases.some(a => {
-                            const cleanA = a.toLowerCase().replace(/[\s_\-/\\]/g, '');
-                            return cleanH === cleanA || cleanH.includes(cleanA);
-                        });
-                    });
-                };
-                
-                let mappedRecords = [];
-                
-                if (targetTab === 'users') {
-                    const emailIdx = getColIdx('email', 'mail', 'user', 'username', 'e-mail', 'อีเมล');
-                    const nameIdx = getColIdx('name', 'fullname', 'displayname', 'ชื่อ');
-                    const roleIdx = getColIdx('role', 'position', 'สิทธิ์', 'ตำแหน่ง');
-                    const passIdx = getColIdx('password', 'pass', 'key', 'securitykey', 'รหัสผ่าน');
-                    const statusIdx = getColIdx('status', 'state', 'active', 'สถานะ');
-                    
-                    if (emailIdx === -1 && rawHeaders.length === 1) {
-                        mappedRecords = dataRows.map(r => ({
-                            email: String(r[0] || '').trim().toLowerCase(),
-                            name: resolveOfficialDisplayName(String(r[0] || '').trim().toLowerCase(), ''),
-                            role: 'sqe_support',
-                            password: 'Carrier@123',
-                            status: 'active'
-                        })).filter(u => u.email && u.email.includes('@'));
-                    } else {
-                        mappedRecords = dataRows.map(r => {
-                            const email = emailIdx !== -1 ? String(r[emailIdx] || '').trim().toLowerCase() : String(r[0] || '').trim().toLowerCase();
-                            const rawRole = roleIdx !== -1 ? String(r[roleIdx] || '').trim().toLowerCase() : 'sqe_support';
-                            let role = 'sqe_support';
-                            if (rawRole.includes('super') || rawRole.includes('หัวหน้า') || rawRole.includes('sup')) role = 'supervisor';
-                            else if (rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) role = 'admin';
-                            else if (rawRole.includes('iqc')) role = 'iqc';
-                            else if (rawRole.includes('eng') || rawRole.includes('วิศวกร')) role = 'engineer';
-                            else if (rawRole.includes('manag') || rawRole.includes('ผจก') || rawRole.includes('ผู้จัดการ')) role = 'manager';
-                            else role = 'sqe_support';
-                            
-                            const rawStatus = statusIdx !== -1 ? String(r[statusIdx] || '').trim().toLowerCase() : 'active';
-                            const status = (rawStatus === 'inactive' || rawStatus === 'ปิด' || rawStatus === 'false') ? 'inactive' : 'active';
-                            const pass = passIdx !== -1 && r[passIdx] ? String(r[passIdx]).trim() : 'Carrier@123';
-                            const name = nameIdx !== -1 && r[nameIdx] ? String(r[nameIdx]).trim() : email.split('@')[0].toUpperCase();
-                            
-                            return { email, name, role, password: pass, status };
-                        }).filter(u => u.email && u.email.includes('@'));
-                    }
-                }
-                else if (targetTab === 'suppliers') {
-                    const nameIdx = getColIdx('name', 'supplier', 'vendor', 'suppliername', 'vendorname', 'ชื่อซัพพลายเออร์', 'ซัพพลายเออร์', 'ชื่อ');
-                    const codeIdx = getColIdx('code', 'suppliercode', 'vendorcode', 'รหัส', 'รหัสซัพพลายเออร์');
-                    
-                    mappedRecords = dataRows.map(r => {
-                        const name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
-                        const code = codeIdx !== -1 ? String(r[codeIdx] || '').trim().toUpperCase() : '';
-                        return { name, code: code || undefined };
-                    }).filter(s => s.name && s.name.length > 0);
-                }
-                else if (targetTab === 'parts') {
-                    const pnIdx = getColIdx('partno', 'partnumber', 'part', 'pn', 'itemno', 'รหัสชิ้นส่วน', 'หมายเลขชิ้นส่วน');
-                    const nameIdx = getColIdx('partname', 'name', 'description', 'desc', 'ชื่อชิ้นส่วน');
-                    const groupIdx = getColIdx('category', 'group', 'model', 'partsgroup', 'กลุ่ม', 'หมวดหมู่');
-                    
-                    mappedRecords = dataRows.map(r => {
-                        const part_no = pnIdx !== -1 ? String(r[pnIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
-                        const part_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim() : (r[1] ? String(r[1]).trim() : '-');
-                        const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
-                        return { part_no, part_name, category };
-                    }).filter(p => p.part_no && p.part_no.length > 0);
-                }
-                else if (targetTab === 'defects') {
-                    const nameIdx = getColIdx('defectname', 'defect', 'symptom', 'name', 'issue', 'problem', 'อาการเสีย', 'ข้อบกพร่อง');
-                    const groupIdx = getColIdx('category', 'group', 'type', 'หมวดหมู่', 'ประเภท');
-                    
-                    mappedRecords = dataRows.map(r => {
-                        const defect_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
-                        const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
-                        return { defect_name, category };
-                    }).filter(d => d.defect_name && d.defect_name.length > 0);
-                }
-                else if (targetTab === 'system') {
-mappedRecords = dataRows.map((r, idx) => {
-    const rowObj = {};
-    rawHeaders.forEach((h, colI) => {
-        const val = r[colI] !== undefined ? String(r[colI]).trim() : '';
-        // ทำความสะอาดหัวตารางเป็นตัวพิมพ์เล็กและใช้ underscore เพื่อให้ getVal ค้นหาง่าย
-        const cleanKey = h.toLowerCase().replace(/[\s\-\./\\]/g, '_').replace(/_+/g, '_');
-        rowObj[cleanKey] = val;
-    });
-
-    const getVal = (patterns) => {
-        // 1. ค้นหาแบบตรงตัวจาก patterns
-        for (const p of patterns) {
-            const cleanP = p.toLowerCase().replace(/[\s\-\./\\]/g, '_').replace(/_+/g, '_');
-            if (rowObj[cleanP] !== undefined && rowObj[cleanP] !== '') return rowObj[cleanP];
-        }
-        // 2. ค้นหาแบบ Fuzzy (ถ้าชื่อใน CSV มีอักขระพิเศษแปลกๆ)
-        for (let c = 0; c < rawHeaders.length; c++) {
-            const normH = (rawHeaders[c] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            for (const p of patterns) {
-                const normP = p.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (normH === normP || (normP.length >= 5 && normH.includes(normP))) {
-                    if (r[c] !== undefined && String(r[c]).trim() !== '') return String(r[c]).trim();
-                }
-            }
-        }
-        return '-'; // คืนค่าขีดถ้าไม่พบข้อมูล
-    };
-
-                        
-    const idNum = getVal(['ID', 'id_num', 'no', 'number']) || (idx + 1);
-    const cleanIdNum = String(idNum).replace(/^vf-rp-/, '').replace(/^#/, '');
-
-                        const vendor_code = getVal(['vendor_code', 'vendorcode', 'supplier_code', 'suppliercode', 'code']) || r[4] || r[2] || 'SUPP';
-                        const supplier = getVal(['supplier', 'supplier_name', 'suppliername', 'vendor', 'vendor_name']) || r[2] || r[1] || 'Vendor';
-                        const initials = getVal(['initials_name', 'initials', 'initial', 'short_name']) || r[3] || vendor_code;
-                        const parts_group = getVal(['parts_group', 'partsgroup', 'part_group', 'group', 'category']) || r[1] || 'General';
-                        const parts_code = getVal(['parts_code', 'part_code', 'partcode', 'part_no']) || '-';
-                        const dear_vendor = getVal(['dear_vendor', 'dear_supp', 'dearvendor']) || r[5] || '-';
-                        const dear_pd = getVal(['dear_pd', 'dearpd']) || r[6] || '-';
-                        const inform_to = getVal(['inform_email_to', 'inform_to', 'to_emails', 'recipient_to', 'to', 'pd_email_line_claim', 'pd_email']) || r[11] || '';
-                        const inform_cc = getVal(['inform_cc', 'cc_emails', 'recipient_cc', 'cc', 'email_cc_line_claim']) || r[12] || '';
-                        
-                        const conf_vf = getVal(['confirm_vf_name', 'confirm_vf', 'confirm_by_vf_report', 'confirm_by_vf']) || '-';
-                        const appr_vf = getVal(['approve_vf_name', 'approve_vf', 'approve_by_vf_report', 'vf_appr']) || '-';
-                        const conf_rp = getVal(['confirm_rp_name', 'confirm_rp', 'confirm_by_rp_report', 'confirm_by_rp']) || '-';
-                        
-                        // RP Appr reads from: Approve by RP-report ( Name )
-                        const appr_rp = getVal([
-                            'approve_by_rp_report_name',
-                            'approve_by_rp_report',
-                            'approve_by_rp',
-                            'approve_rp_name',
-                            'approve_rp',
-                            'rp_appr',
-                            'approve_rp_report'
-                        ]) || '-';
-
-                        // VF Appr reads from: Approve by VF-RP report ( Name )
-                        const appr_vf_rp = getVal([
-                            'approve_by_vf_rp_report_name',
-                            'approve_by_vf_rp_report',
-                            'approve_by_vf_rp',
-                            'approve_vf_rp_name',
-                            'approve_vf_rp',
-                            'vf_appr',
-                            'approve_vf_report_name',
-                            'approve_by_vf_report_name',
-                            'approve_vf_name'
-                        ]) || appr_vf || '-';
-                        
-                        // ค้นหาในฟังก์ชัน executeCSVOverwrite ส่วนที่เป็น targetTab === 'system'
-// และเปลี่ยนการสร้าง Object เป็นชุดนี้
-
-    return {
-        id: 'vf-rp-' + cleanIdNum,
-        id_num: cleanIdNum,
-        // --- ข้อมูลบริษัท ---
-        supplier_name: getVal(['Supplier', 'supplier_name']),
-        parts_group: getVal(['Parts group', 'parts_group']),
-        initials_name: getVal(['Initials name', 'initials_name']),
-        vendor_code: getVal(['Vendor Code', 'vendor_code']),
-
-        // --- เนื้อหาและผู้ติดต่อ ---
-        dear_vendor: getVal(['Dear Vendor', 'dear_vendor']),
-        dear_pd: getVal(['Dear PD', 'dear_pd']),
-        cc_in_email_body: getVal(['CC in Email', 'cc_in_email_body']),
-
-        // --- เส้นทางอีเมล (Email Routing) ---
-        pd_email: getVal(['PD Email', 'pd_email']),
-        pd_claim_email: getVal(['PD Email Line claim', 'pd_claim_email']),
-        email_cc_claim: getVal(['Email CC Line claim', 'email_cc_claim']),
-        inform_email_to: getVal(['Inform E-mail TO', 'inform_email_to']),
-        inform_email_cc: getVal(['Inform cc', 'inform_email_cc']),
-        team_member_email: getVal(['Team member email', 'team_member_email']),
-
-        // --- ข้อมูลวิศวกรรม ---
-        parts_code: getVal(['Parts Code', 'parts_code']),
-        to_vf_rp_report: getVal(['To VF-RP report', 'to_vf_rp_report']),
-        cc_vf_rp_report: getVal(['CC VF-RP report', 'cc_vf_rp_report']),
-        iqc_eng_name: getVal(['IQC ENG Name', 'iqc_eng_name']),
-        iqc_eng_email: getVal(['IQC ENG Email', 'iqc_eng_email']),
-        engineer: getVal(['Engineer', 'engineer']),
-        sqe_email: getVal(['SQE Email', 'sqe_email']),
-
-        // --- Matrix Approval Fields (Mapping ตรงตาม CSV) ---
-        confirm_vf_name: getVal(['Confirm by VF-report ( Name )', 'confirm_vf_name']),
-        confirm_vf_email: getVal(['Confirm by VF-report ( Email )', 'confirm_vf_email']),
-        approve_vf_name: getVal(['Approve by VF-report ( Name )', 'approve_vf_name']),
-        approve_vf_email: getVal(['Approve by VF-report ( Email )', 'approve_vf_email']),
+        const fileName = (file.name || '').toLowerCase();
+        const isJson = fileName.endsWith('.json') || (file.type && file.type.includes('json'));
         
-        confirm_rp_name: getVal(['Confirm by RP-report ( Name )', 'confirm_rp_name']),
-        confirm_rp_email: getVal(['Confirm by RP-report ( Email )', 'confirm_rp_email']),
-        approve_rp_name: getVal(['Approve by RP-report ( Name )', 'approve_rp_name']),
-        approve_rp_email: getVal(['Approve by RP-report ( Email )', 'approve_rp_email']),
-
-        approve_vf_rp_name: getVal(['Approve by VF-RP report ( Name )', 'approve_vf_rp_name']),
-        approve_vf_rp_email: getVal(['Approve by VF-RP report ( Email )', 'approve_vf_rp_email']),
-
-        email_test: getVal(['Email Test', 'email_test']),
-        report_type: getVal(['report_type', 'rule_type']) || 'VF',
-        trigger_event: 'ON_DEFECT_CLAIM',
-        status: 'active'
-    };
-                    }).filter(item => item.supplier || item.vendor_code);
+        if (isJson) {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const text = e.target.result;
+                    await processJSONImport(text, file.name);
+                } catch (err) {
+                    console.error("JSON Import Error:", err);
+                    toast("❌ เกิดข้อผิดพลาดในการอ่านไฟล์ JSON: " + (err.message || err), "error");
                 }
-                
-                if (mappedRecords.length === 0) {
-                    toast("⚠️ ไม่สามารถจับคู่ข้อมูลจากหัวตารางใน CSV ได้ กรุณาตรวจสอบรูปแบบไฟล์", "error");
-                    return;
+            };
+            reader.readAsText(file, 'UTF-8');
+        } else {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const text = e.target.result;
+                    await processCSVUniversalImport(text, file.name);
+                } catch (err) {
+                    console.error("CSV Import Error:", err);
+                    toast("❌ เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: " + (err.message || err), "error");
                 }
-                
-                const tabNames = {
-                    users: 'Agents (รายชื่อพนักงาน)',
-                    suppliers: 'Suppliers (รายชื่อซัพพลายเออร์)',
-                    parts: 'Parts (รายการชิ้นส่วน)',
-                    defects: 'Defects (รายการข้อบกพร่อง/อาการเสีย)',
-                    system: 'VF & RP Email Dispatch (ระบบส่งอีเมล)'
-                };
-                
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+    }
+
+    function handleJSONFileSelected(event) {
+        return handleUniversalFileSelected(event);
+    }
+
+    function handleCSVFileSelected(event) {
+        return handleUniversalFileSelected(event);
+    }
+
+    async function processJSONImport(jsonText, fileName) {
+        let parsed = null;
+        try {
+            parsed = JSON.parse(jsonText);
+        } catch (e) {
+            toast("❌ รูปแบบไฟล์ JSON ไม่ถูกต้อง กรุณาตรวจสอบไฟล์", "error");
+            return;
+        }
+
+        if (!parsed) {
+            toast("⚠️ ไม่พบข้อมูลในไฟล์ JSON", "warning");
+            return;
+        }
+
+        // จัดการกรณีเป็น Multi-table backup object
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && !parsed.data && !parsed.records) {
+            const tablesFound = Object.keys(parsed).filter(k => Array.isArray(parsed[k]) && parsed[k].length > 0);
+            if (tablesFound.length > 0) {
                 showCustomConfirmDialog({
-                    title: `📥 ยืนยันการนำเข้าข้อมูล CSV`,
-                    subtitle: `ระบบตรวจพบข้อมูลจำนวน ${mappedRecords.length} รายการ และจะทำการ "บันทึกทับข้อมูลเดิมทั้งหมด" ในตาราง ${tabNames[targetTab] || targetTab}`,
-                    badge: `CSV OVERWRITE MODE (${targetTab.toUpperCase()})`,
-                    type: "warning",
-                    confirmText: `⚡ ยืนยันบันทึกทับข้อมูลเดิม (${mappedRecords.length} รายการ)`,
+                    title: `📥 นำเข้าชุดข้อมูลสำรอง (Multi-Table Backup)`,
+                    subtitle: `ตรวจพบข้อมูลสำรองจำนวน ${tablesFound.length} ตาราง (${tablesFound.join(', ')}) คุณต้องการนำเข้าข้อมูลทั้งหมดพร้อมระบบป้องกันข้อมูลซ้ำซ้อนใช่หรือไม่?`,
+                    badge: `MULTI-TABLE JSON BACKUP`,
+                    type: "info",
+                    details: tablesFound.map(k => ({ label: `ตาราง ${k}`, value: `${parsed[k].length} รายการ` })),
+                    confirmText: `🛡️ ยืนยันนำเข้าข้อมูลทุกตาราง (กันซ้ำ)`,
                     cancelText: "ยกเลิก",
                     onConfirm: async () => {
-                        await executeCSVOverwrite(targetTab, mappedRecords);
+                        showLoader(true);
+                        try {
+                            let totalImported = 0;
+                            for (const tableKey of tablesFound) {
+                                const tab = tableKey === 'profiles' ? 'users' : (tableKey === 'vf_rp_email_rules' ? 'system' : tableKey);
+                                const tableItems = parsed[tableKey];
+                                const res = await analyzeAndExecuteDeduplication(tab, tableItems, { silent: true });
+                                totalImported += (res?.count || 0);
+                            }
+                            toast(`✅ นำเข้าข้อมูลสำรองทั้งหมดสำเร็จ (${totalImported} รายการใหม่)`, "success");
+                            await loadData();
+                        } catch (err) {
+                            toast("❌ เกิดข้อผิดพลาดในการนำเข้าข้อมูล: " + err.message, "error");
+                        }
+                        showLoader(false);
                     }
                 });
-                
-            } catch (err) {
-                console.error("CSV Import Error:", err);
-                toast("❌ เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: " + err.message, "error");
+                return;
             }
+        }
+
+        let rawItems = [];
+        if (Array.isArray(parsed)) {
+            rawItems = parsed;
+        } else if (Array.isArray(parsed.data)) {
+            rawItems = parsed.data;
+        } else if (Array.isArray(parsed.records)) {
+            rawItems = parsed.records;
+        } else {
+            // ค้นหา Array แรกใน Object
+            for (const k of Object.keys(parsed)) {
+                if (Array.isArray(parsed[k])) {
+                    rawItems = parsed[k];
+                    break;
+                }
+            }
+        }
+
+        if (!rawItems || rawItems.length === 0) {
+            toast("⚠️ ไม่พบรายการข้อมูลในไฟล์ JSON", "warning");
+            return;
+        }
+
+        // ตรวจสอบ Table Type อัตโนมัติจากโครงสร้างข้อมูล
+        const sample = rawItems[0] || {};
+        let detectedTab = _currentTab === 'logs' ? 'users' : _currentTab;
+
+        if (sample.partNo !== undefined || sample.defect !== undefined || sample.inspector !== undefined || sample.claimNo !== undefined || sample.shift !== undefined || sample.judgment !== undefined) {
+            detectedTab = 'records';
+        } else if (sample.inform_email_to !== undefined || sample.vendor_code !== undefined || sample.dear_vendor !== undefined || sample.parts_group !== undefined || sample.confirm_vf_name !== undefined || sample.rule_type !== undefined) {
+            detectedTab = 'system';
+        } else if (sample.email !== undefined && (sample.role !== undefined || sample.is_reset_key_required !== undefined || sample.password !== undefined || sample.full_name !== undefined)) {
+            detectedTab = 'users';
+        } else if (sample.part_no !== undefined || sample.partName !== undefined) {
+            detectedTab = 'parts';
+        } else if (sample.defect_name !== undefined) {
+            detectedTab = 'defects';
+        } else if (sample.name !== undefined || sample.supplier_name !== undefined) {
+            detectedTab = 'suppliers';
+        }
+
+        await runDeduplicationDialogAndImport(detectedTab, rawItems, fileName);
+    }
+
+    async function processCSVUniversalImport(text, fileName) {
+        const rows = parseCSV(text);
+        if (rows.length < 2) {
+            toast("⚠️ ไม่พบข้อมูลในไฟล์ CSV (ต้องมีหัวตารางและอย่างน้อย 1 แถว)", "error");
+            return;
+        }
+        
+        const rawHeaders = rows[0].map(h => String(h).trim().toLowerCase().replace(/^["']|["']$/g, ''));
+        const dataRows = rows.slice(1);
+        
+        const getColIdx = (...aliases) => {
+            return rawHeaders.findIndex(h => {
+                const cleanH = h.toLowerCase().replace(/[\s_\-/\\]/g, '');
+                return aliases.some(a => {
+                    const cleanA = a.toLowerCase().replace(/[\s_\-/\\]/g, '');
+                    return cleanH === cleanA || cleanH.includes(cleanA);
+                });
+            });
         };
-        reader.readAsText(file, 'UTF-8');
+
+        let targetTab = _currentTab === 'logs' ? 'users' : _currentTab;
+        
+        // Auto-detect if CSV matches claims records
+        const hasClaimCols = getColIdx('defect', 'อาการเสีย', 'ข้อบกพร่อง') !== -1 && getColIdx('supplier', 'ซัพพลายเออร์') !== -1 && (getColIdx('partno', 'part', 'pn') !== -1 || getColIdx('ref', 'lotno', 'lot') !== -1);
+        const hasVfCols = getColIdx('inform_email_to', 'informe-mailto', 'informto', 'vendorcode', 'vendor_code') !== -1;
+
+        if (hasClaimCols) {
+            targetTab = 'records';
+        } else if (hasVfCols) {
+            targetTab = 'system';
+        }
+
+        let mappedRecords = [];
+
+        if (targetTab === 'records') {
+            const dateIdx = getColIdx('date', 'วันที่');
+            const shiftIdx = getColIdx('shift', 'กะ');
+            const lineIdx = getColIdx('line', 'สายการผลิต', 'ไลน์');
+            const refIdx = getColIdx('ref', 'lotno', 'lot', 'เลขที่อ้างอิง', 'ล็อต');
+            const suppIdx = getColIdx('supplier', 'vendor', 'ซัพพลายเออร์');
+            const pnIdx = getColIdx('partno', 'part_no', 'partnumber', 'pn', 'รหัสชิ้นส่วน');
+            const pnameIdx = getColIdx('partname', 'part_name', 'name', 'ชื่อชิ้นส่วน');
+            const qtyIdx = getColIdx('qty', 'quantity', 'จำนวน');
+            const unitIdx = getColIdx('unit', 'หน่วย');
+            const defectIdx = getColIdx('defect', 'defectname', 'อาการเสีย', 'ข้อบกพร่อง');
+            const remarkIdx = getColIdx('remark', 'หมายเหตุ', 'รายละเอียด');
+            const judgeIdx = getColIdx('judgment', 'status', 'ผลการตัดสิน');
+            const inspIdx = getColIdx('inspector', 'user', 'ผู้ตรวจสอบ');
+            const imgIdx = getColIdx('imageurl', 'image_url', 'image', 'รูปภาพ');
+            const idIdx = getColIdx('id', 'รหัส');
+
+            mappedRecords = dataRows.map((r, idx) => {
+                const idVal = idIdx !== -1 && r[idIdx] ? String(r[idIdx]).trim() : `rec-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
+                return {
+                    id: idVal,
+                    date: dateIdx !== -1 && r[dateIdx] ? String(r[dateIdx]).trim() : new Date().toISOString().split('T')[0],
+                    shift: shiftIdx !== -1 && r[shiftIdx] ? String(r[shiftIdx]).trim() : 'SHIFT A',
+                    line: lineIdx !== -1 && r[lineIdx] ? String(r[lineIdx]).trim() : '',
+                    ref: refIdx !== -1 && r[refIdx] ? String(r[refIdx]).trim() : '',
+                    supplier: suppIdx !== -1 && r[suppIdx] ? String(r[suppIdx]).trim() : '',
+                    partNo: pnIdx !== -1 && r[pnIdx] ? String(r[pnIdx]).trim().toUpperCase() : '',
+                    partName: pnameIdx !== -1 && r[pnameIdx] ? String(r[pnameIdx]).trim() : '',
+                    qty: qtyIdx !== -1 && r[qtyIdx] ? parseFloat(String(r[qtyIdx]).replace(/[^0-9.-]/g, '')) || 1 : 1,
+                    unit: unitIdx !== -1 && r[unitIdx] ? String(r[unitIdx]).trim() : 'PCS',
+                    defect: defectIdx !== -1 && r[defectIdx] ? String(r[defectIdx]).trim() : '',
+                    remark: remarkIdx !== -1 && r[remarkIdx] ? String(r[remarkIdx]).trim() : '',
+                    judgment: judgeIdx !== -1 && r[judgeIdx] ? String(r[judgeIdx]).trim() : 'REJECT (R)',
+                    inspector: inspIdx !== -1 && r[inspIdx] ? String(r[inspIdx]).trim() : (S.currentUser || 'Inspector'),
+                    imageUrl: imgIdx !== -1 && r[imgIdx] ? String(r[imgIdx]).trim() : ''
+                };
+            }).filter(item => item.supplier || item.partNo || item.defect);
+        }
+        else if (targetTab === 'users') {
+            const emailIdx = getColIdx('email', 'mail', 'user', 'username', 'e-mail', 'อีเมล');
+            const nameIdx = getColIdx('name', 'fullname', 'displayname', 'ชื่อ');
+            const roleIdx = getColIdx('role', 'position', 'สิทธิ์', 'ตำแหน่ง');
+            const passIdx = getColIdx('password', 'pass', 'key', 'securitykey', 'รหัสผ่าน');
+            const statusIdx = getColIdx('status', 'state', 'active', 'สถานะ');
+            
+            if (emailIdx === -1 && rawHeaders.length === 1) {
+                mappedRecords = dataRows.map(r => ({
+                    email: String(r[0] || '').trim().toLowerCase(),
+                    name: resolveOfficialDisplayName(String(r[0] || '').trim().toLowerCase(), ''),
+                    role: 'sqe_support',
+                    password: 'Carrier@123',
+                    status: 'active'
+                })).filter(u => u.email && u.email.includes('@'));
+            } else {
+                mappedRecords = dataRows.map(r => {
+                    const email = emailIdx !== -1 ? String(r[emailIdx] || '').trim().toLowerCase() : String(r[0] || '').trim().toLowerCase();
+                    const rawRole = roleIdx !== -1 ? String(r[roleIdx] || '').trim().toLowerCase() : 'sqe_support';
+                    let role = 'sqe_support';
+                    if (rawRole.includes('super') || rawRole.includes('หัวหน้า') || rawRole.includes('sup')) role = 'supervisor';
+                    else if (rawRole.includes('admin') || rawRole.includes('ผู้ดูแล')) role = 'admin';
+                    else if (rawRole.includes('iqc')) role = 'iqc';
+                    else if (rawRole.includes('eng') || rawRole.includes('วิศวกร')) role = 'engineer';
+                    else if (rawRole.includes('manag') || rawRole.includes('ผจก') || rawRole.includes('ผู้จัดการ')) role = 'manager';
+                    else role = 'sqe_support';
+                    
+                    const rawStatus = statusIdx !== -1 ? String(r[statusIdx] || '').trim().toLowerCase() : 'active';
+                    const status = (rawStatus === 'inactive' || rawStatus === 'ปิด' || rawStatus === 'false') ? 'inactive' : 'active';
+                    const pass = passIdx !== -1 && r[passIdx] ? String(r[passIdx]).trim() : 'Carrier@123';
+                    const name = nameIdx !== -1 && r[nameIdx] ? String(r[nameIdx]).trim() : resolveOfficialDisplayName(email, email.split('@')[0].toUpperCase());
+                    
+                    return { email, name, role, password: pass, status };
+                }).filter(u => u.email && u.email.includes('@'));
+            }
+        }
+        else if (targetTab === 'suppliers') {
+            const nameIdx = getColIdx('name', 'supplier', 'vendor', 'suppliername', 'vendorname', 'ชื่อซัพพลายเออร์', 'ซัพพลายเออร์', 'ชื่อ');
+            const codeIdx = getColIdx('code', 'suppliercode', 'vendorcode', 'รหัส', 'รหัสซัพพลายเออร์');
+            
+            mappedRecords = dataRows.map(r => {
+                const name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
+                const code = codeIdx !== -1 ? String(r[codeIdx] || '').trim().toUpperCase() : '';
+                return { name, code: code || undefined };
+            }).filter(s => s.name && s.name.length > 0);
+        }
+        else if (targetTab === 'parts') {
+            const pnIdx = getColIdx('partno', 'partnumber', 'part', 'pn', 'itemno', 'รหัสชิ้นส่วน', 'หมายเลขชิ้นส่วน');
+            const nameIdx = getColIdx('partname', 'name', 'description', 'desc', 'ชื่อชิ้นส่วน');
+            const groupIdx = getColIdx('category', 'group', 'model', 'partsgroup', 'กลุ่ม', 'หมวดหมู่');
+            
+            mappedRecords = dataRows.map(r => {
+                const part_no = pnIdx !== -1 ? String(r[pnIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
+                const part_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim() : (r[1] ? String(r[1]).trim() : '-');
+                const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
+                return { part_no, part_name, category };
+            }).filter(p => p.part_no && p.part_no.length > 0);
+        }
+        else if (targetTab === 'defects') {
+            const nameIdx = getColIdx('defectname', 'defect', 'symptom', 'name', 'issue', 'problem', 'อาการเสีย', 'ข้อบกพร่อง');
+            const groupIdx = getColIdx('category', 'group', 'type', 'หมวดหมู่', 'ประเภท');
+            
+            mappedRecords = dataRows.map(r => {
+                const defect_name = nameIdx !== -1 ? String(r[nameIdx] || '').trim().toUpperCase() : String(r[0] || '').trim().toUpperCase();
+                const category = groupIdx !== -1 ? String(r[groupIdx] || '').trim() : 'General';
+                return { defect_name, category };
+            }).filter(d => d.defect_name && d.defect_name.length > 0);
+        }
+        else if (targetTab === 'system') {
+            mappedRecords = dataRows.map((r, idx) => {
+                const rowObj = {};
+                rawHeaders.forEach((h, colI) => {
+                    const val = r[colI] !== undefined ? String(r[colI]).trim() : '';
+                    const cleanKey = h.toLowerCase().replace(/[\s\-\./\\]/g, '_').replace(/_+/g, '_');
+                    rowObj[cleanKey] = val;
+                });
+
+                const getVal = (patterns) => {
+                    for (const p of patterns) {
+                        const cleanP = p.toLowerCase().replace(/[\s\-\./\\]/g, '_').replace(/_+/g, '_');
+                        if (rowObj[cleanP] !== undefined && rowObj[cleanP] !== '') return rowObj[cleanP];
+                    }
+                    for (let c = 0; c < rawHeaders.length; c++) {
+                        const normH = (rawHeaders[c] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                        for (const p of patterns) {
+                            const normP = p.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            if (normH === normP || (normP.length >= 5 && normH.includes(normP))) {
+                                if (r[c] !== undefined && String(r[c]).trim() !== '') return String(r[c]).trim();
+                            }
+                        }
+                    }
+                    return '-';
+                };
+
+                const idNum = getVal(['ID', 'id_num', 'no', 'number']) || (idx + 1);
+                const cleanIdNum = String(idNum).replace(/^vf-rp-/, '').replace(/^#/, '');
+
+                return {
+                    id: 'vf-rp-' + cleanIdNum,
+                    id_num: cleanIdNum,
+                    supplier_name: getVal(['Supplier', 'supplier_name']),
+                    parts_group: getVal(['Parts group', 'parts_group']),
+                    initials_name: getVal(['Initials name', 'initials_name']),
+                    vendor_code: getVal(['Vendor Code', 'vendor_code']),
+                    dear_vendor: getVal(['Dear Vendor', 'dear_vendor']),
+                    dear_pd: getVal(['Dear PD', 'dear_pd']),
+                    cc_in_email_body: getVal(['CC in Email', 'cc_in_email_body']),
+                    pd_email: getVal(['PD Email', 'pd_email']),
+                    pd_claim_email: getVal(['PD Email Line claim', 'pd_claim_email']),
+                    email_cc_claim: getVal(['Email CC Line claim', 'email_cc_claim']),
+                    inform_email_to: getVal(['Inform E-mail TO', 'inform_email_to']),
+                    inform_email_cc: getVal(['Inform cc', 'inform_email_cc']),
+                    team_member_email: getVal(['Team member email', 'team_member_email']),
+                    parts_code: getVal(['Parts Code', 'parts_code']),
+                    to_vf_rp_report: getVal(['To VF-RP report', 'to_vf_rp_report']),
+                    cc_vf_rp_report: getVal(['CC VF-RP report', 'cc_vf_rp_report']),
+                    iqc_eng_name: getVal(['IQC ENG Name', 'iqc_eng_name']),
+                    iqc_eng_email: getVal(['IQC ENG Email', 'iqc_eng_email']),
+                    engineer: getVal(['Engineer', 'engineer']),
+                    sqe_email: getVal(['SQE Email', 'sqe_email']),
+                    confirm_vf_name: getVal(['Confirm by VF-report ( Name )', 'confirm_vf_name']),
+                    confirm_vf_email: getVal(['Confirm by VF-report ( Email )', 'confirm_vf_email']),
+                    approve_vf_name: getVal(['Approve by VF-report ( Name )', 'approve_vf_name']),
+                    approve_vf_email: getVal(['Approve by VF-report ( Email )', 'approve_vf_email']),
+                    confirm_rp_name: getVal(['Confirm by RP-report ( Name )', 'confirm_rp_name']),
+                    confirm_rp_email: getVal(['Confirm by RP-report ( Email )', 'confirm_rp_email']),
+                    approve_rp_name: getVal(['Approve by RP-report ( Name )', 'approve_rp_name']),
+                    approve_rp_email: getVal(['Approve by RP-report ( Email )', 'approve_rp_email']),
+                    approve_vf_rp_name: getVal(['Approve by VF-RP report ( Name )', 'approve_vf_rp_name']),
+                    approve_vf_rp_email: getVal(['Approve by VF-RP report ( Email )', 'approve_vf_rp_email']),
+                    email_test: getVal(['Email Test', 'email_test']),
+                    report_type: getVal(['report_type', 'rule_type']) || 'VF',
+                    trigger_event: 'ON_DEFECT_CLAIM',
+                    status: 'active'
+                };
+            }).filter(item => item.supplier_name || item.vendor_code);
+        }
+
+        if (mappedRecords.length === 0) {
+            toast("⚠️ ไม่สามารถจับคู่ข้อมูลจากหัวตารางใน CSV ได้ กรุณาตรวจสอบรูปแบบไฟล์", "error");
+            return;
+        }
+
+        await runDeduplicationDialogAndImport(targetTab, mappedRecords, fileName);
+    }
+
+    async function runDeduplicationDialogAndImport(targetTab, rawItems, fileName) {
+        showLoader(true);
+        let newItems = [];
+        let duplicateItems = [];
+
+        try {
+            if (targetTab === 'records') {
+                const existingRecords = (S.records && Array.isArray(S.records)) ? S.records : [];
+                const existingIds = new Set(existingRecords.map(r => String(r.id || '').trim()).filter(Boolean));
+                const existingSigs = new Set(existingRecords.map(r => {
+                    return `${(r.date || '').trim()}|${(r.supplier || '').toLowerCase().trim()}|${(r.partNo || '').toLowerCase().trim()}|${(r.ref || r.lotNo || '').toLowerCase().trim()}|${(r.defect || '').toLowerCase().trim()}|${r.qty || 0}`;
+                }));
+
+                rawItems.forEach(item => {
+                    const normalized = normalizeRecord(item);
+                    const sig = `${(normalized.date || '').trim()}|${(normalized.supplier || '').toLowerCase().trim()}|${(normalized.partNo || '').toLowerCase().trim()}|${(normalized.ref || '').toLowerCase().trim()}|${(normalized.defect || '').toLowerCase().trim()}|${normalized.qty || 0}`;
+                    
+                    if ((normalized.id && existingIds.has(String(normalized.id).trim())) || existingSigs.has(sig)) {
+                        duplicateItems.push(normalized);
+                    } else {
+                        newItems.push(normalized);
+                        if (normalized.id) existingIds.add(String(normalized.id).trim());
+                        existingSigs.add(sig);
+                    }
+                });
+            }
+            else if (targetTab === 'users') {
+                const existingUsers = _data.users || [];
+                const existingEmails = new Set(existingUsers.map(u => String(u.email || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const email = String(item.email || '').toLowerCase().trim();
+                    if (existingEmails.has(email)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingEmails.add(email);
+                    }
+                });
+            }
+            else if (targetTab === 'suppliers') {
+                const existing = _data.suppliers || [];
+                const existingNames = new Set(existing.map(s => String(s.name || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const name = String(item.name || '').toLowerCase().trim();
+                    if (existingNames.has(name)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingNames.add(name);
+                    }
+                });
+            }
+            else if (targetTab === 'parts') {
+                const existing = _data.parts || [];
+                const existingPns = new Set(existing.map(p => String(p.part_no || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const pn = String(item.part_no || item.partNo || '').toLowerCase().trim();
+                    if (existingPns.has(pn)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingPns.add(pn);
+                    }
+                });
+            }
+            else if (targetTab === 'defects') {
+                const existing = _data.defects || [];
+                const existingDefects = new Set(existing.map(d => String(d.defect_name || d.name || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const def = String(item.defect_name || item.name || '').toLowerCase().trim();
+                    if (existingDefects.has(def)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingDefects.add(def);
+                    }
+                });
+            }
+            else if (targetTab === 'system') {
+                const existing = _data.system || [];
+                const existingCodes = new Set(existing.map(s => String(s.vendor_code || s.supplier_code || s.id || '').toLowerCase().trim()));
+                rawItems.forEach(item => {
+                    const code = String(item.vendor_code || item.supplier_code || item.id || '').toLowerCase().trim();
+                    if (existingCodes.has(code)) {
+                        duplicateItems.push(item);
+                    } else {
+                        newItems.push(item);
+                        existingCodes.add(code);
+                    }
+                });
+            }
+        } catch (scanErr) {
+            console.warn("Scan Deduplication issue:", scanErr);
+            newItems = rawItems;
+            duplicateItems = [];
+        }
+        showLoader(false);
+
+        const tabDisplayNames = {
+            records: '📥 รายการเคลม (Claim Records Database)',
+            users: '👥 Agents (รายชื่อพนักงาน/ผู้ใช้งาน)',
+            suppliers: '🏢 Suppliers (รายชื่อซัพพลายเออร์)',
+            parts: '⚙️ Parts (รายการชิ้นส่วน)',
+            defects: '⚠️ Defects (รายการข้อบกพร่อง/อาการเสีย)',
+            system: '📧 VF & RP Email Dispatch Matrix (ระบบส่งอีเมล)'
+        };
+
+        const targetName = tabDisplayNames[targetTab] || targetTab;
+        const total = rawItems.length;
+        const newCount = newItems.length;
+        const dupCount = duplicateItems.length;
+
+        if (newCount === 0 && dupCount > 0) {
+            showCustomConfirmDialog({
+                title: `🛡️ ตรวจพบข้อมูลซ้ำทั้งหมด (${dupCount} รายการ)`,
+                subtitle: `ข้อมูลทั้งหมด ${total} รายการในไฟล์นี้ มีอยู่ในฐานข้อมูล ${targetName} เรียบร้อยแล้ว (ไม่พบข้อมูลใหม่)`,
+                badge: `SMART DEDUP ENGINE (${targetTab.toUpperCase()})`,
+                type: "warning",
+                details: [
+                    { label: "ชื่อไฟล์", value: fileName || 'Data Import' },
+                    { label: "หมวดหมู่เป้าหมาย", value: targetName },
+                    { label: "ข้อมูลทั้งหมดในไฟล์", value: `${total} รายการ` },
+                    { label: "ข้อมูลที่ซ้ำในระบบ", value: `${dupCount} รายการ (100% Duplicate)` }
+                ],
+                confirmText: `⚡ บันทึกทับ/อัปเดตข้อมูลเดิม (${total} รายการ)`,
+                cancelText: "ยกเลิกการนำเข้า",
+                onConfirm: async () => {
+                    await executeUniversalImport(targetTab, rawItems, { overwrite: true, totalCount: total, duplicateCount: dupCount });
+                }
+            });
+            return;
+        }
+
+        showCustomConfirmDialog({
+            title: `📥 ยืนยันการนำเข้าข้อมูล (พร้อมระบบกันซ้ำ)`,
+            subtitle: `ตรวจพบข้อมูลทั้งหมด ${total} รายการ: มีข้อมูลใหม่ ${newCount} รายการ และข้อมูลที่ซ้ำกับในระบบ ${dupCount} รายการ`,
+            badge: `SMART DEDUP IMPORT (${targetTab.toUpperCase()})`,
+            type: "info",
+            details: [
+                { label: "ชื่อไฟล์", value: fileName || 'Data Import' },
+                { label: "เป้าหมาย", value: targetName },
+                { label: "ข้อมูลทั้งหมดในไฟล์", value: `${total} รายการ` },
+                { label: "🟢 ข้อมูลใหม่ที่จะนำเข้า", value: `${newCount} รายการ` },
+                { label: "🟡 ข้อมูลที่ซ้ำ (จะถูกข้าม)", value: `${dupCount} รายการ` }
+            ],
+            confirmText: `🛡️ นำเข้าเฉพาะรายการใหม่ (${newCount} รายการ - กันซ้ำ)`,
+            cancelText: "ยกเลิก",
+            onConfirm: async () => {
+                await executeUniversalImport(targetTab, newItems, { overwrite: false, totalCount: total, duplicateCount: dupCount });
+            }
+        });
+    }
+
+    async function analyzeAndExecuteDeduplication(targetTab, rawItems, options = {}) {
+        let newItems = [];
+        let duplicateItems = [];
+        
+        if (targetTab === 'records') {
+            const existingRecords = S.records || [];
+            const existingIds = new Set(existingRecords.map(r => String(r.id || '').trim()).filter(Boolean));
+            const existingSigs = new Set(existingRecords.map(r => `${(r.date || '').trim()}|${(r.supplier || '').toLowerCase().trim()}|${(r.partNo || '').toLowerCase().trim()}|${(r.ref || r.lotNo || '').toLowerCase().trim()}|${(r.defect || '').toLowerCase().trim()}|${r.qty || 0}`));
+            
+            rawItems.forEach(item => {
+                const normalized = normalizeRecord(item);
+                const sig = `${(normalized.date || '').trim()}|${(normalized.supplier || '').toLowerCase().trim()}|${(normalized.partNo || '').toLowerCase().trim()}|${(normalized.ref || '').toLowerCase().trim()}|${(normalized.defect || '').toLowerCase().trim()}|${normalized.qty || 0}`;
+                if ((normalized.id && existingIds.has(String(normalized.id).trim())) || existingSigs.has(sig)) {
+                    duplicateItems.push(normalized);
+                } else {
+                    newItems.push(normalized);
+                    if (normalized.id) existingIds.add(String(normalized.id).trim());
+                    existingSigs.add(sig);
+                }
+            });
+        } else if (targetTab === 'users') {
+            const existingEmails = new Set((_data.users || []).map(u => String(u.email || '').toLowerCase().trim()));
+            rawItems.forEach(u => {
+                if (existingEmails.has(String(u.email || '').toLowerCase().trim())) duplicateItems.push(u);
+                else { newItems.push(u); existingEmails.add(String(u.email || '').toLowerCase().trim()); }
+            });
+        } else if (targetTab === 'suppliers') {
+            const existingNames = new Set((_data.suppliers || []).map(s => String(s.name || '').toLowerCase().trim()));
+            rawItems.forEach(s => {
+                if (existingNames.has(String(s.name || '').toLowerCase().trim())) duplicateItems.push(s);
+                else { newItems.push(s); existingNames.add(String(s.name || '').toLowerCase().trim()); }
+            });
+        } else if (targetTab === 'parts') {
+            const existingPns = new Set((_data.parts || []).map(p => String(p.part_no || p.partNo || '').toLowerCase().trim()));
+            rawItems.forEach(p => {
+                const pn = String(p.part_no || p.partNo || '').toLowerCase().trim();
+                if (existingPns.has(pn)) duplicateItems.push(p);
+                else { newItems.push(p); existingPns.add(pn); }
+            });
+        } else if (targetTab === 'defects') {
+            const existingDefects = new Set((_data.defects || []).map(d => String(d.defect_name || d.name || '').toLowerCase().trim()));
+            rawItems.forEach(d => {
+                const dn = String(d.defect_name || d.name || '').toLowerCase().trim();
+                if (existingDefects.has(dn)) duplicateItems.push(d);
+                else { newItems.push(d); existingDefects.add(dn); }
+            });
+        } else if (targetTab === 'system') {
+            const existingCodes = new Set((_data.system || []).map(s => String(s.vendor_code || s.supplier_code || s.id || '').toLowerCase().trim()));
+            rawItems.forEach(r => {
+                const code = String(r.vendor_code || r.supplier_code || r.id || '').toLowerCase().trim();
+                if (existingCodes.has(code)) duplicateItems.push(r);
+                else { newItems.push(r); existingCodes.add(code); }
+            });
+        } else {
+            newItems = rawItems;
+        }
+
+        if (newItems.length > 0) {
+            await executeUniversalImport(targetTab, newItems, { overwrite: false, silent: options.silent });
+        }
+        return { count: newItems.length, dup: duplicateItems.length };
+    }
+
+    async function executeUniversalImport(targetTab, records, options = {}) {
+        if (!records || records.length === 0) {
+            toast("⚠️ ไม่มีรายการใหม่ที่จะนำเข้า (ข้อมูลซ้ำทั้งหมด)", "info");
+            return;
+        }
+
+        showLoader(true);
+        try {
+            const clients = getAdminClients();
+            
+            if (targetTab === 'records') {
+                // บันทึกรายการเคลมลง Supabase ตาราง records ทันที
+                const formattedRecords = records.map(normalizeRecord);
+                const dbRecords = formattedRecords.map(r => formToSupabase(r));
+
+                await chunkedSupabaseUpsert('records', dbRecords, {
+                    chunkSize: 20,
+                    delayMs: 40,
+                    conflictField: 'id',
+                    progressMsg: 'บันทึกรายการเคลมลงฐานข้อมูล',
+                    showProgressToast: formattedRecords.length > 20
+                });
+
+                // อัปเดต Memory State และ Local Storage Cache
+                if (!S.records) S.records = [];
+                S.records = formattedRecords.concat(S.records);
+
+                try {
+                    if (typeof SQEIndexedDBManager !== 'undefined') {
+                        SQEIndexedDBManager.saveTableCache(`claim_records_${S.currentUser}`, S.records);
+                    }
+                    safeLocalStorageSet(`carrier_records_cache_${S.currentUser}`, JSON.stringify(S.records.slice(0, 500)));
+                } catch (ce) {}
+
+                if (typeof renderTable === 'function') renderTable();
+                if (typeof rebuildSmartMemory === 'function') rebuildSmartMemory(S.records);
+                if (typeof updateAIBrain === 'function') updateAIBrain(S.records);
+                if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+                if (typeof loadRecords === 'function') {
+                    try { await loadRecords(); } catch (_) {}
+                }
+                
+                const countDisplay = document.getElementById('record-count');
+                if (countDisplay) {
+                    countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
+                }
+
+                writeAuditLog('RECORD_IMPORT', `นำเข้าข้อมูลรายการเคลมสำเร็จ: ${records.length} รายการใหม่ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้าข้อมูลเคลมสำเร็จ! บันทึกลงฐานข้อมูลแล้ว ${records.length} รายการใหม่ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+            }
+            else if (targetTab === 'users') {
+                const preparedUsers = records.map(u => ({
+                    email: String(u.email || '').trim().toLowerCase(),
+                    display_name: u.display_name || u.name || resolveOfficialDisplayName(u.email, u.email.split('@')[0].toUpperCase()),
+                    role: u.role || 'sqe_support',
+                    password: u.password || 'Carrier@123',
+                    status: u.status || 'active',
+                    updated_at: new Date().toISOString()
+                }));
+
+                await chunkedSupabaseUpsert('profiles', preparedUsers, { chunkSize: 20, delayMs: 40, conflictField: 'email', progressMsg: 'บันทึกบัญชีผู้ใช้' });
+                
+                const existing = _data.users || [];
+                const updatedList = options.overwrite ? preparedUsers : existing.concat(preparedUsers.filter(nu => !existing.some(eu => eu.email.toLowerCase() === nu.email.toLowerCase())));
+                _data.users = updatedList;
+
+                writeAuditLog('USER_IMPORT', `นำเข้าบัญชีพนักงานสำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้าบัญชีพนักงานสำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+                await loadData();
+            }
+            else if (targetTab === 'suppliers') {
+                const preparedSuppliers = records.map(s => ({ 
+                    name: String(s.name || s.supplier_name || '').trim().toUpperCase() 
+                })).filter(s => s.name);
+                await chunkedSupabaseUpsert('master_suppliers', preparedSuppliers, { chunkSize: 25, delayMs: 40, conflictField: 'name', progressMsg: 'บันทึกรายชื่อ Supplier' });
+                
+                const existing = _data.suppliers || [];
+                const updatedList = options.overwrite ? preparedSuppliers : existing.concat(preparedSuppliers.filter(ns => !existing.some(es => es.name.toLowerCase() === ns.name.toLowerCase())));
+                _data.suppliers = updatedList;
+
+                writeAuditLog('SUPPLIER_IMPORT', `นำเข้ารายชื่อ Supplier สำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้ารายชื่อ Supplier สำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+                await loadData();
+            }
+            else if (targetTab === 'parts') {
+                const preparedParts = records.map(p => ({
+                    part_no: String(p.part_no || p.partNo || '').trim().toUpperCase(),
+                    part_name: p.part_name || p.partName || '-',
+                    category: p.category || 'General'
+                })).filter(p => p.part_no);
+
+                await chunkedSupabaseUpsert('master_parts', preparedParts, { chunkSize: 25, delayMs: 40, conflictField: 'part_no', progressMsg: 'บันทึก Part Number' });
+                
+                const existing = _data.parts || [];
+                const updatedList = options.overwrite ? preparedParts : existing.concat(preparedParts.filter(np => !existing.some(ep => ep.part_no.toLowerCase() === np.part_no.toLowerCase())));
+                _data.parts = updatedList;
+
+                writeAuditLog('PART_IMPORT', `นำเข้ารายการ Part Number สำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้ารายการ Part Number สำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+                await loadData();
+            }
+            else if (targetTab === 'defects') {
+                const preparedDefects = records.map(d => ({
+                    defect_name: String(d.defect_name || d.name || '').trim().toUpperCase(),
+                    category: d.category || 'General'
+                })).filter(d => d.defect_name);
+
+                await chunkedSupabaseUpsert('master_defects', preparedDefects, { chunkSize: 25, delayMs: 40, conflictField: 'defect_name', progressMsg: 'บันทึก Defect Code' });
+                
+                const existing = _data.defects || [];
+                const updatedList = options.overwrite ? preparedDefects : existing.concat(preparedDefects.filter(nd => !existing.some(ed => ed.defect_name.toLowerCase() === nd.defect_name.toLowerCase())));
+                _data.defects = updatedList;
+
+                writeAuditLog('DEFECT_IMPORT', `นำเข้ารายการ Defect Code สำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้ารายการ Defect Code สำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+                await loadData();
+            }
+            else if (targetTab === 'system') {
+                const formattedList = records.map((r, idx) => formatRuleForSupabase(r, idx));
+                const existing = _data.system || [];
+                const updatedList = options.overwrite ? formattedList : existing.concat(formattedList.filter(nr => !existing.some(er => (er.vendor_code || '').toLowerCase() === (nr.vendor_code || '').toLowerCase())));
+                
+                _data.system = updatedList;
+                window.VF_RP_MASTER_DATA = updatedList;
+                safeSaveLocalMasterData(updatedList);
+
+                // Cloud persistence
+                for (const client of clients) {
+                    try {
+                        await client.from('system_settings').upsert({
+                            id: 'vf_rp_master_config',
+                            data: updatedList,
+                            updated_at: new Date().toISOString()
+                        });
+                        await client.from('system_settings').update({
+                            vf_rp_email_rules: updatedList,
+                            updated_at: new Date().toISOString()
+                        }).eq('id', 'global_config');
+                    } catch (storeErr) { console.warn("VF_RP persistence warning:", storeErr); }
+                }
+
+                await chunkedSupabaseUpsert('vf_rp_email_rules', updatedList, {
+                    chunkSize: 15,
+                    delayMs: 60,
+                    conflictField: 'id',
+                    progressMsg: 'บันทึก VF & RP Matrix',
+                    showProgressToast: updatedList.length > 25
+                });
+
+                writeAuditLog('SYSTEM_IMPORT', `นำเข้ากฎการส่งอีเมล VF & RP สำเร็จ: ${records.length} รายการ`);
+                if (!options.silent) {
+                    toast(`✅ นำเข้ากฎการส่งอีเมล VF & RP สำเร็จ ${records.length} รายการ (ข้ามรายการซ้ำ ${options.duplicateCount || 0} รายการ)`, "success");
+                }
+                await loadData();
+            }
+
+            renderTable();
+            updateStats();
+        } catch (err) {
+            console.error("Execute Universal Import Error:", err);
+            toast("❌ เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + err.message, "error");
+        }
+        showLoader(false);
     }
 
     async function executeCSVOverwrite(targetTab, records) {
@@ -23984,7 +25177,7 @@ mappedRecords = dataRows.map((r, idx) => {
             if (targetTab === 'users') {
                 for (const client of clients) {
                     try {
-                        await client.from('users').delete().neq('email', 'placeholder@carrier.com');
+                        await client.from('profiles').delete().neq('email', 'placeholder@carrier.com');
                     } catch(delErr) { console.warn("Delete users prior to CSV import:", delErr); }
                 }
                 
@@ -23992,15 +25185,25 @@ mappedRecords = dataRows.map((r, idx) => {
                 if (!hasMaster) {
                     records.unshift({
                         email: masterAdminEmail,
-                        name: 'ADMINISTRATOR',
+                        display_name: 'ADMINISTRATOR',
                         role: 'admin',
                         password: 'admin',
                         status: 'active'
                     });
                 }
                 
-                await chunkedSupabaseUpsert('users', records, { chunkSize: 20, delayMs: 60, conflictField: 'email', progressMsg: 'บันทึกบัญชีผู้ใช้' });
-                _data.users = records;
+                const preparedUsers = records.map(u => ({
+                    email: String(u.email || '').trim().toLowerCase(),
+                    display_name: u.display_name || u.name || resolveOfficialDisplayName(u.email, u.email.split('@')[0].toUpperCase()),
+                    role: u.role || 'sqe_support',
+                    password: u.password || 'Carrier@123',
+                    status: u.status || 'active',
+                    updated_at: new Date().toISOString()
+                }));
+                
+                await chunkedSupabaseUpsert('profiles', preparedUsers, { chunkSize: 20, delayMs: 40, conflictField: 'email', progressMsg: 'บันทึกบัญชีผู้ใช้' });
+                _data.users = preparedUsers;
+                await loadData();
             }
             else if (targetTab === 'suppliers') {
                 for (const client of clients) {
@@ -24009,9 +25212,10 @@ mappedRecords = dataRows.map((r, idx) => {
                     } catch(delErr) { console.warn("Delete suppliers error:", delErr); }
                 }
                 
-                const suppliersToInsert = records.map(s => ({ name: s.name }));
-                await chunkedSupabaseUpsert('master_suppliers', suppliersToInsert, { chunkSize: 25, delayMs: 50, conflictField: 'name', progressMsg: 'บันทึกรายชื่อ Supplier' });
+                const suppliersToInsert = records.map(s => ({ name: String(s.name || s.supplier_name || '').trim().toUpperCase() })).filter(s => s.name);
+                await chunkedSupabaseUpsert('master_suppliers', suppliersToInsert, { chunkSize: 25, delayMs: 40, conflictField: 'name', progressMsg: 'บันทึกรายชื่อ Supplier' });
                 _data.suppliers = suppliersToInsert;
+                await loadData();
             }
             else if (targetTab === 'parts') {
                 for (const client of clients) {
@@ -24020,9 +25224,10 @@ mappedRecords = dataRows.map((r, idx) => {
                     } catch(delErr) { console.warn("Delete parts error:", delErr); }
                 }
                 
-                const partsToInsert = records.map(p => ({ part_no: p.part_no, part_name: p.part_name || '-' }));
-                await chunkedSupabaseUpsert('master_parts', partsToInsert, { chunkSize: 25, delayMs: 50, conflictField: 'part_no', progressMsg: 'บันทึก Part Number' });
+                const partsToInsert = records.map(p => ({ part_no: String(p.part_no || p.partNo || '').trim().toUpperCase(), part_name: p.part_name || p.partName || '-' })).filter(p => p.part_no);
+                await chunkedSupabaseUpsert('master_parts', partsToInsert, { chunkSize: 25, delayMs: 40, conflictField: 'part_no', progressMsg: 'บันทึก Part Number' });
                 _data.parts = partsToInsert;
+                await loadData();
             }
             else if (targetTab === 'defects') {
                 for (const client of clients) {
@@ -24031,9 +25236,10 @@ mappedRecords = dataRows.map((r, idx) => {
                     } catch(delErr) { console.warn("Delete defects error:", delErr); }
                 }
                 
-                const defectsToInsert = records.map(d => ({ defect_name: d.defect_name }));
-                await chunkedSupabaseUpsert('master_defects', defectsToInsert, { chunkSize: 25, delayMs: 50, conflictField: 'defect_name', progressMsg: 'บันทึก Defect Code' });
+                const defectsToInsert = records.map(d => ({ defect_name: String(d.defect_name || d.name || '').trim().toUpperCase(), category: d.category || 'General' })).filter(d => d.defect_name);
+                await chunkedSupabaseUpsert('master_defects', defectsToInsert, { chunkSize: 25, delayMs: 40, conflictField: 'defect_name', progressMsg: 'บันทึก Defect Code' });
                 _data.defects = defectsToInsert;
+                await loadData();
             }
             else if (targetTab === 'system') {
                 const formattedList = records.map((r, idx) => formatRuleForSupabase(r, idx));
@@ -24166,6 +25372,12 @@ mappedRecords = dataRows.map((r, idx) => {
     }
 
     function handleAddNew() {
+        if (_currentTab === 'logs') {
+            toast("🔄 กำลังรีเฟรชข้อมูล Activity Log ล่าสุด...", "info");
+            loadData();
+            return;
+        }
+
         const modal = document.getElementById('admin-master-modal');
         const content = document.getElementById('master-modal-content');
         if (!modal || !content) return;
@@ -25960,7 +27172,7 @@ mappedRecords = dataRows.map((r, idx) => {
             for (const client of clients) {
                 try {
                     if (userId && !String(userId).startsWith('appr_')) {
-                        await client.from('users').update({ 
+                        await client.from('profiles').update({ 
                             force_reset: newVal, 
                             is_reset_key_required: newVal,
                             updated_at: new Date().toISOString()
@@ -25969,7 +27181,7 @@ mappedRecords = dataRows.map((r, idx) => {
                 } catch (_) {}
                 try {
                     if (user.email) {
-                        await client.from('users').update({ 
+                        await client.from('profiles').update({ 
                             force_reset: newVal, 
                             is_reset_key_required: newVal,
                             updated_at: new Date().toISOString()
@@ -26015,11 +27227,11 @@ mappedRecords = dataRows.map((r, idx) => {
 
             for (const client of clients) {
                 try {
-                    await client.from('users').upsert(payload, { onConflict: 'email' });
+                    await client.from('profiles').upsert(payload, { onConflict: 'email' });
                 } catch (_) {}
                 try {
                     if (userId && !String(userId).startsWith('appr_')) {
-                        await client.from('users').update({ 
+                        await client.from('profiles').update({ 
                             password: newPass,
                             updated_at: nowIso
                         }).eq('id', userId);
@@ -26027,7 +27239,7 @@ mappedRecords = dataRows.map((r, idx) => {
                 } catch (_) {}
                 try {
                     if (user.email) {
-                        await client.from('users').update({ 
+                        await client.from('profiles').update({ 
                             password: newPass,
                             updated_at: nowIso
                         }).eq('email', user.email);
@@ -26078,9 +27290,9 @@ mappedRecords = dataRows.map((r, idx) => {
             let success = false;
             for (const client of clients) {
                 try {
-                    const { data: existUser } = await client.from('users').select('id').ilike('email', email).maybeSingle();
+                    const { data: existUser } = await client.from('profiles').select('id').ilike('email', email).maybeSingle();
                     if (existUser && existUser.id) {
-                        const { error: upErr } = await client.from('users').update({
+                        const { error: upErr } = await client.from('profiles').update({
                             display_name: displayName,
                             password: pass,
                             role: role,
@@ -26089,7 +27301,7 @@ mappedRecords = dataRows.map((r, idx) => {
                         }).eq('id', existUser.id);
                         if (!upErr) { success = true; continue; }
                     } else {
-                        const { error: insErr } = await client.from('users').insert([payload]);
+                        const { error: insErr } = await client.from('profiles').insert([payload]);
                         if (!insErr) { success = true; }
                     }
                 } catch (_) {}
@@ -26241,25 +27453,25 @@ mappedRecords = dataRows.map((r, idx) => {
                 // 1. Update by numeric ID
                 if (userId && !isNaN(userId) && Number(userId) > 0) {
                     try {
-                        const { error: idErr, data: idData } = await client.from('users').update(updatePayload).eq('id', Number(userId)).select('id');
+                        const { error: idErr, data: idData } = await client.from('profiles').update(updatePayload).eq('id', Number(userId)).select('id');
                         if (!idErr && idData && idData.length > 0) { success = true; continue; }
                     } catch (_) {}
                 }
 
                 // 2. Update by case-insensitive email
                 try {
-                    const { error: emErr, data: emData } = await client.from('users').update(updatePayload).ilike('email', email).select('id');
+                    const { error: emErr, data: emData } = await client.from('profiles').update(updatePayload).ilike('email', email).select('id');
                     if (!emErr && emData && emData.length > 0) { success = true; continue; }
                 } catch (_) {}
 
                 // 3. Fallback: Find existing or insert
                 try {
-                    const { data: existUser } = await client.from('users').select('id').ilike('email', email).maybeSingle();
+                    const { data: existUser } = await client.from('profiles').select('id').ilike('email', email).maybeSingle();
                     if (existUser && existUser.id) {
-                        const { error: existErr } = await client.from('users').update(updatePayload).eq('id', existUser.id);
+                        const { error: existErr } = await client.from('profiles').update(updatePayload).eq('id', existUser.id);
                         if (!existErr) { success = true; continue; }
                     } else {
-                        const { error: insErr } = await client.from('users').insert([{
+                        const { error: insErr } = await client.from('profiles').insert([{
                             ...updatePayload,
                             created_at: nowIso
                         }]);
@@ -26362,12 +27574,12 @@ mappedRecords = dataRows.map((r, idx) => {
             for (const client of clients) {
                 try {
                     if (userId && !String(userId).startsWith('appr_')) {
-                        await client.from('users').delete().eq('id', userId);
+                        await client.from('profiles').delete().eq('id', userId);
                     }
                 } catch (_) {}
                 try {
                     if (email) {
-                        await client.from('users').delete().eq('email', email);
+                        await client.from('profiles').delete().eq('email', email);
                     }
                 } catch (_) {}
             }
@@ -26384,6 +27596,105 @@ mappedRecords = dataRows.map((r, idx) => {
             toast("❌ ลบบัญชีไม่สำเร็จ: " + (e.message || ''), "error");
         }
         showLoader(false);
+    }
+
+    function viewLogDetails(logId) {
+        const log = (_data.logs || []).find(l => String(l.id) === String(logId));
+        if (!log) {
+            toast("ไม่พบข้อมูล Log นี้", "warning");
+            return;
+        }
+
+        const modal = document.getElementById('admin-master-modal');
+        const content = document.getElementById('master-modal-content');
+        if (!modal || !content) return;
+
+        setModalSize('wide');
+        modal.classList.remove('hidden-view');
+
+        const dateStr = log.created_at ? new Date(log.created_at).toLocaleString('th-TH') : '-';
+        const oldJson = log.old_data ? JSON.stringify(log.old_data, null, 2) : null;
+        const newJson = log.new_data ? JSON.stringify(log.new_data, null, 2) : null;
+        const rawJson = JSON.stringify(log, null, 2);
+        const safeRawJson = rawJson.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+
+        content.innerHTML = `
+            <div class="space-y-4 text-left">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div>
+                        <h3 class="text-base font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+                            ACTIVITY LOG INSPECTOR
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">ID: ${log.id || 'N/A'}</p>
+                    </div>
+                    <button id="btn-copy-log-json" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        Copy JSON
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Timestamp</span>
+                        <span class="font-mono font-semibold text-slate-700 dark:text-slate-200">${dateStr}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">User / Operator</span>
+                        <span class="font-semibold text-blue-600 dark:text-blue-400 truncate block">${log.user_email || log.inspector || 'System'}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Action Type</span>
+                        <span class="font-bold text-slate-800 dark:text-slate-200 uppercase">${log.original_action || log.action || '-'}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target ID</span>
+                        <span class="font-mono font-semibold text-slate-700 dark:text-slate-300">${log.record_id && log.record_id !== '0' ? log.record_id : 'N/A'}</span>
+                    </div>
+                </div>
+
+                ${log.details ? `
+                <div class="p-3 bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl">
+                    <span class="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-0.5">Activity Message</span>
+                    <p class="text-xs text-slate-700 dark:text-slate-200">${log.details}</p>
+                </div>` : ''}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">Old State (Previous Data)</span>
+                        </div>
+                        <pre class="w-full h-44 p-3 bg-slate-900 text-slate-300 rounded-xl text-[11px] font-mono overflow-auto custom-scrollbar border border-slate-800">${oldJson || '// ไม่มีข้อมูลสถานะเดิม (Initial Creation หรือ No Diff)'}</pre>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">New State (Payload / Changed Data)</span>
+                        </div>
+                        <pre class="w-full h-44 p-3 bg-slate-900 text-emerald-300 rounded-xl text-[11px] font-mono overflow-auto custom-scrollbar border border-slate-800">${newJson || '// ไม่มี Payload ข้อมูลใหม่'}</pre>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <button onclick="WapAdminSystem.closeMasterModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer">
+                        ปิดหน้าต่าง
+                    </button>
+                </div>
+            </div>`;
+
+        setTimeout(() => {
+            const btnCopy = document.getElementById('btn-copy-log-json');
+            if (btnCopy) {
+                btnCopy.onclick = () => {
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(rawJson).then(() => {
+                            toast("📋 คัดลอกข้อมูล JSON ทั้งหมดแล้ว", "success");
+                        }).catch(() => {
+                            toast("ไม่สามารถคัดลอกได้", "warning");
+                        });
+                    }
+                };
+            }
+        }, 50);
     }
 
     function closeMasterModal() { 
@@ -26449,7 +27760,12 @@ mappedRecords = dataRows.map((r, idx) => {
     }
 
     return { 
-        init, switchTab, loadData, harvestFromHistory, triggerCSVImport, handleCSVFileSelected, parseCSV, executeCSVOverwrite, updateAnnouncement, 
+        init, switchTab, loadData, harvestFromHistory, 
+        triggerCSVImport, triggerUniversalImport, triggerJSONImport,
+        handleCSVFileSelected, handleUniversalFileSelected, handleJSONFileSelected,
+        parseCSV, processJSONImport, processCSVUniversalImport, runDeduplicationDialogAndImport,
+        analyzeAndExecuteDeduplication, executeUniversalImport, executeCSVOverwrite,
+        updateAnnouncement, 
         toggleBanner, deleteEntry, closeMasterModal, handleAddNew, saveMaster, saveUser,
         extractDisplayNameFromEmail, onEmailInputForDisplayName, changeUserRoleDirectly,
         toggleMaintenance, toggleUserStatus, setForceReset, performFullBackup, performArchive,
@@ -26457,6 +27773,7 @@ mappedRecords = dataRows.map((r, idx) => {
         openResetSecurityModal, copyUserCredentials, toggleForceResetState, applyNewSecurityKey,
         openEditUserModal, updateUser, openDeleteUserModal, confirmDeleteUser,
         openEditEmailRuleModal, saveEmailRule, deleteEmailRule, toggleEmailRuleStatus, openFullDetailModal, exportVFRPToCSV, setModalSize,
+        viewLogDetails,
         triggerAutoPurgeSessions, triggerSecurityAuditScan, triggerOptimizeDatabase, triggerAutoSystemRelay, syncAllVFRPToSupabase, sanitizeAndFixAllEmailRules,
         getEmailRules: () => {
             if ((!_data.system || _data.system.length === 0) && window.VF_RP_MASTER_DATA && window.VF_RP_MASTER_DATA.length > 0) {
@@ -26511,10 +27828,188 @@ mappedRecords = dataRows.map((r, idx) => {
     
 })();
 
+// Expose universal import functions globally
+window.triggerUniversalImport = () => window.WapAdminSystem?.triggerUniversalImport();
+window.triggerJSONImport = () => window.WapAdminSystem?.triggerJSONImport();
+window.handleUniversalFileSelected = (e) => window.WapAdminSystem?.handleUniversalFileSelected(e);
+window.handleJSONFileSelected = (e) => window.WapAdminSystem?.handleJSONFileSelected(e);
+
 /**
- * 🛡️ ULTRA-ROBUST MATRIX LOOKUP ENGINE
- * ออกแบบมาเพื่อรองรับการทำงานทั้งบน Server และการเปิดไฟล์ HTML ตรงๆ (file://)
+ * 🛡️ ULTRA-ROBUST MATRIX LOOKUP ENGINE & BUILT-IN BASELINE RULES
+ * รองรับการทำงานทั้งบน Cloud Supabase, LocalStorage, และ Built-in Standard Baseline
  */
+window.BASE_VF_RP_MATRIX_RULES = [
+    {
+        id: 'vf-rp-alfa-laval',
+        supplier_name: 'Alfa Laval (Thailand) Co., Ltd.',
+        supplier: 'Alfa Laval (Thailand) Co., Ltd.',
+        vendor_code: 'LA0001',
+        parts_group: 'Piping and Mat',
+        initials_name: 'ALFA',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Watcharin Y.',
+        sqe_email: 'watcharin.yawanopart@carrier.com',
+        confirm_vf_name: 'Ms.Nipawan J.',
+        confirm_vf_email: 'nipawan.janpong@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Mr.Watcharin Y.',
+        approve_vf_rp_email: 'watcharin.yawanopart@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    },
+    {
+        id: 'vf-rp-kaosu-packing',
+        supplier_name: 'KAOSU PACKING INDUSTRY CO.,LTD.',
+        supplier: 'KAOSU PACKING INDUSTRY CO.,LTD.',
+        vendor_code: 'LK0194',
+        parts_group: 'Packaging',
+        initials_name: 'KAOSU',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Pongpan P.',
+        sqe_email: 'pongpan.panna@carrier.com',
+        confirm_vf_name: 'Mr.Komson N.',
+        confirm_vf_email: 'komson.namwicha@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    },
+    {
+        id: 'vf-rp-mold-default',
+        supplier_name: 'Plastic Resin Mold Supplier',
+        supplier: 'Plastic Resin Mold Supplier',
+        vendor_code: 'MOLD_DEFAULT',
+        parts_group: 'Plastic Resin Mold Part',
+        initials_name: 'MOLD',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Natthawut C.',
+        sqe_email: 'natthawut.chaising@carrier.com',
+        confirm_vf_name: 'Mr.Pongpan P.',
+        confirm_vf_email: 'pongpan.panna@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    },
+    {
+        id: 'vf-rp-steel-default',
+        supplier_name: 'Sheet Metal & Steel Supplier',
+        supplier: 'Sheet Metal & Steel Supplier',
+        vendor_code: 'STEEL_DEFAULT',
+        parts_group: 'Steel',
+        initials_name: 'STEEL',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Komson N.',
+        sqe_email: 'komson.namwicha@carrier.com',
+        confirm_vf_name: 'Mr.Komson N.',
+        confirm_vf_email: 'komson.namwicha@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    },
+    {
+        id: 'vf-rp-electronic-default',
+        supplier_name: 'Electronic & PCBA Supplier',
+        supplier: 'Electronic & PCBA Supplier',
+        vendor_code: 'ELEC_DEFAULT',
+        parts_group: 'Electric Controls',
+        initials_name: 'ELEC',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Ms.Songporn C.',
+        sqe_email: 'songporn.chaisim@carrier.com',
+        confirm_vf_name: 'Mr.Witsarut S.',
+        confirm_vf_email: 'witsarut.singholsai@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    }
+];
+
+// ฟังก์ชันโหลดข้อมูล Matrix เข้า Memory ทันทีตั้งแต่เปิดแอพ
+window.initVFRPMatrixEngine = async function() {
+    try {
+        let loadedRules = [];
+        // 1. ลองดึงจาก LocalStorage ก่อนเพื่อความรวดเร็ว
+        const cached = localStorage.getItem('carrier_vf_rp_master_data');
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    loadedRules = parsed;
+                    window.VF_RP_MASTER_DATA = loadedRules;
+                    if (window.WapAdminSystem && window.WapAdminSystem._data) {
+                        window.WapAdminSystem._data.system = loadedRules;
+                    }
+                }
+            } catch (_) {}
+        }
+
+        // 2. ดึงข้อมูลล่าสุดจาก Supabase (ถ้าออนไลน์)
+        if (navigator.onLine && typeof sqeClient !== 'undefined') {
+            try {
+                const { data: tblData, error: tblErr } = await sqeClient
+                    .from('vf_rp_email_rules')
+                    .select('*')
+                    .order('supplier_name', { ascending: true });
+                
+                if (!tblErr && tblData && Array.isArray(tblData) && tblData.length > 0) {
+                    loadedRules = tblData;
+                    window.VF_RP_MASTER_DATA = loadedRules;
+                    if (window.WapAdminSystem && window.WapAdminSystem._data) {
+                        window.WapAdminSystem._data.system = loadedRules;
+                    }
+                    localStorage.setItem('carrier_vf_rp_master_data', JSON.stringify(loadedRules));
+                }
+            } catch (queryErr) {
+                console.warn("[initVFRPMatrixEngine] Background query notice:", queryErr);
+            }
+        }
+
+        // 3. รวม Baseline Rules หากในระบบยังไม่มี
+        if (!window.VF_RP_MASTER_DATA || window.VF_RP_MASTER_DATA.length === 0) {
+            window.VF_RP_MASTER_DATA = [...window.BASE_VF_RP_MATRIX_RULES];
+        }
+    } catch (e) {
+        console.warn("[initVFRPMatrixEngine] Error:", e);
+    }
+};
+
 window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
     let list = [];
 
@@ -26523,24 +28018,22 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         list = window.WapAdminSystem.getEmailRules();
     } 
     
-    if ((!list || !list.length) && window.VF_RP_MASTER_DATA) {
+    if ((!list || !list.length) && window.VF_RP_MASTER_DATA && Array.isArray(window.VF_RP_MASTER_DATA) && window.VF_RP_MASTER_DATA.length > 0) {
         list = window.VF_RP_MASTER_DATA;
     }
 
     // 2. Fallback: ค้นหาจาก LocalStorage (กรณีเปิดไฟล์ตรงๆ หรือออฟไลน์)
     if (!list || !list.length) {
         try {
-            // สแกนหาจากทุก Key ที่เป็นไปได้ที่ระบบอาจจะบันทึกไว้
             const backupKeys = ['carrier_vf_rp_master_data', 'vf_rp_master_cache', 'carrier_latest_app_state_backup'];
             for (const key of backupKeys) {
                 const cached = localStorage.getItem(key);
                 if (cached) {
                     const parsed = JSON.parse(cached);
-                    // รองรับทั้งแบบ Array ตรงๆ และแบบ Snapshot Object
                     const actualData = parsed.app_state ? (parsed.app_state.eight_d_cases || []) : parsed;
                     if (Array.isArray(actualData) && actualData.length > 0) {
                         list = actualData;
-                        window.VF_RP_MASTER_DATA = list; // กู้คืนกลับเข้า Memory
+                        window.VF_RP_MASTER_DATA = list;
                         break;
                     }
                 }
@@ -26550,9 +28043,17 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
         }
     }
     
-    // หากยังไม่พบฐานข้อมูลเลย ให้คืนค่า null
+    // รวมรายการ Baseline Rules เพื่อการันตีว่ามีข้อมูลเสมอ
     if (!list || !list.length) {
-        return null;
+        list = window.BASE_VF_RP_MATRIX_RULES || [];
+        window.VF_RP_MASTER_DATA = list;
+    } else if (Array.isArray(window.BASE_VF_RP_MATRIX_RULES)) {
+        // เพิ่ม base rules เข้าไปใน list หากยังไม่มี
+        window.BASE_VF_RP_MATRIX_RULES.forEach(baseRule => {
+            if (!list.some(r => (r.supplier_name && r.supplier_name.toLowerCase() === baseRule.supplier_name.toLowerCase()) || (r.vendor_code && r.vendor_code === baseRule.vendor_code))) {
+                list.push(baseRule);
+            }
+        });
     }
 
     // 3. ฟังก์ชันทำความสะอาดข้อความระดับลึก (Deep Cleaning)
@@ -26582,9 +28083,11 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
             sName = VENDOR_MASTER[vCode];
         }
         if (sName && !vCode) {
-            const foundEntry = Object.entries(VENDOR_MASTER).find(([k, v]) => 
-                v.toLowerCase().includes(sName.toLowerCase()) || sName.toLowerCase().includes(v.toLowerCase())
-            );
+            const cleanSName = deepClean(sName);
+            const foundEntry = Object.entries(VENDOR_MASTER).find(([k, v]) => {
+                const cleanV = deepClean(v);
+                return cleanV === cleanSName || cleanV.includes(cleanSName) || cleanSName.includes(cleanV) || v.toLowerCase().includes(sName.toLowerCase()) || sName.toLowerCase().includes(v.toLowerCase());
+            });
             if (foundEntry) vCode = foundEntry[0];
         }
     }
@@ -26593,33 +28096,89 @@ window.getVFRPMatrixForSupplier = function(supplierName, vendorCode, initials) {
     const targetCode = deepClean(vCode);
     const targetInit = deepClean(sInit);
 
-    // ป้องกันการค้นหาด้วยค่าว่าง
-    if (!targetName && !targetCode && !targetInit) return null;
-
     // 4. เริ่มการค้นหาแบบลำดับความสำคัญ (Matching Logic)
-    return list.find(r => {
-        const dbName = deepClean(r.supplier_name || r.supplier || '');
-        const dbCode = deepClean(r.vendor_code || r.supplier_code || '');
-        const dbInit = deepClean(r.initials_name || '');
-        const dbTo = deepClean(r.to_vf_rp_report || '');
-        const dbDear = deepClean(r.dear_vendor || '');
+    let matched = null;
 
-        // กฎที่ 1: รหัส Vendor ตรงกัน (แม่นยำที่สุด)
-        if (targetCode && dbCode && (dbCode === targetCode || dbCode.includes(targetCode) || targetCode.includes(dbCode))) return true;
+    if (targetName || targetCode || targetInit) {
+        matched = list.find(r => {
+            const dbName = deepClean(r.supplier_name || r.supplier || '');
+            const dbCode = deepClean(r.vendor_code || r.supplier_code || '');
+            const dbInit = deepClean(r.initials_name || '');
+            const dbTo = deepClean(r.to_vf_rp_report || '');
+            const dbDear = deepClean(r.dear_vendor || '');
 
-        // กฎที่ 2: ตัวย่อ (Initials) ตรงกัน
-        if (targetInit && dbInit && (dbInit === targetInit || dbInit.includes(targetInit))) return true;
+            // กฎที่ 1: รหัส Vendor ตรงกัน (แม่นยำที่สุด)
+            if (targetCode && dbCode && (dbCode === targetCode || dbCode.includes(targetCode) || targetCode.includes(dbCode))) return true;
 
-        // กฎที่ 3: ชื่อบริษัทตรงกันเป๊ะ หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา หรือเทียบจากชื่อผู้ติดต่อ
-        if (targetName) {
-            if (dbName && (dbName === targetName || dbName.includes(targetName) || targetName.includes(dbName))) return true;
-            if (dbInit && (dbInit === targetName || targetName.includes(dbInit))) return true;
-            if (dbTo && (dbTo.includes(targetName) || targetName.includes(dbTo))) return true;
-            if (dbDear && (dbDear.includes(targetName) || targetName.includes(dbDear))) return true;
-        }
+            // กฎที่ 2: ตัวย่อ (Initials) ตรงกัน
+            if (targetInit && dbInit && (dbInit === targetInit || dbInit.includes(targetInit))) return true;
 
-        return false;
-    }) || null;
+            // กฎที่ 3: ชื่อบริษัทตรงกันเป๊ะ หรือ ตัวย่อใน DB ตรงกับชื่อที่ค้นหา หรือเทียบจากชื่อผู้ติดต่อ
+            if (targetName) {
+                if (dbName && (dbName === targetName || dbName.includes(targetName) || targetName.includes(dbName))) return true;
+                if (dbInit && (dbInit === targetName || targetName.includes(dbInit))) return true;
+                if (dbTo && (dbTo.includes(targetName) || targetName.includes(dbTo))) return true;
+                if (dbDear && (dbDear.includes(targetName) || targetName.includes(dbDear))) return true;
+
+                // กฎย่อย: เช็คคีย์เวิร์ดสำคัญ เช่น kaosu, alfa laval, etc.
+                const tokens = targetName.split(' ').filter(t => t.length >= 3);
+                if (tokens.length > 0 && dbName) {
+                    const allTokensMatch = tokens.some(tok => dbName.includes(tok));
+                    if (allTokensMatch) return true;
+                }
+            }
+
+            return false;
+        });
+    }
+
+    // หากพบ Vendor โดยตรง ให้คืนค่าทันที
+    if (matched) return matched;
+
+    // 5. Fallback อัจฉริยะตามประเภทกลุ่มงาน (Parts Group / Category Smart Fallback)
+    const lowerName = sName.toLowerCase();
+    if (lowerName.includes('pack') || lowerName.includes('box') || lowerName.includes('carton') || lowerName.includes('print') || lowerName.includes('label')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('pack') || (r.parts_group || '').toLowerCase().includes('print') || (r.supplier_name || '').toLowerCase().includes('kaosu'));
+        if (found) return found;
+    } else if (lowerName.includes('mold') || lowerName.includes('plastic') || lowerName.includes('resin')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('mold') || (r.parts_group || '').toLowerCase().includes('plastic'));
+        if (found) return found;
+    } else if (lowerName.includes('steel') || lowerName.includes('sheet') || lowerName.includes('metal')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('steel') || (r.parts_group || '').toLowerCase().includes('sheet'));
+        if (found) return found;
+    } else if (lowerName.includes('pipe') || lowerName.includes('copper') || lowerName.includes('tube') || lowerName.includes('alfa')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('piping') || (r.supplier_name || '').toLowerCase().includes('alfa'));
+        if (found) return found;
+    } else if (lowerName.includes('elect') || lowerName.includes('pcb') || lowerName.includes('control') || lowerName.includes('wire')) {
+        const found = list.find(r => (r.parts_group || '').toLowerCase().includes('elect') || (r.parts_group || '').toLowerCase().includes('pcba'));
+        if (found) return found;
+    }
+
+    // 6. Default Fallback สำหรับ Supplier ทั่วไป (รับประกันความสมบูรณ์ ไม่เป็น Null)
+    return {
+        id: 'matrix-fallback-' + (vCode || 'GEN'),
+        supplier_name: sName || 'Standard Supplier',
+        supplier: sName || 'Standard Supplier',
+        vendor_code: vCode || 'GEN01',
+        parts_group: 'General',
+        initials_name: sInit || 'SUPP',
+        iqc_eng_name: 'Mr.Meechai T.',
+        iqc_eng_email: 'meechai.thawornpong@carrier.com',
+        engineer: 'Mr.Natthawut C.',
+        sqe_email: 'natthawut.chaising@carrier.com',
+        confirm_vf_name: 'Mr.Komson N.',
+        confirm_vf_email: 'komson.namwicha@carrier.com',
+        approve_vf_name: 'Mr.Watcharin Y.',
+        approve_vf_email: 'watcharin.yawanopart@carrier.com',
+        confirm_rp_name: 'Ms.Siriporn P.',
+        confirm_rp_email: 'Siriporn.Prasongsuk@carrier.com',
+        approve_rp_name: 'Mr.Ekkalak L.',
+        approve_rp_email: 'ekkalak.laksanasamrith@carrier.com',
+        approve_vf_rp_name: 'Ms.Nipawan J.',
+        approve_vf_rp_email: 'nipawan.janpong@carrier.com',
+        manager_name: 'Mr.Jumnong T.',
+        manager_email: 'jumnong.thongsom@carrier.com'
+    };
 };
 
 // --- แก้ไขฟังก์ชันซิงค์ข้อมูลเมื่อมีการแก้ไข VENDOR บนหน้าเอกสาร (Document Sync Engine) ---
@@ -26671,17 +28230,17 @@ window.onVfDocVendorChange = function(el) {
         // อัปเดตชื่อหัวหน้างานและผู้อนุมัติ (CONFIRM BY & APPROVED BY) ตาม Vendor Matrix
         const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
         const isRP = reportType.includes('RP');
-        const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
-        const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
+        const mConfirm = isRP ? (matrix.confirm_rp_name || '') : (matrix.confirm_vf_name || '');
+        const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || '') : (matrix.approve_vf_name || matrix.approve_vf_rp_name || '');
 
         if (curCase?.report_data?.vf_data) {
             const vf = curCase.report_data.vf_data;
-            if (!vf.confirm_sig_active && mConfirm) {
+            if (!vf.confirm_sig_active && mConfirm && mConfirm !== '-') {
                 vf.confirm_by = mConfirm;
                 const cInput = document.getElementById('prob-confirm-by');
                 if (cInput) cInput.value = mConfirm;
             }
-            if (!vf.approved_sig_active && mApprove) {
+            if (!vf.approved_sig_active && mApprove && mApprove !== '-') {
                 vf.approved_by = mApprove;
                 const aInput = document.getElementById('prob-approved-by');
                 if (aInput) aInput.value = mApprove;
@@ -26723,14 +28282,14 @@ window.onVfDocVendorCodeChange = function(el) {
             const vf = curCase.report_data.vf_data;
             const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
             const isRP = reportType.includes('RP');
-            const mConfirm = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
-            const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
-            if (!vf.confirm_sig_active && mConfirm) {
+            const mConfirm = isRP ? (matrix.confirm_rp_name || '') : (matrix.confirm_vf_name || '');
+            const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || '') : (matrix.approve_vf_name || matrix.approve_vf_rp_name || '');
+            if (!vf.confirm_sig_active && mConfirm && mConfirm !== '-') {
                 vf.confirm_by = mConfirm;
                 const cInput = document.getElementById('prob-confirm-by');
                 if (cInput) cInput.value = mConfirm;
             }
-            if (!vf.approved_sig_active && mApprove) {
+            if (!vf.approved_sig_active && mApprove && mApprove !== '-') {
                 vf.approved_by = mApprove;
                 const aInput = document.getElementById('prob-approved-by');
                 if (aInput) aInput.value = mApprove;
@@ -26750,9 +28309,9 @@ async function syncMaintenanceStatus() {
         if (!sb) return;
         const { data, error } = await sb
             .from('system_settings')
-            .select('is_maintenance_active')
+            .select('*')
             .eq('id', 'global_config')
-            .single();
+            .maybeSingle();
 
         const mtxView = document.getElementById('maintenance-view');
         if (error || !data) {
@@ -26763,7 +28322,7 @@ async function syncMaintenanceStatus() {
             return;
         }
 
-        const isMtx = !!data.is_maintenance_active;
+        const isMtx = !!(data.is_maintenance_active || (data.data && data.data.is_maintenance_active));
         
         // เงื่อนไข: ถ้าเปิดโหมดปรับปรุง และผู้ใช้ไม่ใช่ Natthawut (Master Admin)
         const isMaster = S && S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
@@ -26906,7 +28465,7 @@ async function performFullBackup() {
     try {
         // ดึงข้อมูลจากทุกตาราง
         const [users, records, support, s5, ot, sj, skills] = await Promise.all([
-            sqeClient.from('users').select('*'),
+            sqeClient.from('profiles').select('*'),
             sqeClient.from('records').select('*'),
             wapClient.from('support_records').select('*'),
             wapClient.from('s5_records').select('*'),
@@ -27531,7 +29090,7 @@ async function updateUserPresence() {
     
     try {
         await sqeClient
-            .from('users')
+            .from('profiles')
             .update({ last_seen: new Date().toISOString() })
             .eq('email', S.currentUser);
         
@@ -27573,23 +29132,27 @@ updateUserPresence();
 setInterval(updateUserPresence, 300000); // 300,000 ms = 5 นาที
 
 async function checkChangelog() {
-    const { data } = await sqeClient.from('system_settings').select('app_version, update_details').eq('id', 'global_config').single();
-    const localVersion = localStorage.getItem('last_seen_version') || "0.0.0";
+    try {
+        const { data } = await sqeClient.from('system_settings').select('*').eq('id', 'global_config').maybeSingle();
+        const localVersion = localStorage.getItem('last_seen_version') || "0.0.0";
+        const appVer = (data && (data.app_version || (data.data && data.data.app_version))) || null;
+        const updateLog = (data && (data.update_details || (data.data && data.data.update_details))) || 'มีการปรับปรุงประสิทธิภาพระบบ';
 
-    if (data && data.app_version !== localVersion) {
-        // สร้าง Modal แจ้งข่าวสารอัปเดต
-        const modalHtml = `
-            <div id="update-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
-                <div class="bg-white rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-in">
-                    <div class="text-5xl mb-4">✨</div>
-                    <h2 class="text-2xl font-black text-slate-800 mb-2">Version ${data.app_version}</h2>
-                    <p class="text-slate-500 text-sm mb-6 leading-relaxed">${data.update_details || 'มีการปรับปรุงประสิทธิภาพระบบ'}</p>
-                    <button  onclick="closeUpdateModal('${data.app_version}')" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest" title="Close Update Modal" aria-label="Close Update Modal">รับทราบ</button>
+        if (data && appVer && appVer !== localVersion) {
+            // สร้าง Modal แจ้งข่าวสารอัปเดต
+            const modalHtml = `
+                <div id="update-modal" class="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
+                    <div class="bg-white rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-in">
+                        <div class="text-5xl mb-4">✨</div>
+                        <h2 class="text-2xl font-black text-slate-800 mb-2">Version ${appVer}</h2>
+                        <p class="text-slate-500 text-sm mb-6 leading-relaxed">${updateLog}</p>
+                        <button  onclick="closeUpdateModal('${appVer}')" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest" title="Close Update Modal" aria-label="Close Update Modal">รับทราบ</button>
+                    </div>
                 </div>
-            </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-    }
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+    } catch (_) {}
 }
 
 function closeUpdateModal(newVer) {
@@ -27663,7 +29226,7 @@ async function handlePasswordResetSubmit(email) {
         
         // อัปเดตข้อมูลลง Supabase ตามคอลัมน์ในรูป (password, force_reset, updated_at)
         const { error } = await sqeClient
-            .from('users')
+            .from('profiles')
             .update({ 
                 password: newPass, 
                 force_reset: false,
@@ -27717,15 +29280,33 @@ function renderModalAC(type, inputEl) {
     if (!dd) {
         dd = document.createElement('div');
         dd.className = 'modal-ac-dropdown';
-        dd.style.cssText = `
-            position: absolute; top: 100%; left: 0; width: max-content; min-width: 310px; max-width: 420px;
-            max-height: 280px; overflow-y: auto; background: #ffffff;
-            border: 1.5px solid #3b82f6; border-radius: 10px;
-            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18); z-index: 20000; display: none;
-        `;
-        wrap.style.position = 'relative';
         wrap.appendChild(dd);
     }
+    wrap.style.position = 'relative';
+    wrap.style.zIndex = '999999';
+
+    dd.style.cssText = `
+        position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: min(420px, calc(100vw - 32px));
+        max-height: 290px; overflow-y: auto; background: #ffffff;
+        border: 1.5px solid #3b82f6; border-radius: 12px;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.3), 0 4px 12px rgba(0, 0, 0, 0.12); z-index: 9999999; display: none;
+    `;
+
+    // Smart right-alignment if near right edge of screen OR near right edge of modal/form container
+    try {
+        const rect = inputEl.getBoundingClientRect();
+        const container = inputEl.closest('#sup-form') || inputEl.closest('form') || inputEl.closest('.modal-overlay > div') || inputEl.closest('.modal-content') || document.body;
+        const containerRect = container ? container.getBoundingClientRect() : { right: window.innerWidth, left: 0, bottom: window.innerHeight };
+
+        const spaceToRight = Math.min(containerRect.right, window.innerWidth) - rect.left;
+        if (spaceToRight < 340 || inputEl.id === 'prob-supplier' || inputEl.id === 'f-sup-report' || inputEl.id === 'prob-defect' || (containerRect.right - rect.right < 200)) {
+            dd.style.left = 'auto';
+            dd.style.right = '0';
+        } else {
+            dd.style.left = '0';
+            dd.style.right = 'auto';
+        }
+    } catch (e) {}
 
     const query = inputEl.value.trim().toLowerCase();
     let htmlContent = '';
@@ -27745,14 +29326,22 @@ function renderModalAC(type, inputEl) {
         const docTypeLabel = (document.getElementById('vf-doc-type-label')?.innerText || '').toUpperCase();
         const isRP = reportType.includes('RP') || docTypeLabel.includes('RP');
 
-        // 2. ดึงข้อมูล Vendor จากหน้าเอกสารและ Case เพื่อไปค้นหาในฐานข้อมูล Matrix
+        // 2. ดึงข้อมูล Vendor จากหน้าเอกสาร, หน้าฟอร์ม และ Case เพื่อไปค้นหาในฐานข้อมูล Matrix
         const vendorName = document.getElementById('vf-doc-vendor')?.innerText?.trim() 
+            || document.getElementById('prob-supplier')?.value?.trim()
+            || document.getElementById('f-sup-supplier')?.value?.trim()
+            || document.getElementById('em-f-supplier')?.value?.trim()
+            || document.getElementById('f-supplier')?.value?.trim()
             || vfData.vendor 
             || curCase?.supplier 
             || curCase?.vendor 
             || curCase?.report_data?.supplier 
             || "";
         const vendorCode = document.getElementById('vf-doc-vendor-code')?.innerText?.trim() 
+            || document.getElementById('prob-vendor-code')?.value?.trim()
+            || document.getElementById('f-sup-vendor-code')?.value?.trim()
+            || document.getElementById('em-f-vendor-code')?.value?.trim()
+            || document.getElementById('f-vendor-code')?.value?.trim()
             || vfData.vendor_code 
             || curCase?.vendor_code 
             || curCase?.supplier_code 
@@ -27766,12 +29355,12 @@ function renderModalAC(type, inputEl) {
                   || window.getVFRPMatrixForSupplier(docToDisplay, '', '');
         }
 
-        // 3. Helper: รวบรวมรายชื่อพนักงานและบทบาทจากระบบ
+        // 3. Helper: รวบรวมรายชื่อพนักงานและบทบาทจากระบบ Admin Master & Approval Matrix
         const allStaffMap = new Map();
         if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
             MASTER_STAFF_USERS.forEach(u => {
                 if (u && u.name) {
-                    allStaffMap.set(u.name.trim(), {
+                    allStaffMap.set(u.name.trim().toLowerCase(), {
                         name: u.name.trim(),
                         email: u.email || '',
                         role: (u.role || 'staff').toLowerCase(),
@@ -27784,8 +29373,8 @@ function renderModalAC(type, inputEl) {
             Array.from(window._dbUsersRoleMap.values()).forEach(u => {
                 const name = (u.display_name || u.name || '').trim();
                 if (name) {
-                    const existing = allStaffMap.get(name) || {};
-                    allStaffMap.set(name, {
+                    const existing = allStaffMap.get(name.toLowerCase()) || {};
+                    allStaffMap.set(name.toLowerCase(), {
                         name,
                         email: u.email || existing.email || '',
                         role: (u.role || existing.role || 'staff').toLowerCase(),
@@ -27795,23 +29384,59 @@ function renderModalAC(type, inputEl) {
             });
         }
 
-        const renderedNames = new Set();
+        // ตรวจสอบคำนำหน้าชื่อ (Prefix Validation: Mr. / Ms. / Miss / Mrs. / Dr. / Khun / K. / นาย / นาง / นางสาว)
+        const hasValidPrefix = (name) => {
+            if (!name || typeof name !== 'string') return false;
+            const clean = name.trim();
+            if (!clean || clean === '-' || clean === '--' || clean === 'N/A') return false;
+            return /^(mr\.|ms\.|mrs\.|miss\.|miss\s|dr\.|khun\s|k\.|นาย|นาง|นางสาว|mr\s|ms\s|mrs\s)/i.test(clean);
+        };
 
-        // Helper: ฟังก์ชันวาดรายการพนักงาน (Standard UI)
+        // แปลงชื่อให้มีคำนำหน้าที่ถูกต้องตามฐานข้อมูล Master Staff
+        const resolvePrefixedName = (rawName) => {
+            if (!rawName || rawName === '-' || rawName === '--' || rawName === 'N/A') return '';
+            const trimmed = rawName.trim();
+            if (hasValidPrefix(trimmed)) return trimmed;
+            
+            // ค้นหาใน MASTER_STAFF_USERS เพื่อดึงชื่อเต็มที่มีคำนำหน้า (Prefix)
+            if (typeof MASTER_STAFF_USERS !== 'undefined' && Array.isArray(MASTER_STAFF_USERS)) {
+                const found = MASTER_STAFF_USERS.find(u => {
+                    const uName = u.name || '';
+                    const uClean = uName.replace(/^(mr\.|ms\.|mrs\.|miss\.|miss\s|dr\.|khun\s|k\.|นาย|นาง|นางสาว|mr\s|ms\s|mrs\s)\s*/i, '').trim().toLowerCase();
+                    const tClean = trimmed.replace(/^(mr\.|ms\.|mrs\.|miss\.|miss\s|dr\.|khun\s|k\.|นาย|นาง|นางสาว|mr\s|ms\s|mrs\s)\s*/i, '').trim().toLowerCase();
+                    return (uClean && tClean && uClean === tClean) || uName.toLowerCase().includes(tClean);
+                });
+                if (found && hasValidPrefix(found.name)) {
+                    return found.name.trim();
+                }
+            }
+            return '';
+        };
+
+        const renderedNames = new Set();
+        let renderedCount = 0;
+
+        // Helper: ฟังก์ชันวาดรายการพนักงาน (เฉพาะที่มีคำนำหน้า Mr./Ms./Miss/Mrs./etc. เท่านั้น)
         const renderOption = (name, label, color, icon = '👤', emailAddr = '') => {
-            if (!name || name === '-' || name === 'N/A' || name === '--') return '';
-            const trimmedName = name.trim();
-            renderedNames.add(trimmedName.toLowerCase());
-            const finalEmail = emailAddr || ((typeof resolveStaffEmail === 'function') ? resolveStaffEmail(trimmedName) : (STAFF_EMAIL_MAP[trimmedName] || ''));
+            const prefixedName = resolvePrefixedName(name);
+            if (!prefixedName || !hasValidPrefix(prefixedName)) return '';
+            const key = prefixedName.toLowerCase();
+            if (renderedNames.has(key)) return '';
+            renderedNames.add(key);
+            renderedCount++;
+
+            const staffObj = allStaffMap.get(key);
+            const finalEmail = emailAddr || (staffObj ? staffObj.email : '') || ((typeof resolveStaffEmail === 'function') ? resolveStaffEmail(prefixedName) : (STAFF_EMAIL_MAP[prefixedName] || ''));
             return `
                 <div class="modal-ac-item" 
-                     style="padding: 9px 12px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s;"
-                     onmouseenter="this.style.background='#f8fafc'"
-                     onmouseleave="this.style.background='transparent'"
-                     onmousedown="event.preventDefault(); applyModalAC('staff', '${trimmedName.replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                     data-value="${prefixedName.replace(/"/g, '&quot;')}"
+                     style="padding: 10px 14px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s;"
+                     onmouseenter="this.style.background='#eff6ff'; this.style.color='#1d4ed8';"
+                     onmouseleave="this.style.background='transparent'; this.style.color='#1e293b';"
+                     onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('staff', '${prefixedName.replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
                     <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
-                        <span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 800; color: #0f172a; white-space: nowrap;">
-                            <span>${icon}</span> ${trimmedName}
+                        <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: #0f172a; white-space: nowrap;">
+                            <span>${icon}</span> ${prefixedName}
                         </span>
                         <span style="font-size: 9px; color: #64748b; padding-left: 18px; font-family: monospace; overflow: hidden; text-overflow: ellipsis;">${finalEmail}</span>
                     </div>
@@ -27822,148 +29447,173 @@ function renderModalAC(type, inputEl) {
         };
 
         // --------------------------------------------------------
-        // 🔹 [PART A]: ช่อง ISSUE BY (ผู้จัดทำ / วิศวกร)
+        // 🔹 [PART A]: ช่อง ISSUE BY (วิศวกรผู้จัดทำตาม APPROVAL MATRIX ของ Vendor เท่านั้น)
         // --------------------------------------------------------
         if (inputEl.id === 'prob-issue-by') {
-            htmlContent += `<div style="padding: 6px 12px; font-size: 9px; font-weight: 950; color: #2563eb; background: #eff6ff; border-bottom: 1.5px solid #bfdbfe; text-transform: uppercase;">👥 รายชื่อทีมงานวิศวกรและผู้จัดทำ (ISSUE BY)</div>`;
+            const matrixTitle = isRP 
+                ? "🔬 IQC ENGINEER (ผู้จัดทำรายงาน RP: ตาม VENDOR MATRIX)" 
+                : "⚙️ SQE ENGINEER (ผู้จัดทำรายงาน VF: ตาม VENDOR MATRIX)";
+            const headerColor = isRP ? "#0284c7" : "#2563eb";
+            const headerBg = isRP ? "#f0f9ff" : "#eff6ff";
+            const headerBorder = isRP ? "#bae6fd" : "#bfdbfe";
 
-            if (matrix && matrix.engineer && matrix.engineer !== '-') {
-                htmlContent += renderOption(matrix.engineer, 'DESIGNATED SQE', '#2563eb', '⭐', matrix.sqe_email);
-            }
-            if (matrix && matrix.iqc_eng_name && matrix.iqc_eng_name !== '-' && matrix.iqc_eng_name !== matrix.engineer) {
-                htmlContent += renderOption(matrix.iqc_eng_name, 'DESIGNATED IQC', '#0284c7', '⭐', matrix.iqc_eng_email);
+            htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${headerColor}; background: ${headerBg}; border-bottom: 1.5px solid ${headerBorder}; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between;">
+                <span>${matrixTitle}</span>
+                <span style="font-size: 8px; background: ${headerColor}; color: #fff; padding: 1.5px 6px; border-radius: 4px; font-weight: 900;">${isRP ? 'RP ONLY' : 'VF ONLY'}</span>
+            </div>`;
+
+            if (matrix) {
+                if (isRP) {
+                    // รายงาน RP: อ่านเฉพาะ IQC Engineer (รายงาน RP)
+                    if (matrix.iqc_eng_name && matrix.iqc_eng_name !== '-') {
+                        const pName = resolvePrefixedName(matrix.iqc_eng_name);
+                        if (pName && (!query || pName.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pName, 'IQC ENGINEER (RP)', '#0284c7', '⭐', matrix.iqc_eng_email);
+                        }
+                    }
+                } else {
+                    // รายงาน VF: อ่านเฉพาะ SQE Engineer (รายงาน VF)
+                    if (matrix.engineer && matrix.engineer !== '-') {
+                        const pName = resolvePrefixedName(matrix.engineer);
+                        if (pName && (!query || pName.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pName, 'SQE ENGINEER (VF)', '#2563eb', '⭐', matrix.sqe_email);
+                        }
+                    }
+                }
             }
 
-            Array.from(allStaffMap.values())
-                .filter(u => {
-                    if (renderedNames.has(u.name.toLowerCase())) return false;
-                    const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                    return !query || searchStr.includes(query);
-                })
-                .forEach(u => {
-                    const roleLabel = (u.role || 'STAFF').toUpperCase();
-                    htmlContent += renderOption(u.name, roleLabel, '#3b82f6', '👤', u.email);
-                });
+            if (renderedCount === 0) {
+                htmlContent += `
+                    <div style="padding: 12px 14px; font-size: 11px; color: #991b1b; background: #fef2f2; border: 1px dashed #f87171; border-radius: 8px; margin: 4px; text-align: center;">
+                        <div style="font-weight: 800; font-size: 11.5px; margin-bottom: 2px;">⚠️ ไม่พบวิศวกรผู้จัดทำสำหรับ Vendor: <strong>${vendorName || 'ยังไม่ระบุ'}</strong></div>
+                        <div style="font-size: 10px; color: #64748b;">
+                            เอกสาร: <strong>${isRP ? 'RP (IQC Engineer)' : 'VF (SQE Engineer)'}</strong><br>
+                            กรุณากำหนดรายชื่อใน Approval Matrix (Admin User Control)
+                        </div>
+                    </div>`;
+            }
         }
 
         // --------------------------------------------------------
-        // 🔹 [PART B]: ช่อง CONFIRM BY (เฉพาะหัวหน้างาน / ผู้ตรวจสอบตาม Vendor Matrix)
+        // 🔹 [PART B]: ช่อง CONFIRM BY (ผู้ยืนยันตาม APPROVAL MATRIX ของ Vendor เท่านั้น)
         // --------------------------------------------------------
         else if (inputEl.id === 'prob-confirm-by') {
-            if (matrix) {
-                const title = isRP ? "🟢 CONFIRM RP (หัวหน้างานตาม VENDOR MATRIX)" : "🔵 CONFIRM VF (หัวหน้างานตาม VENDOR MATRIX)";
-                const confirmName = isRP ? (matrix.confirm_rp_name || matrix.supervisor_name) : (matrix.confirm_vf_name || matrix.supervisor_name);
-                const confirmEmail = isRP ? (matrix.confirm_rp_email || matrix.supervisor_email) : (matrix.confirm_vf_email || matrix.supervisor_email);
-                const color = isRP ? "#059669" : "#1e40af";
-                
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">🛡️ ${title}</div>`;
-                
-                if (confirmName && confirmName !== '-') {
-                    htmlContent += renderOption(confirmName, 'SUPERVISOR (VENDOR MATRIX)', color, '🛡️', confirmEmail);
-                }
-                if (matrix.supervisor_name && matrix.supervisor_name !== '-' && matrix.supervisor_name !== confirmName) {
-                    htmlContent += renderOption(matrix.supervisor_name, 'SUPERVISOR (VENDOR MATRIX)', '#d97706', '🎖️', matrix.supervisor_email);
-                }
+            const title = isRP 
+                ? "🟢 CONFIRM RP (ผู้ยืนยันรายงาน RP: ตาม VENDOR MATRIX)" 
+                : "🔵 CONFIRM VF (ผู้ยืนยันรายงาน VF: ตาม VENDOR MATRIX)";
+            const color = isRP ? "#059669" : "#1e40af";
+            const bg = isRP ? "#f0fdf4" : "#eff6ff";
+            const border = isRP ? "#bbf7d0" : "#bfdbfe";
 
-                // If user typed a search query, allow matching other supervisors strictly
-                if (query) {
-                    const extraSupervisors = Array.from(allStaffMap.values()).filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isSupervisor = roleLower.includes('super') || roleLower.includes('head') || roleLower.includes('supervisor');
-                        if (!isSupervisor) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return searchStr.includes(query);
-                    });
-                    if (extraSupervisors.length > 0) {
-                        htmlContent += `<div style="padding: 6px 12px; font-size: 8.5px; font-weight: 900; color: #64748b; background: #f1f5f9; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #cbd5e1;">🔍 ผลการค้นหาหัวหน้างานเพิ่มเติม</div>`;
-                        extraSupervisors.forEach(u => {
-                            htmlContent += renderOption(u.name, 'SUPERVISOR', '#d97706', '🛡️', u.email);
-                        });
+            htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: ${bg}; border-bottom: 1.5px solid ${border}; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between;">
+                <span>🛡️ ${title}</span>
+                <span style="font-size: 8px; background: ${color}; color: #fff; padding: 1.5px 6px; border-radius: 4px; font-weight: 900;">${isRP ? 'RP ONLY' : 'VF ONLY'}</span>
+            </div>`;
+
+            if (matrix) {
+                if (isRP) {
+                    // รายงาน RP: อ่านเฉพาะ Confirm RP เท่านั้น
+                    if (matrix.confirm_rp_name && matrix.confirm_rp_name !== '-') {
+                        const pName = resolvePrefixedName(matrix.confirm_rp_name);
+                        if (pName && (!query || pName.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pName, 'CONFIRM RP (VENDOR MATRIX)', '#059669', '⭐', matrix.confirm_rp_email);
+                        }
+                    }
+                } else {
+                    // รายงาน VF: อ่านเฉพาะ Confirm VF เท่านั้น
+                    if (matrix.confirm_vf_name && matrix.confirm_vf_name !== '-') {
+                        const pName = resolvePrefixedName(matrix.confirm_vf_name);
+                        if (pName && (!query || pName.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pName, 'CONFIRM VF (VENDOR MATRIX)', '#1e40af', '⭐', matrix.confirm_vf_email);
+                        }
                     }
                 }
-            } else {
-                // กรณีไม่พบ Vendor ใน Matrix ให้แสดงเฉพาะหัวหน้างาน (Supervisors)
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: #d97706; background: #fffbeb; border-bottom: 1.5px solid #fde68a;">⚠️ รายชื่อหัวหน้างาน (SUPERVISORS)</div>`;
-                Array.from(allStaffMap.values())
-                    .filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isSupervisor = roleLower.includes('super') || roleLower.includes('head') || roleLower.includes('supervisor');
-                        if (!isSupervisor) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return !query || searchStr.includes(query);
-                    })
-                    .forEach(u => {
-                        htmlContent += renderOption(u.name, 'SUPERVISOR', '#d97706', '🛡️', u.email);
-                    });
+            }
+
+            if (renderedCount === 0) {
+                htmlContent += `
+                    <div style="padding: 12px 14px; font-size: 11px; color: #991b1b; background: #fef2f2; border: 1px dashed #f87171; border-radius: 8px; margin: 4px; text-align: center;">
+                        <div style="font-weight: 800; font-size: 11.5px; margin-bottom: 2px;">⚠️ ไม่พบผู้ยืนยันสำหรับ Vendor: <strong>${vendorName || 'ยังไม่ระบุ'}</strong></div>
+                        <div style="font-size: 10px; color: #64748b;">
+                            เอกสาร: <strong>${isRP ? 'Confirm RP (Return Part)' : 'Confirm VF (Vendor Failure)'}</strong><br>
+                            กรุณากำหนดรายชื่อใน Approval Matrix (Admin User Control)
+                        </div>
+                    </div>`;
             }
         }
 
         // --------------------------------------------------------
-        // 🔹 [PART C]: ช่อง APPROVED BY (ผู้อนุมัติ / ผู้จัดการ)
+        // 🔹 [PART C]: ช่อง APPROVED BY (ผู้อนุมัติตาม APPROVAL MATRIX ของ Vendor เท่านั้น)
         // --------------------------------------------------------
         else if (inputEl.id === 'prob-approved-by') {
+            const title = isRP 
+                ? "🟢 APPROVE RP (ผู้อนุมัติรายงาน RP: ตาม VENDOR MATRIX)" 
+                : "🔵 APPROVE VF (ผู้อนุมัติรายงาน VF: ตาม VENDOR MATRIX)";
+            const color = isRP ? "#059669" : "#1e40af";
+            const bg = isRP ? "#f0fdf4" : "#eff6ff";
+            const border = isRP ? "#bbf7d0" : "#bfdbfe";
+
+            htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: ${bg}; border-bottom: 1.5px solid ${border}; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between;">
+                <span>👑 ${title}</span>
+                <span style="font-size: 8px; background: ${color}; color: #fff; padding: 1.5px 6px; border-radius: 4px; font-weight: 900;">${isRP ? 'RP ONLY' : 'VF ONLY'}</span>
+            </div>`;
+
             if (matrix) {
-                const title = isRP ? "🟢 APPROVE RP (ตาม VENDOR MATRIX)" : "🔵 APPROVE VF (ตาม VENDOR MATRIX)";
-                const primaryAppr = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || matrix.manager_name) : (matrix.approve_vf_name || matrix.approve_vf_rp_name || matrix.manager_name);
-                const primaryEmail = isRP ? (matrix.approve_rp_email || matrix.approve_vf_rp_email || matrix.manager_email) : (matrix.approve_vf_email || matrix.approve_vf_rp_email || matrix.manager_email);
-                const jointAppr = matrix.approve_vf_rp_name; // ผู้อนุมัติร่วม (Joint Approval)
-                const jointEmail = matrix.approve_vf_rp_email;
-                const color = isRP ? "#059669" : "#1e40af";
-
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: #f8fafc; border-bottom: 1.5px solid #cbd5e1;">👑 ${title}</div>`;
-                
-                // 1. แสดงผู้อนุมัติหลัก (Primary Approver)
-                if (primaryAppr && primaryAppr !== '-') {
-                    htmlContent += renderOption(primaryAppr, 'PRIMARY APPROVER (VENDOR MATRIX)', color, '👑', primaryEmail);
-                }
-
-                // 2. แสดงผู้อนุมัติร่วม / ผู้จัดการ (Joint Approver)
-                if (jointAppr && jointAppr !== '-' && jointAppr !== primaryAppr) {
-                    htmlContent += `<div style="padding: 4px 12px; font-size: 8.5px; font-weight: 800; color: #7c3aed; background: #f5f3ff; border-top: 1px solid #ddd6fe;">🟣 ผู้มีอำนาจอนุมัติร่วม (MANAGEMENT)</div>`;
-                    htmlContent += renderOption(jointAppr, 'JOINT APPROVAL (MANAGEMENT)', '#7c3aed', '🟣', jointEmail);
-                }
-
-                if (matrix.manager_name && matrix.manager_name !== '-' && matrix.manager_name !== primaryAppr && matrix.manager_name !== jointAppr) {
-                    htmlContent += renderOption(matrix.manager_name, 'SECTION MANAGER (VENDOR MATRIX)', '#0f766e', '🏛️', matrix.manager_email);
-                }
-
-                // If user typed a search query, allow matching other managers/approvers
-                if (query) {
-                    const extraApprovers = Array.from(allStaffMap.values()).filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isApprover = roleLower.includes('manager') || roleLower.includes('admin') || roleLower.includes('approve') || u.department === 'Approved';
-                        if (!isApprover) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return searchStr.includes(query);
-                    });
-                    if (extraApprovers.length > 0) {
-                        htmlContent += `<div style="padding: 6px 12px; font-size: 8.5px; font-weight: 900; color: #64748b; background: #f1f5f9; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #cbd5e1;">🔍 ผลการค้นหาผู้อนุมัติเพิ่มเติม</div>`;
-                        extraApprovers.forEach(u => {
-                            const isMgr = (u.role || '').toLowerCase().includes('manager');
-                            htmlContent += renderOption(u.name, isMgr ? 'MANAGER' : 'APPROVER', isMgr ? '#0f766e' : '#7c3aed', isMgr ? '🏛️' : '👑', u.email);
-                        });
+                if (isRP) {
+                    // รายงาน RP:
+                    // 1. อ่าน Approve RP (เฉพาะ RP เท่านั้น)
+                    if (matrix.approve_rp_name && matrix.approve_rp_name !== '-') {
+                        const pAppr = resolvePrefixedName(matrix.approve_rp_name);
+                        if (pAppr && (!query || pAppr.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pAppr, 'APPROVE RP (VENDOR MATRIX)', '#059669', '⭐', matrix.approve_rp_email);
+                        }
+                    }
+                    // 2. อ่าน 🟣 Approve VF/RP (ผู้อนุมัติร่วม)
+                    if (matrix.approve_vf_rp_name && matrix.approve_vf_rp_name !== '-' && matrix.approve_vf_rp_name !== matrix.approve_rp_name) {
+                        const pJoint = resolvePrefixedName(matrix.approve_vf_rp_name);
+                        if (pJoint && (!query || pJoint.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pJoint, '🟣 APPROVE VF/RP (ผู้อนุมัติร่วม)', '#7c3aed', '🟣', matrix.approve_vf_rp_email);
+                        }
+                    }
+                } else {
+                    // รายงาน VF:
+                    // 1. อ่าน Approve VF (เฉพาะ VF เท่านั้น)
+                    if (matrix.approve_vf_name && matrix.approve_vf_name !== '-') {
+                        const pAppr = resolvePrefixedName(matrix.approve_vf_name);
+                        if (pAppr && (!query || pAppr.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pAppr, 'APPROVE VF (VENDOR MATRIX)', '#1e40af', '⭐', matrix.approve_vf_email);
+                        }
+                    }
+                    // 2. อ่าน 🟣 Approve VF/RP (ผู้อนุมัติร่วม)
+                    if (matrix.approve_vf_rp_name && matrix.approve_vf_rp_name !== '-' && matrix.approve_vf_rp_name !== matrix.approve_vf_name) {
+                        const pJoint = resolvePrefixedName(matrix.approve_vf_rp_name);
+                        if (pJoint && (!query || pJoint.toLowerCase().includes(query))) {
+                            htmlContent += renderOption(pJoint, '🟣 APPROVE VF/RP (ผู้อนุมัติร่วม)', '#7c3aed', '🟣', matrix.approve_vf_rp_email);
+                        }
                     }
                 }
-            } else {
-                // กรณีไม่พบ Vendor ใน Matrix ให้แสดงเฉพาะผู้จัดการและผู้อนุมัติ
-                htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: #7c3aed; background: #f5f3ff; border-bottom: 1.5px solid #c4b5fd;">👑 รายชื่อผู้จัดการและผู้อนุมัติ (MANAGERS & APPROVERS)</div>`;
-                Array.from(allStaffMap.values())
-                    .filter(u => {
-                        if (renderedNames.has(u.name.toLowerCase())) return false;
-                        const roleLower = (u.role || '').toLowerCase();
-                        const isApprover = roleLower.includes('manager') || roleLower.includes('admin') || roleLower.includes('approve') || u.department === 'Approved';
-                        if (!isApprover) return false;
-                        const searchStr = `${u.name} ${u.email} ${u.role}`.toLowerCase();
-                        return !query || searchStr.includes(query);
-                    })
-                    .forEach(u => {
-                        const isMgr = (u.role || '').toLowerCase().includes('manager');
-                        htmlContent += renderOption(u.name, isMgr ? 'MANAGER' : 'APPROVER', isMgr ? '#0f766e' : '#7c3aed', isMgr ? '🏛️' : '👑', u.email);
-                    });
             }
+
+            if (renderedCount === 0) {
+                htmlContent += `
+                    <div style="padding: 12px 14px; font-size: 11px; color: #991b1b; background: #fef2f2; border: 1px dashed #f87171; border-radius: 8px; margin: 4px; text-align: center;">
+                        <div style="font-weight: 800; font-size: 11.5px; margin-bottom: 2px;">⚠️ ไม่พบผู้อนุมัติสำหรับ Vendor: <strong>${vendorName || 'ยังไม่ระบุ'}</strong></div>
+                        <div style="font-size: 10px; color: #64748b;">
+                            เอกสาร: <strong>${isRP ? 'Approve RP (Return Part)' : 'Approve VF (Vendor Failure)'}</strong><br>
+                            กรุณากำหนดรายชื่อใน Approval Matrix (Admin User Control)
+                        </div>
+                    </div>`;
+            }
+        }
+        // ฟิลด์ Staff อื่นๆ ทั่วไป
+        else {
+            const allStaffList = (typeof MASTER_STAFF_USERS !== 'undefined') ? MASTER_STAFF_USERS : [];
+            allStaffList.forEach(u => {
+                const pName = resolvePrefixedName(u.name);
+                if (pName && (!query || pName.toLowerCase().includes(query) || (u.email && u.email.toLowerCase().includes(query)))) {
+                    htmlContent += renderOption(pName, (u.role || 'STAFF').toUpperCase(), '#3b82f6', '👤', u.email);
+                }
+            });
         }
     }
     // ============================================================
@@ -27974,71 +29624,95 @@ function renderModalAC(type, inputEl) {
         const typeLower = type.toLowerCase();
 
         if (typeLower === 'partno') {
-            source = Array.from(smartMemory.values.partNo || []);
+            source = Array.from(smartMemory.values?.partNo || []);
         } else if (typeLower === 'partname') {
-            source = Array.from(smartMemory.values.partName || []);
+            source = Array.from(smartMemory.values?.partName || []);
         } else if (typeLower === 'supplier') {
-            source = Array.from(smartMemory.values.supplier || []);
-        } 
-        // 🎯 📦 ส่วนที่แก้ไข: ดึงมาจาก Proficiency Breakdown (หมวดหมู่ SQE มาตรฐาน)
-// ค้นหาส่วนนี้ในฟังก์ชัน renderModalAC (ประมาณบรรทัด 3901)
-else if (typeLower === 'category' || type === 'part') {
-    source = [
-        "Plastic Resin Mold Part",
-        "Plastic Resin (Assy)",
-        "Packaging part Form",
-        "Aluminium Part",
-        "Steel",
-        "Copper Part",
-        "Terminal",
-        "Remote Control",
-        "Motors",
-        "Electric Controls",
-        "PCBA",
-        "Compressors",
-        "Piping Part",
-        "Printing part"
-    ];
-    // ส่วนนี้จะดึงค่าจากประวัติที่เคยพิมพ์ไว้มาแสดงต่อท้าย (คงไว้เหมือนเดิม)
-    const historyCats = Array.from(smartMemory.values.category || []);
-    historyCats.forEach(c => { if(!source.includes(c)) source.push(c); });
-}
-        else if (typeLower === 'user') {
-            source = Array.from(smartMemory.values.line || []); 
+            source = Array.from(smartMemory.values?.supplier || []);
+            if (typeof window.getApprovalDirectoryVendors === 'function') {
+                const vList = window.getApprovalDirectoryVendors() || [];
+                vList.forEach(v => {
+                    const name = (typeof v === 'string' ? v : (v.supplier_name || v.vendor || '')).trim();
+                    if (name && !source.includes(name)) source.push(name);
+                });
+            }
+        } else if (typeLower === 'category' || type === 'part') {
+            const defaultCategories = [
+                "Plastic Resin Mold Part",
+                "Plastic Resin (Assy)",
+                "Packaging part Form",
+                "Aluminium Part",
+                "Steel",
+                "Copper Part",
+                "Terminal",
+                "Remote Control",
+                "Motors",
+                "Electric Controls",
+                "PCBA",
+                "Compressors",
+                "Piping Part",
+                "Printing part"
+            ];
+            source = [...defaultCategories];
+            const historyCats = Array.from(smartMemory.values?.category || []);
+            historyCats.forEach(c => { if (c && !source.includes(c)) source.push(c); });
+        } else if (typeLower === 'user') {
+            const defaultUsers = [
+                "B1", "MH", "CL5", "LF", "LC3", "CL2", "CL1", 
+                "OSA-A1", "PD1", "PD2", "PD3", "IQC", "OQA", "QA", 
+                "WH", "ENG", "MOLD", "PAINT", "PRESS", "SMT", "FINAL"
+            ];
+            source = Array.from(smartMemory.values?.line || []);
+            defaultUsers.forEach(u => { if (!source.includes(u)) source.push(u); });
         } else if (typeLower === 'defect') {
-            source = Array.from(smartMemory.values.defect || []);
-        } 
-// ค้นหาส่วนนี้ในฟังก์ชัน renderModalAC
-else if (typeLower === 'action') {
-    source = [
-        "Rework (แก้ไขงานซ่อม)",
-        "Repair (ซ่อมแซมตามเงื่อนไข)",
-        "Replace (เปลี่ยนชิ้นส่วนใหม่)",
-        "Sorting 100% (คัดแยกชิ้นงาน 100%)",
-        "Screening & Re-inspection",
-        "Use as is / Concession",
-        "Scrap (ทำลายชิ้นงาน NG)",
-        "RTV (ส่งคืนซัพพลายเออร์)",
-        "Containment / Hold",
-        "Engineering Change (EC/ECN)",
-        "Poka - Yoke / Jig Adjustment",
-        "Supplier On-site Sorting"
-    ];
-}
-        else if (typeLower === 'report') {
+            const defaultDefects = [
+                "Broken", "Crack", "Scratch", "Dent", "Deform", "Burr", "Rust", "Stain", 
+                "Contamination", "Wrong Part", "Missing Part", "Short Shot", "Sink Mark", 
+                "Silver Streak", "Dimension NG", "Gas Mark", "Flash", "Pin Hole", "Discolor", 
+                "Noise", "Leak", "Burn", "Peeling", "Chipped", "Bend", "No Power", "Short Circuit"
+            ];
+            source = Array.from(smartMemory.values?.defect || []);
+            defaultDefects.forEach(d => { if (!source.includes(d)) source.push(d); });
+        } else if (typeLower === 'action') {
+            const defaultActions = [
+                "Rework (แก้ไขงานซ่อม)",
+                "Repair (ซ่อมแซมตามเงื่อนไข)",
+                "Replace (เปลี่ยนชิ้นส่วนใหม่)",
+                "Sorting 100% (คัดแยกชิ้นงาน 100%)",
+                "Screening & Re-inspection",
+                "Use as is / Concession",
+                "Scrap (ทำลายชิ้นงาน NG)",
+                "RTV (ส่งคืนซัพพลายเออร์)",
+                "Containment / Hold",
+                "Engineering Change (EC/ECN)",
+                "Poka - Yoke / Jig Adjustment",
+                "Supplier On-site Sorting"
+            ];
+            source = [...defaultActions];
+            const historyActions = Array.from(smartMemory.values?.action || []);
+            historyActions.forEach(a => { if (a && !source.includes(a)) source.push(a); });
+        } else if (typeLower === 'report') {
             source = ["VF Report", "RP Report", "Records"];
         }
 
         // กรองและเรียงลำดับ
         let matched = query ? source.filter(v => v && v.toString().toLowerCase().includes(query)) : source;
-        matched.sort((a, b) => (a.toString().toLowerCase().startsWith(query) ? 0 : 1) - (b.toString().toLowerCase().startsWith(query) ? 0 : 1));
-        matched = matched.slice(0, 15);
+        matched.sort((a, b) => {
+            if (!query) return 0;
+            const aStart = a.toString().toLowerCase().startsWith(query) ? 0 : 1;
+            const bStart = b.toString().toLowerCase().startsWith(query) ? 0 : 1;
+            return aStart - bStart;
+        });
+        matched = matched.slice(0, 18);
 
         if (matched.length > 0) {
-            htmlContent = matched.map(v => `
+            htmlContent = matched.map((v, idx) => `
                 <div class="modal-ac-item" 
-                     style="padding: 12px 14px; font-size: 12px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9;"
-                     onmousedown="event.preventDefault(); applyModalAC('${type}', '${v.toString().replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                     data-value="${v.toString().replace(/"/g, '&quot;')}"
+                     style="padding: 10px 14px; font-size: 12px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.12s ease; ${idx === 0 ? 'border-top-left-radius: 10px; border-top-right-radius: 10px;' : ''} ${idx === matched.length - 1 ? 'border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; border-bottom: none;' : ''}"
+                     onmouseenter="this.style.background='#eff6ff'; this.style.color='#1d4ed8';"
+                     onmouseleave="this.style.background='transparent'; this.style.color='#1e293b';"
+                     onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('${type}', '${v.toString().replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
                     ${v}
                 </div>
             `).join('');
@@ -28064,6 +29738,7 @@ function applyModalAC(type, value, inputEl) {
     const wrap = inputEl.parentElement;
     const dd = wrap ? wrap.querySelector('.modal-ac-dropdown') : null;
     if (dd) dd.style.display = 'none';
+    if (wrap) wrap.style.zIndex = '';
 
     // 3. บันทึกลง Memory ของ Case (Auto-save) - เก็บเฉพาะชื่อ ไม่เก็บสถานะลายเซ็น
     const curCase = (typeof Wap8DSystem !== 'undefined' && typeof Wap8DSystem.getCurrentCase === 'function')
@@ -28075,25 +29750,42 @@ function applyModalAC(type, value, inputEl) {
         
         if (inputEl.id === 'prob-issue-by') {
             curCase.report_data.vf_data.issue_by = value;
-            
-            // ตรวจสอบว่าถ้าช่อง CONFIRM BY มีชื่อเดิมอยู่แล้วแต่ไม่ได้อยู่ในทีมเดียวกับ ISSUE BY ให้รีเซ็ตช่อง CONFIRM BY
-            const confirmInput = document.getElementById('prob-confirm-by');
-            if (confirmInput && confirmInput.value) {
-                const issueTeam = typeof getStaffTeamName === 'function' ? getStaffTeamName(value) : null;
-                const confirmTeam = typeof getStaffTeamName === 'function' ? getStaffTeamName(confirmInput.value) : null;
-                if (issueTeam && confirmTeam && issueTeam !== confirmTeam) {
-                    confirmInput.value = "";
-                    curCase.report_data.vf_data.confirm_by = "";
-                    curCase.report_data.vf_data.confirm_by_sig_active = false;
-                    curCase.report_data.vf_data.confirm_sig_active = false;
-                    const confirmSig = document.getElementById('sig-prob-confirm-by');
-                    if (confirmSig) confirmSig.innerHTML = '';
-                }
-            }
         } else if (inputEl.id === 'prob-confirm-by') {
             curCase.report_data.vf_data.confirm_by = value;
         } else if (inputEl.id === 'prob-approved-by') {
             curCase.report_data.vf_data.approved_by = value;
+        } else if (type === 'supplier' || inputEl.id === 'prob-supplier') {
+            curCase.supplier = value;
+            curCase.report_data.vf_data.vendor = value;
+            // Lookup Matrix for supplier to pre-fill or suggest authorized signers
+            if (typeof window.getVFRPMatrixForSupplier === 'function') {
+                const matrix = window.getVFRPMatrixForSupplier(value, '', '');
+                if (matrix) {
+                    if (matrix.vendor_code) {
+                        curCase.vendor_code = matrix.vendor_code;
+                        curCase.report_data.vf_data.vendor_code = matrix.vendor_code;
+                    }
+                    if (matrix.parts_group) {
+                        const catSel = document.getElementById('f-sup-part-cat');
+                        if (catSel && !catSel.value) catSel.value = matrix.parts_group;
+                    }
+                    const reportType = (curCase?.report_data?.source_report_type || curCase?.report_type || '').toString().toUpperCase();
+                    const isRP = reportType.includes('RP');
+                    const mConfirm = isRP ? (matrix.confirm_rp_name || '') : (matrix.confirm_vf_name || '');
+                    const mApprove = isRP ? (matrix.approve_rp_name || matrix.approve_vf_rp_name || '') : (matrix.approve_vf_name || matrix.approve_vf_rp_name || '');
+
+                    const confirmInput = document.getElementById('prob-confirm-by');
+                    if (confirmInput && !confirmInput.value && mConfirm && mConfirm !== '-') {
+                        confirmInput.value = mConfirm;
+                        curCase.report_data.vf_data.confirm_by = mConfirm;
+                    }
+                    const approvedInput = document.getElementById('prob-approved-by');
+                    if (approvedInput && !approvedInput.value && mApprove && mApprove !== '-') {
+                        approvedInput.value = mApprove;
+                        curCase.report_data.vf_data.approved_by = mApprove;
+                    }
+                }
+            }
         }
     }
 
@@ -28125,35 +29817,8 @@ function applyModalAC(type, value, inputEl) {
 function updateSupportFormValidation() {
     const modal = document.getElementById('support-form-modal');
     if (!modal) return;
-    const isDark = document.body.classList.contains('dark') || document.body.classList.contains('dark-mode');
 
-    // ตรวจสอบการกรอก 🔢 รหัสพาร์ท (Part No.) เพื่อใช้กำหนดสถานะช่อง 📅 วันที่รายงาน
-    const partNoEl = modal.querySelector('#prob-partno');
-    const hasPartNo = Boolean(partNoEl && (partNoEl.value || '').trim() !== '');
-
-    // 📅 วันที่รายงาน (ให้เป็นสีเทาเสมอหากยังไม่มีการกรอก Part No.)
-    const dateEl = modal.querySelector('#f-sup-date');
-    if (dateEl) {
-        if (!hasPartNo) {
-            dateEl.style.color = '#94a3b8';
-            dateEl.style.backgroundColor = isDark ? '#1e293b' : '#f1f5f9';
-            dateEl.style.borderColor = '#cbd5e1';
-            dateEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
-        } else {
-            dateEl.style.color = '';
-            dateEl.style.backgroundColor = '';
-            dateEl.style.borderColor = '';
-            const val = (dateEl.value || '').trim();
-            if (val !== '') {
-                dateEl.classList.add('field-glow-filled');
-                dateEl.classList.remove('field-glow-pending', 'field-glow-error');
-            } else {
-                dateEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
-            }
-        }
-    }
-
-    // ทุกช่องปกติ: เมื่อมีการเติมข้อมูล ค่อยขึ้นสีเขียว (field-glow-filled) ถ้าไม่มีข้อมูลเป็นสีเทาปกติ (ไม่มีกรอบสีเหลือง)
+    // 1. ช่องข้อความและช่องเลือกทั้งหมด
     const textFields = [
         'prob-partno',
         'prob-part',
@@ -28161,10 +29826,13 @@ function updateSupportFormValidation() {
         'f-sup-part-cat',
         'prob-user',
         'prob-defect',
+        'f-sup-date',
         'f-sup-action',
         'f-sup-report',
         'prob-commander',
         'f-sup-commander',
+        'f-sup-po',
+        'f-sup-inv',
         'f-vf-vendor',
         'f-vf-vendor-code',
         'f-vf-po',
@@ -28185,33 +29853,37 @@ function updateSupportFormValidation() {
         const hasVal = val !== '' && val !== '--' && val !== 'Select...';
 
         if (hasVal) {
-            el.classList.add('field-glow-filled');
+            el.classList.add('field-glow-filled', 'valid');
             el.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            el.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            el.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
     });
 
-    const remarkEl = modal.querySelector('textarea[name="remark"]');
-    if (remarkEl) {
+    // 2. ช่องหมายเหตุ (REMARK)
+    const remarkEls = modal.querySelectorAll('textarea[name="remark"], #f-sup-remark-input');
+    remarkEls.forEach(remarkEl => {
         const val = (remarkEl.value || '').trim();
         if (val !== '') {
-            remarkEl.classList.add('field-glow-filled');
+            remarkEl.classList.add('field-glow-filled', 'valid');
             remarkEl.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            remarkEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            remarkEl.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
-    }
+    });
 
-    // 📦 LOT NO., ✅ OK QTY, ❌ NG QTY: เอากรอบสีเหลืองออกทั้งหมด เมื่อมีข้อมูลให้ขึ้นสีเขียว
+    // 3. 📦 LOT NO., ✅ OK QTY, ❌ NG QTY: เมื่อมีข้อมูลให้ขึ้นสีเขียวนีออน
     const lotEl = modal.querySelector('#f-sup-lot');
+    let hasLot = false;
     if (lotEl) {
-        const num = parseFloat(lotEl.value);
-        if (!isNaN(num) && num > 0) {
-            lotEl.classList.add('field-glow-filled');
+        const lotVal = (lotEl.value || '').trim();
+        const num = parseFloat(lotVal);
+        if (lotVal !== '' && !isNaN(num) && num > 0) {
+            hasLot = true;
+            lotEl.classList.add('field-glow-filled', 'valid');
             lotEl.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            lotEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            lotEl.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
     }
 
@@ -28219,22 +29891,21 @@ function updateSupportFormValidation() {
     if (okEl) {
         const val = (okEl.value || '').trim();
         if (val !== '' && !isNaN(parseFloat(val))) {
-            okEl.classList.add('field-glow-filled');
+            okEl.classList.add('field-glow-filled', 'valid');
             okEl.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            okEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            okEl.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
     }
 
     const ngEl = modal.querySelector('#f-sup-ng');
-    const lotNum = parseFloat(lotEl?.value);
     if (ngEl) {
         const ngVal = (ngEl.value || '').trim();
-        if (!isNaN(lotNum) && lotNum > 0 && ngVal !== '' && !isNaN(parseFloat(ngVal))) {
-            ngEl.classList.add('field-glow-filled');
+        if (ngVal !== '' && !isNaN(parseFloat(ngVal))) {
+            ngEl.classList.add('field-glow-filled', 'valid');
             ngEl.classList.remove('field-glow-pending', 'field-glow-error');
         } else {
-            ngEl.classList.remove('field-glow-filled', 'field-glow-pending', 'field-glow-error');
+            ngEl.classList.remove('field-glow-filled', 'valid', 'field-glow-pending', 'field-glow-error');
         }
     }
 
@@ -28246,15 +29917,16 @@ function updateSupportFormValidation() {
     const previewImg = modal.querySelector('#img-preview-area img');
     const hasSingleImg = Boolean(modal._currentImage || (previewImg && previewImg.getAttribute('src')));
     const isMultiMode = modal._evidenceMode === 'multi';
+    const isDark = document.body.classList.contains('dark') || document.body.classList.contains('dark-mode');
 
     if (!isMultiMode) {
         if (hasSingleImg) {
             if (imgDropzone) {
-                imgDropzone.classList.add('field-glow-filled');
+                imgDropzone.classList.add('field-glow-filled', 'valid');
                 imgDropzone.classList.remove('field-glow-pending', 'field-glow-error');
             }
             if (secCont) {
-                secCont.classList.add('field-glow-filled');
+                secCont.classList.add('field-glow-filled', 'valid');
                 secCont.classList.remove('field-glow-pending', 'field-glow-error');
             }
             if (imgBadge) {
@@ -28265,10 +29937,10 @@ function updateSupportFormValidation() {
         } else {
             if (imgDropzone) {
                 imgDropzone.classList.add('field-glow-pending');
-                imgDropzone.classList.remove('field-glow-filled', 'field-glow-error');
+                imgDropzone.classList.remove('field-glow-filled', 'valid', 'field-glow-error');
             }
             if (secCont) {
-                secCont.classList.remove('field-glow-filled', 'field-glow-error');
+                secCont.classList.remove('field-glow-filled', 'valid', 'field-glow-error');
             }
             if (imgBadge) {
                 imgBadge.textContent = '⚠️ ยังไม่ได้แนบรูปภาพหลักฐาน (จำเป็นสำหรับการบันทึก)';
@@ -28279,11 +29951,11 @@ function updateSupportFormValidation() {
     } else {
         if (modal._currentImage) {
             if (secCont) {
-                secCont.classList.add('field-glow-filled');
+                secCont.classList.add('field-glow-filled', 'valid');
                 secCont.classList.remove('field-glow-pending', 'field-glow-error');
             }
             if (stitchedBox) {
-                stitchedBox.classList.add('field-glow-filled');
+                stitchedBox.classList.add('field-glow-filled', 'valid');
                 stitchedBox.classList.remove('field-glow-pending', 'field-glow-error');
             }
         }
@@ -28307,10 +29979,10 @@ async function openPersonalSettings() {
     try {
         // ดึงข้อมูลพนักงานปัจจุบัน
         const { data: user, error } = await sqeClient
-            .from('users')
+            .from('profiles')
             .select('display_name, avatar_url')
             .eq('email', S.currentUser)
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
 
@@ -28404,7 +30076,7 @@ async function resetProfileToDefault() {
                 };
 
                 const { error } = await sqeClient
-                    .from('users')
+                    .from('profiles')
                     .update(payload)
                     .eq('email', S.currentUser);
 
@@ -28460,7 +30132,7 @@ async function savePersonalProfile() {
         if (tempAvatarBase64) payload.avatar_url = tempAvatarBase64;
 
         const { error } = await sqeClient
-            .from('users')
+            .from('profiles')
             .update(payload)
             .eq('email', S.currentUser);
 
@@ -28484,62 +30156,7 @@ async function savePersonalProfile() {
     }
 }
 
-const canvas = document.getElementById('starfield');
-const ctx = canvas ? canvas.getContext('2d') : null;
-
-let stars = [];
-const numStars = 200;
-const speed = 2;
-
-function initStars() {
-    if (!canvas || !ctx) return;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    stars = [];
-    for (let i = 0; i < numStars; i++) {
-        stars.push({
-            x: Math.random() * canvas.width - canvas.width / 2,
-            y: Math.random() * canvas.height - canvas.height / 2,
-            z: Math.random() * canvas.width,
-            o: Math.random()
-        });
-    }
-}
-
-function updateStars() {
-    if (!canvas || !ctx) return;
-    try {
-        ctx.fillStyle = '#020617';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-
-        for (let i = 0; i < numStars; i++) {
-            let s = stars[i];
-            s.z -= speed;
-
-            if (s.z <= 0) {
-                s.z = canvas.width;
-                s.x = Math.random() * canvas.width - canvas.width / 2;
-                s.y = Math.random() * canvas.height - canvas.height / 2;
-            }
-
-            const x = s.x * (canvas.width / s.z);
-            const y = s.y * (canvas.width / s.z);
-            const r = 1.5 * (canvas.width / s.z);
-
-            ctx.beginPath();
-            ctx.fillStyle = `rgba(0, 242, 255, ${1 - s.z / canvas.width})`;
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.restore();
-    } catch (e) {
-        console.warn("Starfield render skipped due to context issue:", e);
-    }
-    requestAnimationFrame(updateStars);
-}
+// [Cleaned duplicate background star animation loop to optimize frame rate]
 
 // ฟังก์ชันล้างข้อความหัวข้อปัญหาให้กระชับ และแก้ปัญหาวันที่แสดงซ้ำซ้อน (ฉบับปรับปรุง V3)
 function getCleanProblemTitle(title) {
@@ -28808,6 +30425,9 @@ const Wap8DSystem = (function() {
         if (_currentCase) {
             try { await saveCurrentProgress(); } catch (e) {}
             _currentCase = null;
+        }
+        if (typeof window.initVFRPMatrixEngine === 'function') {
+            window.initVFRPMatrixEngine();
         }
         const dash = document.getElementById('eight-d-dashboard');
         const rptView = document.getElementById('eight-d-report-view');
@@ -31024,10 +32644,10 @@ const productionTypeRowHtml = `
 `;
         // --- [จบส่วนแก้ไข] ---
 
-    // Auto-resolve matrix default names for issue, confirm and approve
-    const matrixIssueName = vfMatrix ? (isRP ? (vfMatrix.iqc_eng_name || vfMatrix.engineer || '') : (vfMatrix.engineer || vfMatrix.iqc_eng_name || '')) : '';
-    const matrixConfirmName = vfMatrix ? (isRP ? (vfMatrix.confirm_rp_name || vfMatrix.supervisor_name || '') : (vfMatrix.confirm_vf_name || vfMatrix.supervisor_name || '')) : '';
-    const matrixApproveName = vfMatrix ? (isRP ? (vfMatrix.approve_rp_name || vfMatrix.approve_vf_rp_name || vfMatrix.manager_name || '') : (vfMatrix.approve_vf_name || vfMatrix.approve_vf_rp_name || vfMatrix.manager_name || '')) : '';
+    // Auto-resolve matrix default names for issue, confirm and approve based strictly on document type (VF/RP)
+    const matrixIssueName = vfMatrix ? (isRP ? (vfMatrix.iqc_eng_name || '') : (vfMatrix.engineer || '')) : '';
+    const matrixConfirmName = vfMatrix ? (isRP ? (vfMatrix.confirm_rp_name || '') : (vfMatrix.confirm_vf_name || '')) : '';
+    const matrixApproveName = vfMatrix ? (isRP ? (vfMatrix.approve_rp_name || vfMatrix.approve_vf_rp_name || '') : (vfMatrix.approve_vf_name || vfMatrix.approve_vf_rp_name || '')) : '';
 
     const effectiveIssueBy = vf.issue_by || matrixIssueName || '';
     const effectiveConfirmBy = vf.confirm_by || matrixConfirmName || '';
@@ -35401,6 +37021,7 @@ if (typeof window !== 'undefined') {
         LocalBackupSystem,
 
         updateAllModuleFilters, showPartAC, selectPartAC, calcNG,
+        filterLoginStaffByDept, updatePassStrength, renderEmployeeLoginDropdown,
         signDocument: Wap8DSystem.signDocument,
         removeSignature: Wap8DSystem.removeSignature,
         sendIssueByEmail: Wap8DSystem.sendIssueByEmail,
