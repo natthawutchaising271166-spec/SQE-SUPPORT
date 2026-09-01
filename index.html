@@ -2150,7 +2150,7 @@
                         </linearGradient>
                     </defs>
                 </svg>
-                <div class="absolute inset-0 flex items-center justify-center font-black text-[13px] text-slate-800" id="exec-mission-pct">0%</div>
+                <div class="absolute inset-0 flex items-center justify-center font-black text-[13px] text-slate-800 dark:text-slate-100" id="exec-mission-pct">0%</div>
             </div>
             <div>
                 <div class="flex items-center gap-1.5 mb-1">
@@ -2163,7 +2163,7 @@
         </div>
         
         <!-- Mission Mini Feed with Automated Stagger -->
-        <div class="space-y-2 flex-1" id="exec-mission-mini-feed">
+        <div class="space-y-2 flex-1 overflow-y-auto pr-1 custom-scrollbar" id="exec-mission-mini-feed" style="max-height: 240px;">
             <!-- Items will be auto-injected -->
         </div>
     </div>
@@ -2720,8 +2720,10 @@
                     <div class="card-body flex-1 min-h-0 p-0 overflow-y-auto relative scroll-custom">
                         
                         <!-- 1. Table View -->
-                        <div id="sm-view-table" class="w-full h-full">
-                            <table class="w-full text-left border-collapse min-w-[580px]">
+<!-- บรรทัดที่ประมาณ 1355 -->
+<div id="sm-view-table" class="w-full h-full overflow-x-auto no-scrollbar">
+    <table class="w-full text-left border-collapse min-w-[850px]"> 
+    <!-- ปรับ min-w เป็น 850px เพื่อให้บนแท็บเล็ตเกิดการเลื่อนและไม่บีบตัวหนังสือ -->
                                 <thead class="sticky top-0 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-md text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 z-10">
                                     <tr>
                                         <th class="py-2.5 px-3 text-center w-12">#</th>
@@ -3018,7 +3020,13 @@
                         <h3 class="chart-title-v2">MONTHLY OT TREND (HOURS)</h3>
                         <div class="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full border">
                             <span class="text-[8px] font-black text-slate-400">TARGET:</span>
-                            <input type="number" id="ot-target-input" value="100" class="w-8 bg-transparent border-none text-[10px] font-black text-rose-500 outline-none text-center p-0" title="Ot Target Input" aria-label="Ot Target Input">
+                           <input type="number" 
+       id="ot-target-input" 
+       value="100" 
+       oninput="WapOTManagement.updateTarget(this.value)" 
+       class="w-8 bg-transparent border-none text-[10px] font-black text-rose-500 outline-none text-center p-0" 
+       title="Ot Target Input" 
+       aria-label="Ot Target Input">
                         </div>
                     </div>
                     <div class="chart-wrap-v2"><div id="ot-trend-chart"></div></div>
@@ -3502,8 +3510,9 @@
         </div>
 
         <!-- ส่วนตาราง: เพิ่ม overflow-x-auto เพื่อให้เลื่อนซ้ายขวาได้ -->
-        <div class="flex-1 overflow-auto scroll-custom">
-            <table class="w-full border-collapse text-left" style="min-width: 3500px;"> <!-- กำหนดความกว้างขั้นต่ำเพื่อให้คอลัมน์ไม่เบียดกัน -->
+  <!-- บรรทัดที่ประมาณ 1608 -->
+<div class="flex-1 overflow-x-auto no-scrollbar">
+    <table class="w-full border-collapse text-left" style="min-width: 3500px;"><!-- กำหนดความกว้างขั้นต่ำเพื่อให้คอลัมน์ไม่เบียดกัน -->
                 <thead class="sticky top-0 z-20 shadow-xs">
                     <tr id="rn-table-header" class="text-white">
                         <th style="width: 60px; text-align: center;">No</th>

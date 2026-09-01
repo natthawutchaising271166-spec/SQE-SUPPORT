@@ -14001,27 +14001,22 @@ function renderExecSpecialJobs() {
     const end = document.getElementById('cd-end-date')?.value;
     const currentYear = new Date().getFullYear().toString();
 
-    console.log(`[Debug SpecialJobs] Total in State: ${missions.length}, Filter: ${start} to ${end}`);
-
-    // 3. ปรับปรุง Logic การกรอง (ให้รองรับ String และการเปรียบเทียบที่แม่นยำขึ้น)
+    // 3. ปรับปรุง Logic การกรอง
     const filteredMissions = missions.filter(r => {
         if (!r.date) return false;
-        const rDateStr = String(r.date); // บังคับเป็น String
+        const rDateStr = String(r.date); 
         
         if (start && end) {
             return rDateStr >= start && rDateStr <= end;
         }
-        // ถ้าไม่มี filter ให้โชว์ของปีนี้ทั้งหมด
         return rDateStr.includes(currentYear);
     });
 
     const total = filteredMissions.length;
-    // เช็คสถานะการทำเสร็จ (ตรวจจากคอลัมน์ result ตาม DB ของคุณ)
     const completed = filteredMissions.filter(r => r.result && r.result !== '-' && r.result !== '').length;
     const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    // 4. อัปเดต UI 
-    // อัปเดตกราฟวงกลม
+    // 4. อัปเดต UI ส่วนกราฟและสถิติ
     const circle = document.getElementById('exec-mission-circle');
     if (circle) {
         gsap.to(circle, {
@@ -14031,55 +14026,69 @@ function renderExecSpecialJobs() {
         });
     }
 
-    // ตัวเลข % วิ่ง
-    animateValue('exec-mission-pct', 0, pct, 1500, 0, "%");
+    if (typeof animateValue === 'function') {
+        animateValue('exec-mission-pct', 0, pct, 1500, 0, "%");
+    }
     
-    // ตัวเลขสถิติ x / y
     const statsEl = document.getElementById('exec-mission-stats');
     if (statsEl) {
         statsEl.textContent = `${completed} / ${total}`;
     }
 
-    // Badge ขวาบน
     const badge = document.getElementById('exec-mission-badge');
     if (badge) {
         badge.textContent = `${completed} DONE`;
-        badge.style.display = 'block'; // มั่นใจว่าโชว์
     }
 
-    // 5. วาดรายการ 3 อันล่าสุด (Mini Feed)
+    // 5. วาดรายการ Feed (แก้ไขให้รองรับการเลื่อนและ Dark Mode)
     const feedEl = document.getElementById('exec-mission-mini-feed');
     if (feedEl) {
+        // ตั้งค่า Container ให้เลื่อนได้ (ถ้ายังไม่ได้ตั้งใน CSS)
+        feedEl.style.overflowY = "auto";
+        feedEl.style.maxHeight = "240px"; // กำหนดความสูงเพื่อให้เกิดการ Scroll
+        feedEl.classList.add("custom-scrollbar");
+
         if (total === 0) {
             feedEl.innerHTML = `
                 <div class="h-full flex items-center justify-center py-6">
-                    <p class="text-[10px] text-slate-300 italic uppercase font-bold tracking-widest">No Missions Detected</p>
+                    <p class="text-[10px] text-slate-400 dark:text-slate-500 italic uppercase font-bold tracking-widest">No Missions Detected</p>
                 </div>`;
             return;
         }
 
-        feedEl.innerHTML = filteredMissions.slice(0, 3).map((m, i) => {
+        // เปลี่ยน slice(0, 3) เป็น slice(0, 10) เพื่อให้เห็นรายการเยอะขึ้นและเลื่อนได้
+        feedEl.innerHTML = filteredMissions.slice(0, 10).map((m, i) => {
             const isDone = m.result && m.result !== '-' && m.result !== '';
             return `
-                <div class="p-2 rounded-xl bg-slate-50/80 border border-slate-100 relative overflow-hidden mb-1.5 transition-all hover:translate-x-1" 
+                <div class="p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700 relative overflow-hidden mb-1.5 transition-all hover:translate-x-1 group" 
                      style="opacity:0; transform:translateX(-10px);" id="exec-m-item-${i}">
-                    <div class="absolute left-0 top-0 bottom-0 w-1 ${isDone ? 'bg-emerald-500' : 'bg-amber-400'}"></div>
-                    <div class="flex justify-between items-center">
-                        <p class="text-[10px] font-black text-slate-700 truncate uppercase w-4/5">${m.project || 'Untitled Mission'}</p>
-                        <div class="w-1.5 h-1.5 rounded-full ${isDone ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'}"></div>
+                    <!-- แถบสีสถานะด้านข้าง -->
+                    <div class="absolute left-0 top-0 bottom-0 w-1 ${isDone ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-amber-400 shadow-[0_0_8px_#fbbf24]'}"></div>
+                    
+                    <div class="flex justify-between items-center gap-2">
+                        <p class="text-[10px] font-black text-slate-700 dark:text-slate-100 truncate uppercase flex-1">
+                            ${m.project || 'Untitled Mission'}
+                        </p>
+                        <div class="w-1.5 h-1.5 rounded-full shrink-0 ${isDone ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'}"></div>
                     </div>
-                    <p class="text-[8px] font-bold text-slate-400 mt-0.5">${m.date} | CMD: ${m.assigned_by || 'N/A'}</p>
+                    
+                    <div class="flex justify-between items-center mt-1">
+                        <p class="text-[8px] font-bold text-slate-400 dark:text-slate-500">
+                            ${m.date} <span class="mx-1 opacity-30">|</span> 
+                            <span class="text-blue-500 dark:text-blue-400">CMD: ${m.assigned_by || 'N/A'}</span>
+                        </p>
+                    </div>
                 </div>
             `;
         }).join('');
 
-        // รันอนิเมชั่นโชว์รายการ
+        // 6. รันอนิเมชั่นโชว์รายการ
         gsap.to("[id^='exec-m-item-']", {
             opacity: 1,
             x: 0,
-            duration: 0.5,
-            stagger: 0.1,
-            ease: "back.out(1.7)"
+            duration: 0.4,
+            stagger: 0.05,
+            ease: "power2.out"
         });
     }
 }
@@ -14416,7 +14425,7 @@ function renderExecParts(data) {
 
     if (execCharts.part) execCharts.part.destroy();
 
-const chartOptions = {
+    const chartOptions = {
         series: [{
             name: 'จำนวนปัญหา',
             data: top5.map(x => x[1])
@@ -14426,7 +14435,6 @@ const chartOptions = {
             height: '100%',
             width: '100%',
             toolbar: { show: false },
-            // ปรับตำแหน่งกราฟให้สมดุล
             offsetY: 0, 
             parentHeightOffset: 0, 
             animations: { enabled: true, easing: 'easeinout', speed: 800 }
@@ -14435,12 +14443,9 @@ const chartOptions = {
             bar: {
                 horizontal: true,
                 borderRadius: 4,
-                // ปรับความสูงของแท่ง (Bar Height) ให้มากขึ้นเพื่อขยายพื้นที่ (เดิมอาจจะ 35-50%)
                 barHeight: '75%', 
                 distributed: true,
-                dataLabels: {
-                    position: 'top' // หรือ 'bottom' เพื่อให้อยู่ในแท่ง
-                }
+                dataLabels: { position: 'top' }
             }
         },
         colors: ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe'],
@@ -14449,56 +14454,67 @@ const chartOptions = {
             textAnchor: 'start',
             style: {
                 fontSize: '10px',
-                fontWeight: 600, // ปรับให้บางลงเล็กน้อย
+                fontWeight: 600,
                 colors: ['#1e293b']
             },
-            offsetX: 10, // ขยับตัวเลขออกไปนอกแท่งเล็กน้อย
+            offsetX: 10,
             dropShadow: { enabled: false }
         },
         grid: {
             show: true,
             borderColor: '#f1f5f9',
             strokeDashArray: 4,
-            // สำคัญ: ปรับ Padding ให้ชิดขอบทุกด้าน โดยเฉพาะ bottom
-            padding: {
-                top: -10,
-                bottom: -10,
-                left: 10,
-                right: 40 // เผื่อที่ให้ตัวเลขด้านหลังไม่หลุดขอบ
-            }
+            padding: { top: -10, bottom: -10, left: 10, right: 40 }
         },
         xaxis: {
             categories: top5.map(x => x[0]),
             labels: {
                 show: true,
                 style: {
-                    // เปลี่ยนสีให้เข้มขึ้นเพื่อให้ตัดกับพื้นหลัง (ใช้สี Slate 600)
                     colors: '#475569', 
-                    fontSize: '11px',    // เพิ่มขนาดขึ้นเล็กน้อยจาก 9px เป็น 11px
-                    fontWeight: 600,     // ใช้ความหนาระดับ Semi-bold เพื่อให้คมชัดแต่ไม่หนาปึ้ก
+                    fontSize: '11px',
+                    fontWeight: 600,
                     fontFamily: 'Inter, sans-serif'
                 },
-                // เพิ่มระยะห่างจากเส้นแกนเล็กน้อย
                 offsetY: 0, 
             },
-            axisBorder: {
-                show: false // ซ่อนเส้นขอบแกนเพื่อความคลีน
-            },
-            axisTicks: {
-                show: false // ซ่อนขีดติ๊กเพื่อความอ่อนช้อย
-            }
+            axisBorder: { show: false },
+            axisTicks: { show: false }
         },
         yaxis: {
             labels: {
                 style: {
                     colors: '#64748b',
-                    fontSize: '10px', // ปรับชื่อ Part ให้เล็กลงและบาง
+                    fontSize: '10px',
                     fontWeight: 400
                 }
             }
         },
         legend: { show: false },
-        tooltip: { theme: 'dark' }
+        // --- [ส่วนที่แก้ไข: Custom Tooltip] ---
+        tooltip: {
+            enabled: true,
+            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                const partName = w.globals.labels[dataPointIndex];
+                const val = series[seriesIndex][dataPointIndex];
+                const color = w.globals.colors[dataPointIndex];
+
+                return `
+                    <div class="exec-part-tooltip">
+                        <div class="part-tt-header">📦 Part Detail Insight</div>
+                        <div class="part-tt-body">
+                            <div class="part-tt-row">
+                                <div class="part-tt-label">
+                                    <span class="part-tt-dot" style="background-color:${color}; box-shadow: 0 0 8px ${color}66;"></span>
+                                    <span>${partName}</span>
+                                </div>
+                                <div class="part-tt-val">${val} <small>Cases</small></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
     };
 
     execCharts.part = new ApexCharts($id('exec-part-chart'), chartOptions);
@@ -14506,48 +14522,68 @@ const chartOptions = {
 }
 
 function renderExecPie(rp, vf, rec) {
-    const total = rp + vf + rec;
-    const series = [rp, vf, rec];
+    // 1. เตรียมข้อมูลพื้นฐาน
+    const seriesValues = [Number(rp) || 0, Number(vf) || 0, Number(rec) || 0];
     const labels = ['RP', 'VF', 'REC'];
     const colors = ['#ef4444', '#2563eb', '#f59e0b']; 
+    const total = seriesValues.reduce((a, b) => a + b, 0);
 
+    // ทำลายกราฟเก่าถ้ามีอยู่เพื่อป้องกันการซ้อนทับ
     if (execCharts.pie) execCharts.pie.destroy();
 
+    // เช็คโหมดปัจจุบัน (Dark/Light) เพื่อกำหนดสีตัวหนังสือภายใน Donut
+    const isDark = document.body.classList.contains('dark-mode');
+    const labelColor = isDark ? '#f8fafc' : '#1e293b';
+
     const chartOptions = {
-        series: series,
+        series: seriesValues,
         labels: labels,
         chart: {
             type: 'donut',
             width: '100%',
-            height: 150,      // ลดความสูงจองพื้นที่ลง
-            offsetY: -15,     // *** จุดสำคัญ: ดึงตัววงกลมให้ลอยขึ้นด้านบน ***
+            height: 150,      
+            offsetY: -15,     
             fontFamily: 'Inter, sans-serif',
             animations: { enabled: true, speed: 600 }
         },
         colors: colors,
-        stroke: { show: true, width: 2, colors: ['#ffffff'] },
+        stroke: { 
+            show: true, 
+            width: 2, 
+            colors: [isDark ? '#1e293b' : '#ffffff'] // ขอบของ Pie เปลี่ยนตามธีม
+        },
         plotOptions: {
             pie: {
-                customScale: 0.9, // ขยายวงให้ชัดแต่ไม่ล้น
+                customScale: 0.9, 
                 donut: {
                     size: '72%',
                     labels: {
                         show: true,
-                        name: { show: true, fontSize: '8px', fontWeight: 700, color: '#94a3b8', offsetY: -3 },
+                        name: { 
+                            show: true, 
+                            fontSize: '8px', 
+                            fontWeight: 700, 
+                            color: isDark ? '#94a3b8' : '#64748b', // สีชื่อกลางวง
+                            offsetY: -3 
+                        },
                         value: {
                             show: true,
-                            fontSize: '15px', // ตัวเลขตรงกลาง
+                            fontSize: '15px', 
                             fontWeight: 950,
-                            color: '#1e293b',
+                            color: labelColor, // สีตัวเลขกลางวง
                             offsetY: 3,
-                            formatter: (val) => val
+                            formatter: (val) => (val ? val.toLocaleString() : 0)
                         },
                         total: {
                             show: true,
                             label: 'TOTAL',
                             fontSize: '7px',
                             fontWeight: 800,
-                            formatter: (w) => w.globals.seriesTotals.reduce((a, b) => a + b, 0)
+                            color: isDark ? '#64748b' : '#94a3b8',
+                            formatter: (w) => {
+                                const sum = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                                return sum ? sum.toLocaleString() : 0;
+                            }
                         }
                     }
                 }
@@ -14555,34 +14591,83 @@ function renderExecPie(rp, vf, rec) {
         },
         dataLabels: { enabled: false },
         legend: { show: false },
-        tooltip: { y: { formatter: (val) => val + " รายการ" } }
+        tooltip: {
+            enabled: true,
+            theme: isDark ? 'dark' : 'light',
+            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                const val = series[dataPointIndex];
+                if (val === undefined || val === null) return ''; 
+
+                const label = w.config.labels[dataPointIndex];
+                const color = w.config.colors[dataPointIndex];
+                const totalVal = series.reduce((a, b) => a + b, 0);
+                const pct = totalVal > 0 ? ((val / totalVal) * 100).toFixed(1) : '0.0';
+
+                return `
+                    <div class="exec-pie-tooltip" style="padding: 8px; border-radius: 8px;">
+                        <div class="pie-tt-header" style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">📊 Report Distribution</div>
+                        <div class="pie-tt-body">
+                            <div class="pie-tt-row" style="display: flex; align-items: center; gap: 8px;">
+                                <span class="pie-tt-dot" style="width: 8px; height: 8px; border-radius: 50%; background-color:${color};"></span>
+                                <span style="font-weight: bold;">${label}:</span>
+                                <span>${Number(val).toLocaleString()} รายการ</span>
+                                <span style="color: #3b82f6;">(${pct}%)</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
     };
 
-    execCharts.pie = new ApexCharts(document.getElementById('exec-pie-chart'), chartOptions);
-    execCharts.pie.render();
+    // วาดกราฟลงใน Element
+    const chartEl = document.getElementById('exec-pie-chart');
+    if (chartEl) {
+        execCharts.pie = new ApexCharts(chartEl, chartOptions);
+        execCharts.pie.render();
+    }
 
-    // --- Legend แบบ Ultra Slim (ยกขึ้นมาโชว์ชัดๆ) ---
+// --- ส่วน Legend ภายนอก (อัปเดตใหม่เพื่อความชัดเจน) ---
     const legendEl = document.getElementById('exec-pie-legend');
     if (legendEl) {
+        // เช็คโหมดมืดอีกครั้งเพื่อกำหนดสี
+        const isDark = document.body.classList.contains('dark-mode');
+        const numColor = isDark ? '#ffffff' : '#1e293b'; // ขาวในโหมดมืด, ดำน้ำเงินในโหมดสว่าง
+        const boxBg = isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 0.8)';
+        const borderColor = isDark ? '#334155' : '#f1f5f9';
+
         legendEl.innerHTML = labels.map((l, i) => {
-            const pctVal = total > 0 ? (series[i] / total * 100).toFixed(1) : 0;
+            const pctVal = total > 0 ? (seriesValues[i] / total * 100).toFixed(1) : 0;
             const countId = `pie-count-val-${i}`;
-            const pctId = `pie-pct-val-${i}`;
 
             return `
-                <div class="flex flex-col items-center p-1 rounded-lg bg-slate-50/80 border border-slate-100 transition-all">
+                <div class="flex flex-col items-center p-1 rounded-lg transition-colors" 
+                     style="background: ${boxBg}; border: 1px solid ${borderColor};">
                     <div class="flex items-center gap-1 mb-0.5">
-                        <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:${colors[i]}"></span>
-                        <span class="text-[8px] font-black text-slate-500 uppercase">${l}</span>
+                        <span class="w-1.5 h-1.5 rounded-full" style="background:${colors[i]}"></span>
+                        <span class="text-[8px] font-black uppercase" style="color: ${isDark ? '#94a3b8' : '#64748b'};">${l}</span>
                     </div>
-                    <div id="${countId}" class="text-[13px] font-black text-slate-900 leading-tight">0</div>
-                    <div id="${pctId}" class="text-[7.5px] font-bold text-blue-600 mt-0.5">${pctVal}%</div>
+                    <!-- บังคับสีตัวเลขด้วย style="color: ${numColor}" -->
+                    <div id="${countId}" class="text-[14px] font-black leading-tight" 
+                         style="color: ${numColor};">0</div>
+                    <div class="text-[8px] font-bold" style="color: #3b82f6;">${pctVal}%</div>
                 </div>
             `;
         }).join('');
 
-        series.forEach((val, i) => {
-            animateValue(`pie-count-val-${i}`, val);
+        // ส่วนที่เหลือ (animateValue) คงเดิม...
+
+        // รันอนิเมชั่นตัวเลขวิ่ง
+        seriesValues.forEach((val, i) => {
+            const el = document.getElementById(`pie-count-val-${i}`);
+            if (el) {
+                const safeVal = val || 0; 
+                if (typeof animateValue === 'function') {
+                    animateValue(`pie-count-val-${i}`, 0, safeVal, 1000);
+                } else {
+                    el.textContent = safeVal.toLocaleString();
+                }
+            }
         });
     }
 }
@@ -15014,7 +15099,7 @@ function getUnifiedAttendanceStats(startDate, endDate) {
     };
 }
 
-/* วาดกราฟสถิติรายเดือน - เวอร์ชั่น Hybrid เสถียรสูง */
+/* วาดกราฟสถิติรายเดือน - เวอร์ชั่น Hybrid เสถียรสูง พร้อม Tooltip พรีเมียม */
 function initAttMonthlyChart() {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const year = attSelectedYear;
@@ -15124,9 +15209,6 @@ function initAttMonthlyChart() {
             axisTicks: { show: false },
             labels: {
                 show: true,
-                rotate: 0,
-                rotateAlways: false,
-                hideOverlappingLabels: false,
                 style: { colors: '#94a3b8', fontWeight: 700, fontSize: '11px' }
             }
         },
@@ -15139,39 +15221,60 @@ function initAttMonthlyChart() {
         grid: {
             borderColor: '#f1f5f9',
             strokeDashArray: 5,
-            padding: {
-                top: 0,
-                right: 10,
-                bottom: 2,
-                left: 10
-            }
+            padding: { top: 0, right: 10, bottom: 2, left: 10 }
         },
         legend: { show: false },
+        
+        // --- ส่วนที่ปรับปรุงใหม่: Custom Tooltip ---
         tooltip: {
-            theme: 'light',
+            enabled: true,
             shared: true,
             intersect: false,
-            y: { formatter: val => val + " วัน" }
+            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                const monthNamesFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                const mName = monthNamesFull[dataPointIndex];
+                
+                // ดึงค่าจากแต่ละ Series
+                const worked = series[0][dataPointIndex];
+                const leave = series[1][dataPointIndex];
+                const holiday = series[2][dataPointIndex];
+
+                return `
+                    <div class="att-chart-tooltip">
+                        <div class="tt-header">
+                            <span class="tt-icon">📅</span>
+                            <span class="tt-title">${mName} ${year}</span>
+                        </div>
+                        <div class="tt-content">
+                            <div class="tt-row">
+                                <div class="tt-label"><span class="tt-dot dot-worked"></span>วันทำงานจริง</div>
+                                <div class="tt-value">${worked} วัน</div>
+                            </div>
+                            <div class="tt-row">
+                                <div class="tt-label"><span class="tt-dot dot-leave"></span>วันลาสะสม</div>
+                                <div class="tt-value">${leave} วัน</div>
+                            </div>
+                            <div class="tt-row">
+                                <div class="tt-label"><span class="tt-dot dot-holiday"></span>วันหยุดนักขัตฯ</div>
+                                <div class="tt-value">${holiday} วัน</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         },
+        
         responsive: [
             {
                 breakpoint: 1024,
                 options: {
-                    xaxis: {
-                        labels: {
-                            style: { colors: '#94a3b8', fontWeight: 700, fontSize: '9px' }
-                        }
-                    }
+                    xaxis: { labels: { style: { fontSize: '9px' } } }
                 }
             },
             {
                 breakpoint: 768,
                 options: {
-                    xaxis: {
-                        labels: {
-                            style: { colors: '#94a3b8', fontWeight: 700, fontSize: '8px' }
-                        }
-                    }
+                    xaxis: { labels: { style: { fontSize: '8px' } } }
                 }
             }
         ]
@@ -15254,6 +15357,7 @@ const SUPPORT_PART_CATEGORIES = [
     "Electric Controls",
     "PCBA",
     "Compressors",
+    "Copper",
     "Printing part"
 ];
 
@@ -15896,7 +16000,31 @@ function applyDateFilter() {
 
         // 2. รายชื่อ Commander
         const existingCommanders = [...new Set((S.wapData.specialJobs || []).map(j => j.assigned_by).filter(Boolean))];
-        const commanderOptions = existingCommanders.map(name => `<option value="${_esc(name)}">`).join('');
+        // --- แก้ไขจุดเตรียมรายชื่อพนักงานสำหรับ Dropdown ผู้สั่งงาน ---
+
+// 1. รวบรวมรายชื่อพนักงานจากหน้า Admin และ Master List
+const allStaffNames = new Set();
+
+// ดึงจาก Master Baseline
+if (typeof MASTER_STAFF_USERS !== 'undefined') {
+    MASTER_STAFF_USERS.forEach(u => { if(u.name) allStaffNames.add(u.name.trim()); });
+}
+
+// ดึงจากข้อมูลพนักงานที่ Admin เพิ่ม/แก้ไข (Real-timeจากหน้า Admin Console)
+if (window.WapAdminSystem && window.WapAdminSystem._data && window.WapAdminSystem._data.users) {
+    window.WapAdminSystem._data.users.forEach(u => {
+        const name = (u.display_name || u.name || "").trim();
+        if (name) allStaffNames.add(name);
+    });
+}
+
+// แปลงเป็น Array และเรียงลำดับ ก-ฮ / A-Z
+const sortedStaffList = Array.from(allStaffNames).sort();
+
+// 2. สร้าง HTML Options สำหรับ Select
+const commanderOptionsHtml = sortedStaffList.map(name => 
+    `<option value="${name}" ${r.assigned_by === name ? 'selected' : ''}>${name}</option>`
+).join('');
 
         // 3. --- Smart Part Master Map & Lookup ---
         const partMapByNo = {};
@@ -16328,12 +16456,21 @@ function applyDateFilter() {
                                     </div>
                                     <div style="flex:1;">
                                         <p style="font-size:10.5px; font-weight:800; color:#1e293b; margin:0; text-transform:uppercase;">บันทึกเป็นภารกิจพิเศษ</p>
-                                        <div style="margin-top:3px; display:none;" id="commander-input-wrap">
-                                            <input type="text" id="sync-commander-name" list="commander-list" 
-                                                   placeholder="ชื่อผู้สั่งงาน (Commander)..."
-                                                   style="width:100%; height:26px; font-size:10px; border:1px solid #dbeafe; border-radius:6px; padding:0 8px; outline:none; background:#fff; font-weight:600; color:#2563eb;" title="Commander" aria-label="Commander">
-                                            <datalist id="commander-list">${commanderOptions}</datalist>
-                                        </div>
+<div style="margin-top:3px; display:none;" id="commander-input-wrap">
+    <!-- ใช้โครงสร้างเดียวกับ Part No เพื่อให้ Dropdown แสดงผลตรงตำแหน่ง -->
+    <div class="form-input-wrap" style="position:relative;">
+        <input type="text" id="sync-commander-name" 
+               value="${r.assigned_by || ''}" 
+               placeholder="🔍 ค้นหาหรือเลือกชื่อผู้สั่งงาน..." 
+               class="form-input" 
+               style="width:100%; height:32px; font-size:11px; font-weight:700; color:#1e40af;" 
+               oninput="renderModalAC('commander', this)" 
+               onfocus="renderModalAC('commander', this)"
+               onclick="renderModalAC('commander', this)"
+               autocomplete="off" 
+               title="Commander" aria-label="Commander">
+    </div>
+</div>
                                     </div>
                                 </div>
                                 <label class="premium-toggle">
@@ -18779,15 +18916,38 @@ const Wap5SExcellence = (function() {
                 show: false,
                 padding: { left: 0, right: 0 }
             },
-            tooltip: { 
-                theme: 'dark',
-                y: { formatter: (val) => val + " Points" }
+            // --- ส่วนที่แก้ไข: Custom Tooltip ---
+            tooltip: {
+                enabled: true,
+                shared: false,
+                intersect: false,
+                custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                    const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                    const mName = monthsFull[dataPointIndex];
+                    const val = series[seriesIndex][dataPointIndex];
+                    const currentYear = new Date().getFullYear(); 
+
+                    return `
+                        <div class="s5-custom-tooltip">
+                            <div class="s5-tt-header">📅 ${mName} ${currentYear}</div>
+                            <div class="s5-tt-body">
+                                <div class="s5-tt-row">
+                                    <div class="s5-tt-label">
+                                        <span class="s5-tt-dot"></span>
+                                        <span>จุดที่พบ (Findings)</span>
+                                    </div>
+                                    <div class="s5-tt-val">${val} <small>Points</small></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
             }
         });
         _chart.render();
     }
 
-    function renderRanking() {
+function renderRanking() {
         const areaStats = {};
         _filteredRecords.forEach(r => {
             const area = r.area || r.location || 'Unknown';
@@ -18812,10 +18972,12 @@ const Wap5SExcellence = (function() {
                     <div class="flex justify-between items-end mb-1.5">
                         <div class="flex items-center gap-2 overflow-hidden">
                             <span class="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-black text-slate-500 dark:text-slate-400">${i + 1}</span>
-                            <span class="text-[11px] font-black text-slate-700 dark:text-slate-200 truncate uppercase tracking-tight">${escapeHtml(item[0])}</span>
+                            <!-- แก้ไขจุดที่ 1: เปลี่ยนเป็น dark:text-white -->
+                            <span class="text-[11px] font-black text-slate-700 dark:text-white truncate uppercase tracking-tight">${escapeHtml(item[0])}</span>
                         </div>
                         <div class="flex items-baseline gap-1 flex-shrink-0 ml-4">
-                            <span id="${rowId}" class="text-[15px] font-black text-slate-900 dark:text-slate-100 leading-none">0</span>
+                            <!-- แก้ไขจุดที่ 2: เปลี่ยนเป็น dark:text-white เพื่อให้ตัวเลขคะแนนชัดขึ้นด้วย -->
+                            <span id="${rowId}" class="text-[15px] font-black text-slate-900 dark:text-white leading-none">0</span>
                             <span class="text-[8px] font-black text-slate-400 uppercase tracking-tighter">PTS</span>
                         </div>
                     </div>
@@ -18921,34 +19083,38 @@ const Wap5SExcellence = (function() {
             }
 
             return `
-                <tr class="s5-table-row ${isCurrentEditing ? 'bg-orange-50/70 dark:bg-orange-950/30' : ''} border-b border-slate-100 dark:border-slate-800/60 last:border-0 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors" data-rid="${r.id}">
-                    <td class="py-3 px-3">
-                        <div class="flex items-center gap-1.5">
-                            <span class="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0"></span>
-                            <span class="text-[11px] font-black text-slate-800 dark:text-slate-100 leading-tight uppercase tracking-tight truncate">${area}</span>
-                        </div>
-                    </td>
-                    <td style="text-align:center" class="py-3 px-2">
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900 font-black text-[9px]">
-                            ${points} PTS
-                        </span>
-                    </td>
-                    <td class="py-3 px-3">
-                        <p class="text-[10px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed line-clamp-1 cursor-pointer" title="${detail}" onclick="Wap5SExcellence.view('${r.id}')">
-                            ${detail}
-                        </p>
-                    </td>
-                    <td class="py-3 px-3">
-                        <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">${auditor}</span>
-                    </td>
-                    <td class="py-3 px-3 text-center">
-                        <span class="font-mono text-[9px] text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">${month}</span>
-                    </td>
-                    <td class="py-3 px-3 text-right">
-                        ${actionButtons}
-                    </td>
-                </tr>
-            `;
+    <tr class="s5-table-row ${isCurrentEditing ? 'bg-orange-50/70 dark:bg-orange-950/30' : ''} border-b border-slate-100 dark:border-slate-800/60 last:border-0 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors" data-rid="${r.id}">
+        <td class="py-3 px-3">
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0"></span>
+                <!-- 1. ชื่อแผนก: เปลี่ยนเป็น dark:text-white -->
+                <span class="text-[11px] font-black text-slate-800 dark:text-white leading-tight uppercase tracking-tight truncate">${area}</span>
+            </div>
+        </td>
+        <td style="text-align:center" class="py-3 px-2">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900 font-black text-[9px]">
+                ${points} PTS
+            </span>
+        </td>
+        <td class="py-3 px-3">
+            <!-- 2. รายละเอียด: เปลี่ยนเป็น dark:text-slate-50 (ขาวนวล) -->
+            <p class="text-[10px] text-slate-600 dark:text-slate-50 font-medium leading-relaxed line-clamp-1 cursor-pointer" title="${detail}" onclick="Wap5SExcellence.view('${r.id}')">
+                ${detail}
+            </p>
+        </td>
+        <td class="py-3 px-3">
+            <!-- 3. ชื่อผู้ตรวจ: เปลี่ยนเป็น dark:text-slate-200 (เทาสว่างมาก) -->
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-200 uppercase tracking-tighter">${auditor}</span>
+        </td>
+        <td class="py-3 px-3 text-center">
+            <!-- 4. เดือน: เปลี่ยนเป็น dark:text-slate-300 -->
+            <span class="font-mono text-[9px] text-slate-400 dark:text-slate-300 font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">${month}</span>
+        </td>
+        <td class="py-3 px-3 text-right">
+            ${actionButtons}
+        </td>
+    </tr>
+`;
         }).join('');
 
         if (typeof window.animateTableRows === 'function') {
@@ -19091,20 +19257,21 @@ const Wap5SExcellence = (function() {
             let saveMethod = '';
 
             if (navigator.onLine) {
-                if (isEditing) {
-                    const { error } = await wapClient
-                        .from(TABLE)
-                        .update({
-                            area: payload.area,
-                            issue_count: payload.issue_count,
-                            detail: payload.detail,
-                            owner: payload.owner,
-                            month: payload.month,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('id', recordId);
-                    if (error) throw error;
-                } else {
+ // ค้นหาในส่วนของ isEditing ภายในฟังก์ชัน submit
+if (isEditing) {
+    const { error } = await wapClient
+        .from(TABLE)
+        .update({
+            area: payload.area,
+            issue_count: payload.issue_count,
+            detail: payload.detail,
+            owner: payload.owner,
+            month: payload.month,
+            // updated_at: new Date().toISOString() <--- ลบบรรทัดนี้ทิ้ง หรือคอมเมนต์ไว้
+        })
+        .eq('id', recordId);
+    if (error) throw error;
+} else {
                     const { error } = await wapClient.from(TABLE).insert([payload]);
                     if (error) throw error;
                 }
@@ -19695,62 +19862,97 @@ const WapSkillMatrix = (function() {
         }
     }
 
-    function renderRadar() {
-        const chartEl = document.getElementById('sm-radar-chart');
-        if (!chartEl) return;
-        if (_charts.radar) { _charts.radar.destroy(); _charts.radar = null; }
+function renderRadar() {
+    const chartEl = document.getElementById('sm-radar-chart');
+    if (!chartEl) return;
+    if (_charts.radar) { _charts.radar.destroy(); _charts.radar = null; }
 
-        if (_records.length === 0) {
-            chartEl.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-400 text-center py-6"><p class="text-[10px] font-black uppercase tracking-widest">No Skill Data Available</p></div>`;
-            return;
-        }
-
-        const isDark = document.body.classList.contains('dark-mode');
-        const categories = _records.slice(0, 10).map(r => r.skill_name);
-        const dataVals = _records.slice(0, 10).map(r => r.skill_value || 0);
-
-        const options = {
-            series: [{ name: 'Proficiency Level', data: dataVals }],
-            chart: { 
-                type: 'radar', 
-                height: 200, 
-                toolbar: { show: false },
-                parentHeightOffset: 0
-            },
-            colors: ['#3b82f6'],
-            fill: {
-                type: 'gradient',
-                gradient: { shade: 'dark', gradientToColors: ['#10b981'], shadeIntensity: 1, opacityFrom: 0.5, opacityTo: 0.15 }
-            },
-            markers: { size: 3, colors: ['#2563eb'], strokeColors: '#ffffff', strokeWidth: 1.5, hover: { size: 5 } },
-            plotOptions: {
-                radar: {
-                    size: 70,
-                    polygons: {
-                        strokeColors: isDark ? '#334155' : '#e2e8f0',
-                        connectorColors: isDark ? '#334155' : '#e2e8f0',
-                        fill: { colors: isDark ? ['#0f172a', '#1e293b'] : ['#f8fafc', '#ffffff'] }
-                    }
-                }
-            },
-            xaxis: {
-                categories: categories,
-                labels: { 
-                    show: true,
-                    style: { fontSize: '8.5px', fontWeight: 800, colors: isDark ? '#94a3b8' : '#64748b' },
-                    formatter: function(val) {
-                        if (!val) return '';
-                        return val.length > 12 ? val.substring(0, 10) + '…' : val;
-                    }
-                }
-            },
-            yaxis: { show: false, max: 100, tickAmount: 4 },
-            tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (val) => val + "%" } }
-        };
-
-        _charts.radar = new ApexCharts(chartEl, options);
-        setTimeout(() => { if (_charts.radar) _charts.radar.render(); }, 20);
+    if (_records.length === 0) {
+        chartEl.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-400 text-center py-6"><p class="text-[10px] font-black uppercase tracking-widest">No Skill Data Available</p></div>`;
+        return;
     }
+
+    const isDark = document.body.classList.contains('dark-mode');
+    const categories = _records.slice(0, 10).map(r => r.skill_name);
+    const dataVals = _records.slice(0, 10).map(r => r.skill_value || 0);
+
+    const options = {
+        series: [{ name: 'Proficiency Level', data: dataVals }],
+        chart: { 
+            type: 'radar', 
+            height: 220, // ปรับความสูงเพิ่มนิดนึงเพื่อให้ Label ไม่เบียด
+            toolbar: { show: false },
+            parentHeightOffset: 0,
+            dropShadow: { enabled: true, blur: 8, left: 1, top: 1, opacity: 0.2 }
+        },
+        colors: [isDark ? '#60a5fa' : '#2563eb'], // สีเส้นกราฟ (ฟ้าสว่างขึ้นในโหมดมืด)
+        fill: {
+            type: 'gradient',
+            gradient: { 
+                shade: 'dark', 
+                gradientToColors: [isDark ? '#34d399' : '#10b981'], 
+                shadeIntensity: 1, 
+                opacityFrom: 0.6, 
+                opacityTo: 0.2 
+            }
+        },
+        markers: { 
+            size: 4, 
+            colors: [isDark ? '#60a5fa' : '#2563eb'], 
+            strokeColors: isDark ? '#1e293b' : '#ffffff', 
+            strokeWidth: 2, 
+            hover: { size: 6 } 
+        },
+        plotOptions: {
+            radar: {
+                size: 75,
+                polygons: {
+                    strokeColors: isDark ? '#334155' : '#e2e8f0', // สีเส้นตารางข้างใน
+                    connectorColors: isDark ? '#334155' : '#e2e8f0',
+                    fill: { colors: isDark ? ['#0f172a', '#1e293b'] : ['#f8fafc', '#ffffff'] }
+                }
+            }
+        },
+        xaxis: {
+            categories: categories,
+            labels: { 
+                show: true,
+                style: { 
+                    // แก้จุดนี้: ปรับสีตัวหนังสือรอบกราฟให้สว่างขึ้นมากในโหมดมืด
+                    fontSize: '9px', 
+                    fontWeight: 800, 
+                    colors: Array(10).fill(isDark ? '#cbd5e1' : '#475569'), // ใช้สีเทาขาว (#cbd5e1)
+                    fontFamily: 'Inter, sans-serif'
+                },
+                formatter: function(val) {
+                    if (!val) return '';
+                    return val.length > 12 ? val.substring(0, 10) + '…' : val;
+                }
+            }
+        },
+        yaxis: { show: false, max: 100, tickAmount: 4 },
+        // แก้จุดนี้: ทำ Custom Tooltip ให้เหมือนกับ Pie Chart
+        tooltip: {
+            enabled: true,
+            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                const val = series[seriesIndex][dataPointIndex];
+                const label = w.globals.labels[dataPointIndex];
+                return `
+                    <div class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg shadow-xl" style="font-family: 'Inter', sans-serif;">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">${label}</div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                            <div class="text-white text-sm font-black">Level: ${val}%</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    };
+
+    _charts.radar = new ApexCharts(chartEl, options);
+    setTimeout(() => { if (_charts.radar) _charts.radar.render(); }, 20);
+}
 
     function renderBarChart() {
         const chartEl = document.getElementById('sm-bar-chart');
@@ -20390,46 +20592,40 @@ function calcHours() {
 
     if (!startEl || !endEl) return { raw: 0, actual: 0 };
 
-    // 1. ดึงค่าและเปลี่ยนจุด (.) เป็นโคลอน (:) เพื่อป้องกัน NaN
+    // แปลงจุดเป็นโคลอน และจัดการช่องว่าง
     let start = startEl.value.trim().replace('.', ':');
     let end = endEl.value.trim().replace('.', ':');
     const breakMin = breakEl ? (parseInt(breakEl.value) || 0) : 0;
 
-    // ตรวจสอบรูปแบบเวลา (HH:mm)
-    const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
-    
-    // กรณีพิเศษรองรับ 24:00 หรือ 00:00
-    const isValidStart = timeRegex.test(start) || start === "00:00";
-    const isValidEnd = timeRegex.test(end) || end === "24:00" || end === "00:00";
+    if (!start || !end) return { raw: 0, actual: 0 };
 
-    if (!isValidStart || !isValidEnd) {
+    // ฟังก์ชันช่วยแปลง HH:mm เป็นนาที (รองรับทั้ง 8:00 และ 08:00)
+    const timeToMins = (t) => {
+        const p = t.split(':');
+        if (p.length < 2) return null;
+        const h = parseInt(p[0]) || 0;
+        const m = parseInt(p[1]) || 0;
+        return (h * 60) + m;
+    };
+
+    let startTotal = timeToMins(start);
+    let endTotal = timeToMins(end);
+
+    if (startTotal === null || endTotal === null) {
         if (outEl) outEl.textContent = '0.00';
         return { raw: 0, actual: 0 };
     }
 
-    // 2. แปลงเวลาเป็นนาที
-    const startParts = (start || "00:00").split(':').map(Number);
-    const endParts = (end || "00:00").split(':').map(Number);
-    const sh = startParts[0] || 0;
-    const sm = startParts[1] || 0;
-    let eh = endParts[0] || 0;
-    let em = endParts[1] || 0;
-
-    // ถ้าจบที่ 00:00 ให้ถือว่าเป็น 24:00 (ข้ามวัน)
-    if (eh === 0 && em === 0) eh = 24;
-
-    let startTotal = (sh * 60) + sm;
-    let endTotal = (eh * 60) + em;
-
-    // ถ้าเวลาเลิกงานน้อยกว่าเวลาเริ่ม (เข้ากะดึก) ให้บวกไปอีก 24 ชม.
-    if (endTotal <= startTotal) endTotal += 1440;
+    // กรณีทำงานข้ามเที่ยงคืน (เช่น 22:00 ถึง 02:00)
+    if (endTotal <= startTotal) endTotal += 1440; 
 
     const diffMins = endTotal - startTotal;
     const actualHours = Math.max(0, (diffMins - breakMin) / 60);
 
-    // 3. แสดงผล
     if (outEl) {
         outEl.textContent = actualHours.toFixed(2);
+        // เพิ่มลูกเล่น: ถ้ามีชั่วโมงขึ้น ให้ช่องเป็นสีเขียว
+        outEl.style.color = actualHours > 0 ? '#2563eb' : '#94a3b8';
     }
 
     return { raw: diffMins / 60, actual: actualHours };
@@ -20724,253 +20920,218 @@ function calcYStep(yMax) {
     return 20;
 }
 
-// --- วาดกราฟวิเคราะห์ ---
-    function renderCharts() {
-        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        const mData = new Array(12).fill(0);
-        
-        // ใช้ _allRecords สำหรับกราฟเทรนด์ เพื่อให้เห็นภาพรวมทั้งปีเสมอ
-        _allRecords.forEach(r => {
-            const d = new Date(r.date);
-            if (!isNaN(d.getTime())) mData[d.getMonth()] += parseFloat(r.actual_hours);
-        });
+/**
+ * ฟังก์ชันวาดกราฟวิเคราะห์หน้า OT Management
+ * ประกอบด้วย: 1. OT Trend (Bar) และ 2. OT Distribution (Donut Gauge)
+ */
+function renderCharts() {
+    // 1. เตรียมข้อมูลพื้นฐาน
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const mData = new Array(12).fill(0);
+    const isDark = document.body.classList.contains('dark-mode');
 
-        // 1. กราฟแท่ง Trend
-        if (_charts.trend) _charts.trend.destroy();
-        _charts.trend = new ApexCharts($id('ot-trend-chart'), {
-            series: [{ name: 'Hours', data: mData }],
-            chart: { 
-                type: 'bar', 
-                height: '100%', 
-                toolbar: {show:false},
-                animations: { enabled: true, easing: 'easeinout', speed: 800 }
+    // คำนวณข้อมูลสำหรับกราฟแท่ง (Trend) - ใช้ข้อมูลทั้งหมดของปี
+    _allRecords.forEach(r => {
+        const d = new Date(r.date);
+        if (!isNaN(d.getTime())) {
+            mData[d.getMonth()] += parseFloat(r.actual_hours || 0);
+        }
+    });
+
+    // คำนวณข้อมูลสำหรับกราฟวงกลม (Distribution) - ใช้ข้อมูลที่ถูก Filter แล้ว
+    const distData = [0, 0, 0]; // Index: 0 = 1.5, 1 = 1.0, 2 = 3.0
+    _filteredRecords.forEach(r => {
+        const rate = parseFloat(r.type_rate);
+        if (rate === 1.5) distData[0]++;
+        else if (rate === 1.0) distData[1]++;
+        else if (rate === 3.0) distData[2]++;
+    });
+
+    const totalSessions = distData.reduce((a, b) => a + b, 0);
+
+    // ==========================================
+    // 1. กราฟแท่ง OT Trend (Bar Chart)
+    // ==========================================
+    if (_charts.trend) _charts.trend.destroy();
+    
+    const trendOptions = {
+        series: [{ name: 'OT Hours', data: mData }],
+        chart: { 
+            type: 'bar', 
+            height: '100%', 
+            toolbar: { show: false },
+            fontFamily: 'Inter, sans-serif',
+            animations: { enabled: true, easing: 'easeinout', speed: 800 }
+        },
+        plotOptions: { 
+            bar: { 
+                borderRadius: 5, 
+                columnWidth: '50%',
+                dataLabels: { position: 'top' } 
+            } 
+        },
+        dataLabels: {
+            enabled: true,
+            offsetY: -22,
+            style: { 
+                fontSize: '10px', 
+                colors: [isDark ? '#f8fafc' : '#475569'], // ปรับสีตาม Theme
+                fontWeight: 800 
             },
-            plotOptions: { 
-                bar: { 
-                    borderRadius: 4, 
-                    columnWidth: '50%',
-                    dataLabels: { position: 'top' } 
+            formatter: (val) => val > 0 ? val.toFixed(1) : ''
+        },
+        colors: [isDark ? '#60a5fa' : '#2563eb'],
+        xaxis: { 
+            categories: months,
+            labels: { 
+                style: { 
+                    colors: isDark ? '#94a3b8' : '#64748b', 
+                    fontSize: '10px', 
+                    fontWeight: 600 
                 } 
             },
-            dataLabels: {
-                enabled: true,
-                offsetY: -20,
-                style: { fontSize: '10px', colors: ["#475569"], fontWeight: 700 },
-                formatter: (val) => val > 0 ? val.toFixed(1) : '' // ตัวเลขบนยอดแท่งให้มี 1 ตำแหน่งพอ
-            },
-            colors: ['#3b82f6'],
-            xaxis: { 
-                categories: months,
-                labels: { style: { colors: '#94a3b8', fontSize: '10px', fontWeight: 600 } }
-            },
-            
-            // >>> [จุดที่แก้ไข] ลบทศนิยมยาวๆ ที่แกน Y <<<
-            yaxis: {
-                labels: {
-                    formatter: (val) => val.toFixed(0), // บังคับแสดงเป็นเลขจำนวนเต็ม
-                    style: { colors: '#94a3b8', fontSize: '10px', fontWeight: 600 }
-                }
-            },
-            
-            annotations: {
-                yaxis: [{ 
-                    y: _targetValue, 
-                    borderColor: '#ef4444', 
-                    strokeDashArray: 4,
-                    label: { 
-                        text: 'LIMIT: ' + _targetValue + ' hrs',
-                        style: { color: '#fff', background: '#ef4444', fontSize: '10px', fontWeight: 800 }
-                    } 
-                }]
-            },
-            grid: { borderColor: '#f1f5f9', strokeDashArray: 4 }
-        });
-        _charts.trend.render();
-
-// --- 2. กราฟวงกลม Distribution (ออกแบบสไตล์ Quality Performance Gauge) ---
-const distData = [0, 0, 0]; // 1.5, 1.0, 3.0
-_filteredRecords.forEach(r => {
-    if(r.type_rate == 1.5) distData[0]++;
-    else if(r.type_rate == 1.0) distData[1]++;
-    else if(r.type_rate == 3.0) distData[2]++;
-});
-
-const totalSessions = distData.reduce((a, b) => a + b, 0);
-
-if (_charts.dist) _charts.dist.destroy();
-
-_charts.dist = new ApexCharts($id('ot-dist-chart'), {
-    series: distData,
-    labels: ['วันปกติ (x1.5)', 'วันเสาร์ (x1.0)', 'วันหยุด (x3.0)'],
-    chart: { 
-        type: 'donut', 
-        height: '100%',
-        width: '100%',
-        toolbar: { show: false }, // ซ่อนเมนู 3 จุดไม่ให้บังกราฟ
-        sparkline: { enabled: false },
-        parentHeightOffset: 0,
-        animations: { 
-            enabled: true, 
-            speed: 800,
-            animateGradually: { enabled: true, delay: 150 }
-        }
-    },
-    // สีสไตล์ Quality Performance Gauge (Indigo Blue, Emerald Green, Amber)
-    colors: ['#3b82f6', '#10b981', '#f59e0b'],
-    stroke: { 
-        width: 3, 
-        colors: ['#ffffff'],
-        lineCap: 'round'
-    },
-    plotOptions: {
-        pie: {
-            startAngle: -90,
-            endAngle: 90,
-            offsetY: 12,
-            expandOnClick: false,
-            donut: {
-                size: '78%',
-                labels: {
-                    show: true,
-                    name: {
-                        show: true,
-                        fontSize: '10px',
-                        fontWeight: 800,
-                        color: '#64748b',
-                        offsetY: -14
-                    },
-                    value: {
-                        show: true,
-                        fontSize: '22px',
-                        fontWeight: 900,
-                        color: '#1e293b',
-                        offsetY: -2,
-                        formatter: (v) => {
-                            return totalSessions > 0 ? Math.round((v / totalSessions) * 100) + '%' : '0%';
-                        }
-                    },
-                    total: {
-                        show: true,
-                        label: 'OT RATIO',
-                        fontSize: '9px',
-                        fontWeight: 900,
-                        color: '#3b82f6',
-                        formatter: (w) => {
-                            const totals = w.globals.seriesTotals;
-                            const sum = totals ? totals.reduce((a, b) => a + b, 0) : 0;
-                            return sum > 0 ? Math.round((totals[0] / sum) * 100) + '%' : '0%';
-                        }
-                    }
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+        },
+        yaxis: {
+            labels: {
+                formatter: (val) => val.toFixed(0),
+                style: { 
+                    colors: isDark ? '#94a3b8' : '#64748b', 
+                    fontSize: '10px', 
+                    fontWeight: 600 
                 }
             }
-        }
-    },
-    dataLabels: {
-        enabled: true,
-        formatter: (val) => val > 0 ? val.toFixed(0) + "%" : "",
-        style: {
-            fontSize: '9px',
-            fontWeight: 800,
-            colors: ['#ffffff']
         },
-        dropShadow: { enabled: false }
-    },
-    legend: { 
-        show: true,
-        position: 'bottom',
-        horizontalAlign: 'center',
-        floating: false,
-        fontSize: '10px',
-        fontWeight: 700,
-        offsetY: 4,
-        itemMargin: { horizontal: 6, vertical: 0 },
-        markers: { radius: 12, width: 8, height: 8 },
-        labels: { colors: '#64748b' }
-    },
-    tooltip: { 
-        theme: 'dark',
-        y: { formatter: (v) => v + " รายการ" }
-    },
-    responsive: [
-        {
-            breakpoint: 768,
-            options: {
-                dataLabels: { enabled: false }, // ซ่อนตัวหนังสือบนชิ้นวงกลมเมื่อจอเล็ก
-                plotOptions: {
-                    pie: {
-                        donut: {
-                            size: '78%',
-                            labels: {
-                                show: true,
-                                name: { show: false }, // ซ่อนตัวหนังสือชื่อ
-                                total: { show: false }, // ซ่อนตัวหนังสือหัวข้อ
-                                value: {
-                                    show: true,
-                                    fontSize: '20px',
-                                    fontWeight: 900,
-                                    offsetY: -2,
-                                    formatter: (w) => {
-                                        const totals = w.globals.seriesTotals;
-                                        const sum = totals ? totals.reduce((a, b) => a + b, 0) : 0;
-                                        return sum > 0 ? Math.round((totals[0] / sum) * 100) + '%' : '0%';
-                                    }
-                                }
+        tooltip: {
+            enabled: true,
+            theme: isDark ? 'dark' : 'light',
+            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                const val = series[seriesIndex][dataPointIndex];
+                const monthName = w.globals.labels[dataPointIndex];
+                return `
+                    <div class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg shadow-xl">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">${monthName} Analysis</div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                            <div class="text-white text-sm font-black">${val.toLocaleString()} <small class="text-[10px] font-normal text-slate-400">HRS</small></div>
+                        </div>
+                    </div>
+                `;
+            }
+        },
+        annotations: {
+            yaxis: [{ 
+                y: _targetValue, 
+                borderColor: '#ef4444', 
+                strokeDashArray: 4,
+                label: { 
+                    text: 'LIMIT: ' + _targetValue + ' HRS',
+                    style: { color: '#fff', background: '#ef4444', fontSize: '10px', fontWeight: 900 }
+                } 
+            }]
+        },
+        grid: { 
+            borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9', 
+            strokeDashArray: 4 
+        }
+    };
+
+    _charts.trend = new ApexCharts($id('ot-trend-chart'), trendOptions);
+    _charts.trend.render();
+
+    // ==========================================
+    // 2. กราฟวงกลม Distribution (Donut Gauge)
+    // ==========================================
+    if (_charts.dist) _charts.dist.destroy();
+
+    const distOptions = {
+        series: distData,
+        labels: ['วันปกติ (x1.5)', 'วันเสาร์ (x1.0)', 'วันหยุด (x3.0)'],
+        chart: { 
+            type: 'donut', 
+            height: '100%',
+            toolbar: { show: false },
+            animations: { enabled: true, speed: 800 }
+        },
+        colors: ['#3b82f6', '#10b981', '#f59e0b'], // Blue, Emerald, Amber
+        stroke: { 
+            width: isDark ? 2 : 3, 
+            colors: [isDark ? '#1e293b' : '#ffffff'] 
+        },
+        plotOptions: {
+            pie: {
+                startAngle: -90,
+                endAngle: 90,
+                offsetY: 15,
+                donut: {
+                    size: '78%',
+                    labels: {
+                        show: true,
+                        name: {
+                            show: true,
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            color: isDark ? '#94a3b8' : '#64748b',
+                            offsetY: -14
+                        },
+                        value: {
+                            show: true,
+                            fontSize: '22px',
+                            fontWeight: 900,
+                            color: isDark ? '#f8fafc' : '#1e293b',
+                            offsetY: -2,
+                            formatter: (v) => totalSessions > 0 ? Math.round((v / totalSessions) * 100) + '%' : '0%'
+                        },
+                        total: {
+                            show: true,
+                            label: 'OT RATIO',
+                            fontSize: '9px',
+                            fontWeight: 900,
+                            color: '#3b82f6',
+                            formatter: (w) => {
+                                const totals = w.globals.seriesTotals;
+                                const sum = totals ? totals.reduce((a, b) => a + b, 0) : 0;
+                                // คำนวณสัดส่วนของ x1.5 เป็นหลัก (หรือจะปรับเป็นยอดรวมก็ได้)
+                                return sum > 0 ? Math.round((totals[0] / sum) * 100) + '%' : '0%';
                             }
                         }
                     }
-                },
-                legend: {
-                    position: 'bottom',
-                    horizontalAlign: 'center',
-                    fontSize: '9px',
-                    itemMargin: { horizontal: 4, vertical: 0 },
-                    formatter: function(seriesName) {
-                        return seriesName.split(' ')[0]; // แสดง 'วันปกติ', 'วันเสาร์', 'วันหยุด'
-                    }
                 }
             }
         },
-        {
+        dataLabels: {
+            enabled: true,
+            formatter: (val) => val > 0 ? val.toFixed(0) + "%" : "",
+            style: { fontSize: '9px', fontWeight: 800, colors: ['#ffffff'] },
+            dropShadow: { enabled: false }
+        },
+        legend: { 
+            show: true,
+            position: 'bottom',
+            fontSize: '10px',
+            fontWeight: 700,
+            labels: { colors: isDark ? '#cbd5e1' : '#64748b' },
+            markers: { radius: 12, width: 8, height: 8 },
+            itemMargin: { horizontal: 8, vertical: 0 }
+        },
+        tooltip: { 
+            theme: 'dark',
+            y: { formatter: (v) => v + " รายการ" }
+        },
+        // การปรับแต่งสำหรับมือถือ
+        responsive: [{
             breakpoint: 480,
             options: {
-                dataLabels: { enabled: false },
-                plotOptions: {
-                    pie: {
-                        donut: {
-                            size: '76%',
-                            labels: {
-                                show: true,
-                                name: { show: false },
-                                total: { show: false },
-                                value: {
-                                    show: true,
-                                    fontSize: '18px',
-                                    fontWeight: 900,
-                                    offsetY: -2,
-                                    formatter: (w) => {
-                                        const totals = w.globals.seriesTotals;
-                                        const sum = totals ? totals.reduce((a, b) => a + b, 0) : 0;
-                                        return sum > 0 ? Math.round((totals[0] / sum) * 100) + '%' : '0%';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                legend: {
-                    fontSize: '8px',
-                    itemMargin: { horizontal: 3, vertical: 0 },
-                    formatter: function(seriesName) {
-                        return seriesName.split(' ')[0];
-                    }
-                }
+                legend: { fontSize: '9px', itemMargin: { horizontal: 4 } },
+                plotOptions: { pie: { donut: { labels: { value: { fontSize: '18px' } } } } }
             }
-        }
-    ]
-});
+        }]
+    };
 
-_charts.dist.render();
-    }
+    _charts.dist = new ApexCharts($id('ot-dist-chart'), distOptions);
+    _charts.dist.render();
+}
 
 
 function renderTable() {
@@ -21230,7 +21391,7 @@ function renderTable() {
     }
     if (typeof reapplyKbdRowSelection === 'function') reapplyKbdRowSelection();
 }
-    function renderCharts() {
+function renderCharts() {
     // ==========================================
     // 1. เตรียมข้อมูลสำหรับทั้ง 2 กราฟ
     // ==========================================
@@ -21269,9 +21430,9 @@ function renderTable() {
             plotOptions: {
                 bar: {
                     horizontal: true,
-                    borderRadius: 6, // ทำขอบมนแบบแคปซูล
+                    borderRadius: 6,
                     distributed: true,
-                    barHeight: '35%', // ทำให้แท่งดูเพรียวบางล้ำสมัย
+                    barHeight: '35%',
                     dataLabels: { position: 'right' }
                 }
             },
@@ -21288,32 +21449,43 @@ function renderTable() {
                     style: { 
                         fontSize: '10px', 
                         fontWeight: 900, 
-                        colors: '#64748b' // สีเทา Slate
+                        colors: '#64748b'
                     },
                     maxWidth: 120
                 }
             },
             grid: {
                 show: false,
-                padding: {
-                    top: -20, // ขยับกราฟขึ้นให้กึ่งกลางกล่อง
-                    right: 60, // เผื่อพื้นที่ให้ Data Label ด้านขวาไม่หลุดขอบ
-                    left: 10,
-                    bottom: 0
-                }
+                padding: { top: -20, right: 60, left: 10, bottom: 0 }
             },
             legend: { show: false },
             dataLabels: {
                 enabled: true,
-                style: { 
-                    fontSize: '11px', 
-                    fontWeight: 950, 
-                    colors: ['#475569'] 
-                },
-                offsetX: 45, // ดันตัวเลขออกไปห่างจากปลายแท่งเล็กน้อย
+                style: { fontSize: '11px', fontWeight: 950, colors: ['#475569'] },
+                offsetX: 45,
                 formatter: (val) => val + " งาน"
             },
-            tooltip: { theme: 'dark' },
+            // --- [CUSTOM TOOLTIP: WORKLOAD] ---
+            tooltip: {
+                enabled: true,
+                custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                    const name = w.globals.labels[dataPointIndex];
+                    const val = series[seriesIndex][dataPointIndex];
+                    const color = w.globals.colors[dataPointIndex];
+                    return `
+                        <div class="sj-custom-tooltip">
+                            <div class="sj-tt-header">📊 Workload Insight</div>
+                            <div class="sj-tt-row">
+                                <div class="sj-tt-label">
+                                    <span class="sj-tt-dot" style="background-color:${color}; box-shadow: 0 0 8px ${color}66;"></span>
+                                    <span>${name}</span>
+                                </div>
+                                <div class="sj-tt-val">${val} <small>งาน</small></div>
+                            </div>
+                        </div>
+                    `;
+                }
+            },
             states: { hover: { filter: { type: 'lighten', value: 0.1 } } }
         });
         _charts.assignor.render();
@@ -21332,19 +21504,15 @@ function renderTable() {
                 height: '100%',
                 width: '100%',
                 toolbar: { show: false },
-                offsetY: -15, // ดันกราฟขึ้นให้กึ่งกลาง
+                offsetY: -15,
                 sparkline: { enabled: false },
                 dropShadow: {
                     enabled: true,
                     top: 10, left: 0, blur: 8, 
-                    color: '#3b82f6', opacity: 0.15 // เพิ่มแสงเรืองสีฟ้าจางๆ ใต้เส้น
+                    color: '#3b82f6', opacity: 0.15 
                 }
             },
-            stroke: { 
-                curve: 'smooth', 
-                width: 4, 
-                lineCap: 'round' 
-            },
+            stroke: { curve: 'smooth', width: 4, lineCap: 'round' },
             fill: {
                 type: 'gradient',
                 gradient: {
@@ -21361,9 +21529,7 @@ function renderTable() {
             colors: ['#3b82f6'],
             xaxis: {
                 categories: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'],
-                labels: { 
-                    style: { fontSize: '9px', fontWeight: 700, colors: '#94a3b8' } 
-                },
+                labels: { style: { fontSize: '9px', fontWeight: 700, colors: '#94a3b8' } },
                 axisBorder: { show: false },
                 axisTicks: { show: false }
             },
@@ -21378,10 +21544,25 @@ function renderTable() {
                 size: 0, 
                 hover: { size: 6, strokeWidth: 3, strokeColors: '#fff', colors: '#3b82f6' } 
             },
+            // --- [CUSTOM TOOLTIP: VOLUME] ---
             tooltip: {
-                theme: 'dark',
-                x: { show: true },
-                y: { formatter: (v) => v + " ภารกิจ" }
+                enabled: true,
+                custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                    const month = w.globals.categoryLabels[dataPointIndex];
+                    const val = series[seriesIndex][dataPointIndex];
+                    return `
+                        <div class="sj-custom-tooltip">
+                            <div class="sj-tt-header">📈 Monthly Frequency</div>
+                            <div class="sj-tt-row">
+                                <div class="sj-tt-label">
+                                    <span class="sj-tt-dot" style="background-color:#3b82f6; box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);"></span>
+                                    <span>${month}</span>
+                                </div>
+                                <div class="sj-tt-val">${val} <small>ภารกิจ</small></div>
+                            </div>
+                        </div>
+                    `;
+                }
             }
         });
         _charts.volume.render();
@@ -29883,6 +30064,7 @@ function renderModalAC(type, inputEl) {
                 "PCBA",
                 "Compressors",
                 "Piping Part",
+                "COPPER Part",
                 "Printing part"
             ];
             source = [...defaultCategories];
@@ -29926,7 +30108,40 @@ function renderModalAC(type, inputEl) {
         } else if (typeLower === 'report') {
             source = ["VF Report", "RP Report", "Records"];
         }
+// เพิ่มเงื่อนไขนี้เข้าไปในฟังก์ชัน renderModalAC
+if (type === 'commander') {
+    const allStaffNames = new Set();
 
+    // 1. ดึงจากพนักงานที่ลงทะเบียนไว้ใน Master
+    if (typeof MASTER_STAFF_USERS !== 'undefined') {
+        MASTER_STAFF_USERS.forEach(u => { if(u.name) allStaffNames.add(u.name.trim()); });
+    }
+
+    // 2. ดึงจาก Agents ที่ Admin เพิ่มใหม่ (ดึงสดจากหน่วยความจำหน้า Admin)
+    if (window.WapAdminSystem && window.WapAdminSystem._data && window.WapAdminSystem._data.users) {
+        window.WapAdminSystem._data.users.forEach(u => {
+            const name = (u.display_name || u.name || "").trim();
+            if (name) allStaffNames.add(name);
+        });
+    }
+
+    const list = Array.from(allStaffNames).sort();
+    // กรองตามที่พิมพ์ (ถ้ามี)
+    const matched = query ? list.filter(v => v.toLowerCase().includes(query)) : list;
+
+    if (matched.length > 0) {
+        htmlContent = matched.map((v, idx) => `
+            <div class="modal-ac-item" 
+                 data-value="${v.replace(/"/g, '&quot;')}"
+                 style="padding: 10px 14px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.12s ease;"
+                 onmouseenter="this.style.background='#eff6ff'; this.style.color='#1d4ed8';"
+                 onmouseleave="this.style.background='transparent'; this.style.color='#1e293b';"
+                 onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('commander', '${v.replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                <span style="margin-right:8px;">👤</span> ${v}
+            </div>
+        `).join('');
+    }
+}
         // กรองและเรียงลำดับ
         let matched = query ? source.filter(v => v && v.toString().toLowerCase().includes(query)) : source;
         matched.sort((a, b) => {
