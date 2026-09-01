@@ -21,17 +21,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Comic+Neue:ital,wght@0,700;1,700&family=Dancing+Script:wght@600;700&family=Great+Vibes&family=Inter:wght@300;400;500;600;700;800;900&family=Kalam:wght@700&family=Patrick+Hand&family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&family=Satisfy&family=Style+Script&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/x-icon" href="./favicon.ico">
-    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="48x48" href="./icon-48.png">
-    <link rel="icon" type="image/png" sizes="96x96" href="./icon-96.png">
-    <link rel="icon" type="image/png" sizes="144x144" href="./icon-144.png">
     <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png">
     <link rel="apple-touch-icon" href="./apple-touch-icon-180.png">
-    <link rel="shortcut icon" href="./favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="./icon-192.png" type="image/png">
 
     <!-- 3. Progressive Web App (PWA) Settings -->
     <link rel="manifest" href="./manifest.json">
@@ -43,66 +36,64 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SQE Support">
 
+    <!-- Early Safety Guard to prevent inline ReferenceErrors before script load -->
+    <script>
+        // Global error & promise rejection safety guard for GitHub / Web environments
+        window.addEventListener('unhandledrejection', function(event) {
+            if (event && event.reason) {
+                var reasonStr = String(event.reason.message || event.reason || '');
+                if (reasonStr.indexOf('Canceled') !== -1 || reasonStr.indexOf('Failed to fetch') !== -1 || reasonStr.indexOf('TypeScript not registered') !== -1) {
+                    if (typeof event.preventDefault === 'function') event.preventDefault();
+                }
+            }
+        });
+
+        window.filterLoginStaffByDept = window.filterLoginStaffByDept || function(dept) {
+            window._pendingLoginDept = dept;
+            document.querySelectorAll('.login-dept-pill').forEach(btn => {
+                if (btn.getAttribute('data-dept') === dept) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            if (typeof window.renderEmployeeLoginDropdown === 'function') {
+                const el = document.getElementById('login-email');
+                window.renderEmployeeLoginDropdown(el ? el.value : '');
+            }
+        };
+        window.updatePassStrength = window.updatePassStrength || function() {};
+        window.checkCapsLock = window.checkCapsLock || function() {};
+        window.togglePassVisibility = window.togglePassVisibility || function() {};
+        window.handleEmployeeInput = window.handleEmployeeInput || function(v) {
+            if (typeof window.renderEmployeeLoginDropdown === 'function') window.renderEmployeeLoginDropdown(v);
+        };
+        window.toggleEmployeeLoginDropdown = window.toggleEmployeeLoginDropdown || function(e) {
+            if (e) e.stopPropagation();
+            const el = document.getElementById('login-employee-dropdown');
+            if (el) el.classList.toggle('hidden');
+        };
+    </script>
+
     <!-- 4. Local Stylesheet -->
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=20260901_2">
     <style>
-        /* ApexCharts Tooltip Universal High-Contrast HUD Styling */
+        /* ApexCharts Tooltip Universal Adaptive Styling */
         .apexcharts-tooltip,
         .apexcharts-tooltip.apexcharts-theme-light,
         .apexcharts-tooltip.apexcharts-theme-dark {
             z-index: 999999999 !important;
             pointer-events: none !important;
             overflow: visible !important;
-            background: #081126 !important;
-            border: 1px solid rgba(56, 189, 248, 0.5) !important;
-            border-radius: 12px !important;
-            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 20px rgba(56, 189, 248, 0.25) !important;
-            color: #ffffff !important;
-            backdrop-filter: blur(12px) !important;
-            padding: 0 !important;
-            transition: opacity 0.12s ease, transform 0.12s ease !important;
-        }
-
-        .apexcharts-tooltip-title {
-            background: #0e1d3e !important;
-            border-bottom: 1px solid rgba(56, 189, 248, 0.3) !important;
-            color: #38bdf8 !important;
-            font-weight: 800 !important;
-            font-size: 11px !important;
-            padding: 7px 12px !important;
-            letter-spacing: 0.03em !important;
-            display: block !important;
-            margin: 0 !important;
-        }
-
-        .apexcharts-tooltip-series-group {
-            padding: 7px 12px !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 8px !important;
             background: transparent !important;
-            margin: 0 !important;
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            transition: opacity 0.1s ease, transform 0.1s ease !important;
         }
 
-        .apexcharts-tooltip-text {
-            color: #ffffff !important;
-            font-size: 11px !important;
-            font-weight: 700 !important;
-        }
-
-        .apexcharts-tooltip-text-y-label,
-        .apexcharts-tooltip-text-label {
-            color: #94a3b8 !important;
-            font-weight: 700 !important;
-            margin-right: 4px !important;
-        }
-
-        .apexcharts-tooltip-text-y-value,
-        .apexcharts-tooltip-text-value,
-        .apexcharts-tooltip-text-goals-value {
-            color: #38bdf8 !important;
-            font-weight: 900 !important;
-            font-family: 'DM Mono', monospace !important;
+        .custom-chart-tooltip-wrapper {
+            z-index: 999999999 !important;
+            pointer-events: none !important;
+            user-select: none !important;
         }
 
         .compact-main-grid {
@@ -135,6 +126,729 @@
         .chart-canvas-wrap,
         .apexcharts-canvas {
             overflow: visible !important;
+        }
+
+        /* ============================================================
+           ✏️ EVIDENCE DEFECT ANNOTATOR - HIGH PRECISION CYBER HUD
+           ============================================================ */
+        .annotator-modal-overlay {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 999999 !important;
+            background: rgba(3, 7, 18, 0.92) !important;
+            backdrop-filter: blur(20px) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 16px !important;
+            font-family: 'Plus Jakarta Sans', 'Prompt', -apple-system, sans-serif !important;
+            animation: annotatorFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+
+        @keyframes annotatorFadeIn {
+            from { opacity: 0; transform: scale(0.985); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .annotator-container {
+            width: 95vw !important;
+            max-width: 1280px !important;
+            height: 90vh !important;
+            max-height: 860px !important;
+            background: #090d16 !important;
+            border-radius: 20px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            position: relative !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(37, 99, 235, 0.2) !important;
+        }
+
+        .annotator-header {
+            padding: 14px 24px !important;
+            background: #0f172a !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            flex-shrink: 0 !important;
+            z-index: 20 !important;
+        }
+
+        .annotator-header-left {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+        }
+
+        .annotator-header-icon-box {
+            width: 38px !important;
+            height: 38px !important;
+            border-radius: 10px !important;
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.25), rgba(234, 88, 12, 0.1)) !important;
+            border: 1px solid rgba(249, 115, 22, 0.4) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 18px !important;
+            box-shadow: 0 0 14px rgba(249, 115, 22, 0.25) !important;
+        }
+
+        .annotator-header-text {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 2px !important;
+        }
+
+        .annotator-title {
+            font-weight: 800 !important;
+            color: #ffffff !important;
+            font-size: 15px !important;
+            letter-spacing: 0.02em !important;
+            text-transform: uppercase !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+        }
+
+        .annotator-subtitle {
+            font-size: 11px !important;
+            color: #94a3b8 !important;
+            font-weight: 500 !important;
+        }
+
+        .annotator-header-actions {
+            display: flex !important;
+            align-items: center !important;
+            gap: 10px !important;
+        }
+
+        .annotator-header-btn {
+            padding: 8px 18px !important;
+            border-radius: 10px !important;
+            font-size: 12.5px !important;
+            font-weight: 700 !important;
+            cursor: pointer !important;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            border: 1px solid transparent !important;
+        }
+
+        .btn-close-modal {
+            background: rgba(30, 41, 59, 0.7) !important;
+            color: #cbd5e1 !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+        }
+        .btn-close-modal:hover {
+            background: rgba(51, 65, 85, 0.9) !important;
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.25) !important;
+        }
+
+        .btn-save-modal {
+            background: linear-gradient(135deg, #2563eb, #0284c7) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 16px rgba(37, 99, 235, 0.45) !important;
+            border-color: rgba(96, 165, 250, 0.4) !important;
+        }
+        .btn-save-modal:hover {
+            background: linear-gradient(135deg, #1d4ed8, #0369a1) !important;
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        /* Floating Toolbar HUD */
+        .annotator-floating-toolbar-wrap {
+            display: flex !important;
+            justify-content: center !important;
+            padding: 12px 16px !important;
+            position: absolute !important;
+            top: 72px !important;
+            left: 0 !important;
+            width: 100% !important;
+            z-index: 30 !important;
+            pointer-events: none !important;
+        }
+
+        .annotator-floating-toolbar {
+            pointer-events: auto !important;
+            background: rgba(15, 23, 42, 0.88) !important;
+            backdrop-filter: blur(20px) !important;
+            padding: 5px 8px !important;
+            border-radius: 9999px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 20px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .annotator-pill-group {
+            display: flex !important;
+            align-items: center !important;
+            gap: 3px !important;
+            padding: 2px 4px !important;
+            border-radius: 9999px !important;
+            background: rgba(255, 255, 255, 0.04) !important;
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        }
+
+        .annotator-pill-btn {
+            min-width: 32px !important;
+            height: 32px !important;
+            padding: 0 8px !important;
+            border-radius: 9999px !important;
+            border: none !important;
+            background: transparent !important;
+            color: #94a3b8 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            font-size: 11.5px !important;
+            font-weight: 700 !important;
+            transition: all 0.15s ease !important;
+            user-select: none !important;
+        }
+
+        .annotator-pill-btn:hover {
+            background: rgba(255, 255, 255, 0.12) !important;
+            color: #ffffff !important;
+        }
+
+        .annotator-pill-btn.active {
+            background: #2563eb !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 14px rgba(37, 99, 235, 0.6) !important;
+        }
+
+        .annotator-zoom-display {
+            color: #38bdf8 !important;
+            font-size: 11.5px !important;
+            font-weight: 800 !important;
+            font-family: 'DM Mono', monospace !important;
+            min-width: 44px !important;
+            text-align: center !important;
+            padding: 0 4px !important;
+        }
+
+        /* Canvas Viewport */
+        .annotator-canvas-viewport {
+            flex: 1 !important;
+            background: #050b17 !important;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px) !important;
+            background-size: 24px 24px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            overflow: hidden !important;
+            position: relative !important;
+            cursor: crosshair !important;
+        }
+
+        .annotator-stage {
+            display: inline-block !important;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 20px rgba(0, 0, 0, 0.5) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 4px !important;
+            background: #000000 !important;
+            line-height: 0 !important;
+            transform-origin: center center !important;
+            transition: transform 0.05s linear !important;
+        }
+
+        .annotator-stage canvas {
+            display: block !important;
+            max-width: none !important;
+            max-height: none !important;
+        }
+
+        /* Bottom Help Pill */
+        .annotator-bottom-help {
+            position: absolute !important;
+            bottom: 16px !important;
+            left: 0 !important;
+            width: 100% !important;
+            display: flex !important;
+            justify-content: center !important;
+            pointer-events: none !important;
+            z-index: 25 !important;
+        }
+
+        .annotator-bottom-help .help-pill {
+            pointer-events: auto !important;
+            padding: 6px 18px !important;
+            background: rgba(15, 23, 42, 0.88) !important;
+            backdrop-filter: blur(14px) !important;
+            border-radius: 9999px !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            color: #94a3b8 !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+        }
+
+        /* Color popover */
+        .annotator-color-popover {
+            position: absolute !important;
+            top: 48px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            background: #0f172a !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            padding: 8px 10px !important;
+            border-radius: 14px !important;
+            display: flex !important;
+            gap: 6px !important;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7) !important;
+            z-index: 50 !important;
+        }
+
+        .color-swatch {
+            width: 22px !important;
+            height: 22px !important;
+            border-radius: 50% !important;
+            cursor: pointer !important;
+            border: 2px solid transparent !important;
+            transition: transform 0.15s ease !important;
+        }
+        .color-swatch:hover { transform: scale(1.2) !important; }
+        .color-swatch.active { border-color: #ffffff !important; box-shadow: 0 0 8px rgba(255,255,255,0.6) !important; }
+
+        /* ============================================================
+           🖼️ MULTI-IMAGE EVIDENCE GRID & ADD-SLOT GEOMETRY
+           ============================================================ */
+        .evidence-multi-grid {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important;
+            gap: 10px !important;
+            width: 100% !important;
+            align-items: stretch !important;
+        }
+
+        .evidence-thumb-card {
+            position: relative !important;
+            aspect-ratio: 4 / 3 !important;
+            width: 100% !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+            background: #f1f5f9 !important;
+            box-sizing: border-box !important;
+        }
+
+        .evidence-add-slot {
+            position: relative !important;
+            aspect-ratio: 4 / 3 !important;
+            width: 100% !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            border: 2px dashed #93c5fd !important;
+            background: #f8fafc !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            color: #2563eb !important;
+            transition: all 0.2s ease !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+            box-sizing: border-box !important;
+            text-align: center !important;
+            padding: 6px !important;
+        }
+
+        .evidence-add-slot:hover {
+            border-color: #3b82f6 !important;
+            background: #eff6ff !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15) !important;
+        }
+
+        /* ============================================================
+           📸 EVIDENCE MODE SWITCHER (SEGMENTED PILL TAB CONTROLS)
+           ============================================================ */
+        .evidence-mode-switcher {
+            display: flex !important;
+            background: #e2e8f0 !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 12px !important;
+            padding: 4px !important;
+            gap: 6px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        body.dark-mode .evidence-mode-switcher,
+        [data-theme="dark"] .evidence-mode-switcher {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+        }
+
+        .evidence-mode-tab-btn {
+            flex: 1 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+            padding: 8px 14px !important;
+            font-size: 11.5px !important;
+            font-weight: 700 !important;
+            border-radius: 8px !important;
+            border: 1.5px solid transparent !important;
+            color: #64748b !important;
+            background: transparent !important;
+            cursor: pointer !important;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            user-select: none !important;
+            text-align: center !important;
+            white-space: nowrap !important;
+        }
+
+        .evidence-mode-tab-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.6) !important;
+            color: #1e293b !important;
+        }
+
+        body.dark-mode .evidence-mode-tab-btn:hover:not(.active),
+        [data-theme="dark"] .evidence-mode-tab-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.06) !important;
+            color: #e2e8f0 !important;
+        }
+
+        .evidence-mode-tab-btn.active {
+            background: #ffffff !important;
+            color: #2563eb !important;
+            border-color: #93c5fd !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+            font-weight: 800 !important;
+        }
+
+        body.dark-mode .evidence-mode-tab-btn.active,
+        [data-theme="dark"] .evidence-mode-tab-btn.active {
+            background: #0f172a !important;
+            color: #60a5fa !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .evidence-mode-tab-btn .tab-badge {
+            font-size: 10px !important;
+            font-weight: 700 !important;
+            padding: 2px 6px !important;
+            border-radius: 5px !important;
+            background: #cbd5e1 !important;
+            color: #334155 !important;
+            transition: all 0.18s ease !important;
+        }
+
+        .evidence-mode-tab-btn.active .tab-badge {
+            background: #dbeafe !important;
+            color: #1d4ed8 !important;
+        }
+
+        body.dark-mode .evidence-mode-tab-btn .tab-badge,
+        [data-theme="dark"] .evidence-mode-tab-btn .tab-badge {
+            background: #334155 !important;
+            color: #94a3b8 !important;
+        }
+
+        body.dark-mode .evidence-mode-tab-btn.active .tab-badge,
+        [data-theme="dark"] .evidence-mode-tab-btn.active .tab-badge {
+            background: rgba(37, 99, 235, 0.25) !important;
+            color: #93c5fd !important;
+        }
+
+        /* ============================================================
+           ✍️ MODAL & AUTO-COMPLETE DROPDOWN STYLING (ALWAYS ON TOP)
+           ============================================================ */
+        .modal-ac-dropdown {
+            position: absolute !important;
+            top: calc(100% + 4px) !important;
+            max-height: 290px !important;
+            overflow-y: auto !important;
+            background: #ffffff !important;
+            border: 1.5px solid #3b82f6 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 20px 40px -4px rgba(15, 23, 42, 0.25), 0 0 16px rgba(59, 130, 246, 0.18) !important;
+            z-index: 999999 !important;
+            animation: modalACFade 0.12s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+
+        .ac-dropdown {
+            z-index: 999999 !important;
+        }
+
+        #login-employee-dropdown,
+        #staff-custom-dropdown-panel {
+            z-index: 999999 !important;
+        }
+
+        /* ============================================================
+           ✨ COMPOSITE PREVIEW & EVIDENCE ACTION BUTTONS
+           ============================================================ */
+        .evidence-stitched-wrap {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+            margin-top: 10px !important;
+            padding: 12px 14px !important;
+            background: #f8fafc !important;
+            border: 1.5px solid #cbd5e1 !important;
+            border-radius: 14px !important;
+            box-sizing: border-box !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+        }
+
+        body.dark-mode .evidence-stitched-wrap,
+        [data-theme="dark"] .evidence-stitched-wrap {
+            background: #0f172a !important;
+            border-color: #334155 !important;
+        }
+
+        .evidence-composite-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+            margin-bottom: 10px !important;
+            width: 100% !important;
+        }
+
+        .evidence-composite-title {
+            font-size: 11.5px !important;
+            font-weight: 800 !important;
+            color: #0f172a !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            letter-spacing: 0.02em !important;
+        }
+
+        body.dark-mode .evidence-composite-title,
+        [data-theme="dark"] .evidence-composite-title {
+            color: #f8fafc !important;
+        }
+
+        .evidence-composite-actions {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            flex-wrap: nowrap !important;
+        }
+
+        .evidence-preview-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 5px !important;
+            padding: 5px 12px !important;
+            border-radius: 8px !important;
+            font-size: 11px !important;
+            font-weight: 800 !important;
+            white-space: nowrap !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease !important;
+            line-height: 1.3 !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+            user-select: none !important;
+        }
+
+        .evidence-preview-btn span {
+            font-size: 12px !important;
+            line-height: 1 !important;
+        }
+
+        .evidence-preview-btn.btn-zoom {
+            background: #eff6ff !important;
+            color: #1d4ed8 !important;
+            border: 1.5px solid #bfdbfe !important;
+        }
+
+        .evidence-preview-btn.btn-zoom:hover {
+            background: #dbeafe !important;
+            border-color: #93c5fd !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 3px 8px rgba(37, 99, 235, 0.15) !important;
+        }
+
+        .evidence-preview-btn.btn-download {
+            background: #ecfdf5 !important;
+            color: #047857 !important;
+            border: 1.5px solid #a7f3d0 !important;
+        }
+
+        .evidence-preview-btn.btn-download:hover {
+            background: #d1fae5 !important;
+            border-color: #6ee7b7 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 3px 8px rgba(16, 185, 129, 0.15) !important;
+        }
+
+        /* ============================================================
+           📊 RUNNING NUMBER TABLE HEADER & ROW STYLING
+           ============================================================ */
+        #rn-table-header th {
+            padding: 10px 14px !important;
+            font-size: 11px !important;
+            font-weight: 900 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.03em !important;
+            white-space: nowrap !important;
+            vertical-align: middle !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+            line-height: 1.3 !important;
+            user-select: none !important;
+            box-sizing: border-box !important;
+        }
+
+        #rn-table-header th:last-child {
+            border-right: none !important;
+        }
+
+        #rn-table-body td {
+            padding: 8px 12px !important;
+            vertical-align: middle !important;
+            font-size: 11px !important;
+            white-space: nowrap !important;
+            box-sizing: border-box !important;
+        }
+
+        /* ============================================================
+           🎯 PART NO INPUT STATUS ICONS & QTY UNIT STYLING
+           ============================================================ */
+        .f-part-status-icon {
+            position: absolute !important;
+            right: 10px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            pointer-events: none !important;
+            z-index: 10 !important;
+        }
+
+        .f-part-status-icon.hidden {
+            display: none !important;
+        }
+
+        .f-part-spinner {
+            position: absolute !important;
+            right: 32px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            width: 14px !important;
+            height: 14px !important;
+            border: 2px solid #cbd5e1 !important;
+            border-top-color: #3b82f6 !important;
+            border-radius: 50% !important;
+            animation: spin 0.8s linear infinite !important;
+            pointer-events: none !important;
+            z-index: 10 !important;
+        }
+
+        .f-part-spinner.hidden {
+            display: none !important;
+        }
+
+        #f-part.form-input {
+            padding-right: 36px !important;
+        }
+
+        #f-unit.valid {
+            border-color: #10b981 !important;
+            border-width: 1.5px !important;
+            border-left: 1px solid #10b981 !important;
+            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.35), 0 0 10px rgba(16, 185, 129, 0.2) !important;
+            background-color: rgba(16, 185, 129, 0.04) !important;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+        }
+
+        /* ============================================================
+           🛡️ ADMIN SUB-TABS (AGENTS, SUPPLIERS, PARTS, DEFECTS, ETC.)
+           ============================================================ */
+        .cyber-admin-tab {
+            display: inline-flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+            padding: 5px 11px !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: #64748b !important;
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            border-radius: 6px !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease !important;
+            white-space: nowrap !important;
+            line-height: 1.3 !important;
+            user-select: none !important;
+            box-sizing: border-box !important;
+            text-decoration: none !important;
+        }
+
+        .cyber-admin-tab svg {
+            width: 13px !important;
+            height: 13px !important;
+            flex-shrink: 0 !important;
+            display: inline-block !important;
+            color: inherit !important;
+        }
+
+        .cyber-admin-tab:hover {
+            color: #0f172a !important;
+            background: #f1f5f9 !important;
+        }
+
+        .cyber-admin-tab.active {
+            color: #ffffff !important;
+            background: #2563eb !important;
+            border-color: #1d4ed8 !important;
+            box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25) !important;
+        }
+
+        .cyber-admin-tab.active svg {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .cyber-admin-tab,
+        [data-theme="dark"] .cyber-admin-tab {
+            color: #94a3b8 !important;
+        }
+
+        body.dark-mode .cyber-admin-tab:hover,
+        [data-theme="dark"] .cyber-admin-tab:hover {
+            color: #f8fafc !important;
+            background: #334155 !important;
+        }
+
+        body.dark-mode .cyber-admin-tab.active,
+        [data-theme="dark"] .cyber-admin-tab.active {
+            color: #ffffff !important;
+            background: #3b82f6 !important;
+            border-color: #2563eb !important;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35) !important;
+        }
+
+        body.dark-mode .cyber-admin-tab.active svg,
+        [data-theme="dark"] .cyber-admin-tab.active svg {
+            color: #ffffff !important;
+        }
+
+        @keyframes modalACFade {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
@@ -437,20 +1151,20 @@
     </div>
 
     <!-- ดรอปดาวน์พนักงาน (Custom Dropdown สำหรับ Supervisor ย้ายมาอยู่ใต้ brand-sub ภายในโซน Sidebar) -->
-    <div id="staff-selector-wrap" class="hidden flex-col w-full px-1.5 pt-1 relative z-50">
+    <div id="staff-selector-wrap" class="hidden flex-col w-full px-2 pt-1 pb-1 relative z-50">
         <div class="relative w-full">
             <button type="button" 
                     id="staff-custom-select-btn" 
                     onclick="window.toggleStaffCustomDropdown(event)"
-                    class="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10.5px] font-bold rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-blue-50/80 dark:hover:bg-slate-700/80 border border-slate-300/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs transition-all duration-150 cursor-pointer justify-between"
+                    class="group w-full flex items-center justify-between gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/40 dark:hover:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 shadow-2xs transition-all duration-150 cursor-pointer"
                     title="เลือกผู้ปฏิบัติงาน"
                     aria-label="เลือกผู้ปฏิบัติงาน">
-                <div class="flex items-center gap-1.5 truncate">
-                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                    <span id="staff-custom-select-label" class="truncate font-bold text-[10.5px]">-- เลือกผู้ปฏิบัติงาน --</span>
+                <div class="flex items-center gap-2 truncate min-w-0">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)] shrink-0"></span>
+                    <span id="staff-custom-select-label" class="truncate text-[11px] font-semibold text-slate-700 dark:text-slate-200">-- เลือกผู้ปฏิบัติงาน --</span>
                 </div>
-                <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-400 shrink-0 transition-transform duration-200" id="staff-select-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
+                <svg class="w-3 h-3 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 shrink-0 transition-transform duration-200" id="staff-select-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </button>
 
@@ -874,8 +1588,8 @@
                 <div class="form-section-inner space-y-3">
                     <div class="form-input-wrap">
                         <label class="form-label">📦 หมายเลขพาร์ท (PN) *</label>
-                        <div class="relative w-full flex items-center">
-                            <input  type="text" id="f-part" class="form-input" onfocus="showAC('partNo', this)" oninput="onACInput('partNo', this); if (typeof validatePartNoInput === 'function') validatePartNoInput(this);" onblur="if (typeof validatePartNoInput === 'function') validatePartNoInput(this);" autocomplete="off" title="F Part" aria-label="F Part">
+                        <div class="relative w-full">
+                            <input  type="text" id="f-part" class="form-input" style="padding-right: 36px;" onfocus="showAC('partNo', this)" onclick="showAC('partNo', this)" oninput="onACInput('partNo', this); if (typeof validatePartNoInput === 'function') validatePartNoInput(this); if (typeof refreshNeonGlow === 'function') refreshNeonGlow();" onblur="if (typeof validatePartNoInput === 'function') validatePartNoInput(this); if (typeof refreshNeonGlow === 'function') refreshNeonGlow();" autocomplete="off" title="F Part" aria-label="F Part">
                             <div id="f-part-spinner" class="f-part-spinner hidden" title="Auto-completing..."></div>
                             <div id="f-part-success" class="f-part-status-icon success hidden" title="Valid Part Number">
                                 <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -885,28 +1599,41 @@
                             </div>
                         </div>
                     </div>
-                    <div class="form-input-wrap"><label class="form-label">📋 ชื่อพาร์ท (Part Name) *</label><input  type="text" id="f-partname" class="form-input" onfocus="showAC('partName', this)" oninput="onACInput('partName', this)" autocomplete="off" title="F Partname" aria-label="F Partname"></div>
-                    <div class="form-input-wrap"><label class="form-label">🏭 ผู้ขาย / ซัพพลายเออร์ (Supplier) *</label><input  type="text" id="f-supplier" class="form-input" onfocus="showAC('supplier',this)" oninput="onACInput('supplier',this)" autocomplete="off" title="F Supplier" aria-label="F Supplier"></div>
+                    <div class="form-input-wrap"><label class="form-label">📋 ชื่อพาร์ท (Part Name) *</label><input  type="text" id="f-partname" class="form-input" onfocus="showAC('partName', this)" onclick="showAC('partName', this)" oninput="onACInput('partName', this)" autocomplete="off" title="F Partname" aria-label="F Partname"></div>
+                    <div class="form-input-wrap"><label class="form-label">🏭 ผู้ขาย / ซัพพลายเออร์ (Supplier) *</label><input  type="text" id="f-supplier" class="form-input" onfocus="showAC('supplier',this)" onclick="showAC('supplier',this)" oninput="onACInput('supplier',this)" autocomplete="off" title="F Supplier" aria-label="F Supplier"></div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div class="form-input-wrap"><label class="form-label">🔖 Ref No *</label><input  type="text" id="f-ref" class="form-input font-mono" oninput="validateRef(event)" title="F Ref" aria-label="F Ref"></div>
                     <div class="relative"><label class="form-label">📦 จำนวน (QTY) *</label>
-                        <div class="flex"><input  type="number" id="f-qty" class="form-input font-mono rounded-r-none min-w-0" placeholder="0" title="0" aria-label="0">
-<select  id="f-unit" class="form-select form-input" style="width:64px;flex-shrink:0;border-left:none;border-top-left-radius:0;border-bottom-left-radius:0" title="F Unit" aria-label="F Unit">
-    <option>PCS</option>
-    <option>KG</option>
-    <option>ROLL</option>
-    <option>MTR</option>
-    <option>SET</option>
-</select>
-                            </div>
+                        <div class="flex">
+                            <input  type="number" id="f-qty" class="form-input font-mono rounded-r-none min-w-0" placeholder="0" min="0" oninput="if (typeof refreshNeonGlow === 'function') refreshNeonGlow();" onkeyup="if (typeof refreshNeonGlow === 'function') refreshNeonGlow();" onchange="if (typeof refreshNeonGlow === 'function') refreshNeonGlow();" title="0" aria-label="0">
+                            <select  id="f-unit" class="form-select form-input" style="width:68px;flex-shrink:0;border-left:none;border-top-left-radius:0;border-bottom-left-radius:0" onchange="if (typeof refreshNeonGlow === 'function') refreshNeonGlow();" title="F Unit" aria-label="F Unit">
+                                <option>PCS</option>
+                                <option>KG</option>
+                                <option>ROLL</option>
+                                <option>MTR</option>
+                                <option>SET</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <div class="form-input-wrap"><label class="form-label">📍 ไลน์ (Line)</label><input  type="text" id="f-line" class="form-input" onfocus="showAC('line',this)" oninput="onACInput('line',this)" title="F Line" aria-label="F Line"></div>
-                    <div class="form-input-wrap"><label class="form-label">⚠️ ปัญหา (Defect)</label><input  type="text" id="f-defect" class="form-input" onfocus="showAC('defect',this)" oninput="onACInput('defect',this)" title="F Defect" aria-label="F Defect"></div>
+                    <div class="form-input-wrap"><label class="form-label">📍 ไลน์ (Line)</label><input  type="text" id="f-line" class="form-input" onfocus="showAC('line',this)" onclick="showAC('line',this)" oninput="onACInput('line',this)" autocomplete="off" title="F Line" aria-label="F Line"></div>
+                    <div class="form-input-wrap"><label class="form-label">⚠️ ปัญหา (Defect)</label><input  type="text" id="f-defect" class="form-input" onfocus="showAC('defect',this)" onclick="showAC('defect',this)" oninput="onACInput('defect',this)" autocomplete="off" title="F Defect" aria-label="F Defect"></div>
                 </div>
-                <div><label class="form-label">หมายเหตุ</label><textarea id="f-remark" class="form-textarea" rows="2"></textarea></div>
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="form-label mb-0">หมายเหตุ (Remark)</label>
+                        <div class="flex items-center gap-1 flex-wrap">
+                            <button type="button" onclick="insertClaimRemarkPreset('• Sorting 100% at Line / WIP Stock')" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">⚡ Sorting</button>
+                            <button type="button" onclick="insertClaimRemarkPreset('• รอผลการวิเคราะห์ Root Cause จาก Supplier')" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-colors">🔍 Root Cause</button>
+                            <button type="button" onclick="insertClaimRemarkPreset('• คัดแยกชิ้นงาน NG ส่งคืน Supplier เพื่อเคลม')" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors">⚠️ ส่งคืนเคลม</button>
+                            <button type="button" onclick="insertClaimRemarkPreset('• ตรวจสอบแล้วสามารถใช้งานต่อได้ (Can Use)')" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-colors">✅ Can Use</button>
+                            <button type="button" onclick="clearClaimRemark()" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200">ล้าง</button>
+                        </div>
+                    </div>
+                    <textarea id="f-remark" class="form-textarea" rows="2" placeholder="พิมพ์หมายเหตุหรือเลือกปุ่มแม่แบบด้านบน..."></textarea>
+                </div>
                 <div class="form-section" style="background:#eff6ff;border-color:#bfdbfe">
                     <label class="form-label" style="color:#1e40af">ผลการตัดสิน (Judgment) *</label>
                     <select  id="judgmentSelect" class="judgment-select" onchange="handleJudgment(this.value)" title="JudgmentSelect" aria-label="JudgmentSelect">
@@ -1842,143 +2569,199 @@
     </div>
 </div>
 <!-- ============================================================
-     6. SKILL MATRIX - NEON ANALYTICS COMMAND CENTER
+     6. SKILL MATRIX - NEON ANALYTICS COMMAND CENTER (V5.0 SINGLE-SCREEN)
      ============================================================ -->
 <div id="skill-matrix-content" class="hidden-view">
     <div class="sm-ultra-layout">
         
-        <!-- แถวที่ 1: Glass KPI Cards (ความเชี่ยวชาญภาพรวม) -->
-        <div class="sm-top-kpis">
-            <div class="glass-stat-card blue">
-                <div class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
-                <div class="stat-info">
-                    <p class="stat-label">Competency Index</p>
-                    <h2 class="stat-val" id="sm-kpi-avg">0%</h2>
+        <!-- [แถวบน] Top Header / Executive Competency & Quick Action Bar -->
+        <div class="sm-top-deck">
+            <!-- 1. Employee Competency Gauge & Level Badge -->
+            <div class="sm-profile-pill">
+                <div class="sm-avatar-circle">
+                    <span id="sm-user-avatar">👤</span>
                 </div>
-                <div id="sm-level-badge" class="level-pill">LEVEL: --</div>
+                <div class="flex flex-col min-w-0 justify-center">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">Employee Competency</span>
+                        <div id="sm-level-badge" class="level-pill">LEVEL: --</div>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <h2 class="stat-val text-xl sm:text-2xl font-black" id="sm-kpi-avg">0%</h2>
+                        <span class="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-tight">Competency Index</span>
+                    </div>
+                </div>
             </div>
+
+            <!-- 2. Micro Insights (Total, Strength, Gap) -->
+            <div class="sm-insights-capsules">
+                <!-- Total Skills -->
+                <div class="sm-capsule">
+                    <div class="sm-cap-icon blue">⚡</div>
+                    <div class="min-w-0 flex-1">
+                        <p class="stat-label">Total Skills</p>
+                        <h3 class="stat-val-sm text-slate-800 dark:text-slate-100" id="sm-kpi-count">0 Skills</h3>
+                    </div>
+                </div>
+                <!-- Primary Strength -->
+                <div class="sm-capsule">
+                    <div class="sm-cap-icon emerald">🌟</div>
+                    <div class="min-w-0 flex-1">
+                        <p class="stat-label">Primary Strength</p>
+                        <h3 class="stat-val-sm text-emerald-600 dark:text-emerald-400 truncate" id="sm-kpi-top" title="Primary Strength">--</h3>
+                    </div>
+                </div>
+                <!-- Critical Gap -->
+                <div class="sm-capsule">
+                    <div class="sm-cap-icon amber">⚠️</div>
+                    <div class="min-w-0 flex-1">
+                        <p class="stat-label">Critical Gap</p>
+                        <h3 class="stat-val-sm text-amber-600 dark:text-amber-400 truncate" id="sm-kpi-weak" title="Critical Gap">--</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Integrated Compact Quick Console -->
+            <div class="sm-quick-console">
+                <input type="text" id="sm-f-name" class="console-input-compact flex-1 min-w-[130px]" placeholder="ชื่อทักษะ (เช่น Mold Design)..." title="ระบุชื่อทักษะ" aria-label="ระบุชื่อทักษะ">
+                <input type="number" id="sm-f-value" class="console-input-compact text-center font-bold w-18" min="0" max="100" placeholder="0-100%" title="คะแนน 0-100%">
+                <button onclick="WapSkillMatrix.submit()" class="btn-sm-trigger-compact" title="บันทึกทักษะ">
+                    <span>➕ บันทึก</span>
+                </button>
+                <button onclick="WapSkillMatrix.clearAll()" class="btn-sm-clear-compact" title="ล้างทั้งหมด">
+                    🗑️
+                </button>
+            </div>
+        </div>
+
+        <!-- [พื้นที่หลัก] 2-Column Split Command Dashboard (Fill Remaining Height) -->
+        <div class="sm-main-grid">
             
-            <div class="glass-stat-card emerald">
-                <div class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-1.006 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946 1.006 3.42 3.42 0 013.138 3.138 3.42 3.42 0 001.006 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-1.006 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946 1.006 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-1.006 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-1.006-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 001.006-1.946 3.42 3.42 0 013.138-3.138z"/></svg></div>
-                <div class="stat-info">
-                    <p class="stat-label">Total Skills Asset</p>
-                    <h2 class="stat-val" id="sm-kpi-count">0</h2>
-                </div>
-            </div>
-
-            <div class="glass-stat-card purple">
-                <div class="stat-info">
-                    <p class="stat-label">Primary Strength</p>
-                    <h2 class="stat-val-text truncate" id="sm-kpi-top">--</h2>
-                </div>
-                <div class="strength-tag"></div>
-            </div>
-
-            <div class="glass-stat-card indigo">
-                <div class="stat-info">
-                    <p class="stat-label">Critical Gap</p>
-                    <h2 class="stat-val-text truncate" id="sm-kpi-weak">--</h2>
-                </div>
-                <div class="gap-tag"></div>
-            </div>
-        </div>
-
-        <!-- แถวที่ 2: Command Console (แถบอัปเดตทักษะ) -->
-        <div class="sm-console-bar">
-            <div class="console-inner">
-                <div class="flex-1 relative">
-                    <span class="input-tag">Skill Identity</span>
-                    <input type="text" id="sm-f-name" class="console-input" placeholder="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)..." title="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)..." aria-label="ระบุชื่อทักษะ (เช่น Mold Design, PCBA Control)...">
-                </div>
-                <div class="w-36 relative">
-                    <span class="input-tag">Proficiency</span>
-                    <input type="number" id="sm-f-value" class="console-input" min="0" max="100" placeholder="0-100%" title="0 100%" aria-label="0 100%">
-                </div>
-                <button onclick="WapSkillMatrix.submit()" class="btn-sm-trigger" title="UPDATE CORE SKILL" aria-label="UPDATE CORE SKILL">
-                    <span>➕ เพิ่ม/อัปเดตทักษะ</span>
-                    <div class="btn-reflection"></div>
-                </button>
-                <button onclick="WapSkillMatrix.clearAll()" class="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 rounded-xl text-[11px] font-bold transition-all" title="Clear All Skills">
-                    🗑️ ล้างทั้งหมด
-                </button>
-            </div>
-        </div>
-
-        <!-- แถวที่ 3: Deep Analytics Grid -->
-        <div class="sm-analytics-grid">
-            <!-- 3.1 Radar Map -->
-            <div class="analytics-card">
-                <div class="card-head flex justify-between items-center">
-                    <h3>Skill Radar Map</h3>
-                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Multi-Axis Spider</span>
-                </div>
-                <div class="card-body relative overflow-hidden flex items-center justify-center p-3 min-h-[310px]">
-                    <div id="sm-radar-chart" class="w-full h-full min-h-[290px]"></div>
-                </div>
-            </div>
-
-            <!-- 3.2 Skill Level Breakdown & Neon Bars -->
-            <div class="analytics-card">
-                <div class="card-head flex justify-between items-center">
-                    <h3>Proficiency Breakdown</h3>
-                    <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
-                        <button onclick="WapSkillMatrix.toggleViewMode('bar')" id="sm-btn-mode-bar" class="px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transition-all">📊 Graph</button>
-                        <button onclick="WapSkillMatrix.toggleViewMode('list')" id="sm-btn-mode-list" class="px-2.5 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all">📋 List (Edit/Delete)</button>
+            <!-- [ซ้าย] Left Column: Radar Spider & Tier Distribution (Width ~350px) -->
+            <div class="sm-left-col">
+                
+                <!-- 1. Skill Radar Spider Map Card -->
+                <div class="analytics-card flex-1 min-h-0 flex flex-col">
+                    <div class="card-head py-2 px-3 flex justify-between items-center shrink-0">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs">🕸️</span>
+                            <h3 class="text-xs font-black uppercase text-slate-800 dark:text-slate-100">Skill Radar Map</h3>
+                        </div>
+                        <span class="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Multi-Axis Spider</span>
+                    </div>
+                    <div class="card-body relative flex-1 min-h-0 flex items-center justify-center p-1 overflow-hidden">
+                        <div id="sm-radar-chart" class="w-full h-full min-h-[160px]"></div>
                     </div>
                 </div>
-                <div class="card-body relative overflow-hidden p-3 flex flex-col justify-center min-h-[310px]">
-                    <div id="sm-bar-chart" class="w-full h-full min-h-[290px]"></div>
-                    <div id="sm-bar-list" class="hidden w-full h-full overflow-y-auto scroll-hide space-y-2 max-h-[290px]">
-                        <!-- รายการบาร์ทักษะจะถูกฉีดเข้าที่นี่ -->
+
+                <!-- 2. Competency Tier Weight Card (Donut Centered + Bottom Legend Grid) -->
+                <div class="analytics-card flex-1 min-h-0 flex flex-col">
+                    <div class="card-head py-2 px-3 flex justify-between items-center shrink-0">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs">🎯</span>
+                            <h3 class="text-xs font-black uppercase text-slate-800 dark:text-slate-100">Competency Weight</h3>
+                        </div>
+                        <span class="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Tier Distribution</span>
                     </div>
+                    <div class="card-body flex-1 min-h-0 flex flex-col items-center justify-between p-2.5 overflow-hidden">
+                        <!-- Centered Donut Chart -->
+                        <div class="w-full flex-1 min-h-0 flex items-center justify-center relative">
+                            <div id="sm-donut-chart" class="w-full h-full flex justify-center items-center"></div>
+                        </div>
+                        <!-- Details evenly aligned at the bottom -->
+                        <div id="sm-donut-legend" class="w-full shrink-0 grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/80"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- [ขวา] Right Column: Master Skill Matrix & Supervisor Assessment Console -->
+            <div class="sm-right-col">
+                <div class="analytics-card h-full flex flex-col overflow-hidden">
+                    
+                    <!-- Card Header with Filter Pills, Search, and View Switcher -->
+                    <div class="card-head py-2 px-3.5 flex justify-between items-center flex-wrap gap-2 shrink-0 border-b border-slate-100 dark:border-slate-800">
+                        
+                        <!-- Left: Title & Count -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-blue-500 text-sm">⚡</span>
+                            <h3 class="text-xs sm:text-sm font-extrabold tracking-wide text-slate-800 dark:text-slate-100 uppercase">Skill Competency Matrix</h3>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800" id="sm-table-count">0 Items</span>
+                        </div>
+
+                        <!-- Center: Tier Filter Tabs -->
+                        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-0.5 rounded-xl text-[10px] font-bold">
+                            <button onclick="WapSkillMatrix.setTierFilter('ALL')" id="sm-tier-btn-all" class="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs transition-all">All</button>
+                            <button onclick="WapSkillMatrix.setTierFilter('EXPERT')" id="sm-tier-btn-expert" class="px-2 py-0.5 rounded-lg text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all">🟢 Expert</button>
+                            <button onclick="WapSkillMatrix.setTierFilter('ADVANCED')" id="sm-tier-btn-adv" class="px-2 py-0.5 rounded-lg text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all">🔵 Adv</button>
+                            <button onclick="WapSkillMatrix.setTierFilter('DEVELOPING')" id="sm-tier-btn-dev" class="px-2 py-0.5 rounded-lg text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 transition-all">🟡 Dev</button>
+                            <button onclick="WapSkillMatrix.setTierFilter('BASIC')" id="sm-tier-btn-basic" class="px-2 py-0.5 rounded-lg text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-all">⚪ Basic</button>
+                        </div>
+
+                        <!-- Right: Search & View Tabs -->
+                        <div class="flex items-center gap-2">
+                            <!-- Search -->
+                            <div class="relative">
+                                <input type="text" id="sm-search-input" oninput="WapSkillMatrix.filterTable()" placeholder="🔍 ค้นหาทักษะ..." class="px-2.5 py-1 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-32 sm:w-40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all placeholder:text-slate-400">
+                            </div>
+                            
+                            <!-- View Toggle Switcher -->
+                            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-0.5 rounded-lg">
+                                <button onclick="WapSkillMatrix.toggleViewMode('table')" id="sm-btn-mode-table" class="px-2 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs transition-all" title="Matrix Table">📑 Table</button>
+                                <button onclick="WapSkillMatrix.toggleViewMode('bar')" id="sm-btn-mode-bar" class="px-2 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all" title="Ranked Graph">📊 Bars</button>
+                                <button onclick="WapSkillMatrix.toggleViewMode('list')" id="sm-btn-mode-list" class="px-2 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all" title="List View">📋 List</button>
+                                <button onclick="WapSkillMatrix.toggleViewMode('gap')" id="sm-btn-mode-gap" class="px-2 py-1 rounded-md text-[10px] font-extrabold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-all" title="Supervisor Gap Analysis">🎯 Review</button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Card Body Content: Dynamic Scrollable Container -->
+                    <div class="card-body flex-1 min-h-0 p-0 overflow-y-auto relative scroll-custom">
+                        
+                        <!-- 1. Table View -->
+                        <div id="sm-view-table" class="w-full h-full">
+                            <table class="w-full text-left border-collapse min-w-[580px]">
+                                <thead class="sticky top-0 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-md text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 z-10">
+                                    <tr>
+                                        <th class="py-2.5 px-3 text-center w-12">#</th>
+                                        <th class="py-2.5 px-3">Skill Identity</th>
+                                        <th class="py-2.5 px-3 w-48 sm:w-56">Proficiency Level</th>
+                                        <th class="py-2.5 px-3 text-center w-28">Tier</th>
+                                        <th class="py-2.5 px-3 text-center w-28">Supervisor Status</th>
+                                        <th class="py-2.5 px-3 text-center w-24">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sm-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/70 text-xs font-bold text-slate-700 dark:text-slate-200">
+                                    <!-- Table Rows Injected Here -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 2. Bar Chart View -->
+                        <div id="sm-view-bar" class="hidden w-full h-full p-3 flex flex-col justify-center">
+                            <div id="sm-bar-chart" class="w-full h-full min-h-[240px]"></div>
+                        </div>
+
+                        <!-- 3. List Edit View -->
+                        <div id="sm-view-list" class="hidden w-full h-full p-3 overflow-y-auto space-y-2 scroll-custom">
+                            <div id="sm-bar-list" class="w-full space-y-2">
+                                <!-- Neon list items injected here -->
+                            </div>
+                        </div>
+
+                        <!-- 4. Supervisor Review & Gap Analysis View (Gimmick!) -->
+                        <div id="sm-view-gap" class="hidden w-full h-full p-4 overflow-y-auto scroll-custom">
+                            <div id="sm-gap-analysis-content" class="space-y-4">
+                                <!-- Dynamic Supervisor Insights injected here -->
+                            </div>
+                        </div>
+
+                    </div>
+
                 </div>
             </div>
 
-            <!-- 3.3 Skill Weight Donut -->
-            <div class="analytics-card">
-                <div class="card-head flex justify-between items-center">
-                    <h3>Competency Weight</h3>
-                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tier Distribution</span>
-                </div>
-                <div class="card-body flex flex-col items-center justify-between p-3 min-h-[310px]">
-                    <div id="sm-donut-chart" class="w-full min-h-[180px] flex justify-center items-center"></div>
-                    <div id="sm-donut-legend" class="w-full mt-2 space-y-1"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- แถวที่ 4: Management Table (ตารางทักษะพร้อมปุ่มแก้ไข/ลบ) -->
-        <div class="sm-table-card analytics-card w-full shadow-sm">
-            <div class="card-head flex justify-between items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                <div class="flex items-center gap-2.5 flex-wrap">
-                    <div class="flex items-center gap-2">
-                        <span class="text-blue-500 text-sm">⚡</span>
-                        <h3 class="text-xs sm:text-sm font-extrabold tracking-wide text-slate-800 dark:text-slate-100 uppercase">Skill Competency Matrix Table</h3>
-                    </div>
-                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800" id="sm-table-count">0 Items</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <div class="relative">
-                        <input type="text" id="sm-search-input" oninput="WapSkillMatrix.filterTable()" placeholder="🔍 ค้นหาทักษะ..." class="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-44 sm:w-56 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400">
-                    </div>
-                </div>
-            </div>
-            <div class="sm-table-container w-full overflow-x-auto overflow-y-visible min-h-[220px]">
-                <table class="w-full text-left border-collapse min-w-[650px]">
-                    <thead class="sticky top-0 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-md text-[10.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 z-10">
-                        <tr>
-                            <th class="py-3 px-4 text-center w-14">#</th>
-                            <th class="py-3 px-4">Skill Identity</th>
-                            <th class="py-3 px-4 w-56 sm:w-64">Proficiency Level</th>
-                            <th class="py-3 px-4 text-center w-36">Competency Tier</th>
-                            <th class="py-3 px-4 text-center w-32">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="sm-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/70 text-xs font-bold text-slate-700 dark:text-slate-200">
-                        <!-- Table Rows Injected Here -->
-                    </tbody>
-                </table>
-            </div>
         </div>
 
     </div>
@@ -2325,7 +3108,7 @@
                     <span>ซิงค์ Supabase</span>
                 </button>
 
-                <button onclick="if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerUniversalImport === 'function') { window.WapAdminSystem.triggerUniversalImport(); } else if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerJSONImport === 'function') { window.WapAdminSystem.triggerJSONImport(); }" class="px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white border border-emerald-400/40 rounded-lg text-[10.5px] sm:text-[11px] font-black transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm shadow-emerald-900/20 shrink-0" title="นำเข้าไฟล์ CSV หรือ JSON จาก Supabase เพื่อบันทึกข้อมูลเดิมลงฐานข้อมูลใหม่ (พร้อมระบบป้องกันข้อมูลซ้ำซ้อนทุกหน้า)">
+                <button onclick="if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerUniversalImport === 'function') { window.WapAdminSystem.triggerUniversalImport(); } else if(typeof triggerUniversalImport === 'function') { triggerUniversalImport(); } else if(window.WapAdminSystem && typeof window.WapAdminSystem.triggerCSVImport === 'function') { window.WapAdminSystem.triggerCSVImport(); }" class="px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white border border-emerald-400/40 rounded-lg text-[10.5px] sm:text-[11px] font-black transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm shadow-emerald-900/20 shrink-0" title="นำเข้าไฟล์ CSV หรือ JSON จาก Supabase เพื่อบันทึกข้อมูลเดิมลงฐานข้อมูลใหม่ (พร้อมระบบป้องกันข้อมูลซ้ำซ้อนทุกหน้า)">
                     <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                     <span>📥 นำเข้า CSV / JSON (กันซ้ำ)</span>
                 </button>
@@ -2553,9 +3336,9 @@
                         <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         Defects
                     </button>
-                    <button onclick="WapAdminSystem.switchTab('logs')" id="cyber-tab-logs" class="cyber-admin-tab" title="Audit Logs">
+                    <button onclick="WapAdminSystem.switchTab('logs')" id="cyber-tab-logs" class="cyber-admin-tab" title="Activity Log">
                         <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        Audit Logs
+                        Activity Log
                     </button>
                     <button onclick="WapAdminSystem.switchTab('system')" id="cyber-tab-system" class="cyber-admin-tab" title="VF & RP Email Dispatch">
                         <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
@@ -2721,37 +3504,37 @@
         <!-- ส่วนตาราง: เพิ่ม overflow-x-auto เพื่อให้เลื่อนซ้ายขวาได้ -->
         <div class="flex-1 overflow-auto scroll-custom">
             <table class="w-full border-collapse text-left" style="min-width: 3500px;"> <!-- กำหนดความกว้างขั้นต่ำเพื่อให้คอลัมน์ไม่เบียดกัน -->
-                <thead class="sticky top-0 z-20">
+                <thead class="sticky top-0 z-20 shadow-xs">
                     <tr id="rn-table-header" class="text-white">
-                        <th style="width: 50px;">No</th>
-                        <th style="width: 130px;">Ref.Vendor</th>
+                        <th style="width: 60px; text-align: center;">No</th>
+                        <th style="width: 140px;">Ref.Vendor</th>
                         <th style="width: 120px;">Trob Date</th>
                         <th style="width: 120px;">Issue Date</th>
-                        <th style="width: 150px;">Part Number</th>
+                        <th style="width: 160px;">Part Number</th>
                         <th style="width: 180px;">Part Name</th>
-                        <th style="width: 250px;">Failed Description</th>
-                        <th style="width: 300px;">Non-Conformance details</th>
+                        <th style="width: 200px;">Failed Description</th>
+                        <th style="width: 320px;">Non-Conformance details</th>
                         <th style="width: 180px;">Defective Mode (CTQ)</th>
-                        <th style="width: 120px;">Vendor Code</th>
-                        <th style="width: 200px;">VENDOR NAME</th>
-                        <th style="width: 130px;">Part Code</th>
+                        <th style="width: 130px;">Vendor Code</th>
+                        <th style="width: 200px;">Vendor Name</th>
+                        <th style="width: 110px; text-align: center;">Part Code</th>
                         <th style="width: 130px;">Part Group</th>
-                        <th style="width: 180px;">Incoming or PD Order (Pcs)</th>
-                        <th style="width: 150px;">SS. Defect Quantity</th>
-                        <th style="width: 150px;">Total Part V/F (Pcs)</th>
+                        <th style="width: 180px; text-align: center;">Incoming / PD Order (Pcs)</th>
+                        <th style="width: 150px; text-align: center;">SS. Defect Quantity</th>
+                        <th style="width: 150px; text-align: center;">Total Part V/F (Pcs)</th>
                         <th style="width: 130px;">Model Effect</th>
                         <th style="width: 130px;">Issue By</th>
-                        <th style="width: 200px;">Response</th>
+                        <th style="width: 160px;">Response</th>
                         <th style="width: 120px;">Target Date</th>
-                        <th style="width: 150px;">2nd Follow up Date</th>
-                        <th style="width: 120px;">Report Type</th>
-                        <th style="width: 120px; text-align:center;">Status</th>
-                        <th style="width: 130px;">Complete Date</th>
-                        <th style="width: 110px;">Count PPM</th>
-                        <th style="width: 150px;">Quality Event (QS)</th>
-                        <th style="width: 250px;">Remark</th>
-                        <th style="width: 180px;">Continue Follow up Date</th>
-                        <th style="width: 110px;">Progress</th>
+                        <th style="width: 160px;">2nd Follow up Date</th>
+                        <th style="width: 120px; text-align: center;">Report Type</th>
+                        <th style="width: 110px; text-align: center;">Status</th>
+                        <th style="width: 135px;">Complete Date</th>
+                        <th style="width: 110px; text-align: center;">Count PPM</th>
+                        <th style="width: 160px;">Quality Event (QS)</th>
+                        <th style="width: 240px;">Remark</th>
+                        <th style="width: 190px;">Continue Follow up Date</th>
+                        <th style="width: 110px; text-align: center;">Progress</th>
                     </tr>
                 </thead>
                 <tbody id="rn-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -2767,6 +3550,7 @@
     </div> <!-- /#dashboard-view -->
 
     <!-- วาง script ไว้ก่อนปิด body เสมอเพื่อให้โหลด DOM เสร็จก่อน -->
-    <script src="script.js"></script>
+    <script src="vf_rp_seed_rules.js?v=20260901_2"></script>
+    <script src="script.js?v=20260901_2"></script>
 </body>
 </html>

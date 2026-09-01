@@ -9366,11 +9366,18 @@ function refreshNeonGlow() {
     const judgmentEl = $id('judgmentSelect');
     const btnCommit = $id('btn-commit');
     
-    const hasQty = qtyEl && qtyEl.value !== '' && parseFloat(qtyEl.value) > 0;
+    const qtyRaw = qtyEl ? String(qtyEl.value).trim() : '';
+    const qtyNum = parseFloat(qtyRaw);
+    const hasQty = qtyRaw !== '' && !isNaN(qtyNum) && qtyNum >= 1;
 
-    // 1. หน่วย และ วันที่ - ไม่เรืองแสงค้างเมื่อเริ่มต้นหรือล้างข้อมูล
+    // 1. หน่วย (f-unit): เมื่อมีจำนวน 1 ขึ้นไปให้แสดงกรอบสีเขียวทันที และหายไปเมื่อเป็น 0 หรือไม่มี
     if (unitEl) {
-        unitEl.classList.remove('valid', 'invalid', 'field-glow-filled');
+        if (hasQty) {
+            unitEl.classList.add('valid');
+            unitEl.classList.remove('invalid', 'field-glow-filled');
+        } else {
+            unitEl.classList.remove('valid', 'invalid', 'field-glow-filled');
+        }
     }
 
     if (dateEl) {
@@ -9395,8 +9402,12 @@ function refreshNeonGlow() {
         }
 
         if (id === 'f-qty') {
-            if (hasQty) el.classList.add('valid');
-            else el.classList.remove('valid', 'invalid', 'field-glow-filled');
+            if (hasQty) {
+                el.classList.add('valid');
+                el.classList.remove('invalid', 'field-glow-filled');
+            } else {
+                el.classList.remove('valid', 'invalid', 'field-glow-filled');
+            }
             return;
         }
 
@@ -13366,6 +13377,12 @@ function renderDashboardCharts(yieldRate, filtered) {
         claimsCount: 0,
         lots: new Set(),
         totalQty: 0,
+        byJudgment: {
+            OK: { pcs: 0, lots: new Set(), claims: 0 },
+            SF: { pcs: 0, lots: new Set(), claims: 0 },
+            CTC: { pcs: 0, lots: new Set(), claims: 0 },
+            VENDOR: { pcs: 0, lots: new Set(), claims: 0 }
+        },
         defects: {},
         suppliers: {},
         parts: {}
@@ -13387,22 +13404,31 @@ function renderDashboardCharts(yieldRate, filtered) {
             if (isCurrentYear && mIdx > currentMonthIdx) return;
 
             const qty = parseFloat(r.qty) || 0;
-            const j = (r.judgment || '').toUpperCase().trim();
+            const rawJ = (r.judgment || '').toUpperCase().trim();
+
+            let jKey = 'OK';
+            if (rawJ === 'CAN USE' || rawJ === 'OK' || rawJ.includes('CAN USE')) jKey = 'OK';
+            else if (rawJ === 'SF' || rawJ.includes('SPECIAL FOCUS')) jKey = 'SF';
+            else if (rawJ === 'CTC' || rawJ.includes('CHARGE')) jKey = 'CTC';
+            else if (rawJ.includes('VENDOR') || rawJ.includes('SUPPLIER')) jKey = 'VENDOR';
+            else jKey = 'OK';
 
             if (dataSet.OK[mIdx] === null) dataSet.OK[mIdx] = 0;
             if (dataSet.SF[mIdx] === null) dataSet.SF[mIdx] = 0;
             if (dataSet.CTC[mIdx] === null) dataSet.CTC[mIdx] = 0;
             if (dataSet.VENDOR[mIdx] === null) dataSet.VENDOR[mIdx] = 0;
 
-            if (j === 'CAN USE' || j === 'OK') dataSet.OK[mIdx] += qty;
-            else if (j === 'SF') dataSet.SF[mIdx] += qty;
-            else if (j === 'CTC') dataSet.CTC[mIdx] += qty;
-            else if (j.includes('VENDOR')) dataSet.VENDOR[mIdx] += qty;
-            else dataSet.OK[mIdx] += qty;
+            dataSet[jKey][mIdx] += qty;
+
+            const lotIdentifier = (r.ref && r.ref.trim()) ? r.ref.trim() : `claim_${r.id || Math.random()}`;
 
             monthDetails[mIdx].claimsCount += 1;
-            if (r.ref) monthDetails[mIdx].lots.add(r.ref);
+            monthDetails[mIdx].lots.add(lotIdentifier);
             monthDetails[mIdx].totalQty += qty;
+
+            monthDetails[mIdx].byJudgment[jKey].pcs += qty;
+            monthDetails[mIdx].byJudgment[jKey].claims += 1;
+            monthDetails[mIdx].byJudgment[jKey].lots.add(lotIdentifier);
 
             if (r.defect) {
                 const df = r.defect.trim();
@@ -13479,63 +13505,162 @@ function renderDashboardCharts(yieldRate, filtered) {
                 intersect: false,
                 custom: function({ series, seriesIndex, dataPointIndex, w }) {
                     const mName = months[dataPointIndex];
-                    const ok = dataSet.OK[dataPointIndex] || 0;
-                    const sf = dataSet.SF[dataPointIndex] || 0;
-                    const ctc = dataSet.CTC[dataPointIndex] || 0;
-                    const vendor = dataSet.VENDOR[dataPointIndex] || 0;
-                    const totalM = ok + sf + ctc + vendor;
-                    const details = monthDetails[dataPointIndex];
-                    const claims = details.claimsCount;
-                    const lots = details.lots.size;
+                    const details = monthDetails[dataPointIndex] || {
+                        claimsCount: 0,
+                        lots: new Set(),
+                        totalQty: 0,
+                        byJudgment: {
+                            OK: { pcs: 0, lots: new Set(), claims: 0 },
+                            SF: { pcs: 0, lots: new Set(), claims: 0 },
+                            CTC: { pcs: 0, lots: new Set(), claims: 0 },
+                            VENDOR: { pcs: 0, lots: new Set(), claims: 0 }
+                        },
+                        defects: {},
+                        suppliers: {},
+                        parts: {}
+                    };
 
-                    const topDefectEntry = Object.entries(details.defects).sort((a, b) => b[1] - a[1])[0];
+                    const okPcs = details.byJudgment.OK ? details.byJudgment.OK.pcs : 0;
+                    const okLots = details.byJudgment.OK ? details.byJudgment.OK.lots.size : 0;
+
+                    const sfPcs = details.byJudgment.SF ? details.byJudgment.SF.pcs : 0;
+                    const sfLots = details.byJudgment.SF ? details.byJudgment.SF.lots.size : 0;
+
+                    const ctcPcs = details.byJudgment.CTC ? details.byJudgment.CTC.pcs : 0;
+                    const ctcLots = details.byJudgment.CTC ? details.byJudgment.CTC.lots.size : 0;
+
+                    const vendorPcs = details.byJudgment.VENDOR ? details.byJudgment.VENDOR.pcs : 0;
+                    const vendorLots = details.byJudgment.VENDOR ? details.byJudgment.VENDOR.lots.size : 0;
+
+                    const totalPcs = okPcs + sfPcs + ctcPcs + vendorPcs;
+                    const totalLots = details.lots ? details.lots.size : (okLots + sfLots + ctcLots + vendorLots);
+                    const claims = details.claimsCount || 0;
+
+                    const okPct = totalPcs > 0 ? ((okPcs / totalPcs) * 100).toFixed(1) : '0.0';
+                    const sfPct = totalPcs > 0 ? ((sfPcs / totalPcs) * 100).toFixed(1) : '0.0';
+                    const ctcPct = totalPcs > 0 ? ((ctcPcs / totalPcs) * 100).toFixed(1) : '0.0';
+                    const vendorPct = totalPcs > 0 ? ((vendorPcs / totalPcs) * 100).toFixed(1) : '0.0';
+
+                    const topDefectEntry = Object.entries(details.defects || {}).sort((a, b) => b[1] - a[1])[0];
                     const topDefectStr = topDefectEntry ? `${topDefectEntry[0]} (${topDefectEntry[1].toLocaleString()})` : '-';
 
-                    const topSupplierEntry = Object.entries(details.suppliers).sort((a, b) => b[1] - a[1])[0];
+                    const topSupplierEntry = Object.entries(details.suppliers || {}).sort((a, b) => b[1] - a[1])[0];
                     const topSupplierStr = topSupplierEntry ? `${topSupplierEntry[0]} (${topSupplierEntry[1].toLocaleString()})` : '-';
 
+                    const isDark = document.body.classList.contains('dark-mode');
+
                     return `
-                    <div style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.6); font-family: inherit; min-width: 240px; color: #fff;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 7px; margin-bottom: 9px;">
-                            <div style="font-weight: 900; font-size: 13px; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
-                                <span>📅</span> <span>${mName} ${targetYear}</span>
+                    <div class="custom-chart-tooltip-wrapper" style="
+                        background: ${isDark ? 'rgba(15, 23, 42, 0.98)' : 'rgba(255, 255, 255, 0.98)'};
+                        backdrop-filter: blur(16px);
+                        -webkit-backdrop-filter: blur(16px);
+                        border: ${isDark ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(203, 213, 225, 0.9)'};
+                        border-radius: 14px;
+                        padding: 13px 15px;
+                        box-shadow: ${isDark ? '0 24px 50px -6px rgba(0, 0, 0, 0.85), 0 0 25px rgba(56, 189, 248, 0.2)' : '0 20px 45px -8px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(0, 0, 0, 0.05)'};
+                        font-family: inherit;
+                        min-width: 295px;
+                        max-width: 330px;
+                        color: ${isDark ? '#f8fafc' : '#0f172a'};
+                        z-index: 999999999 !important;
+                        position: relative;
+                    ">
+                        <!-- Header with Month Title & Total Badges -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(226, 232, 240, 0.9)'}; padding-bottom: 9px; margin-bottom: 10px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 14px;">📅</span>
+                                <span style="font-weight: 900; font-size: 13.5px; color: ${isDark ? '#38bdf8' : '#0284c7'}; letter-spacing: -0.01em;">
+                                    ${mName} ${targetYear}
+                                </span>
                             </div>
-                            <div style="font-size: 10px; font-weight: 800; background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(56,189,248,0.3);">
-                                ${totalM.toLocaleString()} PCS
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span style="font-size: 10px; font-weight: 900; background: ${isDark ? 'rgba(56, 189, 248, 0.2)' : '#e0f2fe'}; color: ${isDark ? '#38bdf8' : '#0369a1'}; padding: 2.5px 8px; border-radius: 6px; border: 1px solid ${isDark ? 'rgba(56,189,248,0.35)' : '#bae6fd'}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                    ${totalPcs.toLocaleString()} PCS
+                                </span>
+                                <span style="font-size: 10px; font-weight: 800; background: ${isDark ? 'rgba(148, 163, 184, 0.18)' : '#f1f5f9'}; color: ${isDark ? '#cbd5e1' : '#475569'}; padding: 2.5px 7px; border-radius: 6px; border: 1px solid ${isDark ? 'rgba(148,163,184,0.25)' : '#e2e8f0'};">
+                                    ${totalLots.toLocaleString()} Lots
+                                </span>
                             </div>
                         </div>
                         
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 9px;">
-                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #10b981;">
-                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">OK / CAN USE</div>
-                                <div style="font-size: 11px; font-weight: 800; color: #34d399;">${ok.toLocaleString()}</div>
+                        <!-- 4 Judgments Grid (CAN USE, SF, CTC, VENDOR) with LOT, PCS, % distinctly separated -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 11px;">
+                            
+                            <!-- 1. OK / CAN USE -->
+                            <div style="background: ${isDark ? 'rgba(30, 41, 59, 0.65)' : '#f0fdf4'}; border: 1px solid ${isDark ? 'rgba(16, 185, 129, 0.25)' : '#bbf7d0'}; border-radius: 9px; padding: 7px 9px; border-left: 3.5px solid #10b981;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                                    <span style="font-size: 9px; font-weight: 800; color: ${isDark ? '#6ee7b7' : '#15803d'};">CAN USE / OK</span>
+                                    <span style="font-size: 8.5px; font-weight: 900; background: ${isDark ? 'rgba(16, 185, 129, 0.22)' : '#dcfce7'}; color: ${isDark ? '#34d399' : '#166534'}; padding: 1px 5px; border-radius: 4px; border: 1px solid ${isDark ? 'rgba(16, 185, 129, 0.3)' : '#86efac'};">${okPct}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                    <span style="font-size: 13px; font-weight: 900; color: ${isDark ? '#34d399' : '#16a34a'}; font-family: 'DM Mono', monospace;">${okPcs.toLocaleString()} <span style="font-size: 8.5px; font-weight: 700; color: ${isDark ? '#94a3b8' : '#64748b'};">PCS</span></span>
+                                    <span style="font-size: 9.5px; font-weight: 800; color: ${isDark ? '#cbd5e1' : '#475569'};">${okLots.toLocaleString()} <span style="font-size: 8px; font-weight: 600; opacity: 0.75;">Lots</span></span>
+                                </div>
+                                <div style="height: 3px; background: ${isDark ? 'rgba(255,255,255,0.08)' : '#dcfce7'}; border-radius: 99px; margin-top: 4px; overflow: hidden;">
+                                    <div style="width: ${okPct}%; height: 100%; background: #10b981; border-radius: 99px;"></div>
+                                </div>
                             </div>
-                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #f97316;">
-                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">SPECIAL FOCUS</div>
-                                <div style="font-size: 11px; font-weight: 800; color: #fb923c;">${sf.toLocaleString()}</div>
+
+                            <!-- 2. SPECIAL FOCUS (SF) -->
+                            <div style="background: ${isDark ? 'rgba(30, 41, 59, 0.65)' : '#fff7ed'}; border: 1px solid ${isDark ? 'rgba(249, 115, 22, 0.25)' : '#fed7aa'}; border-radius: 9px; padding: 7px 9px; border-left: 3.5px solid #f97316;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                                    <span style="font-size: 9px; font-weight: 800; color: ${isDark ? '#fdba74' : '#c2410c'};">SPECIAL FOCUS</span>
+                                    <span style="font-size: 8.5px; font-weight: 900; background: ${isDark ? 'rgba(249, 115, 22, 0.22)' : '#ffedd5'}; color: ${isDark ? '#fb923c' : '#9a3412'}; padding: 1px 5px; border-radius: 4px; border: 1px solid ${isDark ? 'rgba(249, 115, 22, 0.3)' : '#fdba74'};">${sfPct}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                    <span style="font-size: 13px; font-weight: 900; color: ${isDark ? '#fb923c' : '#ea580c'}; font-family: 'DM Mono', monospace;">${sfPcs.toLocaleString()} <span style="font-size: 8.5px; font-weight: 700; color: ${isDark ? '#94a3b8' : '#64748b'};">PCS</span></span>
+                                    <span style="font-size: 9.5px; font-weight: 800; color: ${isDark ? '#cbd5e1' : '#475569'};">${sfLots.toLocaleString()} <span style="font-size: 8px; font-weight: 600; opacity: 0.75;">Lots</span></span>
+                                </div>
+                                <div style="height: 3px; background: ${isDark ? 'rgba(255,255,255,0.08)' : '#ffedd5'}; border-radius: 99px; margin-top: 4px; overflow: hidden;">
+                                    <div style="width: ${sfPct}%; height: 100%; background: #f97316; border-radius: 99px;"></div>
+                                </div>
                             </div>
-                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #3b82f6;">
-                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">CTC (CHARGE)</div>
-                                <div style="font-size: 11px; font-weight: 800; color: #60a5fa;">${ctc.toLocaleString()}</div>
+
+                            <!-- 3. CTC (CHARGE) -->
+                            <div style="background: ${isDark ? 'rgba(30, 41, 59, 0.65)' : '#eff6ff'}; border: 1px solid ${isDark ? 'rgba(59, 130, 246, 0.25)' : '#bfdbfe'}; border-radius: 9px; padding: 7px 9px; border-left: 3.5px solid #3b82f6;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                                    <span style="font-size: 9px; font-weight: 800; color: ${isDark ? '#93c5fd' : '#1d4ed8'};">CTC (CHARGE)</span>
+                                    <span style="font-size: 8.5px; font-weight: 900; background: ${isDark ? 'rgba(59, 130, 246, 0.22)' : '#dbeafe'}; color: ${isDark ? '#60a5fa' : '#1e40af'}; padding: 1px 5px; border-radius: 4px; border: 1px solid ${isDark ? 'rgba(59, 130, 246, 0.3)' : '#93c5fd'};">${ctcPct}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                    <span style="font-size: 13px; font-weight: 900; color: ${isDark ? '#60a5fa' : '#2563eb'}; font-family: 'DM Mono', monospace;">${ctcPcs.toLocaleString()} <span style="font-size: 8.5px; font-weight: 700; color: ${isDark ? '#94a3b8' : '#64748b'};">PCS</span></span>
+                                    <span style="font-size: 9.5px; font-weight: 800; color: ${isDark ? '#cbd5e1' : '#475569'};">${ctcLots.toLocaleString()} <span style="font-size: 8px; font-weight: 600; opacity: 0.75;">Lots</span></span>
+                                </div>
+                                <div style="height: 3px; background: ${isDark ? 'rgba(255,255,255,0.08)' : '#dbeafe'}; border-radius: 99px; margin-top: 4px; overflow: hidden;">
+                                    <div style="width: ${ctcPct}%; height: 100%; background: #3b82f6; border-radius: 99px;"></div>
+                                </div>
                             </div>
-                            <div style="background: rgba(255,255,255,0.06); padding: 6px 8px; border-radius: 7px; border-left: 3px solid #ef4444;">
-                                <div style="font-size: 8.5px; color: #94a3b8; font-weight: 700;">VENDOR FAULT</div>
-                                <div style="font-size: 11px; font-weight: 800; color: #f87171;">${vendor.toLocaleString()}</div>
+
+                            <!-- 4. VENDOR FAULT -->
+                            <div style="background: ${isDark ? 'rgba(30, 41, 59, 0.65)' : '#fef2f2'}; border: 1px solid ${isDark ? 'rgba(239, 68, 68, 0.25)' : '#fecaca'}; border-radius: 9px; padding: 7px 9px; border-left: 3.5px solid #ef4444;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                                    <span style="font-size: 9px; font-weight: 800; color: ${isDark ? '#fca5a5' : '#b91c1c'};">VENDOR FAULT</span>
+                                    <span style="font-size: 8.5px; font-weight: 900; background: ${isDark ? 'rgba(239, 68, 68, 0.22)' : '#fee2e2'}; color: ${isDark ? '#f87171' : '#991b1b'}; padding: 1px 5px; border-radius: 4px; border: 1px solid ${isDark ? 'rgba(239, 68, 68, 0.3)' : '#fca5a5'};">${vendorPct}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                    <span style="font-size: 13px; font-weight: 900; color: ${isDark ? '#f87171' : '#dc2626'}; font-family: 'DM Mono', monospace;">${vendorPcs.toLocaleString()} <span style="font-size: 8.5px; font-weight: 700; color: ${isDark ? '#94a3b8' : '#64748b'};">PCS</span></span>
+                                    <span style="font-size: 9.5px; font-weight: 800; color: ${isDark ? '#cbd5e1' : '#475569'};">${vendorLots.toLocaleString()} <span style="font-size: 8px; font-weight: 600; opacity: 0.75;">Lots</span></span>
+                                </div>
+                                <div style="height: 3px; background: ${isDark ? 'rgba(255,255,255,0.08)' : '#fee2e2'}; border-radius: 99px; margin-top: 4px; overflow: hidden;">
+                                    <div style="width: ${vendorPct}%; height: 100%; background: #ef4444; border-radius: 99px;"></div>
+                                </div>
                             </div>
+
                         </div>
 
-                        <div style="border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 7px; font-size: 9.5px; line-height: 1.45; color: #cbd5e1;">
+                        <!-- Summary Details Footer -->
+                        <div style="border-top: 1px dashed ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(203, 213, 225, 0.9)'}; padding-top: 8px; font-size: 9.5px; line-height: 1.5; color: ${isDark ? '#cbd5e1' : '#475569'};">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                                <span style="color: #94a3b8;">Total Records / Lots:</span>
-                                <span style="font-weight: 800; color: #fff;">${claims} Recs / ${lots} Lots</span>
+                                <span style="color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 600;">Total Claims / Lots:</span>
+                                <span style="font-weight: 800; color: ${isDark ? '#ffffff' : '#0f172a'};">${claims} Claims / ${totalLots} Lots</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                                <span style="color: #94a3b8;">Top Defect:</span>
-                                <span style="font-weight: 700; color: #fde047; text-align: right; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topDefectStr}</span>
+                                <span style="color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 600;">Top Defect:</span>
+                                <span style="font-weight: 800; color: ${isDark ? '#fde047' : '#b45309'}; text-align: right; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topDefectStr}</span>
                             </div>
                             <div style="display: flex; justify-content: space-between;">
-                                <span style="color: #94a3b8;">Top Supplier:</span>
-                                <span style="font-weight: 700; color: #a78bfa; text-align: right; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topSupplierStr}</span>
+                                <span style="color: ${isDark ? '#94a3b8' : '#64748b'}; font-weight: 600;">Top Supplier:</span>
+                                <span style="font-weight: 800; color: ${isDark ? '#a78bfa' : '#6d28d9'}; text-align: right; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${topSupplierStr}</span>
                             </div>
                         </div>
                     </div>
@@ -14228,30 +14353,44 @@ function renderExecTrends(actData, s5Data) {
                 const supp = supportData[dataPointIndex] || 0;
                 const sj = specialJobsData[dataPointIndex] || 0;
                 const totalAct = s5 + supp + sj;
+                const isDark = document.body.classList.contains('dark-mode');
 
                 return `
-                <div style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 12px; padding: 12px 14px; box-shadow: 0 12px 30px -5px rgba(0,0,0,0.6); font-family: inherit; min-width: 220px; color: #fff;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 7px; margin-bottom: 9px;">
-                        <div style="font-weight: 900; font-size: 13px; color: #c084fc; display: flex; align-items: center; gap: 6px;">
+                <div class="custom-chart-tooltip-wrapper" style="
+                    background: ${isDark ? 'rgba(15, 23, 42, 0.98)' : 'rgba(255, 255, 255, 0.98)'};
+                    backdrop-filter: blur(16px);
+                    -webkit-backdrop-filter: blur(16px);
+                    border: ${isDark ? '1px solid rgba(168, 85, 247, 0.35)' : '1px solid rgba(203, 213, 225, 0.9)'};
+                    border-radius: 14px;
+                    padding: 12px 14px;
+                    box-shadow: ${isDark ? '0 20px 45px -6px rgba(0, 0, 0, 0.8), 0 0 20px rgba(168, 85, 247, 0.2)' : '0 18px 40px -8px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(0, 0, 0, 0.04)'};
+                    font-family: inherit;
+                    min-width: 230px;
+                    color: ${isDark ? '#f8fafc' : '#0f172a'};
+                    z-index: 999999999 !important;
+                    position: relative;
+                ">
+                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(226, 232, 240, 0.9)'}; padding-bottom: 8px; margin-bottom: 9px;">
+                        <div style="font-weight: 900; font-size: 13px; color: ${isDark ? '#c084fc' : '#7e22ce'}; display: flex; align-items: center; gap: 6px;">
                             <span>📊</span> <span>${mName} ${targetYear}</span>
                         </div>
-                        <div style="font-size: 10px; font-weight: 800; background: rgba(168, 85, 247, 0.2); color: #c084fc; padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(168, 85, 247, 0.3);">
-                            ${totalAct} Total Activities
+                        <div style="font-size: 10px; font-weight: 900; background: ${isDark ? 'rgba(168, 85, 247, 0.2)' : '#f3e8ff'}; color: ${isDark ? '#c084fc' : '#6b21a8'}; padding: 2px 7px; border-radius: 6px; border: 1px solid ${isDark ? 'rgba(168, 85, 247, 0.35)' : '#d8b4fe'};">
+                            ${totalAct} Total
                         </div>
                     </div>
                     
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.06); padding: 5px 8px; border-radius: 6px; border-left: 3px solid #a855f7;">
-                            <span style="font-size: 10px; color: #d8b4fe; font-weight: 700;">5S Findings</span>
-                            <span style="font-size: 11px; font-weight: 800; color: #fff;">${s5.toLocaleString()}</span>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: ${isDark ? 'rgba(255,255,255,0.06)' : '#faf5ff'}; border: 1px solid ${isDark ? 'rgba(168, 85, 247, 0.2)' : '#e9d5ff'}; padding: 6px 9px; border-radius: 8px; border-left: 3.5px solid #a855f7;">
+                            <span style="font-size: 10px; color: ${isDark ? '#d8b4fe' : '#6b21a8'}; font-weight: 800;">5S Findings</span>
+                            <span style="font-size: 12px; font-weight: 900; color: ${isDark ? '#ffffff' : '#4c1d95'}; font-family: 'DM Mono', monospace;">${s5.toLocaleString()}</span>
                         </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.06); padding: 5px 8px; border-radius: 6px; border-left: 3px solid #3b82f6;">
-                            <span style="font-size: 10px; color: #93c5fd; font-weight: 700;">Support Line</span>
-                            <span style="font-size: 11px; font-weight: 800; color: #fff;">${supp.toLocaleString()}</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: ${isDark ? 'rgba(255,255,255,0.06)' : '#eff6ff'}; border: 1px solid ${isDark ? 'rgba(59, 130, 246, 0.2)' : '#bfdbfe'}; padding: 6px 9px; border-radius: 8px; border-left: 3.5px solid #3b82f6;">
+                            <span style="font-size: 10px; color: ${isDark ? '#93c5fd' : '#1d4ed8'}; font-weight: 800;">Support Line</span>
+                            <span style="font-size: 12px; font-weight: 900; color: ${isDark ? '#ffffff' : '#1e3a8a'}; font-family: 'DM Mono', monospace;">${supp.toLocaleString()}</span>
                         </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.06); padding: 5px 8px; border-radius: 6px; border-left: 3px solid #10b981;">
-                            <span style="font-size: 10px; color: #6ee7b7; font-weight: 700;">Special Missions</span>
-                            <span style="font-size: 11px; font-weight: 800; color: #fff;">${sj.toLocaleString()}</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: ${isDark ? 'rgba(255,255,255,0.06)' : '#f0fdf4'}; border: 1px solid ${isDark ? 'rgba(16, 185, 129, 0.2)' : '#bbf7d0'}; padding: 6px 9px; border-radius: 8px; border-left: 3.5px solid #10b981;">
+                            <span style="font-size: 10px; color: ${isDark ? '#6ee7b7' : '#15803d'}; font-weight: 800;">Special Missions</span>
+                            <span style="font-size: 12px; font-weight: 900; color: ${isDark ? '#ffffff' : '#14532d'}; font-family: 'DM Mono', monospace;">${sj.toLocaleString()}</span>
                         </div>
                     </div>
                 </div>
@@ -16957,11 +17096,11 @@ function applyDateFilter() {
 
             // 1. วาดรายการรูปภาพที่มีอยู่ (ขนาดสัดส่วน 4:3 เท่ากันทุกช่อง)
             multiImages.forEach((imgData, idx) => {
-                const card迷 = document.createElement('div');
-                card迷.className = 'evidence-thumb-card';
-                card迷.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#f1f5f9; box-sizing:border-box;';
+                const card = document.createElement('div');
+                card.className = 'evidence-thumb-card';
+                card.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#f1f5f9; box-sizing:border-box;';
                 
-                card迷.innerHTML = `
+                card.innerHTML = `
                     <img src="${imgData}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Evidence ${idx + 1}" />
                     <div style="position:absolute; top:5px; right:5px; display:flex; gap:4px; z-index:2;">
                         <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">↻</button>
@@ -16971,9 +17110,9 @@ function applyDateFilter() {
                 `;
 
                 // ปุ่มหมุนรูป 90°
-                const rotBtn = card迷.querySelector('.evidence-thumb-rotate-btn');
+                const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
                 if (rotBtn) {
-                    rotBtn.onclick迷 = async (e) => {
+                    rotBtn.rotHandler = async (e) => {
                         e.stopPropagation();
                         rotBtn.textContent = '⏳';
                         const rotated = await rotateImageDataUrl(multiImages[idx]);
@@ -16981,11 +17120,11 @@ function applyDateFilter() {
                         await handleMultiImagesChange();
                         toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
                     };
-                    rotBtn.onclick = rotBtn.onclick迷;
+                    rotBtn.onclick = rotBtn.rotHandler;
                 }
 
                 // ปุ่มลบรูป
-                const delBtn = card迷.querySelector('.evidence-thumb-delete-btn');
+                const delBtn = card.querySelector('.evidence-thumb-delete-btn');
                 if (delBtn) {
                     delBtn.onclick = async (e) => {
                         e.stopPropagation();
@@ -16995,7 +17134,7 @@ function applyDateFilter() {
                     };
                 }
 
-                multiGrid.appendChild(card迷);
+                multiGrid.appendChild(card);
             });
 
             // 2. ช่องกดเพิ่มรูปภาพ (+ เพิ่มรูปภาพ) - ขนาดสัดส่วน 4:3 เท่ากับรูปภาพเสมอ
@@ -19315,30 +19454,135 @@ const WapSkillMatrix = (function() {
         });
     }
 
+    let _tierFilter = 'ALL';
+
+    function setTierFilter(tier) {
+        _tierFilter = tier || 'ALL';
+        const btns = {
+            'ALL': $id('sm-tier-btn-all'),
+            'EXPERT': $id('sm-tier-btn-expert'),
+            'ADVANCED': $id('sm-tier-btn-adv'),
+            'DEVELOPING': $id('sm-tier-btn-dev'),
+            'BASIC': $id('sm-tier-btn-basic')
+        };
+        Object.keys(btns).forEach(k => {
+            const b = btns[k];
+            if (!b) return;
+            if (k === _tierFilter) {
+                b.className = 'px-2 py-0.5 rounded-lg bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 font-black shadow-xs transition-all';
+            } else {
+                b.className = 'px-2 py-0.5 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-bold transition-all';
+            }
+        });
+        renderTable();
+    }
+
     function toggleViewMode(mode) {
         _viewMode = mode;
+        const vTable = $id('sm-view-table');
+        const vBar = $id('sm-view-bar');
+        const vList = $id('sm-view-list');
+        const vGap = $id('sm-view-gap');
+
+        const btnTable = $id('sm-btn-mode-table');
         const btnBar = $id('sm-btn-mode-bar');
         const btnList = $id('sm-btn-mode-list');
-        const chartBox = $id('sm-bar-chart');
-        const listBox = $id('sm-bar-list');
+        const btnGap = $id('sm-btn-mode-gap');
+
+        const activeClass = 'px-2 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs transition-all';
+        const inactiveClass = 'px-2 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all';
+
+        if (btnTable) btnTable.className = mode === 'table' ? activeClass : inactiveClass;
+        if (btnBar) btnBar.className = mode === 'bar' ? activeClass : inactiveClass;
+        if (btnList) btnList.className = mode === 'list' ? activeClass : inactiveClass;
+        if (btnGap) btnGap.className = mode === 'gap' ? 'px-2 py-1 rounded-md text-[10px] font-extrabold bg-purple-600 text-white shadow-xs transition-all' : 'px-2 py-1 rounded-md text-[10px] font-extrabold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-all';
+
+        if (vTable) vTable.classList.toggle('hidden', mode !== 'table');
+        if (vBar) vBar.classList.toggle('hidden', mode !== 'bar');
+        if (vList) vList.classList.toggle('hidden', mode !== 'list');
+        if (vGap) vGap.classList.toggle('hidden', mode !== 'gap');
 
         if (mode === 'bar') {
-            if (btnBar) btnBar.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transition-all';
-            if (btnList) btnList.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all';
-            if (chartBox) chartBox.classList.remove('hidden');
-            if (listBox) listBox.classList.add('hidden');
-            if (typeof gsap !== 'undefined' && chartBox) {
-                gsap.fromTo(chartBox, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power2.out' });
-            }
+            renderBarChart();
+        } else if (mode === 'list') {
+            renderBars();
+        } else if (mode === 'gap') {
+            renderGapAnalysis();
         } else {
-            if (btnList) btnList.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transition-all';
-            if (btnBar) btnBar.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all';
-            if (listBox) listBox.classList.remove('hidden');
-            if (chartBox) chartBox.classList.add('hidden');
-            if (typeof gsap !== 'undefined' && listBox) {
-                gsap.fromTo(listBox, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' });
-            }
+            renderTable();
         }
+    }
+
+    function renderGapAnalysis() {
+        const gapBox = document.getElementById('sm-gap-analysis-content');
+        if (!gapBox) return;
+
+        if (_records.length === 0) {
+            gapBox.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-48 text-slate-400">
+                    <span class="text-3xl mb-2">🎯</span>
+                    <p class="text-xs font-black uppercase tracking-wider">No Competency Records to Analyze</p>
+                </div>`;
+            return;
+        }
+
+        const sorted = [..._records].sort((a, b) => (a.skill_value || 0) - (b.skill_value || 0));
+        const gaps = sorted.filter(r => (r.skill_value || 0) < 70);
+        const strengths = sorted.filter(r => (r.skill_value || 0) >= 80);
+
+        gapBox.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- 1. Gap Summary & Action Plan -->
+                <div class="p-3.5 rounded-2xl bg-amber-500/5 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/60">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-amber-500 text-sm">⚠️</span>
+                            <h4 class="text-xs font-black text-amber-900 dark:text-amber-300 uppercase">Critical Skill Gaps (<70%)</h4>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">${gaps.length} Skills</span>
+                    </div>
+                    <div class="space-y-2 mt-2">
+                        ${gaps.length === 0 ? '<p class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">🎉 ยอดเยี่ยม! ไม่มีทักษะที่มี Gap ต่ำกว่าเกณฑ์</p>' : 
+                            gaps.map(g => `
+                                <div class="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-amber-100 dark:border-amber-900/40 shadow-2xs">
+                                    <div class="min-w-0 pr-2">
+                                        <p class="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">${_esc(g.skill_name)}</p>
+                                        <p class="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Gap: -${100 - (g.skill_value || 0)}% (แนะนำอบรมเพิ่ม)</p>
+                                    </div>
+                                    <button onclick="WapSkillMatrix.editSkill('${_esc(g.skill_name)}', ${g.skill_value})" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black shrink-0 transition-all">
+                                        🚀 เพิ่มทักษะ
+                                    </button>
+                                </div>
+                            `).join('')}
+                    </div>
+                </div>
+
+                <!-- 2. Benchmark & Ready-to-Lead Assets -->
+                <div class="p-3.5 rounded-2xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/60">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-emerald-500 text-sm">🌟</span>
+                            <h4 class="text-xs font-black text-emerald-900 dark:text-emerald-300 uppercase">Core Strengths (Expert Assets)</h4>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">${strengths.length} Skills</span>
+                    </div>
+                    <div class="space-y-2 mt-2">
+                        ${strengths.length === 0 ? '<p class="text-[11px] font-bold text-slate-400">ยังไม่มีทักษะระดับ Expert</p>' : 
+                            strengths.map(s => `
+                                <div class="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-emerald-100 dark:border-emerald-900/40 shadow-2xs">
+                                    <div class="min-w-0 pr-2">
+                                        <p class="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">${_esc(s.skill_name)}</p>
+                                        <p class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">พร้อมเป็น Trainer / Lead (${s.skill_value}%)</p>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-black shrink-0">
+                                        🏆 Certified
+                                    </span>
+                                </div>
+                            `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     function filterTable() {
@@ -19360,87 +19604,45 @@ const WapSkillMatrix = (function() {
     function animateChartEntrances() {
         if (typeof gsap === 'undefined') return;
 
-        // 1. Stat cards entrance stagger
-        const statCards = document.querySelectorAll('#skill-matrix-content .glass-stat-card');
+        const statCards = document.querySelectorAll('#skill-matrix-content .sm-capsule, #skill-matrix-content .sm-profile-pill');
         if (statCards.length > 0) {
             gsap.fromTo(statCards, 
-                { opacity: 0, y: 18, scale: 0.96 }, 
-                { opacity: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.08, ease: "power2.out" }
+                { opacity: 0, y: 10, scale: 0.98 }, 
+                { opacity: 1, y: 0, scale: 1, duration: 0.35, stagger: 0.04, ease: "power2.out" }
             );
         }
 
-        // 2. Command console bar slide up
-        const consoleBar = document.querySelector('#skill-matrix-content .sm-console-bar');
-        if (consoleBar) {
-            gsap.fromTo(consoleBar, 
-                { opacity: 0, y: 15 }, 
-                { opacity: 1, y: 0, duration: 0.4, delay: 0.12, ease: "power2.out" }
-            );
-        }
-
-        // 3. Analytics cards entrance stagger
-        const analyticsCards = document.querySelectorAll('#skill-matrix-content .analytics-card');
-        if (analyticsCards.length > 0) {
-            gsap.fromTo(analyticsCards, 
-                { opacity: 0, y: 22, scale: 0.97 }, 
-                { opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, delay: 0.18, ease: "back.out(1.2)" }
-            );
-        }
-
-        // 4. Radar Map chart entrance
         const radarChart = document.getElementById('sm-radar-chart');
         if (radarChart) {
             gsap.fromTo(radarChart, 
-                { opacity: 0, scale: 0.88 }, 
-                { opacity: 1, scale: 1, duration: 0.5, delay: 0.25, ease: "back.out(1.4)" }
+                { opacity: 0, scale: 0.9 }, 
+                { opacity: 1, scale: 1, duration: 0.4, delay: 0.1, ease: "back.out(1.4)" }
             );
         }
 
-        // 5. Bar Chart container entrance
-        const barChart = document.getElementById('sm-bar-chart');
-        if (barChart && !barChart.classList.contains('hidden')) {
-            gsap.fromTo(barChart, 
-                { opacity: 0, x: -15 }, 
-                { opacity: 1, x: 0, duration: 0.45, delay: 0.28, ease: "power2.out" }
-            );
-        }
-
-        // 6. Neon Bar list items stagger
-        const barItems = document.querySelectorAll('#sm-bar-list .neon-bar-item');
-        if (barItems.length > 0) {
-            gsap.fromTo(barItems, 
-                { opacity: 0, x: -20 }, 
-                { opacity: 1, x: 0, duration: 0.35, stagger: 0.05, ease: "power2.out" }
-            );
-        }
-
-        // 7. Donut Chart & Legend pills
         const donutChart = document.getElementById('sm-donut-chart');
         if (donutChart) {
             gsap.fromTo(donutChart, 
-                { opacity: 0, scale: 0.82 }, 
-                { opacity: 1, scale: 1, duration: 0.5, delay: 0.25, ease: "back.out(1.5)" }
+                { opacity: 0, scale: 0.88 }, 
+                { opacity: 1, scale: 1, duration: 0.4, delay: 0.15, ease: "back.out(1.4)" }
             );
         }
 
-        const legendPills = document.querySelectorAll('#sm-donut-legend > div');
-        if (legendPills.length > 0) {
-            gsap.fromTo(legendPills, 
-                { opacity: 0, y: 10 }, 
-                { opacity: 1, y: 0, duration: 0.35, stagger: 0.06, delay: 0.3, ease: "power2.out" }
-            );
-        }
-
-        // 8. Table rows entrance
         const tableBody = document.getElementById('sm-table-body');
         if (tableBody && typeof window.animateTableRows === 'function') {
-            window.animateTableRows(tableBody, { y: 10, duration: 0.35, maxRows: 12, ease: "power2.out" });
+            window.animateTableRows(tableBody, { y: 8, duration: 0.3, maxRows: 12, ease: "power2.out" });
         }
     }
 
     function updateKPIs() {
-        const count = _records.length;
-        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
+        const targetUser = S.userRole === 'supervisor' ? (S.viewingUser || S.currentUser) : S.currentUser;
+        const profileEl = document.getElementById('sm-profile-name');
+        if (profileEl) {
+            profileEl.textContent = targetUser || 'SQE ENGINEER';
+        }
+
+        const count = Array.isArray(_records) ? _records.length : 0;
+        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (Number(r.skill_value) || 0), 0) / count) : 0;
         
         const badge = document.getElementById('sm-level-badge');
         let level = { label: '⚙️ BASIC', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
@@ -19450,15 +19652,15 @@ const WapSkillMatrix = (function() {
         
         if (badge) {
             badge.textContent = level.label;
-            badge.className = `px-4 py-1.5 rounded-full text-[10px] font-black border uppercase tracking-wider ${level.cls}`;
+            badge.className = `px-3 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-wider ${level.cls}`;
             if (typeof gsap !== 'undefined') {
-                gsap.fromTo(badge, { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.7)" });
+                gsap.fromTo(badge, { scale: 0.85, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(1.7)" });
             }
         }
 
         if (typeof animateValue === 'function') {
-            animateValue('sm-kpi-avg', 0, avg, 1200, 0, "%");
-            animateValue('sm-kpi-count', 0, count, 1000, 0, " Skills");
+            animateValue('sm-kpi-avg', 0, avg, 800, 0, "%");
+            animateValue('sm-kpi-count', 0, count, 600, 0, " Skills");
         } else {
             const avgEl = document.getElementById('sm-kpi-avg');
             if (avgEl) avgEl.textContent = avg + '%';
@@ -19466,20 +19668,29 @@ const WapSkillMatrix = (function() {
             if (cntEl) cntEl.textContent = count + ' Skills';
         }
 
-        const sorted = (Array.isArray(_records) ? [..._records] : []).sort((a, b) => (b.skill_value || 0) - (a.skill_value || 0));
+        const sorted = (Array.isArray(_records) ? [..._records] : []).sort((a, b) => (Number(b.skill_value) || 0) - (Number(a.skill_value) || 0));
         const topEl = document.getElementById('sm-kpi-top');
         if (topEl) {
-            topEl.textContent = sorted[0]?.skill_name || '—';
-            if (typeof gsap !== 'undefined') {
-                gsap.fromTo(topEl, { y: 5, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 });
+            if (sorted.length > 0 && sorted[0]?.skill_name) {
+                const topVal = Number(sorted[0].skill_value) || 0;
+                topEl.textContent = `${sorted[0].skill_name} (${topVal}%)`;
+                topEl.title = `${sorted[0].skill_name} (${topVal}%)`;
+            } else {
+                topEl.textContent = '—';
+                topEl.title = 'No Data';
             }
         }
 
         const weakEl = document.getElementById('sm-kpi-weak');
         if (weakEl) {
-            weakEl.textContent = sorted[sorted.length - 1]?.skill_name || '—';
-            if (typeof gsap !== 'undefined') {
-                gsap.fromTo(weakEl, { y: 5, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, delay: 0.1 });
+            if (sorted.length > 0 && sorted[sorted.length - 1]?.skill_name) {
+                const weakItem = sorted[sorted.length - 1];
+                const weakVal = Number(weakItem.skill_value) || 0;
+                weakEl.textContent = `${weakItem.skill_name} (${weakVal}%)`;
+                weakEl.title = `${weakItem.skill_name} (${weakVal}%)`;
+            } else {
+                weakEl.textContent = '—';
+                weakEl.title = 'No Data';
             }
         }
     }
@@ -19502,7 +19713,7 @@ const WapSkillMatrix = (function() {
             series: [{ name: 'Proficiency Level', data: dataVals }],
             chart: { 
                 type: 'radar', 
-                height: 320, 
+                height: 200, 
                 toolbar: { show: false },
                 parentHeightOffset: 0
             },
@@ -19511,10 +19722,10 @@ const WapSkillMatrix = (function() {
                 type: 'gradient',
                 gradient: { shade: 'dark', gradientToColors: ['#10b981'], shadeIntensity: 1, opacityFrom: 0.5, opacityTo: 0.15 }
             },
-            markers: { size: 4, colors: ['#2563eb'], strokeColors: '#ffffff', strokeWidth: 2, hover: { size: 6 } },
+            markers: { size: 3, colors: ['#2563eb'], strokeColors: '#ffffff', strokeWidth: 1.5, hover: { size: 5 } },
             plotOptions: {
                 radar: {
-                    size: 110,
+                    size: 70,
                     polygons: {
                         strokeColors: isDark ? '#334155' : '#e2e8f0',
                         connectorColors: isDark ? '#334155' : '#e2e8f0',
@@ -19526,10 +19737,10 @@ const WapSkillMatrix = (function() {
                 categories: categories,
                 labels: { 
                     show: true,
-                    style: { fontSize: '9px', fontWeight: 800, colors: isDark ? '#94a3b8' : '#64748b' },
+                    style: { fontSize: '8.5px', fontWeight: 800, colors: isDark ? '#94a3b8' : '#64748b' },
                     formatter: function(val) {
                         if (!val) return '';
-                        return val.length > 15 ? val.substring(0, 13) + '…' : val;
+                        return val.length > 12 ? val.substring(0, 10) + '…' : val;
                     }
                 }
             },
@@ -19668,34 +19879,38 @@ const WapSkillMatrix = (function() {
         const legendEl = document.getElementById('sm-donut-legend');
         if (!legendEl) return; 
 
-        const count = _records.length;
-        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
+        const count = Array.isArray(_records) ? _records.length : 0;
+        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (Number(r.skill_value) || 0), 0) / count) : 0;
 
         const dist = { expert: 0, adv: 0, dev: 0, basic: 0 };
-        _records.forEach(r => {
-            const v = r.skill_value || 0;
-            if (v >= 80) dist.expert++;
-            else if (v >= 60) dist.adv++;
-            else if (v >= 40) dist.dev++;
-            else dist.basic++;
-        });
+        if (Array.isArray(_records)) {
+            _records.forEach(r => {
+                const v = Number(r.skill_value) || 0;
+                if (v >= 80) dist.expert++;
+                else if (v >= 60) dist.adv++;
+                else if (v >= 40) dist.dev++;
+                else dist.basic++;
+            });
+        }
 
         const series = [dist.expert, dist.adv, dist.dev, dist.basic];
         const labels = ['Expert (80-100%)', 'Advanced (60-79%)', 'Developing (40-59%)', 'Basic (<40%)'];
+        const shortLabels = ['EXPERT (80-100%)', 'ADVANCED (60-79%)', 'DEVELOPING (40-59%)', 'BASIC (<40%)'];
         const colors = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8'];
 
+        const totalItems = series.reduce((a, b) => a + b, 0);
+
         legendEl.innerHTML = labels.map((l, i) => {
-            const total = series.reduce((a, b) => a + b, 0);
-            const pct = total > 0 ? ((series[i] / total) * 100).toFixed(0) : 0;
+            const pct = totalItems > 0 ? Math.round((series[i] / totalItems) * 100) : 0;
             return `
-                <div class="flex items-center justify-between p-1.5 px-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/80 shadow-xs">
-                    <div class="flex items-center gap-2">
-                        <div class="w-2.5 h-2.5 rounded-full" style="background:${colors[i]}; box-shadow: 0 0 6px ${colors[i]}55"></div>
-                        <span class="text-[9.5px] font-black text-slate-600 dark:text-slate-300 uppercase">${l}</span>
+                <div class="flex items-center justify-between p-1.5 px-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 shadow-2xs">
+                    <div class="flex items-center gap-1.5 min-w-0 pr-1">
+                        <span class="w-2 h-2 rounded-full shrink-0" style="background:${colors[i]}; box-shadow: 0 0 5px ${colors[i]}55"></span>
+                        <span class="text-[9px] font-extrabold text-slate-600 dark:text-slate-300 truncate">${shortLabels[i]}</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-[9px] font-bold text-slate-400">${pct}%</span>
-                        <span class="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">${series[i]}</span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span class="text-[8.5px] font-bold text-slate-400 font-mono">${pct}%</span>
+                        <span class="text-[11px] font-black text-slate-800 dark:text-slate-100 font-mono">${series[i]}</span>
                     </div>
                 </div>
             `;
@@ -19712,7 +19927,7 @@ const WapSkillMatrix = (function() {
             labels: labels,
             chart: { 
                 type: 'donut', 
-                height: 190, 
+                height: 145, 
                 animations: { enabled: true, speed: 400 },
                 parentHeightOffset: 0
             },
@@ -19726,11 +19941,11 @@ const WapSkillMatrix = (function() {
                             show: true,
                             name: { show: false },
                             value: { 
-                                show: true, fontSize: '16px', fontWeight: '900', color: isDark ? '#ffffff' : '#1e293b', offsetY: 6,
+                                show: true, fontSize: '15px', fontWeight: '900', color: isDark ? '#ffffff' : '#1e293b', offsetY: 5,
                                 formatter: (val) => val
                             },
                             total: { 
-                                show: true, label: 'AVG', color: '#64748b', fontSize: '8px', fontWeight: '800',
+                                show: true, label: 'AVG', color: '#64748b', fontSize: '8.5px', fontWeight: '800',
                                 formatter: () => avg + '%'
                             }
                         }
@@ -19756,15 +19971,26 @@ const WapSkillMatrix = (function() {
             filtered = filtered.filter(r => (r.skill_name || '').toLowerCase().includes(_searchQuery));
         }
 
+        if (_tierFilter && _tierFilter !== 'ALL') {
+            filtered = filtered.filter(r => {
+                const v = Number(r.skill_value) || 0;
+                if (_tierFilter === 'EXPERT') return v >= 80;
+                if (_tierFilter === 'ADVANCED') return v >= 60 && v < 80;
+                if (_tierFilter === 'DEVELOPING') return v >= 40 && v < 60;
+                if (_tierFilter === 'BASIC') return v < 40;
+                return true;
+            });
+        }
+
         if (countBadge) countBadge.textContent = `${filtered.length} Items`;
 
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="5" class="py-12 text-center text-slate-400 dark:text-slate-500 font-bold text-xs">
+                    <td colspan="6" class="py-12 text-center text-slate-400 dark:text-slate-500 font-bold text-xs">
                         <div class="flex flex-col items-center justify-center gap-2">
                             <span class="text-2xl">⚡</span>
-                            <span>${_searchQuery ? 'ไม่พบทักษะที่ตรงกับคำค้นหา "' + _esc(_searchQuery) + '"' : 'ยังไม่มีข้อมูลทักษะในระบบ (สามารถเพิ่มทักษะผ่านแถบควบคุมด้านบน)'}</span>
+                            <span>${_searchQuery || _tierFilter !== 'ALL' ? 'ไม่พบทักษะที่ตรงกับเงื่อนไขการค้นหา/ตัวกรอง' : 'ยังไม่มีข้อมูลทักษะในระบบ (สามารถเพิ่มทักษะผ่านแถบควบคุมด้านบน)'}</span>
                         </div>
                     </td>
                 </tr>`;
@@ -19773,39 +19999,44 @@ const WapSkillMatrix = (function() {
 
         tbody.innerHTML = filtered.map((r, index) => {
             const val = Number(r.skill_value) || 0;
-            let tier = { label: 'BASIC', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700', barCls: 'bg-slate-400' };
-            if (val >= 80) tier = { label: 'EXPERT', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800', barCls: 'bg-emerald-500' };
-            else if (val >= 60) tier = { label: 'ADVANCED', cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800', barCls: 'bg-blue-500' };
-            else if (val >= 40) tier = { label: 'DEVELOPING', cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800', barCls: 'bg-amber-500' };
+            let tier = { label: 'BASIC', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700', barCls: 'bg-slate-400', supStatus: 'Needs Training', supCls: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800' };
+            if (val >= 80) tier = { label: 'EXPERT', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800', barCls: 'bg-emerald-500', supStatus: '🏆 Certified Lead', supCls: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' };
+            else if (val >= 60) tier = { label: 'ADVANCED', cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800', barCls: 'bg-blue-500', supStatus: '✅ Target Met', supCls: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800' };
+            else if (val >= 40) tier = { label: 'DEVELOPING', cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800', barCls: 'bg-amber-500', supStatus: '⏳ In Progress', supCls: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' };
 
             return `
                 <tr class="hover:bg-blue-50/40 dark:hover:bg-slate-800/60 transition-colors group">
-                    <td class="py-3 px-4 text-center text-slate-400 font-mono text-xs font-bold">${index + 1}</td>
-                    <td class="py-3 px-4">
+                    <td class="py-2.5 px-3 text-center text-slate-400 font-mono text-xs font-bold">${index + 1}</td>
+                    <td class="py-2.5 px-3">
                         <div class="flex items-center gap-2">
                             <span class="w-1.5 h-1.5 rounded-full ${tier.barCls}"></span>
                             <span class="font-extrabold text-slate-800 dark:text-slate-100 text-xs sm:text-[13px] tracking-tight">${_esc(r.skill_name || '')}</span>
                         </div>
                     </td>
-                    <td class="py-3 px-4">
-                        <div class="flex items-center gap-3">
-                            <span class="font-black text-xs font-mono text-slate-700 dark:text-slate-200 w-10 text-right shrink-0">${val}%</span>
-                            <div class="flex-1 min-w-[80px] h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200/60 dark:border-slate-700/60">
-                                <div class="h-full rounded-full ${tier.barCls} transition-all duration-500 shadow-xs" style="width:${val}%"></div>
+                    <td class="py-2.5 px-3">
+                        <div class="flex items-center gap-2.5">
+                            <span class="font-black text-xs font-mono text-slate-700 dark:text-slate-200 w-9 text-right shrink-0">${val}%</span>
+                            <div class="flex-1 min-w-[70px] h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200/60 dark:border-slate-700/60">
+                                <div class="h-full rounded-full ${tier.barCls} transition-all duration-500 shadow-2xs" style="width:${val}%"></div>
                             </div>
                         </div>
                     </td>
-                    <td class="py-3 px-4 text-center">
-                        <span class="inline-block px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${tier.cls}">
+                    <td class="py-2.5 px-3 text-center">
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[9.5px] font-black border uppercase tracking-wider ${tier.cls}">
                             ${tier.label}
                         </span>
                     </td>
-                    <td class="py-3 px-4 text-center">
-                        <div class="flex items-center justify-center gap-1.5">
-                            <button onclick="WapSkillMatrix.editSkill('${_esc(r.skill_name)}', ${val})" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200/50 dark:border-blue-800/50 text-[11px] font-bold transition-all" title="แก้ไขทักษะ">
+                    <td class="py-2.5 px-3 text-center">
+                        <span class="inline-block px-2.5 py-0.5 rounded-md text-[9.5px] font-extrabold border ${tier.supCls}">
+                            ${tier.supStatus}
+                        </span>
+                    </td>
+                    <td class="py-2.5 px-3 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="WapSkillMatrix.editSkill('${_esc(r.skill_name)}', ${val})" class="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200/50 dark:border-blue-800/50 text-[10.5px] font-bold transition-all" title="แก้ไขทักษะ">
                                 ✏️ แก้ไข
                             </button>
-                            <button onclick="WapSkillMatrix.remove('${_esc(r.skill_name)}')" class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200/50 dark:border-rose-800/50 text-[11px] font-bold transition-all" title="ลบทักษะ">
+                            <button onclick="WapSkillMatrix.remove('${_esc(r.skill_name)}')" class="px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200/50 dark:border-rose-800/50 text-[10.5px] font-bold transition-all" title="ลบทักษะ">
                                 🗑️ ลบ
                             </button>
                         </div>
@@ -19821,6 +20052,7 @@ const WapSkillMatrix = (function() {
         editSkill, 
         remove, 
         clearAll, 
+        setTierFilter,
         toggleViewMode, 
         filterTable, 
         renderAll,
@@ -33081,6 +33313,7 @@ return `
             _currentSlide++;
             renderSlide();
             _rehydrateUI();
+            fitSlideToContainer();
         }
     }
 
@@ -33090,6 +33323,7 @@ return `
             _currentSlide--;
             renderSlide();
             _rehydrateUI();
+            fitSlideToContainer();
         }
     }
 
@@ -35531,11 +35765,39 @@ container.innerHTML = '<div style="padding:40px; text-align:center; color:#64748
         updateExportAndEmailButtons();
         const d2 = c ? (c.d2_data || {}) : {};
 
+        const presContainer = document.getElementById('eight-d-presentation-container');
+        if (presContainer) {
+            presContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+                background: #cbd5e1;
+                width: 100%;
+                height: 100%;
+                padding: 16px;
+                box-sizing: border-box;
+                position: relative;
+            `;
+        }
+
+        const slideWrapper = document.getElementById('eight-d-slide-wrapper');
+        if (slideWrapper) {
+            slideWrapper.style.cssText = `
+                position: relative;
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: auto;
+            `;
+        }
+
         // ล้างค่าเก่าและตั้งค่า Container หลักให้เป็น Flex Column ความสูงเต็ม
         container.innerHTML = '';
         container.style.cssText = `
             width: 960px;
-            height: 680px;
+            height: 600px;
             box-sizing: border-box; 
             display: flex; 
             flex-direction: column; 
@@ -36818,7 +37080,20 @@ else if (_currentSlide === 15) {
             slide.style.margin = '0 auto';
             slide.style.height = 'auto';
             slide.style.transform = 'none';
+            slide.style.position = 'relative';
+            slide.style.top = 'auto';
+            slide.style.left = 'auto';
             return;
+        }
+
+        if (container) {
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.justifyContent = 'center';
+            container.style.overflow = 'hidden';
+            container.style.padding = '16px';
+            container.style.boxSizing = 'border-box';
+            container.style.position = 'relative';
         }
 
         const availW = Math.max(100, container.clientWidth - 32);
@@ -36831,13 +37106,25 @@ else if (_currentSlide === 15) {
         const scaleY = availH / baseH;
         const scale = Math.min(scaleX, scaleY);
 
-        wrapper.style.width = `${Math.round(baseW * scale)}px`;
-        wrapper.style.height = `${Math.round(baseH * scale)}px`;
+        const scaledW = Math.round(baseW * scale);
+        const scaledH = Math.round(baseH * scale);
+
+        wrapper.style.width = `${scaledW}px`;
+        wrapper.style.height = `${scaledH}px`;
+        wrapper.style.margin = 'auto';
+        wrapper.style.position = 'relative';
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.justifyContent = 'center';
+        wrapper.style.flexShrink = '0';
 
         slide.style.width = `${baseW}px`;
         slide.style.height = `${baseH}px`;
         slide.style.transform = `scale(${scale})`;
         slide.style.transformOrigin = 'top left';
+        slide.style.position = 'absolute';
+        slide.style.top = '0';
+        slide.style.left = '0';
         if (_currentSlide === 5) adjustD4ConnectorLine();
     }
 
@@ -37050,6 +37337,7 @@ if (qtyInput) {
         if (this.value < 0) {
             this.value = 0;
         }
+        if (typeof refreshNeonGlow === 'function') refreshNeonGlow();
     });
 
     // 3. ป้องกันการลบข้อมูลจนว่างเปล่า (เมื่อเสีย Focus ให้กลับมาเป็น 0)
@@ -37057,6 +37345,7 @@ if (qtyInput) {
         if (this.value === "" || this.value < 0) {
             this.value = 0;
         }
+        if (typeof refreshNeonGlow === 'function') refreshNeonGlow();
     });
 }
 

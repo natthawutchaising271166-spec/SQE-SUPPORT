@@ -9366,18 +9366,11 @@ function refreshNeonGlow() {
     const judgmentEl = $id('judgmentSelect');
     const btnCommit = $id('btn-commit');
     
-    const qtyRaw = qtyEl ? String(qtyEl.value).trim() : '';
-    const qtyNum = parseFloat(qtyRaw);
-    const hasQty = qtyRaw !== '' && !isNaN(qtyNum) && qtyNum >= 1;
+    const hasQty = qtyEl && qtyEl.value !== '' && parseFloat(qtyEl.value) > 0;
 
-    // 1. หน่วย (f-unit): เมื่อมีจำนวน 1 ขึ้นไปให้แสดงกรอบสีเขียวทันที และหายไปเมื่อเป็น 0 หรือไม่มี
+    // 1. หน่วย และ วันที่ - ไม่เรืองแสงค้างเมื่อเริ่มต้นหรือล้างข้อมูล
     if (unitEl) {
-        if (hasQty) {
-            unitEl.classList.add('valid');
-            unitEl.classList.remove('invalid', 'field-glow-filled');
-        } else {
-            unitEl.classList.remove('valid', 'invalid', 'field-glow-filled');
-        }
+        unitEl.classList.remove('valid', 'invalid', 'field-glow-filled');
     }
 
     if (dateEl) {
@@ -9402,12 +9395,8 @@ function refreshNeonGlow() {
         }
 
         if (id === 'f-qty') {
-            if (hasQty) {
-                el.classList.add('valid');
-                el.classList.remove('invalid', 'field-glow-filled');
-            } else {
-                el.classList.remove('valid', 'invalid', 'field-glow-filled');
-            }
+            if (hasQty) el.classList.add('valid');
+            else el.classList.remove('valid', 'invalid', 'field-glow-filled');
             return;
         }
 
@@ -17096,11 +17085,11 @@ function applyDateFilter() {
 
             // 1. วาดรายการรูปภาพที่มีอยู่ (ขนาดสัดส่วน 4:3 เท่ากันทุกช่อง)
             multiImages.forEach((imgData, idx) => {
-                const card = document.createElement('div');
-                card.className = 'evidence-thumb-card';
-                card.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#f1f5f9; box-sizing:border-box;';
+                const card迷 = document.createElement('div');
+                card迷.className = 'evidence-thumb-card';
+                card迷.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#f1f5f9; box-sizing:border-box;';
                 
-                card.innerHTML = `
+                card迷.innerHTML = `
                     <img src="${imgData}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Evidence ${idx + 1}" />
                     <div style="position:absolute; top:5px; right:5px; display:flex; gap:4px; z-index:2;">
                         <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">↻</button>
@@ -17110,9 +17099,9 @@ function applyDateFilter() {
                 `;
 
                 // ปุ่มหมุนรูป 90°
-                const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
+                const rotBtn = card迷.querySelector('.evidence-thumb-rotate-btn');
                 if (rotBtn) {
-                    rotBtn.rotHandler = async (e) => {
+                    rotBtn.onclick迷 = async (e) => {
                         e.stopPropagation();
                         rotBtn.textContent = '⏳';
                         const rotated = await rotateImageDataUrl(multiImages[idx]);
@@ -17120,11 +17109,11 @@ function applyDateFilter() {
                         await handleMultiImagesChange();
                         toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
                     };
-                    rotBtn.onclick = rotBtn.rotHandler;
+                    rotBtn.onclick = rotBtn.onclick迷;
                 }
 
                 // ปุ่มลบรูป
-                const delBtn = card.querySelector('.evidence-thumb-delete-btn');
+                const delBtn = card迷.querySelector('.evidence-thumb-delete-btn');
                 if (delBtn) {
                     delBtn.onclick = async (e) => {
                         e.stopPropagation();
@@ -17134,7 +17123,7 @@ function applyDateFilter() {
                     };
                 }
 
-                multiGrid.appendChild(card);
+                multiGrid.appendChild(card迷);
             });
 
             // 2. ช่องกดเพิ่มรูปภาพ (+ เพิ่มรูปภาพ) - ขนาดสัดส่วน 4:3 เท่ากับรูปภาพเสมอ
@@ -19454,135 +19443,30 @@ const WapSkillMatrix = (function() {
         });
     }
 
-    let _tierFilter = 'ALL';
-
-    function setTierFilter(tier) {
-        _tierFilter = tier || 'ALL';
-        const btns = {
-            'ALL': $id('sm-tier-btn-all'),
-            'EXPERT': $id('sm-tier-btn-expert'),
-            'ADVANCED': $id('sm-tier-btn-adv'),
-            'DEVELOPING': $id('sm-tier-btn-dev'),
-            'BASIC': $id('sm-tier-btn-basic')
-        };
-        Object.keys(btns).forEach(k => {
-            const b = btns[k];
-            if (!b) return;
-            if (k === _tierFilter) {
-                b.className = 'px-2 py-0.5 rounded-lg bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 font-black shadow-xs transition-all';
-            } else {
-                b.className = 'px-2 py-0.5 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-bold transition-all';
-            }
-        });
-        renderTable();
-    }
-
     function toggleViewMode(mode) {
         _viewMode = mode;
-        const vTable = $id('sm-view-table');
-        const vBar = $id('sm-view-bar');
-        const vList = $id('sm-view-list');
-        const vGap = $id('sm-view-gap');
-
-        const btnTable = $id('sm-btn-mode-table');
         const btnBar = $id('sm-btn-mode-bar');
         const btnList = $id('sm-btn-mode-list');
-        const btnGap = $id('sm-btn-mode-gap');
-
-        const activeClass = 'px-2 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs transition-all';
-        const inactiveClass = 'px-2 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all';
-
-        if (btnTable) btnTable.className = mode === 'table' ? activeClass : inactiveClass;
-        if (btnBar) btnBar.className = mode === 'bar' ? activeClass : inactiveClass;
-        if (btnList) btnList.className = mode === 'list' ? activeClass : inactiveClass;
-        if (btnGap) btnGap.className = mode === 'gap' ? 'px-2 py-1 rounded-md text-[10px] font-extrabold bg-purple-600 text-white shadow-xs transition-all' : 'px-2 py-1 rounded-md text-[10px] font-extrabold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-all';
-
-        if (vTable) vTable.classList.toggle('hidden', mode !== 'table');
-        if (vBar) vBar.classList.toggle('hidden', mode !== 'bar');
-        if (vList) vList.classList.toggle('hidden', mode !== 'list');
-        if (vGap) vGap.classList.toggle('hidden', mode !== 'gap');
+        const chartBox = $id('sm-bar-chart');
+        const listBox = $id('sm-bar-list');
 
         if (mode === 'bar') {
-            renderBarChart();
-        } else if (mode === 'list') {
-            renderBars();
-        } else if (mode === 'gap') {
-            renderGapAnalysis();
+            if (btnBar) btnBar.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transition-all';
+            if (btnList) btnList.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all';
+            if (chartBox) chartBox.classList.remove('hidden');
+            if (listBox) listBox.classList.add('hidden');
+            if (typeof gsap !== 'undefined' && chartBox) {
+                gsap.fromTo(chartBox, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power2.out' });
+            }
         } else {
-            renderTable();
+            if (btnList) btnList.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm transition-all';
+            if (btnBar) btnBar.className = 'px-2.5 py-1 rounded-md text-[10px] font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all';
+            if (listBox) listBox.classList.remove('hidden');
+            if (chartBox) chartBox.classList.add('hidden');
+            if (typeof gsap !== 'undefined' && listBox) {
+                gsap.fromTo(listBox, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' });
+            }
         }
-    }
-
-    function renderGapAnalysis() {
-        const gapBox = document.getElementById('sm-gap-analysis-content');
-        if (!gapBox) return;
-
-        if (_records.length === 0) {
-            gapBox.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-48 text-slate-400">
-                    <span class="text-3xl mb-2">🎯</span>
-                    <p class="text-xs font-black uppercase tracking-wider">No Competency Records to Analyze</p>
-                </div>`;
-            return;
-        }
-
-        const sorted = [..._records].sort((a, b) => (a.skill_value || 0) - (b.skill_value || 0));
-        const gaps = sorted.filter(r => (r.skill_value || 0) < 70);
-        const strengths = sorted.filter(r => (r.skill_value || 0) >= 80);
-
-        gapBox.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <!-- 1. Gap Summary & Action Plan -->
-                <div class="p-3.5 rounded-2xl bg-amber-500/5 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/60">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2">
-                            <span class="text-amber-500 text-sm">⚠️</span>
-                            <h4 class="text-xs font-black text-amber-900 dark:text-amber-300 uppercase">Critical Skill Gaps (<70%)</h4>
-                        </div>
-                        <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">${gaps.length} Skills</span>
-                    </div>
-                    <div class="space-y-2 mt-2">
-                        ${gaps.length === 0 ? '<p class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">🎉 ยอดเยี่ยม! ไม่มีทักษะที่มี Gap ต่ำกว่าเกณฑ์</p>' : 
-                            gaps.map(g => `
-                                <div class="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-amber-100 dark:border-amber-900/40 shadow-2xs">
-                                    <div class="min-w-0 pr-2">
-                                        <p class="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">${_esc(g.skill_name)}</p>
-                                        <p class="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Gap: -${100 - (g.skill_value || 0)}% (แนะนำอบรมเพิ่ม)</p>
-                                    </div>
-                                    <button onclick="WapSkillMatrix.editSkill('${_esc(g.skill_name)}', ${g.skill_value})" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black shrink-0 transition-all">
-                                        🚀 เพิ่มทักษะ
-                                    </button>
-                                </div>
-                            `).join('')}
-                    </div>
-                </div>
-
-                <!-- 2. Benchmark & Ready-to-Lead Assets -->
-                <div class="p-3.5 rounded-2xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/60">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2">
-                            <span class="text-emerald-500 text-sm">🌟</span>
-                            <h4 class="text-xs font-black text-emerald-900 dark:text-emerald-300 uppercase">Core Strengths (Expert Assets)</h4>
-                        </div>
-                        <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">${strengths.length} Skills</span>
-                    </div>
-                    <div class="space-y-2 mt-2">
-                        ${strengths.length === 0 ? '<p class="text-[11px] font-bold text-slate-400">ยังไม่มีทักษะระดับ Expert</p>' : 
-                            strengths.map(s => `
-                                <div class="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-emerald-100 dark:border-emerald-900/40 shadow-2xs">
-                                    <div class="min-w-0 pr-2">
-                                        <p class="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">${_esc(s.skill_name)}</p>
-                                        <p class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">พร้อมเป็น Trainer / Lead (${s.skill_value}%)</p>
-                                    </div>
-                                    <span class="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-black shrink-0">
-                                        🏆 Certified
-                                    </span>
-                                </div>
-                            `).join('')}
-                    </div>
-                </div>
-            </div>
-        `;
     }
 
     function filterTable() {
@@ -19604,45 +19488,87 @@ const WapSkillMatrix = (function() {
     function animateChartEntrances() {
         if (typeof gsap === 'undefined') return;
 
-        const statCards = document.querySelectorAll('#skill-matrix-content .sm-capsule, #skill-matrix-content .sm-profile-pill');
+        // 1. Stat cards entrance stagger
+        const statCards = document.querySelectorAll('#skill-matrix-content .glass-stat-card');
         if (statCards.length > 0) {
             gsap.fromTo(statCards, 
-                { opacity: 0, y: 10, scale: 0.98 }, 
-                { opacity: 1, y: 0, scale: 1, duration: 0.35, stagger: 0.04, ease: "power2.out" }
+                { opacity: 0, y: 18, scale: 0.96 }, 
+                { opacity: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.08, ease: "power2.out" }
             );
         }
 
+        // 2. Command console bar slide up
+        const consoleBar = document.querySelector('#skill-matrix-content .sm-console-bar');
+        if (consoleBar) {
+            gsap.fromTo(consoleBar, 
+                { opacity: 0, y: 15 }, 
+                { opacity: 1, y: 0, duration: 0.4, delay: 0.12, ease: "power2.out" }
+            );
+        }
+
+        // 3. Analytics cards entrance stagger
+        const analyticsCards = document.querySelectorAll('#skill-matrix-content .analytics-card');
+        if (analyticsCards.length > 0) {
+            gsap.fromTo(analyticsCards, 
+                { opacity: 0, y: 22, scale: 0.97 }, 
+                { opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, delay: 0.18, ease: "back.out(1.2)" }
+            );
+        }
+
+        // 4. Radar Map chart entrance
         const radarChart = document.getElementById('sm-radar-chart');
         if (radarChart) {
             gsap.fromTo(radarChart, 
-                { opacity: 0, scale: 0.9 }, 
-                { opacity: 1, scale: 1, duration: 0.4, delay: 0.1, ease: "back.out(1.4)" }
+                { opacity: 0, scale: 0.88 }, 
+                { opacity: 1, scale: 1, duration: 0.5, delay: 0.25, ease: "back.out(1.4)" }
             );
         }
 
+        // 5. Bar Chart container entrance
+        const barChart = document.getElementById('sm-bar-chart');
+        if (barChart && !barChart.classList.contains('hidden')) {
+            gsap.fromTo(barChart, 
+                { opacity: 0, x: -15 }, 
+                { opacity: 1, x: 0, duration: 0.45, delay: 0.28, ease: "power2.out" }
+            );
+        }
+
+        // 6. Neon Bar list items stagger
+        const barItems = document.querySelectorAll('#sm-bar-list .neon-bar-item');
+        if (barItems.length > 0) {
+            gsap.fromTo(barItems, 
+                { opacity: 0, x: -20 }, 
+                { opacity: 1, x: 0, duration: 0.35, stagger: 0.05, ease: "power2.out" }
+            );
+        }
+
+        // 7. Donut Chart & Legend pills
         const donutChart = document.getElementById('sm-donut-chart');
         if (donutChart) {
             gsap.fromTo(donutChart, 
-                { opacity: 0, scale: 0.88 }, 
-                { opacity: 1, scale: 1, duration: 0.4, delay: 0.15, ease: "back.out(1.4)" }
+                { opacity: 0, scale: 0.82 }, 
+                { opacity: 1, scale: 1, duration: 0.5, delay: 0.25, ease: "back.out(1.5)" }
             );
         }
 
+        const legendPills = document.querySelectorAll('#sm-donut-legend > div');
+        if (legendPills.length > 0) {
+            gsap.fromTo(legendPills, 
+                { opacity: 0, y: 10 }, 
+                { opacity: 1, y: 0, duration: 0.35, stagger: 0.06, delay: 0.3, ease: "power2.out" }
+            );
+        }
+
+        // 8. Table rows entrance
         const tableBody = document.getElementById('sm-table-body');
         if (tableBody && typeof window.animateTableRows === 'function') {
-            window.animateTableRows(tableBody, { y: 8, duration: 0.3, maxRows: 12, ease: "power2.out" });
+            window.animateTableRows(tableBody, { y: 10, duration: 0.35, maxRows: 12, ease: "power2.out" });
         }
     }
 
     function updateKPIs() {
-        const targetUser = S.userRole === 'supervisor' ? (S.viewingUser || S.currentUser) : S.currentUser;
-        const profileEl = document.getElementById('sm-profile-name');
-        if (profileEl) {
-            profileEl.textContent = targetUser || 'SQE ENGINEER';
-        }
-
-        const count = Array.isArray(_records) ? _records.length : 0;
-        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (Number(r.skill_value) || 0), 0) / count) : 0;
+        const count = _records.length;
+        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
         
         const badge = document.getElementById('sm-level-badge');
         let level = { label: '⚙️ BASIC', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
@@ -19652,15 +19578,15 @@ const WapSkillMatrix = (function() {
         
         if (badge) {
             badge.textContent = level.label;
-            badge.className = `px-3 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-wider ${level.cls}`;
+            badge.className = `px-4 py-1.5 rounded-full text-[10px] font-black border uppercase tracking-wider ${level.cls}`;
             if (typeof gsap !== 'undefined') {
-                gsap.fromTo(badge, { scale: 0.85, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(1.7)" });
+                gsap.fromTo(badge, { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.7)" });
             }
         }
 
         if (typeof animateValue === 'function') {
-            animateValue('sm-kpi-avg', 0, avg, 800, 0, "%");
-            animateValue('sm-kpi-count', 0, count, 600, 0, " Skills");
+            animateValue('sm-kpi-avg', 0, avg, 1200, 0, "%");
+            animateValue('sm-kpi-count', 0, count, 1000, 0, " Skills");
         } else {
             const avgEl = document.getElementById('sm-kpi-avg');
             if (avgEl) avgEl.textContent = avg + '%';
@@ -19668,29 +19594,20 @@ const WapSkillMatrix = (function() {
             if (cntEl) cntEl.textContent = count + ' Skills';
         }
 
-        const sorted = (Array.isArray(_records) ? [..._records] : []).sort((a, b) => (Number(b.skill_value) || 0) - (Number(a.skill_value) || 0));
+        const sorted = (Array.isArray(_records) ? [..._records] : []).sort((a, b) => (b.skill_value || 0) - (a.skill_value || 0));
         const topEl = document.getElementById('sm-kpi-top');
         if (topEl) {
-            if (sorted.length > 0 && sorted[0]?.skill_name) {
-                const topVal = Number(sorted[0].skill_value) || 0;
-                topEl.textContent = `${sorted[0].skill_name} (${topVal}%)`;
-                topEl.title = `${sorted[0].skill_name} (${topVal}%)`;
-            } else {
-                topEl.textContent = '—';
-                topEl.title = 'No Data';
+            topEl.textContent = sorted[0]?.skill_name || '—';
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(topEl, { y: 5, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4 });
             }
         }
 
         const weakEl = document.getElementById('sm-kpi-weak');
         if (weakEl) {
-            if (sorted.length > 0 && sorted[sorted.length - 1]?.skill_name) {
-                const weakItem = sorted[sorted.length - 1];
-                const weakVal = Number(weakItem.skill_value) || 0;
-                weakEl.textContent = `${weakItem.skill_name} (${weakVal}%)`;
-                weakEl.title = `${weakItem.skill_name} (${weakVal}%)`;
-            } else {
-                weakEl.textContent = '—';
-                weakEl.title = 'No Data';
+            weakEl.textContent = sorted[sorted.length - 1]?.skill_name || '—';
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(weakEl, { y: 5, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, delay: 0.1 });
             }
         }
     }
@@ -19713,7 +19630,7 @@ const WapSkillMatrix = (function() {
             series: [{ name: 'Proficiency Level', data: dataVals }],
             chart: { 
                 type: 'radar', 
-                height: 200, 
+                height: 320, 
                 toolbar: { show: false },
                 parentHeightOffset: 0
             },
@@ -19722,10 +19639,10 @@ const WapSkillMatrix = (function() {
                 type: 'gradient',
                 gradient: { shade: 'dark', gradientToColors: ['#10b981'], shadeIntensity: 1, opacityFrom: 0.5, opacityTo: 0.15 }
             },
-            markers: { size: 3, colors: ['#2563eb'], strokeColors: '#ffffff', strokeWidth: 1.5, hover: { size: 5 } },
+            markers: { size: 4, colors: ['#2563eb'], strokeColors: '#ffffff', strokeWidth: 2, hover: { size: 6 } },
             plotOptions: {
                 radar: {
-                    size: 70,
+                    size: 110,
                     polygons: {
                         strokeColors: isDark ? '#334155' : '#e2e8f0',
                         connectorColors: isDark ? '#334155' : '#e2e8f0',
@@ -19737,10 +19654,10 @@ const WapSkillMatrix = (function() {
                 categories: categories,
                 labels: { 
                     show: true,
-                    style: { fontSize: '8.5px', fontWeight: 800, colors: isDark ? '#94a3b8' : '#64748b' },
+                    style: { fontSize: '9px', fontWeight: 800, colors: isDark ? '#94a3b8' : '#64748b' },
                     formatter: function(val) {
                         if (!val) return '';
-                        return val.length > 12 ? val.substring(0, 10) + '…' : val;
+                        return val.length > 15 ? val.substring(0, 13) + '…' : val;
                     }
                 }
             },
@@ -19879,38 +19796,34 @@ const WapSkillMatrix = (function() {
         const legendEl = document.getElementById('sm-donut-legend');
         if (!legendEl) return; 
 
-        const count = Array.isArray(_records) ? _records.length : 0;
-        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (Number(r.skill_value) || 0), 0) / count) : 0;
+        const count = _records.length;
+        const avg = count > 0 ? Math.round(_records.reduce((sum, r) => sum + (r.skill_value || 0), 0) / count) : 0;
 
         const dist = { expert: 0, adv: 0, dev: 0, basic: 0 };
-        if (Array.isArray(_records)) {
-            _records.forEach(r => {
-                const v = Number(r.skill_value) || 0;
-                if (v >= 80) dist.expert++;
-                else if (v >= 60) dist.adv++;
-                else if (v >= 40) dist.dev++;
-                else dist.basic++;
-            });
-        }
+        _records.forEach(r => {
+            const v = r.skill_value || 0;
+            if (v >= 80) dist.expert++;
+            else if (v >= 60) dist.adv++;
+            else if (v >= 40) dist.dev++;
+            else dist.basic++;
+        });
 
         const series = [dist.expert, dist.adv, dist.dev, dist.basic];
         const labels = ['Expert (80-100%)', 'Advanced (60-79%)', 'Developing (40-59%)', 'Basic (<40%)'];
-        const shortLabels = ['EXPERT (80-100%)', 'ADVANCED (60-79%)', 'DEVELOPING (40-59%)', 'BASIC (<40%)'];
         const colors = ['#10b981', '#3b82f6', '#f59e0b', '#94a3b8'];
 
-        const totalItems = series.reduce((a, b) => a + b, 0);
-
         legendEl.innerHTML = labels.map((l, i) => {
-            const pct = totalItems > 0 ? Math.round((series[i] / totalItems) * 100) : 0;
+            const total = series.reduce((a, b) => a + b, 0);
+            const pct = total > 0 ? ((series[i] / total) * 100).toFixed(0) : 0;
             return `
-                <div class="flex items-center justify-between p-1.5 px-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 shadow-2xs">
-                    <div class="flex items-center gap-1.5 min-w-0 pr-1">
-                        <span class="w-2 h-2 rounded-full shrink-0" style="background:${colors[i]}; box-shadow: 0 0 5px ${colors[i]}55"></span>
-                        <span class="text-[9px] font-extrabold text-slate-600 dark:text-slate-300 truncate">${shortLabels[i]}</span>
+                <div class="flex items-center justify-between p-1.5 px-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/80 shadow-xs">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-2.5 rounded-full" style="background:${colors[i]}; box-shadow: 0 0 6px ${colors[i]}55"></div>
+                        <span class="text-[9.5px] font-black text-slate-600 dark:text-slate-300 uppercase">${l}</span>
                     </div>
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <span class="text-[8.5px] font-bold text-slate-400 font-mono">${pct}%</span>
-                        <span class="text-[11px] font-black text-slate-800 dark:text-slate-100 font-mono">${series[i]}</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[9px] font-bold text-slate-400">${pct}%</span>
+                        <span class="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">${series[i]}</span>
                     </div>
                 </div>
             `;
@@ -19927,7 +19840,7 @@ const WapSkillMatrix = (function() {
             labels: labels,
             chart: { 
                 type: 'donut', 
-                height: 145, 
+                height: 190, 
                 animations: { enabled: true, speed: 400 },
                 parentHeightOffset: 0
             },
@@ -19941,11 +19854,11 @@ const WapSkillMatrix = (function() {
                             show: true,
                             name: { show: false },
                             value: { 
-                                show: true, fontSize: '15px', fontWeight: '900', color: isDark ? '#ffffff' : '#1e293b', offsetY: 5,
+                                show: true, fontSize: '16px', fontWeight: '900', color: isDark ? '#ffffff' : '#1e293b', offsetY: 6,
                                 formatter: (val) => val
                             },
                             total: { 
-                                show: true, label: 'AVG', color: '#64748b', fontSize: '8.5px', fontWeight: '800',
+                                show: true, label: 'AVG', color: '#64748b', fontSize: '8px', fontWeight: '800',
                                 formatter: () => avg + '%'
                             }
                         }
@@ -19971,26 +19884,15 @@ const WapSkillMatrix = (function() {
             filtered = filtered.filter(r => (r.skill_name || '').toLowerCase().includes(_searchQuery));
         }
 
-        if (_tierFilter && _tierFilter !== 'ALL') {
-            filtered = filtered.filter(r => {
-                const v = Number(r.skill_value) || 0;
-                if (_tierFilter === 'EXPERT') return v >= 80;
-                if (_tierFilter === 'ADVANCED') return v >= 60 && v < 80;
-                if (_tierFilter === 'DEVELOPING') return v >= 40 && v < 60;
-                if (_tierFilter === 'BASIC') return v < 40;
-                return true;
-            });
-        }
-
         if (countBadge) countBadge.textContent = `${filtered.length} Items`;
 
         if (filtered.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="py-12 text-center text-slate-400 dark:text-slate-500 font-bold text-xs">
+                    <td colspan="5" class="py-12 text-center text-slate-400 dark:text-slate-500 font-bold text-xs">
                         <div class="flex flex-col items-center justify-center gap-2">
                             <span class="text-2xl">⚡</span>
-                            <span>${_searchQuery || _tierFilter !== 'ALL' ? 'ไม่พบทักษะที่ตรงกับเงื่อนไขการค้นหา/ตัวกรอง' : 'ยังไม่มีข้อมูลทักษะในระบบ (สามารถเพิ่มทักษะผ่านแถบควบคุมด้านบน)'}</span>
+                            <span>${_searchQuery ? 'ไม่พบทักษะที่ตรงกับคำค้นหา "' + _esc(_searchQuery) + '"' : 'ยังไม่มีข้อมูลทักษะในระบบ (สามารถเพิ่มทักษะผ่านแถบควบคุมด้านบน)'}</span>
                         </div>
                     </td>
                 </tr>`;
@@ -19999,44 +19901,39 @@ const WapSkillMatrix = (function() {
 
         tbody.innerHTML = filtered.map((r, index) => {
             const val = Number(r.skill_value) || 0;
-            let tier = { label: 'BASIC', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700', barCls: 'bg-slate-400', supStatus: 'Needs Training', supCls: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800' };
-            if (val >= 80) tier = { label: 'EXPERT', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800', barCls: 'bg-emerald-500', supStatus: '🏆 Certified Lead', supCls: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' };
-            else if (val >= 60) tier = { label: 'ADVANCED', cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800', barCls: 'bg-blue-500', supStatus: '✅ Target Met', supCls: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800' };
-            else if (val >= 40) tier = { label: 'DEVELOPING', cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800', barCls: 'bg-amber-500', supStatus: '⏳ In Progress', supCls: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' };
+            let tier = { label: 'BASIC', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700', barCls: 'bg-slate-400' };
+            if (val >= 80) tier = { label: 'EXPERT', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800', barCls: 'bg-emerald-500' };
+            else if (val >= 60) tier = { label: 'ADVANCED', cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800', barCls: 'bg-blue-500' };
+            else if (val >= 40) tier = { label: 'DEVELOPING', cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800', barCls: 'bg-amber-500' };
 
             return `
                 <tr class="hover:bg-blue-50/40 dark:hover:bg-slate-800/60 transition-colors group">
-                    <td class="py-2.5 px-3 text-center text-slate-400 font-mono text-xs font-bold">${index + 1}</td>
-                    <td class="py-2.5 px-3">
+                    <td class="py-3 px-4 text-center text-slate-400 font-mono text-xs font-bold">${index + 1}</td>
+                    <td class="py-3 px-4">
                         <div class="flex items-center gap-2">
                             <span class="w-1.5 h-1.5 rounded-full ${tier.barCls}"></span>
                             <span class="font-extrabold text-slate-800 dark:text-slate-100 text-xs sm:text-[13px] tracking-tight">${_esc(r.skill_name || '')}</span>
                         </div>
                     </td>
-                    <td class="py-2.5 px-3">
-                        <div class="flex items-center gap-2.5">
-                            <span class="font-black text-xs font-mono text-slate-700 dark:text-slate-200 w-9 text-right shrink-0">${val}%</span>
-                            <div class="flex-1 min-w-[70px] h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200/60 dark:border-slate-700/60">
-                                <div class="h-full rounded-full ${tier.barCls} transition-all duration-500 shadow-2xs" style="width:${val}%"></div>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-3">
+                            <span class="font-black text-xs font-mono text-slate-700 dark:text-slate-200 w-10 text-right shrink-0">${val}%</span>
+                            <div class="flex-1 min-w-[80px] h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200/60 dark:border-slate-700/60">
+                                <div class="h-full rounded-full ${tier.barCls} transition-all duration-500 shadow-xs" style="width:${val}%"></div>
                             </div>
                         </div>
                     </td>
-                    <td class="py-2.5 px-3 text-center">
-                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[9.5px] font-black border uppercase tracking-wider ${tier.cls}">
+                    <td class="py-3 px-4 text-center">
+                        <span class="inline-block px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${tier.cls}">
                             ${tier.label}
                         </span>
                     </td>
-                    <td class="py-2.5 px-3 text-center">
-                        <span class="inline-block px-2.5 py-0.5 rounded-md text-[9.5px] font-extrabold border ${tier.supCls}">
-                            ${tier.supStatus}
-                        </span>
-                    </td>
-                    <td class="py-2.5 px-3 text-center">
-                        <div class="flex items-center justify-center gap-1">
-                            <button onclick="WapSkillMatrix.editSkill('${_esc(r.skill_name)}', ${val})" class="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200/50 dark:border-blue-800/50 text-[10.5px] font-bold transition-all" title="แก้ไขทักษะ">
+                    <td class="py-3 px-4 text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button onclick="WapSkillMatrix.editSkill('${_esc(r.skill_name)}', ${val})" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200/50 dark:border-blue-800/50 text-[11px] font-bold transition-all" title="แก้ไขทักษะ">
                                 ✏️ แก้ไข
                             </button>
-                            <button onclick="WapSkillMatrix.remove('${_esc(r.skill_name)}')" class="px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200/50 dark:border-rose-800/50 text-[10.5px] font-bold transition-all" title="ลบทักษะ">
+                            <button onclick="WapSkillMatrix.remove('${_esc(r.skill_name)}')" class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200/50 dark:border-rose-800/50 text-[11px] font-bold transition-all" title="ลบทักษะ">
                                 🗑️ ลบ
                             </button>
                         </div>
@@ -20052,7 +19949,6 @@ const WapSkillMatrix = (function() {
         editSkill, 
         remove, 
         clearAll, 
-        setTierFilter,
         toggleViewMode, 
         filterTable, 
         renderAll,
@@ -37337,7 +37233,6 @@ if (qtyInput) {
         if (this.value < 0) {
             this.value = 0;
         }
-        if (typeof refreshNeonGlow === 'function') refreshNeonGlow();
     });
 
     // 3. ป้องกันการลบข้อมูลจนว่างเปล่า (เมื่อเสีย Focus ให้กลับมาเป็น 0)
@@ -37345,7 +37240,6 @@ if (qtyInput) {
         if (this.value === "" || this.value < 0) {
             this.value = 0;
         }
-        if (typeof refreshNeonGlow === 'function') refreshNeonGlow();
     });
 }
 
