@@ -12039,10 +12039,9 @@ body.dark-mode .float-toggle {
    ============================================================ */
 
 /* ============================================================
-   SKILL MATRIX - ULTIMATE SINGLE-SCREEN COMMAND CENTER (V5.0)
+   SKILL MATRIX - NEON ANALYTICS COMMAND CENTER (V5.0 SINGLE-SCREEN)
    ============================================================ */
 
-/* 1.  ｸｭｹｸｹｸｭ｣ｸｫ･ｱ : ･ ｸｭ ｸｫｹｸｲｸｭ ｸｫｸｸｭｸｵ 100% Viewport  ｸ｡ｸｹｸｭ ｹ･ｷｸｭｸｪ≒ｸｭ｣ｸｸｲ｣  */
 #skill-matrix-content {
     width: 100%;
     height: calc(100vh - 64px) !important;
@@ -12051,7 +12050,7 @@ body.dark-mode .float-toggle {
     box-sizing: border-box;
 }
 
-#skill-matrix-content:not(.hidden-view) .sm-ultra-layout {
+#skill-matrix-content:not(.hidden-view) .sm-master-layout {
     width: 100% !important;
     height: 100% !important;
     max-height: 100% !important;
@@ -12064,139 +12063,184 @@ body.dark-mode .float-toggle {
     overflow: hidden !important;
 }
 
-/* 2. Top Header Executive Deck */
-.sm-top-deck {
+/* 1. Skill Matrix KPI Command Cards */
+.sm-kpi-row {
+    flex-shrink: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px !important;
+}
+
+.sm-kpi-card-styled {
+    background: #ffffff;
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 104px !important;
+    min-height: 104px !important;
+    max-height: 104px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.sm-kpi-card-styled:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.sm-kpi-blue { border-top: 4px solid #3b82f6 !important; }
+.sm-kpi-purple { border-top: 4px solid #8b5cf6 !important; }
+.sm-kpi-emerald { border-top: 4px solid #10b981 !important; }
+.sm-kpi-amber { border-top: 4px solid #f59e0b !important; }
+
+body.dark-mode .sm-kpi-blue { border-top: 4px solid #60a5fa !important; }
+body.dark-mode .sm-kpi-purple { border-top: 4px solid #c084fc !important; }
+body.dark-mode .sm-kpi-emerald { border-top: 4px solid #34d399 !important; }
+body.dark-mode .sm-kpi-amber { border-top: 4px solid #fbbf24 !important; }
+
+.sm-kpi-card-styled .val-mega {
+    font-size: clamp(20px, 2vw, 26px);
+    font-weight: 950;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: 4px 0;
+}
+
+.sm-kpi-card-styled .val-mega.blue { color: #2563eb !important; }
+.sm-kpi-card-styled .val-mega.purple { color: #7c3aed !important; }
+.sm-kpi-card-styled .val-mega.emerald { color: #059669 !important; font-size: 15px !important; line-height: 1.2 !important; }
+.sm-kpi-card-styled .val-mega.amber { color: #d97706 !important; font-size: 15px !important; line-height: 1.2 !important; }
+
+body.dark-mode .sm-kpi-card-styled .val-mega.blue { color: #60a5fa !important; text-shadow: 0 0 12px rgba(96, 165, 250, 0.4); }
+body.dark-mode .sm-kpi-card-styled .val-mega.purple { color: #c084fc !important; text-shadow: 0 0 12px rgba(192, 132, 252, 0.4); }
+body.dark-mode .sm-kpi-card-styled .val-mega.emerald { color: #34d399 !important; font-size: 15px !important; line-height: 1.2 !important; text-shadow: 0 0 12px rgba(52, 211, 153, 0.3); }
+body.dark-mode .sm-kpi-card-styled .val-mega.amber { color: #fbbf24 !important; font-size: 15px !important; line-height: 1.2 !important; text-shadow: 0 0 12px rgba(251, 191, 36, 0.3); }
+
+.sm-kpi-card-styled .ot-label {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    color: #64748b;
+}
+
+body.dark-mode .sm-kpi-card-styled .ot-label {
+    color: #94a3b8 !important;
+}
+
+.sm-kpi-card-styled .tiny-caption {
+    font-size: 9px;
+    font-weight: 700;
+    color: #94a3b8;
+}
+
+body.dark-mode .sm-kpi-card-styled .tiny-caption {
+    color: #64748b !important;
+}
+
+.sm-badge-pill {
+    padding: 1px 8px;
+    border-radius: 9999px;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-width: 1px;
+    border-style: solid;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.4;
+}
+
+.sm-badge-expert {
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+.sm-badge-advanced {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+.sm-badge-developing {
+    background: #fffbeb;
+    color: #b45309;
+    border-color: #fde68a;
+}
+.sm-badge-basic {
+    background: #f8fafc;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+
+body.dark-mode .sm-badge-expert {
+    background: rgba(6, 78, 59, 0.45) !important;
+    color: #6ee7b7 !important;
+    border-color: rgba(52, 211, 153, 0.4) !important;
+}
+body.dark-mode .sm-badge-advanced {
+    background: rgba(30, 58, 138, 0.45) !important;
+    color: #93c5fd !important;
+    border-color: rgba(96, 165, 250, 0.4) !important;
+}
+body.dark-mode .sm-badge-developing {
+    background: rgba(120, 53, 15, 0.45) !important;
+    color: #fcd34d !important;
+    border-color: rgba(251, 191, 36, 0.4) !important;
+}
+body.dark-mode .sm-badge-basic {
+    background: rgba(30, 41, 59, 0.6) !important;
+    color: #cbd5e1 !important;
+    border-color: rgba(71, 85, 105, 0.6) !important;
+}
+
+/* 2. Skill Action Console Bar */
+.sm-console-bar {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    padding: 6px 10px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    height: 72px;
-    min-height: 72px;
-    max-height: 72px;
-    flex-shrink: 0;
-    background: #ffffff;
-    border-radius: 18px;
-    border: 1px solid #f1f5f9;
-    padding: 8px 16px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
-    box-sizing: border-box;
-    overflow: hidden;
-}
-
-.sm-profile-pill {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding-right: 14px;
-    border-right: 1px solid #f1f5f9;
-    flex-shrink: 0;
-}
-
-.sm-avatar-circle {
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, #3b82f6, #6366f1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.28);
-    flex-shrink: 0;
-}
-
-.sm-insights-capsules {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.sm-capsule {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
-    background: #f8fafc;
-    border-radius: 14px;
-    border: 1px solid #f1f5f9;
-    flex: 1;
-    min-width: 0;
-    height: 52px;
-    box-sizing: border-box;
+    gap: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    flex-shrink: 0 !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    box-sizing: border-box;
 }
 
-.sm-cap-icon {
-    width: 32px;
+.sm-action-input {
     height: 32px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    flex-shrink: 0;
-}
-.sm-cap-icon.blue { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
-.sm-cap-icon.emerald { background: rgba(16, 185, 129, 0.12); color: #10b981; }
-.sm-cap-icon.amber { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
-
-.stat-label {
-    margin-bottom: 2px;
-    font-size: 9.5px;
-    font-weight: 850;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.stat-val-sm {
-    font-size: 13px;
-    font-weight: 900;
-    color: #0f172a;
-    line-height: 1.15;
-}
-
-.sm-quick-console {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: #0f172a;
-    padding: 5px 7px;
-    border-radius: 12px;
-    flex-shrink: 0;
-    border: 1px solid #1e293b;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-}
-
-.console-input-compact {
-    height: 32px;
-    background: #1e293b;
-    border: 1px solid #334155;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
     border-radius: 8px;
     padding: 0 10px;
-    color: #f8fafc;
+    color: #1e293b;
     font-size: 11.5px;
     font-weight: 700;
     outline: none;
-    transition: all 0.2s;
-}
-.console-input-compact:focus {
-    border-color: #10b981;
-    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    transition: all 0.2s ease;
+    box-sizing: border-box;
 }
 
-.btn-sm-trigger-compact {
+.sm-action-input:focus {
+    background: #ffffff;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.sm-btn-save {
     height: 32px;
-    padding: 0 12px;
+    padding: 0 14px;
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
+    color: #ffffff;
     border: none;
     border-radius: 8px;
     font-size: 11px;
@@ -12206,44 +12250,50 @@ body.dark-mode .float-toggle {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    transition: 0.2s;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+    transition: all 0.2s ease;
     white-space: nowrap;
 }
-.btn-sm-trigger-compact:hover {
+
+.sm-btn-save:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
 }
 
-.btn-sm-clear-compact {
+.sm-btn-clear {
     height: 32px;
-    width: 32px;
+    padding: 0 10px;
+    background: rgba(244, 63, 94, 0.08);
+    color: #f43f5e;
+    border: 1px solid rgba(244, 63, 94, 0.2);
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(244, 63, 94, 0.12);
-    color: #f43f5e;
-    border: 1px solid rgba(244, 63, 94, 0.25);
-    border-radius: 8px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: 0.2s;
-    flex-shrink: 0;
+    gap: 4px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
 }
-.btn-sm-clear-compact:hover {
-    background: rgba(244, 63, 94, 0.25);
+
+.sm-btn-clear:hover {
+    background: rgba(244, 63, 94, 0.16);
     transform: translateY(-1px);
 }
 
-/* 3. Main Bento Grid (Single-Screen) */
+/* 3. Main Bento Grid */
 .sm-main-grid {
     display: grid;
-    grid-template-columns: 350px 1fr;
+    grid-template-columns: 330px 1fr;
     gap: 8px;
     flex: 1;
-    min-height: 0;
+    min-height: 0 !important;
+    height: 100% !important;
     width: 100%;
     box-sizing: border-box;
-    overflow: hidden;
+    overflow: hidden !important;
 }
 
 .sm-left-col {
@@ -12251,27 +12301,28 @@ body.dark-mode .float-toggle {
     flex-direction: column;
     gap: 8px;
     height: 100%;
-    min-height: 0;
-    overflow: hidden;
+    min-height: 0 !important;
+    overflow: hidden !important;
 }
 
 .sm-right-col {
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 0;
-    overflow: hidden;
+    min-height: 0 !important;
+    min-width: 0;
+    overflow: hidden !important;
 }
 
 .analytics-card {
     width: 100% !important;
     background: #ffffff;
-    border-radius: 18px;
-    border: 1px solid #f1f5f9;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
     box-sizing: border-box !important;
 }
 
@@ -12346,22 +12397,25 @@ body.dark-mode .scroll-custom::-webkit-scrollbar-thumb {
 }
 
 /* 6. Dark Mode Rules */
-body.dark-mode #skill-matrix-content .sm-ultra-layout {
+body.dark-mode #skill-matrix-content .sm-master-layout {
     background-color: #020617 !important;
 }
-body.dark-mode .sm-top-deck {
+body.dark-mode .sm-kpi-card-styled {
     background-color: #0f172a !important;
     border-color: #1e293b !important;
 }
-body.dark-mode .sm-profile-pill {
-    border-right-color: #1e293b !important;
+body.dark-mode .sm-console-bar {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
 }
-body.dark-mode .sm-capsule {
-    background-color: #1e293b/60 !important;
-    border-color: #334155/60 !important;
-}
-body.dark-mode .stat-val-sm {
+body.dark-mode .sm-action-input {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
     color: #f8fafc !important;
+}
+body.dark-mode .sm-action-input:focus {
+    background-color: #0f172a !important;
+    border-color: #3b82f6 !important;
 }
 body.dark-mode .analytics-card {
     background-color: #0f172a !important;
@@ -12374,43 +12428,42 @@ body.dark-mode .neon-bar-name {
     color: #cbd5e1 !important;
 }
 body.dark-mode .neon-bar-bg {
-    background: #1e293b;
+    background: #1e293b !important;
 }
 
 /* 7. Responsive Breakpoints */
 @media (max-width: 1024px) {
-    .sm-main-grid {
-        grid-template-columns: 280px 1fr !important;
-    }
-}
-@media (max-width: 768px) {
     #skill-matrix-content {
         height: auto !important;
         max-height: none !important;
         overflow-y: auto !important;
     }
-    #skill-matrix-content:not(.hidden-view) .sm-ultra-layout {
+    #skill-matrix-content:not(.hidden-view) .sm-master-layout {
         height: auto !important;
         max-height: none !important;
         overflow-y: visible !important;
-    }
-    .sm-top-deck {
-        height: auto !important;
-        max-height: none !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-    }
-    .sm-profile-pill {
-        border-right: none !important;
-        border-bottom: 1px solid #f1f5f9 !important;
-        padding-bottom: 8px !important;
     }
     .sm-main-grid {
         grid-template-columns: 1fr !important;
         height: auto !important;
     }
-    .sm-left-col, .sm-right-col {
+    .sm-left-col {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px !important;
+        height: 280px !important;
+    }
+    .sm-right-col {
+        height: 500px !important;
+    }
+}
+@media (max-width: 768px) {
+    .sm-left-col {
+        grid-template-columns: 1fr !important;
         height: auto !important;
+    }
+    .sm-kpi-row {
+        grid-template-columns: repeat(2, 1fr) !important;
     }
 }
 
@@ -13132,6 +13185,30 @@ body.dark-mode .ot-progress-circle circle.bg {
 .border-t-rose {
     border-top: 4px solid #ef4444;
 }
+.border-t-purple {
+    border-top: 4px solid #8b5cf6;
+}
+
+/* 5S Custom KPI Cards in OT style */
+.s5-kpi-card-styled {
+    background: #ffffff;
+    border-radius: 18px;
+    border: 1px solid #eef2f6;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    min-width: 0 !important;
+    box-sizing: border-box;
+    overflow: hidden;
+    height: 100%;
+}
+body.dark-mode .s5-kpi-card-styled {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
 
 /* Progress Circle Big */
 .ot-progress-circle-big {
@@ -13182,6 +13259,9 @@ body.dark-mode .ot-progress-circle circle.bg {
 .val-mega.rose {
     color: #dc2626;
 }
+.val-mega.purple {
+    color: #7c3aed;
+}
 .val-mega small {
     font-size: 11px; color: #94a3b8; font-weight: 700; margin-left: 2px;
 }
@@ -13202,6 +13282,9 @@ body.dark-mode .ot-progress-circle circle.bg {
 .status-tag {
     font-size: 10px; font-weight: 900;
 }
+.status-tag.blue {
+    color: #2563eb;
+}
 .status-tag.emerald {
     color: #10b981;
 }
@@ -13210,6 +13293,9 @@ body.dark-mode .ot-progress-circle circle.bg {
 }
 .status-tag.rose {
     color: #ef4444;
+}
+.status-tag.purple {
+    color: #8b5cf6;
 }
 
 /* 4. Main Ops Layout */
@@ -15000,4 +15086,1476 @@ body.dark-mode #ot-table-body td.text-slate-400 {
 .modal-ac-item:hover {
     background-color: #eff6ff !important;
     color: #2563eb !important;
+}
+/* ============================================================
+   🎯 MATCHING STYLE: SUPPORT TABLE HEADER -> PART LINE CLAIM
+   ============================================================ */
+
+/* 1. ปรับแต่งส่วนหัว (thead) ให้เป็นสีเทา Slate และตัวหนังสือจิ๋วแต่เข้ม */
+.support-table thead th {
+    position: sticky !important;
+    top: 0;
+    z-index: 40 !important;
+    background: #f1f5f9 !important; /* สีเทาอ่อนที่เป็นเอกลักษณ์ของหน้า Claim */
+    padding: 6px 12px !important;    /* Padding ที่กระชับมาก */
+    text-align: left;
+    font-size: 8.5px !important;      /* ขนาดตัวหนังสือจิ๋วแบบหน้า Claim */
+    font-weight: 850 !important;      /* ความหนาพิเศษ */
+    color: #475569 !important;      /* สี Slate-600 */
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important; /* ระยะห่างตัวอักษรเพื่อความอ่านง่าย */
+    border-bottom: 2px solid #cbd5e1 !important; /* เส้นคั่นล่างหนา 2px */
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+    line-height: 1.4 !important;
+}
+
+/* 2. ลบเส้นคั่นแนวตั้งออกทั้งหมดเพื่อให้ดูคลีนเหมือนหน้า Claim */
+.support-table thead th {
+    border-right: none !important;
+    border-left: none !important;
+    border-top: none !important;
+}
+
+/* 3. ปรับแต่ง Hover ให้นิ่งๆ ไม่เปลี่ยนสีพื้นหลัง (รักษาลุค Technical) */
+.support-table thead th:hover {
+    color: #1e293b !important;
+    background: #f1f5f9 !important;
+}
+
+/* ============================================================
+   🌙 DARK MODE MATCHING (หน้าตาเดียวกับหน้า Claim ในโหมดมืด)
+   ============================================================ */
+body.dark-mode .support-table thead th {
+    background: #1e293b !important; /* สี Slate-800 สำหรับโหมดมืด */
+    color: #94a3b8 !important;     /* สี Slate-400 */
+    border-bottom: 2px solid #020617 !important; /* เส้นคั่นล่างสีเข้มจัด */
+}
+/* ============================================================
+   🎯 COMPACT INFO BAR (Title & Count) - MATCHING CLAIM STYLE
+   ============================================================ */
+
+/* 1. ปรับแถบพื้นหลังให้เตี้ยลง และสีเนียนไปกับขอบตาราง */
+#line-support-logs-content .table-info-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 6px 14px !important; /* ลดความสูงลงให้กระชับมาก */
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important; /* เส้นแบ่งบางๆ ก่อนถึงหัวตาราง */
+    border-top-left-radius: 20px !important; /* ให้โค้งมนไปกับตัวการ์ดหลัก */
+    border-top-right-radius: 20px !important;
+}
+
+/* 2. ปรับขนาดหัวข้อภาษาอังกฤษให้จิ๋วแต่เข้ม */
+#line-support-logs-content .table-title {
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    color: #1e293b !important;
+    letter-spacing: 0.02em !important;
+}
+
+/* 3. ปรับแต่งจุด Pulse (สีเขียว) ให้เล็กลงพอดีกับข้อความ */
+#line-support-logs-content .live-dot {
+    width: 7px !important;
+    height: 7px !important;
+    margin-right: 8px !important;
+}
+
+/* 4. ปรับแต่ง Badge จำนวน (Case Logs) ให้ดูทันสมัยและกระชับ */
+#line-support-logs-content .case-count-badge {
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    padding: 2px 10px !important;
+    background: #eff6ff !important; /* สีฟ้าอ่อน */
+    color: #2563eb !important;
+    border: 1px solid #dbeafe !important;
+    border-radius: 99px !important; /* ทรงแคปซูล */
+    box-shadow: none !important;
+}
+
+/* ============================================================
+   🌙 DARK MODE SUPPORT
+   ============================================================ */
+body.dark-mode #line-support-logs-content .table-info-bar {
+    background: #0f172a !important;
+    border-bottom-color: #1e293b !important;
+}
+
+body.dark-mode #line-support-logs-content .table-title {
+    color: #f8fafc !important;
+}
+
+body.dark-mode #line-support-logs-content .case-count-badge {
+    background: rgba(59, 130, 246, 0.15) !important;
+    color: #60a5fa !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+}
+/* ============================================================
+   🎨 MATCHING STYLE: SUPPORT TABLE -> PART LINE CLAIM THEME
+   ============================================================ */
+
+/* 1. ปรับแต่งตัวครอบหลัก (Table Card) ให้โค้งมนและมีขอบเหมือนหน้า Claim */
+#line-support-logs-content .table-card {
+    background: #ffffff !important;
+    border-radius: 20px !important; /* มุมโค้งมนตามภาพที่ 2 */
+    border: 1px solid #edf2f7 !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    margin-top: 5px !important;
+}
+
+/* 2. เพิ่มแถบสีน้ำเงินไฮไลท์ที่ขอบบนสุด (Top Accent Bar) */
+#line-support-logs-content .table-card::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 4px !important; /* ความหนาของแถบสี */
+    background: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #2563eb 100%) !important;
+    background-size: 200% auto !important;
+    animation: shimmerLine 4s linear infinite !important; /* แอนิเมชั่นแสงวิ่ง */
+    z-index: 20 !important;
+    border-radius: 20px 20px 0 0 !important;
+}
+
+/* 3. ปรับแถบข้อมูล (Info Bar) ให้ขยับลงมาใต้แถบสีและดูสะอาดตา */
+#line-support-logs-content .table-info-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 10px 18px 8px 18px !important; /* เว้นระยะด้านบนเผื่อแถบสี */
+    background: #fafbfd !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+/* 4. ปรับแต่ง Badge จำนวน Case Logs ให้ดูเข้าชุดกัน */
+#line-support-logs-content .case-count-badge {
+    background: #ffffff !important;
+    color: #2563eb !important;
+    border: 1.5px solid #dbeafe !important;
+    font-size: 10px !important;
+    font-weight: 900 !important;
+    padding: 3px 12px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
+}
+
+/* ============================================================
+   🌙 DARK MODE SUPPORT (Matching Claim Dark Theme)
+   ============================================================ */
+body.dark-mode #line-support-logs-content .table-card {
+    background: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #line-support-logs-content .table-info-bar {
+    background: #090d16 !important;
+    border-bottom-color: #1e293b !important;
+}
+
+body.dark-mode #line-support-logs-content .case-count-badge {
+    background: #1e293b !important;
+    color: #60a5fa !important;
+    border-color: #334155 !important;
+}
+/* ============================================================
+   🎯 SUPPORT LOGS: MATCHING PART LINE CLAIM STYLE
+   ============================================================ */
+
+/* แถบสี Shimmer วิ่งด้านบนสุด */
+#line-support-logs-content .table-card::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0; left: 0; right: 0;
+    height: 4px !important;
+    background: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #2563eb 100%) !important;
+    background-size: 200% auto !important;
+    animation: shimmerLine 4s linear infinite !important;
+    z-index: 20 !important;
+}
+
+/* หัวตาราง: พื้นหลัง Slate อ่อน, ตัวหนังสือจิ๋วเข้ม */
+#line-support-logs-content .support-table thead th {
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    font-size: 8.5px !important;
+    font-weight: 850 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+    border-bottom: 2px solid #cbd5e1 !important;
+    border-right: none !important;
+}
+
+/* ปรับแต่งปุ่มฟิลเตอร์ในแถบเดียวกับจำนวนรายการ */
+#line-support-logs-content .f-btn {
+    height: 24px !important;
+    padding: 0 12px !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+}
+
+/* ปรับระยะแถวในตารางให้สวยงาม */
+#line-support-logs-content .support-table tbody td {
+    padding: 10px 12px !important;
+    font-size: 11px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+
+/* Dark Mode Support */
+body.dark-mode #line-support-logs-content .table-card {
+    background: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #line-support-logs-content .support-table thead th {
+    background: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom-color: #020617 !important;
+}
+/* ============================================================
+   🎨 SUPPORT LOGS: ACTIVE FILTER BUTTON COLORS
+   ============================================================ */
+
+/* ปุ่ม ALL - สีเทาเข้ม/ดำ */
+#line-support-logs-content .f-btn.active[data-filter="ALL"] {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.3) !important;
+}
+
+/* ปุ่ม VF REPORT - สีน้ำเงิน (ตรงกับสีของพาร์ทเนอร์/Vendor) */
+#line-support-logs-content .f-btn.active[data-filter="VF"] {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
+}
+
+/* ปุ่ม RP REPORT - สีแดง (ตรงกับสีงาน Reject/NG) */
+#line-support-logs-content .f-btn.active[data-filter="RP"] {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+}
+
+/* ปุ่ม RECORDS - สีเหลืองส้ม (ตรงกับสีงานตรวจสอบ/Records) */
+#line-support-logs-content .f-btn.active[data-filter="RECORDS"] {
+    background: #f59e0b !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+}
+/* ============================================================
+   🎨 SUPPORT LOGS: UNIFIED ACTION BAR STYLE
+   ============================================================ */
+
+/* แถบสีวิ่งขอบบน (Shimmer) */
+#line-support-logs-content .table-card::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0; left: 0; right: 0;
+    height: 4px !important;
+    background: linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #2563eb 100%) !important;
+    background-size: 200% auto !important;
+    animation: shimmerLine 4s linear infinite !important;
+    z-index: 20 !important;
+}
+
+/* ปรับระยะห่างในแถบเครื่องมือ */
+#line-support-logs-content .filter-container {
+    min-height: 48px !important;
+}
+
+/* ปรับแต่งปุ่มฟิลเตอร์ให้จิ๋วแต่เข้ม */
+#line-support-logs-content .f-btn {
+    height: 26px !important;
+    font-size: 9px !important;
+    font-weight: 850 !important;
+    padding: 0 10px !important;
+}
+
+/* เส้นแบ่งแนวตั้ง */
+#line-support-logs-content .v-divider {
+    width: 1px;
+    height: 18px;
+    background: #e2e8f0;
+    margin: 0 4px;
+}
+
+/* Dark Mode Integration */
+body.dark-mode #line-support-logs-content .filter-container {
+    background: #090d16 !important;
+}
+
+body.dark-mode #line-support-logs-content .search-box-wrapper,
+body.dark-mode #line-support-logs-content .record-counter-badge {
+    background: #020617 !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #line-support-logs-content .v-divider {
+    background: #1e293b;
+}
+
+/* จัดระเบียบหัวตารางให้ดูสะอาด */
+#line-support-logs-content .support-table thead th {
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    font-size: 8px !important;
+    border-bottom: 2px solid #cbd5e1 !important;
+}
+
+body.dark-mode #line-support-logs-content .support-table thead th {
+    background: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom-color: #020617 !important;
+}
+/* ปรับความกว้างคอลัมน์ ACTION ให้กว้างขึ้น และยอมให้ขยายตามเนื้อหา */
+#line-support-logs-content .support-table th:nth-child(3),
+#line-support-logs-content .support-table td:nth-child(3) {
+    width: 190px !important; /* เพิ่มพื้นที่จาก 120px เป็น 190px */
+    min-width: 190px !important;
+}
+
+/* ปรับสไตล์ Badge ให้ยืดหยุ่นและมีขอบเขตที่ชัดเจน */
+.col-action-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 4px 12px !important;
+    font-size: 10.5px !important;
+    white-space: nowrap !important; /* บังคับให้อยู่บรรทัดเดียว */
+    max-width: 100% !important; /* ห้ามกว้างเกินคอลัมน์ */
+    overflow: hidden !important;
+    text-overflow: ellipsis !important; /* ถ้ายังยาวเกินให้ขึ้น ... แทนการโดนตัดดื้อๆ */
+}
+
+/* ============================================================
+   📱 TABLET RESPONSIVENESS & INVISIBLE SCROLLBAR STANDARDS
+   ============================================================ */
+
+/* 1. Invisible Scrollbars for all tables */
+.no-scrollbar, .scroll-hide {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+.no-scrollbar::-webkit-scrollbar, .scroll-hide::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* 2. Project History Logs Table: Never squish on tablet/mobile */
+.sj-table-container {
+    overflow-x: auto !important;
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+.sj-table-container::-webkit-scrollbar {
+    display: none !important;
+}
+.sj-premium-table {
+    min-width: 720px !important;
+    width: 100% !important;
+}
+.sj-premium-table th, .sj-premium-table td {
+    white-space: nowrap;
+}
+.sj-premium-table th:nth-child(2), .sj-premium-table td:nth-child(2) {
+    white-space: normal !important;
+    min-width: 200px !important;
+}
+
+/* 3. Skill Matrix & Tablet Adaptations */
+@media (max-width: 1024px) {
+    #skill-matrix-content:not(.hidden-view) .sm-master-layout {
+        overflow-y: auto !important;
+        height: auto !important;
+        min-height: calc(100vh - 64px) !important;
+    }
+    
+    /* 5S Cards Responsive Grid */
+    #five-s-content .s5-kpi-row {
+        height: auto !important;
+        min-height: 95px !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 8px !important;
+    }
+    .s5-kpi-card-styled {
+        padding: 10px 12px !important;
+    }
+    .s5-kpi-card-styled .val-mega {
+        font-size: 18px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    #five-s-content .s5-kpi-row {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* 4. Dark Mode Enhancements for 5S & OT & Matrix */
+body.dark-mode .border-t-purple {
+    border-top-color: #a78bfa !important;
+}
+body.dark-mode .val-mega.purple {
+    color: #c084fc !important;
+}
+body.dark-mode .val-mega.blue {
+    color: #60a5fa !important;
+}
+body.dark-mode .val-mega.amber {
+    color: #fbbf24 !important;
+}
+body.dark-mode .val-mega.rose {
+    color: #fb7185 !important;
+}
+body.dark-mode .status-tag.purple {
+    color: #c084fc !important;
+}
+body.dark-mode .status-tag.blue {
+    color: #60a5fa !important;
+}
+
+/* ============================================================
+   🌙 DARK MODE: RUNNING NUMBER SYSTEM
+   ============================================================ */
+body.dark-mode #rn-management-content,
+[data-theme="dark"] #rn-management-content {
+    background-color: #020617 !important;
+}
+
+body.dark-mode #rn-management-content > div,
+[data-theme="dark"] #rn-management-content > div {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #rn-management-content .border-b {
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #rn-management-content input[type="text"],
+body.dark-mode #rn-management-content input[type="date"],
+body.dark-mode #rn-management-content input[type="number"],
+body.dark-mode #rn-management-content select {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+    color-scheme: dark;
+}
+
+body.dark-mode #rn-management-content input:focus,
+body.dark-mode #rn-management-content select:focus {
+    border-color: #3b82f6 !important;
+    background-color: #0f172a !important;
+}
+
+body.dark-mode #rn-table-header th {
+    border-bottom: 2px solid #0f172a !important;
+}
+
+body.dark-mode #rn-table-body tr {
+    border-bottom: 1px solid #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #rn-table-body tr:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+body.dark-mode #rn-record-count-badge {
+    background-color: #1e293b !important;
+    color: #60a5fa !important;
+    border-color: #334155 !important;
+}
+
+/* ============================================================
+   🌙 DARK MODE: 8D CORRECTIVE ACTION SYSTEM
+   ============================================================ */
+body.dark-mode #eight-d-content,
+[data-theme="dark"] #eight-d-content {
+    background-color: #020617 !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode #eight-d-content .bg-white {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #eight-d-content .bg-slate-50 {
+    background-color: #020617 !important;
+}
+
+body.dark-mode #eight-d-content .text-slate-800,
+body.dark-mode #eight-d-content .text-slate-900 {
+    color: #f8fafc !important;
+}
+
+body.dark-mode #eight-d-content .text-slate-600,
+body.dark-mode #eight-d-content .text-slate-500 {
+    color: #94a3b8 !important;
+}
+
+body.dark-mode #eight-d-content input[type="text"],
+body.dark-mode #eight-d-content input[type="date"],
+body.dark-mode #eight-d-content select,
+body.dark-mode #eight-d-content textarea {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+    color-scheme: dark;
+}
+
+body.dark-mode #eight-d-content input:focus,
+body.dark-mode #eight-d-content select:focus,
+body.dark-mode #eight-d-content textarea:focus {
+    border-color: #3b82f6 !important;
+    background-color: #0f172a !important;
+}
+
+body.dark-mode #eight-d-table-header th {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-mode #eight-d-table-body tr {
+    border-bottom: 1px solid #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #eight-d-table-body tr:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+body.dark-mode #eight-d-report-view {
+    background-color: #020617 !important;
+}
+
+body.dark-mode #eight-d-presentation-container {
+    background-color: #020617 !important;
+}
+
+/* ============================================================
+   🌙 DARK MODE: CLAIM OPERATIONS TERMINAL
+   ============================================================ */
+body.dark-mode #entry-terminal-content,
+[data-theme="dark"] #entry-terminal-content {
+    background-color: #020617 !important;
+}
+
+body.dark-mode #entry-terminal-content #form-panel > div,
+body.dark-mode #entry-terminal-content #table-panel {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #entry-terminal-content .form-label {
+    color: #94a3b8 !important;
+}
+
+body.dark-mode #entry-terminal-content input,
+body.dark-mode #entry-terminal-content select,
+body.dark-mode #entry-terminal-content textarea {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+    color-scheme: dark;
+}
+
+body.dark-mode #entry-terminal-content input:focus,
+body.dark-mode #entry-terminal-content select:focus,
+body.dark-mode #entry-terminal-content textarea:focus {
+    border-color: #3b82f6 !important;
+    background-color: #0b1120 !important;
+}
+
+body.dark-mode #entry-terminal-content .table-filter-bar {
+    background-color: #0f172a !important;
+    border-bottom-color: #1e293b !important;
+}
+
+body.dark-mode #entry-terminal-content .table-head-row th {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-mode #entry-terminal-content .claim-table-row {
+    border-bottom: 1px solid #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #entry-terminal-content .claim-table-row:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+/* ============================================================
+   👑 DARK MODE: ADMIN USER CONTROL & CONSOLE
+   ============================================================ */
+body.dark-mode #admin-console-content,
+[data-theme="dark"] #admin-console-content {
+    background-color: #020617 !important;
+    color: #f8fafc !important;
+}
+
+body.dark-mode #admin-console-content .bg-white,
+body.dark-mode #admin-console-content .bg-slate-50,
+body.dark-mode #admin-console-content .bg-slate-50\/70 {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #admin-console-content .border-slate-200,
+body.dark-mode #admin-console-content .border-slate-100 {
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #admin-console-content h2,
+body.dark-mode #admin-console-content h3,
+body.dark-mode #admin-console-content h4 {
+    color: #f8fafc !important;
+}
+
+body.dark-mode #admin-console-content input[type="text"],
+body.dark-mode #admin-console-content input[type="number"],
+body.dark-mode #admin-console-content select {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+    color-scheme: dark;
+}
+
+body.dark-mode #admin-console-content input:focus,
+body.dark-mode #admin-console-content select:focus {
+    border-color: #3b82f6 !important;
+    background-color: #0b1120 !important;
+}
+
+body.dark-mode #admin-table-container {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #admin-table-head th {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-mode #admin-table-body tr {
+    border-bottom: 1px solid #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #admin-table-body tr:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+body.dark-mode #admin-master-modal-box {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #admin-master-modal-box input,
+body.dark-mode #admin-master-modal-box select,
+body.dark-mode #admin-master-modal-box textarea {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #334155 !important;
+    color-scheme: dark;
+}
+
+body.dark-mode #admin-master-modal-box label {
+    color: #94a3b8 !important;
+}
+
+body.dark-mode #admin-master-modal-box .bg-slate-50,
+body.dark-mode #admin-master-modal-box .bg-slate-100 {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+}
+
+/* ============================================================
+   🌟 ULTRA-HIGH CONTRAST DARK MODE FOR ALL TABLES & DATA LISTS
+   ============================================================ */
+
+/* 1. SPECIAL JOBS (MISSION REGISTRY TABLE - Image 1) */
+body.dark-mode #special-jobs-content .sj-premium-table {
+    color: #f8fafc !important;
+}
+
+body.dark-mode #special-jobs-content .sj-premium-table thead th {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode #special-jobs-content .sj-table-row {
+    border-bottom: 1px solid #1e293b !important;
+}
+
+body.dark-mode #special-jobs-content .sj-table-row:hover {
+    background-color: rgba(30, 41, 59, 0.7) !important;
+}
+
+body.dark-mode #special-jobs-content .sj-table-row td {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #special-jobs-content .sj-table-row td:first-child {
+    color: #94a3b8 !important;
+}
+
+body.dark-mode #special-jobs-content .sj-table-row .text-slate-700,
+body.dark-mode #special-jobs-content .sj-table-row span[class*="text-slate-700"] {
+    color: #f8fafc !important;
+    font-weight: 800 !important;
+}
+
+body.dark-mode #special-jobs-content .sj-table-row .text-slate-400,
+body.dark-mode #special-jobs-content .sj-table-row span[class*="text-slate-400"] {
+    color: #94a3b8 !important;
+    font-weight: 600 !important;
+}
+
+body.dark-mode #special-jobs-content .sj-table-row .text-slate-300 {
+    color: #cbd5e1 !important;
+}
+
+body.dark-mode #special-jobs-content .sj-table-row .bg-emerald-50 {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #34d399 !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+}
+
+body.dark-mode #special-jobs-content .sj-table-row .bg-amber-50 {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
+
+/* 2. SKILL MATRIX (COMPETENCY TABLE & LISTS - Image 2) */
+body.dark-mode #skill-matrix-content table thead th {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode #skill-matrix-content #sm-table-body tr {
+    border-bottom: 1px solid #1e293b !important;
+}
+
+body.dark-mode #skill-matrix-content #sm-table-body tr:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+body.dark-mode #skill-matrix-content #sm-table-body td {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #skill-matrix-content #sm-table-body .text-slate-800,
+body.dark-mode #skill-matrix-content #sm-table-body span[class*="text-slate-800"] {
+    color: #f8fafc !important;
+    font-weight: 800 !important;
+}
+
+body.dark-mode #skill-matrix-content #sm-table-body .text-slate-700,
+body.dark-mode #skill-matrix-content #sm-table-body span[class*="text-slate-700"] {
+    color: #f1f5f9 !important;
+    font-weight: 800 !important;
+}
+
+body.dark-mode #skill-matrix-content #sm-table-body .text-slate-400 {
+    color: #94a3b8 !important;
+}
+
+body.dark-mode #skill-matrix-content .neon-bar-item {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #skill-matrix-content .neon-bar-item .neon-bar-name {
+    color: #f8fafc !important;
+    font-weight: 800 !important;
+}
+
+
+/* 3. 5S EXCELLENCE (FINDINGS & AUDIT TABLE - Image 3) */
+body.dark-mode #five-s-content .s5-cyber-table thead th {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode #five-s-content .s5-table-row {
+    border-bottom: 1px solid #1e293b !important;
+}
+
+body.dark-mode #five-s-content .s5-table-row:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+body.dark-mode #five-s-content .s5-table-row td {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #five-s-content .s5-table-row .text-slate-800,
+body.dark-mode #five-s-content .s5-table-row span[class*="text-slate-800"] {
+    color: #f8fafc !important;
+    font-weight: 800 !important;
+}
+
+body.dark-mode #five-s-content .s5-table-row .text-slate-600,
+body.dark-mode #five-s-content .s5-table-row p[class*="text-slate-600"],
+body.dark-mode #five-s-content .s5-table-row span[class*="text-slate-600"] {
+    color: #cbd5e1 !important;
+    font-weight: 600 !important;
+}
+
+body.dark-mode #five-s-content .s5-table-row .text-slate-500,
+body.dark-mode #five-s-content .s5-table-row span[class*="text-slate-500"] {
+    color: #94a3b8 !important;
+    font-weight: 700 !important;
+}
+
+body.dark-mode #five-s-content .s5-table-row .bg-orange-50 {
+    background-color: rgba(249, 115, 22, 0.15) !important;
+    color: #fb923c !important;
+    border: 1px solid rgba(249, 115, 22, 0.3) !important;
+}
+
+body.dark-mode #s5-ranking-list .rank-item {
+    color: #f8fafc !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-mode #s5-ranking-list .rank-item span {
+    color: #f8fafc !important;
+}
+
+
+/* 4. OVERTIME (OT MANAGEMENT TABLE) */
+body.dark-mode #ot-management-content .ot-table-row {
+    border-bottom: 1px solid #1e293b !important;
+}
+
+body.dark-mode #ot-management-content .ot-table-row:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+body.dark-mode #ot-management-content .ot-table-row td {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #ot-management-content .ot-table-row .text-slate-700,
+body.dark-mode #ot-management-content .ot-table-row span[class*="text-slate-700"] {
+    color: #f8fafc !important;
+    font-weight: 800 !important;
+}
+
+body.dark-mode #ot-management-content .ot-table-row .text-slate-400 {
+    color: #94a3b8 !important;
+}
+
+
+/* 5. LINE SUPPORT LOGS TABLE */
+body.dark-mode #line-support-logs-content .support-table thead th {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode #line-support-logs-content #tableBody tr {
+    border-bottom: 1px solid #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #line-support-logs-content #tableBody tr:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+body.dark-mode #line-support-logs-content #tableBody td {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #line-support-logs-content #tableBody .text-slate-800,
+body.dark-mode #line-support-logs-content #tableBody .text-slate-700 {
+    color: #f8fafc !important;
+}
+
+body.dark-mode #line-support-logs-content #tableBody .text-slate-600,
+body.dark-mode #line-support-logs-content #tableBody .text-slate-500,
+body.dark-mode #line-support-logs-content #tableBody .text-slate-400 {
+    color: #94a3b8 !important;
+}
+
+
+/* 6. ATTENDANCE LOGS TABLE */
+body.dark-mode #attendance-logs #att-records-table thead th {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode #attendance-logs #att-records-tbody tr {
+    border-bottom: 1px solid #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #attendance-logs #att-records-tbody tr:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+body.dark-mode #attendance-logs #att-records-tbody td {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #attendance-logs #att-records-tbody .text-slate-700,
+body.dark-mode #attendance-logs #att-records-tbody .text-slate-800 {
+    color: #f8fafc !important;
+}
+
+body.dark-mode #attendance-logs #att-records-tbody .text-slate-400,
+body.dark-mode #attendance-logs #att-records-tbody .text-slate-500 {
+    color: #94a3b8 !important;
+}
+/* ============================================================
+   🌙 PREMIUM DARK MODE FOR SUPPORT FORM MODAL (LINE SUPPORT)
+   ============================================================ */
+
+body.dark-mode #support-form-modal > div {
+    background: #0f172a !important; /* พื้นหลังตัวกล่อง */
+    border: 1px solid #1e293b !important;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* 1. ส่วนหัว (Header) */
+body.dark-mode #support-form-modal > div > div:first-child {
+    background: linear-gradient(90deg, #020617 0%, #1e3a8a 100%) !important;
+    border-bottom: 2px solid #2563eb !important;
+}
+
+/* 2. กล่องแจ้งเตือนแบบร่าง (Offline Draft Banner) */
+body.dark-mode #offline-draft-banner {
+    background: rgba(30, 41, 59, 0.5) !important;
+    border: 1px solid #334155 !important;
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #btn-restore-draft {
+    background: #2563eb !important;
+    box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
+}
+
+/* 3. กล่องส่วนเนื้อหา (Section Containers) */
+body.dark-mode #sup-form > div {
+    background: #1e293b !important; /* สี Slate-800 */
+    border: 1px solid #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+body.dark-mode label {
+    color: #94a3b8 !important; /* สี Label เทาจางๆ */
+}
+
+body.dark-mode label b, 
+body.dark-mode label strong {
+    color: #f8fafc !important; /* ตัวหนังสือเน้นหนักสีขาว */
+}
+
+/* 4. ช่องพิมพ์ข้อมูล (Inputs) */
+body.dark-mode .form-input,
+body.dark-mode #sup-form input,
+body.dark-mode #sup-form select,
+body.dark-mode #sup-form textarea {
+    background-color: #020617 !important; /* พื้นหลังช่องพิมพ์มืดสนิท */
+    border-color: #334155 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .form-input:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.25) !important;
+}
+
+/* 5. แถบ Preview ข้อความด้านล่าง */
+body.dark-mode #prob-preview-text {
+    color: #60a5fa !important; /* สีฟ้าเรืองแสง */
+    background: transparent !important;
+}
+
+body.dark-mode #sup-form div[style*="background:#ffffff"] {
+    background: #020617 !important; /* เปลี่ยนพื้นหลัง Preview เป็นสีมืด */
+    border-color: #334155 !important;
+}
+
+/* 6. ปุ่มเลือกโหมดรูปภาพ (Evidence Mode Switcher) */
+body.dark-mode .evidence-mode-switcher {
+    background: #020617 !important;
+    border-color: #334155 !important;
+}
+
+body.dark-mode .evidence-mode-tab-btn {
+    color: #64748b !important;
+}
+
+body.dark-mode .evidence-mode-tab-btn.active {
+    background: #1e293b !important;
+    color: #38bdf8 !important;
+    border-color: #3b82f6 !important;
+}
+
+/* 7. พื้นที่อัปโหลดรูป (Dropzone) */
+body.dark-mode #img-dropzone {
+    background: #090d16 !important;
+    border-color: #334155 !important;
+}
+
+body.dark-mode #img-dropzone:hover {
+    border-color: #3b82f6 !important;
+    background: #0f172a !important;
+}
+
+body.dark-mode #img-dropzone span[style*="color:#2563eb"] {
+    color: #60a5fa !important;
+}
+
+/* 8. กล่องปุ่มลัดหมายเหตุ (Remark Chips) */
+body.dark-mode .sup-remark-chip {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    color: #cbd5e1 !important;
+}
+
+body.dark-mode .sup-remark-chip:hover {
+    background: #334155 !important;
+    color: #ffffff !important;
+    border-color: #475569 !important;
+}
+
+/* 9. ส่วนล่าง (Footer) และปุ่มบันทึก */
+body.dark-mode #sup-form > div:last-child {
+    background: #020617 !important;
+    border-top: 1px solid #1e293b !important;
+}
+
+body.dark-mode #sup-form-submit-btn {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%) !important;
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3) !important;
+}
+
+/* 10. แถบเลื่อน (Scrollbar) ของ Modal */
+body.dark-mode #sup-form::-webkit-scrollbar-track {
+    background: #020617;
+}
+
+body.dark-mode #sup-form::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border: 2px solid #020617;
+}
+
+/* 11. แก้ไขสีกรอบ Special Jobs & 8D Toggles */
+body.dark-mode #sync-container, 
+body.dark-mode #8d-container {
+    background: rgba(30, 41, 59, 0.3) !important;
+    border: 1px dashed #334155 !important;
+}
+
+body.dark-mode #sync-container p, 
+body.dark-mode #8d-container p {
+    color: #e2e8f0 !important;
+}
+/* ============================================================
+   🌑 ULTIMATE DARK MODE: SUPPORT FORM MODAL (100% IMAGE MATCH)
+   ============================================================ */
+
+body.dark-mode #support-form-modal > div {
+    background: #0b1220 !important; /* พื้นหลังสีเข้มสนิทตามภาพ */
+    border: 1px solid #1e293b !important;
+    border-radius: 12px !important;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* 1. Header & Title */
+body.dark-mode #support-form-modal > div > div:first-child {
+    background: #111827 !important;
+    border-bottom: 2px solid #1e293b !important;
+    padding: 12px 18px !important;
+}
+
+body.dark-mode #support-form-modal h3 {
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    font-size: 14px !important;
+}
+
+/* 2. บล็อกแจ้งเตือนแบบร่าง (Draft Banner) */
+body.dark-mode #offline-draft-banner {
+    background: #0f172a !important;
+    border: 1.5px solid #1e40af !important;
+    color: #93c5fd !important;
+    border-radius: 10px !important;
+}
+
+body.dark-mode #btn-restore-draft {
+    background: #2563eb !important;
+    color: #fff !important;
+    border-radius: 6px !important;
+}
+
+/* 3. กล่องส่วนเนื้อหา (Section Containers) */
+body.dark-mode #sup-form > div {
+    background: #0f172a !important;
+    border: 1.5px solid #1e293b !important;
+    border-radius: 12px !important;
+}
+
+/* 4. Labels & Badges */
+body.dark-mode .s5-label,
+body.dark-mode label {
+    color: #94a3b8 !important; /* สีเทาอมฟ้าจางๆ */
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+body.dark-mode #prob-date-badge {
+    background: rgba(59, 130, 246, 0.1) !important;
+    color: #60a5fa !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+}
+
+/* 5. Inputs & Textarea */
+body.dark-mode .form-input,
+body.dark-mode #sup-form input,
+body.dark-mode #sup-form select,
+body.dark-mode #sup-form textarea {
+    background-color: #040914 !important; /* พื้นหลังช่องพิมพ์มืดเข้ม */
+    border: 1.5px solid #1e293b !important;
+    color: #ffffff !important;
+    border-radius: 8px !important;
+}
+
+body.dark-mode .form-input:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* ช่อง NG QTY (Auto) บังคับสีแดงตามภาพ */
+body.dark-mode #f-sup-ng {
+    background: rgba(225, 29, 72, 0.05) !important;
+    border-color: #450a0a !important;
+    color: #f87171 !important;
+}
+
+/* 6. Preview Text Area */
+body.dark-mode #prob-preview-text {
+    color: #f1f5f9 !important;
+    font-family: 'DM Mono', monospace !important;
+}
+
+body.dark-mode #sup-form div[style*="background:#ffffff"] {
+    background: #020617 !important; /* พื้นหลัง Preview Box */
+    border: 1px solid #1e293b !important;
+}
+
+/* 7. Special & 8D Toggles */
+body.dark-mode #sync-container,
+body.dark-mode #8d-container {
+    background: rgba(30, 41, 59, 0.4) !important;
+    border: 1px dashed #334155 !important;
+}
+
+body.dark-mode #sync-container p,
+body.dark-mode #8d-container p {
+    color: #f1f5f9 !important;
+}
+
+/* 8. Evidence Section & Dropzone */
+body.dark-mode .evidence-mode-switcher {
+    background: #020617 !important;
+    border: 1px solid #1e293b !important;
+}
+
+body.dark-mode .evidence-mode-tab-btn {
+    color: #64748b !important;
+}
+
+body.dark-mode .evidence-mode-tab-btn.active {
+    background: #1e293b !important;
+    color: #38bdf8 !important;
+    border: 1.5px solid #3b82f6 !important;
+}
+
+body.dark-mode #img-dropzone {
+    background: #040914 !important;
+    border: 2px dashed #1e293b !important;
+}
+
+body.dark-mode #img-dropzone span {
+    color: #60a5fa !important;
+}
+
+/* 9. Remark & Preset Chips (ปุ่มสีด้านล่าง) */
+body.dark-mode #f-sup-remark-input {
+    background: #020617 !important;
+}
+
+body.dark-mode .sup-remark-chip {
+    border-radius: 6px !important;
+    font-weight: 800 !important;
+}
+
+/* ตั้งค่าสี Chip ตามภาพ */
+body.dark-mode .sup-remark-chip[data-type="lot-summary"] { background: #064e3b !important; color: #10b981 !important; border-color: #065f46 !important; }
+body.dark-mode .sup-remark-chip[data-preset*="Sorting"] { background: #1e3a8a !important; color: #60a5fa !important; border-color: #1e40af !important; }
+body.dark-mode .sup-remark-chip[data-preset*="Root Cause"] { background: #451a03 !important; color: #f59e0b !important; border-color: #78350f !important; }
+body.dark-mode .sup-remark-chip[data-preset*="NG"] { background: #450a0a !important; color: #f87171 !important; border-color: #7f1d1d !important; }
+
+/* 10. Footer Buttons */
+body.dark-mode #sup-form-submit-btn {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%) !important;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4) !important;
+    color: #ffffff !important;
+}
+
+/* 11. Scrollbar for Modal */
+body.dark-mode #sup-form::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border: 2px solid #0b1220;
+}
+/* ============================================================
+   ⚡ SPECIAL JOBS & 8D REPORT TOGGLE EFFECT (DARK MODE)
+   ============================================================ */
+
+/* ปรับแต่ง Container ทั้งสองตัวให้เป็นขอบเส้นประและพื้นหลังมืด */
+body.dark-mode #sync-container,
+body.dark-mode #8d-container {
+    padding: 10px 15px !important;
+    border-radius: 14px !important;
+    height: 58px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    transition: all 0.3s ease;
+    background: rgba(15, 23, 42, 0.4) !important; /* พื้นหลังมืดโปร่งแสง */
+}
+
+/* เอฟเฟกต์เส้นประสีฟ้าสำหรับ Special Job */
+body.dark-mode #sync-container {
+    border: 1.5px dashed rgba(59, 130, 246, 0.6) !important;
+}
+
+/* เอฟเฟกต์เส้นประสีแดงสำหรับ 8D Report */
+body.dark-mode #8d-container {
+    border: 1.5px dashed rgba(239, 68, 68, 0.6) !important;
+}
+
+/* ปรับแต่งกล่องไอคอนให้เป็นสีขาวโค้งมน (White Rounded Icon Box) */
+body.dark-mode #sync-container div[style*="width:28px"],
+body.dark-mode #8d-container div[style*="width:28px"] {
+    width: 36px !important;
+    height: 36px !important;
+    background: #ffffff !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0;
+}
+
+/* ปรับไอคอนสายฟ้าให้เป็นสีน้ำเงิน */
+body.dark-mode #sync-container svg {
+    color: #3b82f6 !important;
+}
+
+/* ปรับข้อความ 8D ให้เป็นสีแดงเข้ม */
+body.dark-mode #8d-container div[style*="color:#e11d48"] {
+    color: #e11d48 !important;
+    font-weight: 950 !important;
+}
+
+/* ⚪ ปรับตัวหนังสือข้างในให้เป็นสีขาวทั้งหมด */
+body.dark-mode #sync-container p,
+body.dark-mode #8d-container p {
+    color: #ffffff !important; /* ตัวหนังสือขาว */
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em;
+    margin: 0 0 0 12px !important; /* ดันระยะห่างจากไอคอน */
+}
+
+/* ปรับแต่ง Checkbox ให้เป็นสี่เหลี่ยมสีขาวตามภาพ */
+body.dark-mode .premium-toggle input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: 2px solid #ffffff; /* ขอบขาว */
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+}
+
+/* เมื่อติ๊ก Checkbox ให้มีพื้นหลังสีขาวและเครื่องหมายถูก */
+body.dark-mode .premium-toggle input[type="checkbox"]:checked {
+    background: #ffffff;
+}
+
+body.dark-mode .premium-toggle input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -55%);
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 900;
+}
+
+/* ลบเอฟเฟกต์ Toggle Slider เดิมออก (ถ้ามี) เพื่อให้เหลือแค่สี่เหลี่ยมขาว */
+body.dark-mode .toggle-slider {
+    display: none !important;
+}
+/* ============================================================
+   🎯 FORCE WHITE TEXT FOR SPECIAL JOB & 8D TOGGLES
+   ============================================================ */
+
+/* ปรับพื้นหลังและขอบประ */
+body.dark-mode #sync-container,
+body.dark-mode #8d-container {
+    background: rgba(15, 23, 42, 0.6) !important; /* พื้นหลังมืด */
+    padding: 10px 15px !important;
+    border-radius: 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    transition: all 0.3s ease;
+}
+
+/* ขอบประสีฟ้าสำหรับภารกิจพิเศษ */
+body.dark-mode #sync-container {
+    border: 1.5px dashed rgba(59, 130, 246, 0.6) !important;
+}
+
+/* ขอบประสีแดงสำหรับ 8D Report */
+body.dark-mode #8d-container {
+    border: 1.5px dashed rgba(239, 68, 68, 0.6) !important;
+}
+
+/* ⚪ บังคับตัวหนังสือเป็นสีขาว (Force White Text) */
+body.dark-mode #sync-container p,
+body.dark-mode #8d-container p {
+    color: #ffffff !important; /* บังคับสีขาว */
+    font-weight: 800 !important;
+    font-size: 11.5px !important;
+    margin: 0 0 0 12px !important; /* ระยะห่างจากไอคอน */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); /* เพิ่มเงาให้อ่านง่ายขึ้น */
+}
+
+/* ปรับแต่งกล่องไอคอนให้เด่นชัด (White Background Icon Box) */
+body.dark-mode #sync-container div[style*="width:28px"],
+body.dark-mode #8d-container div[style*="width:28px"] {
+    background-color: #ffffff !important;
+    border-radius: 10px !important;
+    width: 36px !important;
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ปรับแต่ง Checkbox ให้เป็นสี่เหลี่ยมขาว (White Square Checkbox) */
+body.dark-mode .premium-toggle input[type="checkbox"] {
+    width: 19px;
+    height: 19px;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: 2px solid #ffffff !important; /* ขอบขาว */
+    border-radius: 4px !important;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+}
+
+/* เมื่อติ๊กถูกให้กลายเป็นกล่องขาวและมีเครื่องหมายดำ */
+body.dark-mode .premium-toggle input[type="checkbox"]:checked {
+    background: #ffffff !important;
+}
+
+body.dark-mode .premium-toggle input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -55%);
+    color: #0f172a; /* สีเครื่องหมายถูกเข้ม */
+    font-size: 15px;
+    font-weight: 900;
+}
+
+/* ลบตัวสไลด์เดิมออก (ถ้ามี) */
+body.dark-mode .toggle-slider {
+    display: none !important;
+}
+/* ปุ่มเลื่อนลำดับภาพในตาราง Multi-Grid */
+.evidence-move-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(59, 130, 246, 0.8); /* สีน้ำเงินโปร่งแสง */
+    backdrop-filter: blur(4px);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.evidence-move-btn:hover {
+    background: #3b82f6;
+    transform: scale(1.1);
+}
+
+.evidence-move-btn:disabled {
+    background: rgba(148, 163, 184, 0.3);
+    color: rgba(255, 255, 255, 0.3);
+    cursor: not-allowed;
+}
+
+/* จัดตำแหน่งปุ่มเครื่องมือด้านบนภาพ */
+.evidence-thumb-actions {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    display: flex;
+    justify-content: space-between; /* แยกปุ่มเลื่อนไว้ซ้าย ปุ่มลบ/หมุนไว้ขวา */
+    z-index: 5;
+}
+
+.move-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.action-controls {
+    display: flex;
+    gap: 4px;
 }

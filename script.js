@@ -6327,18 +6327,24 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
                         </button>
                     </div>
 
-                    <!-- History Group -->
-                    <div class="annotator-pill-group">
-                        <button type="button" class="annotator-pill-btn" id="annotator-undo-btn" title="ย้อนกลับ (Undo)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-                        </button>
-                        <button type="button" class="annotator-pill-btn" id="annotator-redo-btn" title="ทำซ้ำ (Redo)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                        </button>
-                        <button type="button" class="annotator-pill-btn" id="annotator-flip-btn" title="กลับด้านภาพ (Flip Horizontal)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
-                        </button>
-                    </div>
+
+<div class="annotator-pill-group">
+
+<button type="button" class="annotator-pill-btn" id="annotator-rotate-left-btn" title="หมุนซ้าย 90°">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 2v6h6"></path>
+        <path d="M3 13a9 9 0 1 0 3-7.7L3 8"></path>
+    </svg>
+</button>
+
+
+<button type="button" class="annotator-pill-btn" id="annotator-rotate-right-btn" title="หมุนขวา 90°">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 2v6h-6"></path>
+        <path d="M21 13a9 9 0 1 1-3-7.7L21 8"></path>
+    </svg>
+</button>
+</div>
 
                     <!-- Color Picker Group -->
                     <div class="annotator-pill-group color-picker-group" style="position:relative;">
@@ -6382,17 +6388,34 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
                     </div>
 
                     <!-- Rotate & Action Group -->
-                    <div class="annotator-pill-group action-tools-group">
-                        <button type="button" class="annotator-pill-btn" id="annotator-rotate-left-btn" title="หมุนทวนเข็มนาฬิกา 90°">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-                        </button>
-                        <button type="button" class="annotator-pill-btn" id="annotator-rotate-right-btn" title="หมุนตามเข็มนาฬิกา 90°">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                        </button>
-                        <button type="button" class="annotator-pill-btn btn-clear-canvas" id="annotator-clear-btn" title="ล้างการวาดทั้งหมด">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        </button>
-                    </div>
+                    <!-- Rotate & Action Group (เปลี่ยนเป็น Undo, Redo, Clear) -->
+
+
+<div class="annotator-pill-group action-tools-group">
+    <!-- ปุ่ม Undo (ย้อนกลับ) - เปลี่ยนเป็นลูกศรชี้ซ้ายแบบตรง -->
+    <button type="button" class="annotator-pill-btn" id="annotator-undo-action-btn" title="ย้อนกลับ (Undo)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5"></path>
+            <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+    </button>
+
+    <!-- ปุ่ม Redo (ทำซ้ำ) - เปลี่ยนเป็นลูกศรชี้ขวาแบบตรง -->
+    <button type="button" class="annotator-pill-btn" id="annotator-redo-action-btn" title="ทำซ้ำ (Redo)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"></path>
+            <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+    </button>
+
+    <!-- ปุ่มล้าง (ถังขยะ) คงเดิม -->
+    <button type="button" class="annotator-pill-btn btn-clear-canvas" id="annotator-clear-btn" title="ล้างการวาดทั้งหมด">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+    </button>
+</div>
                 </div>
             </div>
             
@@ -6605,50 +6628,52 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
         };
     }
 
-    // Undo / Redo
-    const undoBtn = overlay.querySelector('#annotator-undo-btn');
-    const redoBtn = overlay.querySelector('#annotator-redo-btn');
+    // --- ส่วนควบคุมปุ่มกลุ่มขวาใหม่ ---
 
-    if (undoBtn) {
-        undoBtn.onclick = () => {
-            if (history.length > 1) {
-                const popped = history.pop();
-                redoStack.push(popped);
-                const prevState = history[history.length - 1];
-                canvas.width = prevState.width;
-                canvas.height = prevState.height;
-                ctx.putImageData(prevState, 0, 0);
-            }
-        };
-    }
+// ปุ่ม Undo (ย้อนกลับ)
+const undoActionBtn = overlay.querySelector('#annotator-undo-action-btn');
+if (undoActionBtn) {
+    undoActionBtn.onclick = () => {
+        if (history.length > 1) {
+            const popped = history.pop();
+            redoStack.push(popped);
+            const prevState = history[history.length - 1];
+            canvas.width = prevState.width;
+            canvas.height = prevState.height;
+            ctx.putImageData(prevState, 0, 0);
+        }
+    };
+}
 
-    if (redoBtn) {
-        redoBtn.onclick = () => {
-            if (redoStack.length > 0) {
-                const nextState = redoStack.pop();
-                history.push(nextState);
-                canvas.width = nextState.width;
-                canvas.height = nextState.height;
-                ctx.putImageData(nextState, 0, 0);
-            }
-        };
-    }
+// ปุ่ม Redo (ทำซ้ำ)
+const redoActionBtn = overlay.querySelector('#annotator-redo-action-btn');
+if (redoActionBtn) {
+    redoActionBtn.onclick = () => {
+        if (redoStack.length > 0) {
+            const nextState = redoStack.pop();
+            history.push(nextState);
+            canvas.width = nextState.width;
+            canvas.height = nextState.height;
+            ctx.putImageData(nextState, 0, 0);
+        }
+    };
+}
 
-    // Clear
-    const clearBtn = overlay.querySelector('#annotator-clear-btn');
-    if (clearBtn) {
-        clearBtn.onclick = () => {
-            if (history.length > 0) {
-                const initial = history[0];
-                canvas.width = initial.width;
-                canvas.height = initial.height;
-                ctx.putImageData(initial, 0, 0);
-                history = [initial];
-                redoStack = [];
-                if (typeof toast === 'function') toast('🗑️ ล้างการวาดทั้งหมดเรียบร้อยแล้ว', 'info');
-            }
-        };
-    }
+// ปุ่มล้างทั้งหมด (ถังขยะ)
+const clearBtn = overlay.querySelector('#annotator-clear-btn');
+if (clearBtn) {
+    clearBtn.onclick = () => {
+        if (history.length > 0) {
+            const initial = history[0]; // กลับไปที่รูปภาพต้นฉบับ
+            canvas.width = initial.width;
+            canvas.height = initial.height;
+            ctx.putImageData(initial, 0, 0);
+            history = [initial];
+            redoStack = [];
+            toast('🗑️ ล้างการวาดทั้งหมดเรียบร้อยแล้ว', 'info');
+        }
+    };
+}
 
     // Spacebar Pan Key Listener
     window.addEventListener('keydown', (e) => {
@@ -14412,17 +14437,37 @@ function renderExecTrends(actData, s5Data) {
 
 function renderExecParts(data) {
     const partMap = {};
-    // ประมวลผลข้อมูล
+    
+    // 1. ระบบ Smart Grouping: รวมชื่อที่ใกล้เคียงกัน
     data.forEach(r => {
-        const p = r.part || 'Unknown';
+        let p = (r.part || 'Unknown').trim();
+        let upperP = p.toUpperCase(); // แปลงเป็นตัวพิมพ์ใหญ่เพื่อใช้เช็คเงื่อนไข
+
+        // ตรวจสอบคำสำคัญเพื่อยุบรวมกลุ่ม (Normalization Logic)
+        if (upperP.includes('MOLD')) {
+            p = 'Mold Parts';
+        } else if (upperP.includes('STEEL') || upperP.includes('SHEET METAL')) {
+            p = 'Steel Parts';
+        } else if (upperP.includes('INSULATION')) {
+            p = 'Insulation Parts';
+        } else if (upperP.includes('PACKAGING')) {
+            p = 'Packaging Parts';
+        } else if (upperP.includes('COPPER') || upperP.includes('PIPE')) {
+            p = 'Piping Parts';
+        } else {
+            // กรณีอื่นๆ จัดรูปแบบเป็นตัวแรกใหญ่ที่เหลือเล็ก (Title Case)
+            p = p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+        }
+
         partMap[p] = (partMap[p] || 0) + 1;
     });
 
-    // ดึง Top 5 และเรียงลำดับ
+    // 2. ดึง Top 5 และเรียงลำดับ (เหมือนเดิม)
     const top5 = Object.entries(partMap)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5);
 
+    // --- ส่วนที่เหลือ (ตั้งแต่ if (execCharts.part) ... ลงไป) ให้ใช้ของเดิมที่คุณมีได้เลยครับ ---
     if (execCharts.part) execCharts.part.destroy();
 
     const chartOptions = {
@@ -15013,7 +15058,7 @@ async function submitLeaveRequest() {
     renderDailySubmissionMatrix();  // สั่งวาดปฏิทินใหม่ทันที
 }
 
-// ฟังก์ชันคำนวณสถิติเข้างานแบบมาตรฐาน (นับเฉพาะ จันทร์-ศุกร์)
+// ฟังก์ชันคำนวณสถิติเข้างานแบบมาตรฐาน (นับทุกวันรวมเสาร์-อาทิตย์ หากไม่ลงว่าหยุดให้นับเป็นวันทำงาน/ทำ OT)
 function getGlobalAttendanceStats(startDate, endDate) {
     const allRecords = S.attLeaveRecords || [];
     const rangeStart = new Date(startDate);
@@ -15146,13 +15191,9 @@ function initAttMonthlyChart() {
         leaveData[m] = countL;
         holidayData[m] = countH;
 
-        if (isCurrentYear && monthStart > now) {
-            workedData[m] = 0;
-        } else {
-            const capEnd = (isCurrentYear && monthEnd > now) ? now : monthEnd;
-            const totalPotentialWeekdays = countWeekdaysInRange(monthStart, capEnd);
-            workedData[m] = Math.max(0, totalPotentialWeekdays - (countL + countH));
-        }
+        // คำนวณวันทำงานจริงของเดือน โดยนับทุกวันรวมเสาร์-อาทิตย์ (หากไม่ใช่วันลา/วันหยุดนักขัตฯ ให้นับเป็นวันทำงาน/ทำ OT)
+        const totalDaysInMonth = monthEnd.getDate();
+        workedData[m] = Math.max(0, totalDaysInMonth - (countL + countH));
     }
 
     const options = {
@@ -15214,8 +15255,8 @@ function initAttMonthlyChart() {
         },
         yaxis: {
             min: 0,
-            max: 25,
-            tickAmount: 5,
+            max: 35,
+            tickAmount: 7,
             labels: { style: { colors: '#cbd5e1', fontWeight: 600, fontSize: '10px' } }
         },
         grid: {
@@ -15291,10 +15332,13 @@ function initAttMonthlyChart() {
 
 function countWeekdaysInRange(start, end) {
     let count = 0;
-    let cur = new Date(start.getTime());
-    while (cur <= end) {
-        let day = cur.getDay();
-        if (day !== 0 && day !== 6) count++;
+    const s = (typeof start === 'string') ? new Date(start) : new Date(start.getTime());
+    const e = (typeof end === 'string') ? new Date(end) : new Date(end.getTime());
+    let cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+    const endNorm = new Date(e.getFullYear(), e.getMonth(), e.getDate());
+    while (cur <= endNorm) {
+        // นับทุกวันรวมเสาร์-อาทิตย์ หากเป็นวันเสาร์-อาทิตย์ถ้าไม่ลงว่าหยุด ให้นับเป็นวันทำงาน (เนื่องจากมีการทำ OT)
+        count++;
         cur.setDate(cur.getDate() + 1);
     }
     return count;
@@ -17227,119 +17271,137 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
             return canvas.toDataURL('image/jpeg', 0.98);
         }
 
-        const renderMultiGrid = () => {
-            if (!multiGrid) return;
-            multiGrid.innerHTML = '';
+        // --- ฟังก์ชันช่วยเหลือสำหรับสลับตำแหน่ง Array ---
+const moveImage = (fromIndex, toIndex) => {
+    if (toIndex < 0 || toIndex >= multiImages.length) return;
+    const temp = multiImages[fromIndex];
+    multiImages[fromIndex] = multiImages[toIndex];
+    multiImages[toIndex] = temp;
+    handleMultiImagesChange(); // เรียกฟังก์ชันเดิมของคุณเพื่อ Update ภาพรวม
+};
 
-            // 1. วาดรายการรูปภาพที่มีอยู่ (ขนาดสัดส่วน 4:3 เท่ากันทุกช่อง)
-            multiImages.forEach((imgData, idx) => {
-                const card = document.createElement('div');
-                card.className = 'evidence-thumb-card';
-                card.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#f1f5f9; box-sizing:border-box;';
-                
-                card.innerHTML = `
-                    <img src="${imgData}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Evidence ${idx + 1}" />
-                    <div style="position:absolute; top:5px; right:5px; display:flex; gap:4px; z-index:2;">
-                        <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">↻</button>
-                        <button type="button" class="evidence-thumb-delete-btn" title="ลบรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(239,68,68,0.85); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
-                    </div>
-                    <span style="position:absolute; bottom:5px; left:5px; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; padding:2px 7px; border-radius:5px; font-size:9px; font-weight:800; z-index:2;">รูปที่ ${idx + 1}</span>
-                `;
+const renderMultiGrid = () => {
+    if (!multiGrid) return;
+    multiGrid.innerHTML = '';
 
-                // ปุ่มหมุนรูป 90°
-                const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
-                if (rotBtn) {
-                    rotBtn.rotHandler = async (e) => {
-                        e.stopPropagation();
-                        rotBtn.textContent = '⏳';
-                        const rotated = await rotateImageDataUrl(multiImages[idx]);
-                        multiImages[idx] = rotated;
-                        await handleMultiImagesChange();
-                        toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
-                    };
-                    rotBtn.onclick = rotBtn.rotHandler;
-                }
+    // 1. วาดรายการรูปภาพที่มีอยู่
+    multiImages.forEach((imgData, idx) => {
+        const card = document.createElement('div');
+        card.className = 'evidence-thumb-card';
+        card.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#f1f5f9; box-sizing:border-box;';
+        
+        card.innerHTML = `
+            <img src="${imgData}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Evidence ${idx + 1}" />
+            
+            <!-- แถบเครื่องมือจัดการภาพ (เพิ่มปุ่มเลื่อนลำดับ) -->
+            <div style="position:absolute; top:5px; right:5px; left:5px; display:flex; justify-content:space-between; z-index:2;">
+                <!-- กลุ่มปุ่มเลื่อนลำดับ (ซ้าย) -->
+                <div style="display:flex; gap:4px;">
+                    <button type="button" class="btn-move-left" title="เลื่อนไปข้างหน้า" 
+                        style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(37, 99, 235, 0.85); color:white; font-size:10px; cursor:pointer; display:${idx === 0 ? 'none' : 'flex'}; align-items:center; justify-content:center;">◀</button>
+                    <button type="button" class="btn-move-right" title="เลื่อนไปข้างหลัง" 
+                        style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(37, 99, 235, 0.85); color:white; font-size:10px; cursor:pointer; display:${idx === multiImages.length - 1 ? 'none' : 'flex'}; align-items:center; justify-content:center;">▶</button>
+                </div>
 
-                // ปุ่มลบรูป
-                const delBtn = card.querySelector('.evidence-thumb-delete-btn');
-                if (delBtn) {
-                    delBtn.onclick = async (e) => {
-                        e.stopPropagation();
-                        multiImages.splice(idx, 1);
-                        await handleMultiImagesChange();
-                        toast(`🗑️ ลบรูปภาพที่ ${idx + 1} เรียบร้อย`, 'info');
-                    };
-                }
+                <!-- กลุ่มปุ่มจัดการเดิม (ขวา) -->
+                <div style="display:flex; gap:4px;">
+                    <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">↻</button>
+                    <button type="button" class="evidence-thumb-delete-btn" title="ลบรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(239,68,68,0.85); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+                </div>
+            </div>
+            <span style="position:absolute; bottom:5px; left:5px; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; padding:2px 7px; border-radius:5px; font-size:9px; font-weight:800; z-index:2;">รูปที่ ${idx + 1}</span>
+        `;
 
-                multiGrid.appendChild(card);
-            });
+        // --- เพิ่ม Event ลำดับภาพ ---
+        const moveLeft = card.querySelector('.btn-move-left');
+        if (moveLeft) moveLeft.onclick = (e) => { e.stopPropagation(); moveImage(idx, idx - 1); };
 
-            // 2. ช่องกดเพิ่มรูปภาพ (+ เพิ่มรูปภาพ) - ขนาดสัดส่วน 4:3 เท่ากับรูปภาพเสมอ
-            if (multiImages.length < 5) {
-                const addSlot = document.createElement('div');
-                addSlot.className = 'evidence-add-slot';
-                addSlot.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:2px dashed #93c5fd; background:#f8fafc; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; cursor:pointer; color:#2563eb; transition:all 0.2s ease; box-sizing:border-box; padding:6px;';
-                addSlot.innerHTML = `
-                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" style="margin-bottom:3px; color:#2563eb;">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    <span style="font-size:10.5px; font-weight:800; color:#1e40af; line-height:1.2;">+ เพิ่มรูปภาพ</span>
-                    <span style="font-size:8.5px; color:#64748b; margin-top:2px;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
-                `;
-                addSlot.onclick = () => {
-                    if (imgMultiInput) {
-                        imgMultiInput.value = '';
-                        imgMultiInput.click();
-                    }
-                };
-                multiGrid.appendChild(addSlot);
-            }
+        const moveRight = card.querySelector('.btn-move-right');
+        if (moveRight) moveRight.onclick = (e) => { e.stopPropagation(); moveImage(idx, idx + 1); };
 
-            // 🎯 อัปเดตตัวนับจำนวนภาพใน Mode 2
-            if (multiCountBadge) {
-                if (multiImages.length >= 3 && multiImages.length <= 5) {
-                    multiCountBadge.textContent = `✔ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ครบเกณฑ์)`;
-                    multiCountBadge.style.background = '#059669';
-                } else if (multiImages.length === 0) {
-                    multiCountBadge.textContent = `(อัปโหลดแล้ว 0/5 รูป)`;
-                    multiCountBadge.style.background = '#d97706';
-                } else {
-                    multiCountBadge.textContent = `⚠️ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ต้องการ 3-5 รูป)`;
-                    multiCountBadge.style.background = '#d97706';
-                }
+        // --- Event เดิม (หมุน/ลบ) ---
+        const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
+        if (rotBtn) {
+            rotBtn.onclick = async (e) => {
+                e.stopPropagation();
+                rotBtn.textContent = '⏳';
+                const rotated = await rotateImageDataUrl(multiImages[idx]);
+                multiImages[idx] = rotated;
+                await handleMultiImagesChange();
+                toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
+            };
+        }
+
+        const delBtn = card.querySelector('.evidence-thumb-delete-btn');
+        if (delBtn) {
+            delBtn.onclick = async (e) => {
+                e.stopPropagation();
+                multiImages.splice(idx, 1);
+                await handleMultiImagesChange();
+                toast(`🗑️ ลบรูปภาพที่ ${idx + 1} เรียบร้อย`, 'info');
+            };
+        }
+
+        multiGrid.appendChild(card);
+    });
+
+    // 2. ช่องกดเพิ่มรูปภาพ
+    if (multiImages.length < 5) {
+        const addSlot = document.createElement('div');
+        addSlot.className = 'evidence-add-slot';
+        addSlot.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:2px dashed #93c5fd; background:#f8fafc; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; cursor:pointer; color:#2563eb; transition:all 0.2s ease; box-sizing:border-box; padding:6px;';
+        addSlot.innerHTML = `
+            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" style="margin-bottom:3px; color:#2563eb;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span style="font-size:10.5px; font-weight:800; color:#1e40af; line-height:1.2;">+ เพิ่มรูปภาพ</span>
+            <span style="font-size:8.5px; color:#64748b; margin-top:2px;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
+        `;
+        addSlot.onclick = () => {
+            if (imgMultiInput) {
+                imgMultiInput.value = '';
+                imgMultiInput.click();
             }
         };
+        multiGrid.appendChild(addSlot);
+    }
 
-        // 🎯 ผูก Action Buttons บนภาพรวม Composite (Zoom & Download)
-        if (btnZoomComposite) {
-            btnZoomComposite.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (stitchedMultiImage) {
-                    _openLightbox(stitchedMultiImage);
-                } else {
-                    toast('⚠️ ยังไม่มีภาพรวมที่ประมวลผลเสร็จสิ้น', 'warning');
-                }
-            };
+    // อัปเดต Badge จำนวนภาพ
+    if (multiCountBadge) {
+        if (multiImages.length >= 3 && multiImages.length <= 5) {
+            multiCountBadge.textContent = `✔ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ครบเกณฑ์)`;
+            multiCountBadge.style.background = '#059669';
+        } else if (multiImages.length === 0) {
+            multiCountBadge.textContent = `(อัปโหลดแล้ว 0/5 รูป)`;
+            multiCountBadge.style.background = '#d97706';
+        } else {
+            multiCountBadge.textContent = `⚠️ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ต้องการ 3-5 รูป)`;
+            multiCountBadge.style.background = '#d97706';
         }
+    }
+};
+/**
+ * ฟังก์ชันสลับตำแหน่งภาพใน Array
+ * @param {number} index - ตำแหน่งปัจจุบันของภาพ
+ * @param {number} direction - ทิศทางที่จะไป (-1 คือซ้าย, 1 คือขวา)
+ */
+function moveImageInArray(index, direction) {
+    const targetIndex = index + direction;
 
-        if (btnDownloadComposite) {
-            btnDownloadComposite.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!stitchedMultiImage) {
-                    toast('⚠️ ยังไม่มีภาพรวมให้ดาวน์โหลด', 'warning');
-                    return;
-                }
-                const link = document.createElement('a');
-                link.href = stitchedMultiImage;
-                link.download = `evidence-composite-${Date.now()}.jpg`;
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                toast('📥 กำลังดาวน์โหลดภาพหลักฐานรวม...', 'success');
-            };
-        }
+    // ตรวจสอบขอบเขตของ Array
+    if (targetIndex < 0 || targetIndex >= multiImages.length) return;
+
+    // ทำการสลับตำแหน่ง (Swap) โดยใช้ Destructuring
+    [multiImages[index], multiImages[targetIndex]] = [multiImages[targetIndex], multiImages[index]];
+
+    // แจ้งระบบว่ามีการเปลี่ยนแปลงข้อมูลภาพ (เพื่อให้วาดตารางและ Composite ใหม่)
+    handleMultiImagesChange();
+    
+    // แสดง Toast แจ้งเตือนเบาๆ
+    if (typeof toast === 'function') {
+        toast(`🔄 สลับลำดับภาพที่ ${index + 1} และ ${targetIndex + 1} แล้ว`, 'info');
+    }
+}
 
         // ฟังก์ชันจัดการเมื่อรูปภาพ Mode 2 มีการเปลี่ยนแปลง
         const handleMultiImagesChange = async () => {
@@ -18585,15 +18647,24 @@ function _openViewModal(id) {
             };
         }
         if ($.filterGrp) {
-            $.filterGrp.onclick = (e) => {
-                const btn = e.target.closest('.filter-pill');
-                if (!btn) return;
-                $.filterGrp.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-                btn.classList.add('active');
-                _filter = btn.getAttribute('data-filter') || 'ALL';
-                applyDateFilter();
-            };
-        }
+    $.filterGrp.onclick = (e) => {
+        // 🎯 ตรวจสอบว่าคลิกโดนปุ่มที่มีคลาส .f-btn หรือไม่
+        const btn = e.target.closest('.f-btn'); 
+        if (!btn) return;
+
+        // ลบคลาส active ออกจากทุกปุ่มก่อน
+        $.filterGrp.querySelectorAll('.f-btn').forEach(p => p.classList.remove('active'));
+        
+        // เพิ่มคลาส active ให้ปุ่มที่เพิ่งกด
+        btn.classList.add('active');
+
+        // ดึงค่า filter มาใช้งาน (ALL, VF, RP, RECORDS)
+        _filter = btn.getAttribute('data-filter') || 'ALL';
+
+        // สั่งกรองข้อมูลและวาดตารางใหม่
+        applyDateFilter(); 
+    };
+}
     }
 
 /* ──────────────────────────────────────────
@@ -20267,31 +20338,51 @@ let isFormHidden = true;
 function toggleFormPanel() {
     const formPanel = document.getElementById('form-panel');
     const showBtn = document.getElementById('show-form-btn');
+    const arrowIcon = showBtn.querySelector('svg');
     
-    // ปรับระยะเวลาให้เร็วขึ้นเป็น 0.3 วินาที
     const fastSpeed = 0.3; 
 
     if (!isFormHidden) {
-        // --- จังหวะพับปิด (รวดเร็ว) ---
+        // --- ⬅️ จังหวะพับปิด (ลูกศรชี้ขวา กลับไปที่เดิม) ---
+        if (arrowIcon) {
+            gsap.to(arrowIcon, { 
+                rotation: 0, 
+                duration: fastSpeed, 
+                ease: "power2.inOut",
+                transformOrigin: "50% 50%" // บังคับจุดหมุนกึ่งกลางเป๊ะ
+            });
+        }
+
         gsap.to(formPanel, {
             x: -350,
             opacity: 0,
             width: 0,
             marginRight: -12,
             duration: fastSpeed,
-            ease: "power2.in", // เร่งความเร็วตอนออก
+            ease: "power2.in",
             onComplete: () => {
                 formPanel.classList.add('hidden');
                 showBtn.classList.remove('hidden');
                 gsap.fromTo(showBtn, { x: -10, opacity: 0 }, { x: 0, opacity: 1, duration: 0.2 });
-                renderTable(); // ขยายตารางทันที
+                renderTable(); 
             }
         });
         isFormHidden = true;
     } else {
-        // --- จังหวะเปิดออก (รวดเร็วและคมชัด) ---
+        // --- ➡️ จังหวะเปิดออก (ลูกศรหมุนไปทางซ้าย) ---
+        if (arrowIcon) {
+            gsap.to(arrowIcon, { 
+                rotation: 180, 
+                duration: fastSpeed, 
+                ease: "power2.inOut",
+                transformOrigin: "50% 50%"
+            });
+        }
+
         formPanel.classList.remove('hidden');
-        showBtn.classList.add('hidden');
+        
+        // ถ้าต้องการให้เห็นปุ่มตอนกางออก ให้เอาบรรทัดล่างนี้ออกครับ
+        // showBtn.classList.add('hidden'); 
         
         gsap.fromTo(formPanel, 
             { x: -350, opacity: 0, width: 0, marginRight: -12 },
@@ -20300,8 +20391,8 @@ function toggleFormPanel() {
                 opacity: 1, 
                 width: 340, 
                 marginRight: 0, 
-                duration: fastSpeed + 0.1, // เพิ่มนิดเดียวเพื่อให้ดูไม่กระชากเกินไป
-                ease: "expo.out", // เปิดพรึ่บออกมาแล้วค่อยๆ หยุด
+                duration: fastSpeed + 0.1,
+                ease: "expo.out",
                 onComplete: () => {
                     renderTable();
                 }
@@ -36215,6 +36306,9 @@ if (_currentSlide === 0) {
 // ==========================================
 // แผ่นที่ 3: D2- Define the Problem (ฉบับ Responsive ป้องกันตารางล้น 100%)
 // ==========================================
+// ==========================================
+// แผ่นที่ 3: D2- Define the Problem (ฉบับแก้ปัญหาตัวหนังสือจมในโหมดมืด)
+// ==========================================
 else if (_currentSlide === 2) {
     const rawTitle = c.problem_title || "";
     const parsedD2 = parseProblemTitleForD2(rawTitle, c);
@@ -36224,7 +36318,6 @@ else if (_currentSlide === 2) {
     let extSupplier = parsedD2.supplier; 
     let extDefect   = parsedD2.defectName;
 
-    // --- 2. ระบบคำนวณสถิติ ---
     const ng = Number(c.ng_qty) || 0;
     const ok = Number(c.ok_qty) || 0;
     const total = ng + ok; 
@@ -36232,95 +36325,97 @@ else if (_currentSlide === 2) {
     const today = new Date().toISOString().split('T')[0];
     const supportImage = c.report_data?.evidence_img || ""; 
 
+    // บังคับสไตล์ตัวหนังสือให้เป็นสีดำเด็ดขาด (!important)
+    const labelStyle = 'border:1px solid #000; padding:1px 8px; font-weight:900; color:#000000 !important;';
+    const valueStyle = 'border:1px solid #000; padding:1px 8px; outline:none; color:#000000 !important;';
+
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; color: #000 !important;">
             
-            <!-- Header Section (Fixed Height) -->
+            <!-- Header Section -->
             <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
-                <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000; outline: none; letter-spacing: -1.5px; line-height: 0.9;">
+                <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000 !important; outline: none; letter-spacing: -1.5px; line-height: 0.9;">
                     D2-Define the Problem
                 </h1>
-                <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 2px 10px; font-weight: 950; font-size: 13px; border: 1.2px solid #000; text-transform: uppercase; outline: none; margin-bottom: 4px;">
+                <div contenteditable="true" style="background: #0000FF; color: #FFFF00 !important; padding: 2px 10px; font-weight: 950; font-size: 13px; border: 1.2px solid #000; text-transform: uppercase; outline: none; margin-bottom: 4px;">
                     &lt;Fill by CTC &gt;
                 </div>
             </div>
             <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 10px; flex-shrink: 0;"></div>
 
-            <!-- Main Content Area (Flexible Height) -->
+            <!-- Main Content Area -->
             <div style="display: flex; gap: 20px; flex: 1; min-height: 0; overflow: hidden; margin-bottom: 10px; align-items: stretch;">
                 
-                <!-- ฝั่งซ้าย: ตาราง (บีบอัดความสูงให้พอดีพื้นที่) -->
+                <!-- ฝั่งซ้าย: ตาราง (บังคับสีตัวหนังสือดำ) -->
                 <div style="flex: 0 0 45%; display: flex; flex-direction: column; min-height: 0;">
                     <table style="width: 100%; height: 100%; border-collapse: collapse; border: 1.5px solid #000; table-layout: fixed; font-size: 11px;">
-                        <tr style="background:#2563eb; color:#fff; font-weight:900; height: 8.5%;">
+                        <tr style="background:#2563eb; color:#fff !important; font-weight:900; height: 8.5%;">
                             <td style="border:1px solid #000; padding:1px 8px; width:40%;">VF/RP No.</td>
                             <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-weight:950; font-family: monospace;">${c.id}</td>
                         </tr>
                         <tr style="height: 7.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Issue Date</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">${new Date(c.created_at).toLocaleDateString('en-GB')}</td>
+                            <td style="${labelStyle} background:#f1f5f9;">Issue Date</td>
+                            <td contenteditable="true" style="${valueStyle}">${new Date(c.created_at).toLocaleDateString('en-GB')}</td>
                         </tr>
                         <tr style="height: 7.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Model</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">-</td>
+                            <td style="${labelStyle}">Model</td>
+                            <td contenteditable="true" style="${valueStyle}">-</td>
                         </tr>
                         <tr style="height: 8%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Part Name</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; font-weight:950; outline: none;">${extPartName}</td>
+                            <td style="${labelStyle} background:#f1f5f9;">Part Name</td>
+                            <td contenteditable="true" style="${valueStyle} font-weight:950;">${extPartName}</td>
                         </tr>
                         <tr style="height: 7.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Drawing No.</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-family: monospace;">${extDrawing}</td>
+                            <td style="${labelStyle}">Drawing No.</td>
+                            <td contenteditable="true" style="${valueStyle} font-family: monospace;">${extDrawing}</td>
                         </tr>
                         <tr style="height: 7.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Part Group</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">${c.part_group || 'Steel'}</td>
+                            <td style="${labelStyle} background:#f1f5f9;">Part Group</td>
+                            <td contenteditable="true" style="${valueStyle}">${c.part_group || 'Steel'}</td>
                         </tr>
                         <tr style="height: 7.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Supplier</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; font-weight:950; color: #2563eb; outline: none;">${extSupplier}</td>
+                            <td style="${labelStyle}">Supplier</td>
+                            <td contenteditable="true" style="${valueStyle} font-weight:950; color: #2563eb !important;">${extSupplier}</td>
                         </tr>
                         <tr style="height: 9.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Defect name</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; color:red; font-weight:950; outline: none; line-height: 1;">${extDefect}</td>
+                            <td style="${labelStyle} background:#f1f5f9;">Defect name</td>
+                            <td contenteditable="true" style="${valueStyle} color:red !important; font-weight:950; line-height: 1;">${extDefect}</td>
                         </tr>
                         <tr style="height: 8%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Lot size/Used Q'ty</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none; font-weight:900;">${ng} / ${total} Pcs.</td>
+                            <td style="${labelStyle}">Lot size/Used Q'ty</td>
+                            <td contenteditable="true" style="${valueStyle} font-weight:900;">${ng} / ${total} Pcs.</td>
                         </tr>
                         <tr style="height: 8%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Defect Q'ty (%)</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; font-weight:950; outline: none;">${defectPct}</td>
+                            <td style="${labelStyle} background:#f1f5f9;">Defect Q'ty (%)</td>
+                            <td contenteditable="true" style="${valueStyle} font-weight:950;">${defectPct}</td>
                         </tr>
                         <tr style="height: 7.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Trouble Rank</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; font-weight:950; color:red; outline: none;">B</td>
+                            <td style="${labelStyle}">Trouble Rank</td>
+                            <td contenteditable="true" style="${valueStyle} font-weight:950; color:red !important;">B</td>
                         </tr>
                         <tr style="height: 7.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900; background:#f1f5f9;">Inspection Date</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">${today}</td>
+                            <td style="${labelStyle} background:#f1f5f9;">Inspection Date</td>
+                            <td contenteditable="true" style="${valueStyle}">${today}</td>
                         </tr>
                         <tr style="height: 7.5%;">
-                            <td style="border:1px solid #000; padding:1px 8px; font-weight:900;">Defect Found Area</td>
-                            <td contenteditable="true" style="border:1px solid #000; padding:1px 8px; outline: none;">Line claim</td>
+                            <td style="${labelStyle}">Defect Found Area</td>
+                            <td contenteditable="true" style="${valueStyle}">Line claim</td>
                         </tr>
                     </table>
                 </div>
                 
-                <!-- ฝั่งขวา: รูปภาพ (ยืดหดตามตาราง) -->
+                <!-- ฝั่งขวา: รูปภาพ -->
                 <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
-                    <h3 contenteditable="true" style="font-size: 15px; font-weight: 950; margin: 0 0 5px 0; color: #000; outline: none; text-transform: uppercase;">
-                        Describe of Defect <span style="background: yellow; color: red; padding: 0 5px; font-style: italic; font-size: 11px; font-weight: 800;">(Picture and Judgement method)</span>
+                    <h3 contenteditable="true" style="font-size: 15px; font-weight: 950; margin: 0 0 5px 0; color: #000 !important; outline: none; text-transform: uppercase;">
+                        Describe of Defect <span style="background: yellow; color: red !important; padding: 0 5px; font-style: italic; font-size: 11px; font-weight: 800;">(Picture and Judgement method)</span>
                     </h3>
                     <div style="flex: 1; border: 2px solid #000; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; border-radius: 4px;">
                         ${supportImage 
-                            ? `<img  src="${supportImage}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto;" alt="Image" title="Image">` 
+                            ? `<img src="${supportImage}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto;">` 
                             : '<span style="color:#eee; font-size:40px; font-weight:900;">PHOTO AREA</span>'}
                     </div>
                 </div>
             </div>
-
-
         </div>`;
 }
 // ==========================================
@@ -36413,119 +36508,131 @@ else if (_currentSlide === 3) {
         // ==========================================
         // แผ่นที่ 5: D3-Interim Containment Action (ICA)
         // ==========================================
-        else if (_currentSlide === 4) {
-            const locations = ["CTC WIP", "CTC Stock", "Supplier Stock", "On the way", "", ""];
-            
-            mainContent = `
-                <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
-                    <!-- Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
-                        <h1 contenteditable="true" style="font-size: 36px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1.5px; outline: none; line-height: 1;">
-                            D3-Interim Containment Action (ICA)
-                        </h1>
-                        <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 3px 12px; font-weight: 950; font-size: 13px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1; flex-shrink: 0;">
-                            &lt;Fill by CTC & Supplier&gt;
-                        </div>
-                    </div>
-                    <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
+        // ==========================================
+// แผ่นที่ 5: D3-Interim Containment Action (ICA) - แก้ไขตัวหนังสือหายในโหมดมืด
+// ==========================================
+else if (_currentSlide === 4) {
+    const locations = ["CTC WIP", "CTC Stock", "Supplier Stock", "On the way", "", ""];
+    
+    // สไตล์ตัวหนังสือดำเด็ดขาด
+    const blackTextStyle = 'color: #000000 !important;';
 
-                    <!-- Main Table -->
-                    <div style="width: 100%; flex-shrink: 0;">
-                        <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 11px; table-layout: fixed;">
-                            <thead style="background: #fff; font-weight: 900; text-align: center;">
-                                <tr style="height: 38px;">
-                                    <td style="border: 1px solid #000; width: 12%;">Location</td>
-                                    <td style="border: 1px solid #000; width: 6%;">Qty</td>
-                                    <td style="border: 1px solid #000; width: 15%;">Action<br><span style="font-size:9px; font-weight:500;">(Sorting, Rework, etc.)</span></td>
-                                    <td style="border: 1px solid #000; width: 10%;">Person in charge</td>
-                                    <td style="border: 1px solid #000; width: 10%;">Start date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
-                                    <td style="border: 1px solid #000; width: 10%;">Finished Date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
-                                    <td style="border: 1px solid #000; width: 8%;">Sorted Q'ty</td>
-                                    <td style="border: 1px solid #000; width: 8%;">NG Q'ty</td>
-                                    <td style="border: 1px solid #000; width: 11%;">Disposition</td>
-                                    <td style="border: 1px solid #000; width: 10%;">Remarks</td>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${locations.map(loc => `
-                                    <tr style="height: 26px;">
-                                        <td contenteditable="true" style="border: 1px solid #000; padding: 0 6px; font-weight: 800; background: #fff; outline: none; vertical-align: middle;">${loc}</td>
-                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;">${loc ? '0' : ''}</td>
-                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
-                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
-                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
-                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
-                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
-                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
-                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; color: red;"></td>
-                                        <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none;"></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Bottom Sections (3 Boxes) -->
-                    <div style="width: 100%; margin-top: 10px; flex: 1; min-height: 0; flex-shrink: 0; background: #fff;">
-                        <table style="width: 100%; height: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 12px; table-layout: fixed;">
-                            <thead>
-                                <tr style="height: 32px; background: #8caed6;">
-                                    <th style="border: 1.5px solid #000; width: 38%; text-align: left; padding: 5px 10px; font-weight: 900; color: #000; text-decoration: underline;">Sort/Rework Method Used:</th>
-                                    <th style="border: 1.5px solid #000; width: 30%; text-align: left; padding: 5px 10px; font-weight: 900; color: #000; text-decoration: underline;">Identify mark:</th>
-                                    <th style="border: 1.5px solid #000; width: 32%; text-align: left; padding: 5px 10px; font-weight: 900; color: #000; text-decoration: underline;">Sorting/Rework lot Ship Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr style="vertical-align: top; background: #fff;">
-                                    <td contenteditable="true" style="border: 1.5px solid #000; padding: 8px 10px; line-height: 1.5; font-weight: 500; color: #000; outline: none; background: #fff;">
-                                        V.TKCP screw Sorting parts in stock<br>Stock : 0 Pcs.<br>OK : .... Pcs.<br>NG : .... Pcs.
-                                    </td>
-                                    <td contenteditable="true" style="border: 1.5px solid #000; padding: 8px 10px; font-weight: 500; color: #000; outline: none; background: #fff;">
-                                        Mark label ok control
-                                    </td>
-                                    <td contenteditable="true" style="border: 1.5px solid #000; padding: 8px 10px; line-height: 1.5; font-weight: 500; color: #000; outline: none; background: #fff;">
-                                        Sorting date : ....<br>Shipment replacement part date : ....
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Instruction Footer -->
-                    <div style="background: #ffffcc; border: 1.5px solid #ffcc00; margin-top: 10px; padding: 6px 12px; font-size: 11px; line-height: 1.4; flex-shrink: 0; border-radius: 2px;">
-                        <div style="color: red; font-weight: 900; font-style: italic;">3D - Interim Containment Action (ICA)</div>
-                        <div style="color: #000; font-style: italic;">
-                            Take action to ensure that the customer is protected and the problem does not get out of your area. Ensure all suspect parts of the manufacturing process, On-Hand stock, On the way has been quarantine.
-                        </div>
-                    </div>
+    mainContent = `
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; ${blackTextStyle}">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
+                <h1 contenteditable="true" style="font-size: 36px; font-weight: 950; margin: 0; ${blackTextStyle} letter-spacing: -1.5px; outline: none; line-height: 1;">
+                    D3-Interim Containment Action (ICA)
+                </h1>
+                <div contenteditable="true" style="background: #0000FF; color: #FFFF00 !important; padding: 3px 12px; font-weight: 950; font-size: 13px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1; flex-shrink: 0;">
+                    &lt;Fill by CTC & Supplier&gt;
                 </div>
-            `;
-        }
+            </div>
+            <div style="width: 100%; height: 6px; background: #003366; margin-bottom: 12px; flex-shrink: 0;"></div>
+
+            <!-- Main Table -->
+            <div style="width: 100%; flex-shrink: 0;">
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 11px; table-layout: fixed; ${blackTextStyle}">
+                    <thead style="background: #fff; font-weight: 900; text-align: center;">
+                        <tr style="height: 38px; ${blackTextStyle}">
+                            <td style="border: 1px solid #000; width: 12%;">Location</td>
+                            <td style="border: 1px solid #000; width: 6%;">Qty</td>
+                            <td style="border: 1px solid #000; width: 15%;">Action<br><span style="font-size:9px; font-weight:500;">(Sorting, Rework, etc.)</span></td>
+                            <td style="border: 1px solid #000; width: 10%;">Person in charge</td>
+                            <td style="border: 1px solid #000; width: 10%;">Start date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
+                            <td style="border: 1px solid #000; width: 10%;">Finished Date<br><span style="font-size:9px; font-weight:500;">[YY.MM.DD]</span></td>
+                            <td style="border: 1px solid #000; width: 8%;">Sorted Q'ty</td>
+                            <td style="border: 1px solid #000; width: 8%;">NG Q'ty</td>
+                            <td style="border: 1px solid #000; width: 11%;">Disposition</td>
+                            <td style="border: 1px solid #000; width: 10%;">Remarks</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${locations.map(loc => `
+                            <tr style="height: 26px; ${blackTextStyle}">
+                                <td contenteditable="true" style="border: 1px solid #000; padding: 0 6px; font-weight: 800; background: #fff; outline: none; vertical-align: middle; ${blackTextStyle}">${loc}</td>
+                                <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; ${blackTextStyle}">${loc ? '0' : ''}</td>
+                                <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; ${blackTextStyle}"></td>
+                                <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; ${blackTextStyle}"></td>
+                                <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; ${blackTextStyle}"></td>
+                                <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; ${blackTextStyle}"></td>
+                                <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; ${blackTextStyle}"></td>
+                                <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; ${blackTextStyle}"></td>
+                                <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; color: red !important;"></td>
+                                <td contenteditable="true" style="border: 1px solid #000; text-align: center; vertical-align: middle; outline: none; ${blackTextStyle}"></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Middle 3 Boxes -->
+            <div style="width: 100%; margin-top: 10px; flex: 1; min-height: 0; flex-shrink: 0; background: #fff;">
+                <table style="width: 100%; height: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 12px; table-layout: fixed; ${blackTextStyle}">
+                    <thead>
+                        <tr style="height: 32px; background: #8caed6;">
+                            <th style="border: 1.5px solid #000; width: 38%; text-align: left; padding: 5px 10px; font-weight: 900; color: #000 !important; text-decoration: underline;">Sort/Rework Method Used:</th>
+                            <th style="border: 1.5px solid #000; width: 30%; text-align: left; padding: 5px 10px; font-weight: 900; color: #000 !important; text-decoration: underline;">Identify mark:</th>
+                            <th style="border: 1.5px solid #000; width: 32%; text-align: left; padding: 5px 10px; font-weight: 900; color: #000 !important; text-decoration: underline;">Sorting/Rework lot Ship Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="vertical-align: top; background: #fff;">
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 8px 10px; line-height: 1.5; font-weight: 500; ${blackTextStyle} outline: none; background: #fff;">
+                                V.TKCP screw Sorting parts in stock<br>Stock : 0 Pcs.<br>OK : .... Pcs.<br>NG : .... Pcs.
+                            </td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 8px 10px; font-weight: 500; ${blackTextStyle} outline: none; background: #fff;">
+                                Mark label ok control
+                            </td>
+                            <td contenteditable="true" style="border: 1.5px solid #000; padding: 8px 10px; line-height: 1.5; font-weight: 500; ${blackTextStyle} outline: none; background: #fff;">
+                                Sorting date : ....<br>Shipment replacement part date : ....
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Instruction Footer -->
+            <div style="background: #ffffcc; border: 1.5px solid #ffcc00; margin-top: 10px; padding: 6px 12px; font-size: 11px; line-height: 1.4; flex-shrink: 0; border-radius: 2px;">
+                <div style="color: red !important; font-weight: 900; font-style: italic;">3D - Interim Containment Action (ICA)</div>
+                <div style="color: #000 !important; font-style: italic;">
+                    Take action to ensure that the customer is protected and the problem does not get out of your area. Ensure all suspect parts of the manufacturing process, On-Hand stock, On the way has been quarantine.
+                </div>
+            </div>
+        </div>
+    `;
+}
 // ==========================================
 // แผ่นที่ 6: D4-Identify Root cause and Escape cause (PROCESS FLOW - MATCH D4 WIDTH)
 // ==========================================
+// ==========================================
+// แผ่นที่ 6: D4-Identify Root cause (PROCESS FLOW) - ปรับปรุงสีตัวหนังสือให้อ่านออกในโหมดมืด
+// ==========================================
 else if (_currentSlide === 5) {
-    // 1. ฟังก์ชันสร้างแถว
+    // 1. ฟังก์ชันสร้างแถว (ปรับปรุงสไตล์ตัวหนังสือ)
     const createFlowRow = (text, isRed = false, isDiamond = false, elementId = "") => {
         const idAttr = elementId ? `id="${elementId}"` : '';
+        
+        // บังคับสีตัวหนังสือในกล่องสี่เหลี่ยม
         const boxStyle = isDiamond 
             ? `position: relative; width: 180px; height: 50px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;`
-            : `width: 180px; height: 38px; background: #d9d9d9; border: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; text-transform: uppercase; color: ${isRed ? 'red' : '#000'}; outline: none; box-shadow: 2px 2px 0px #000; flex-shrink: 0;`;
+            : `width: 180px; height: 38px; background: #d9d9d9; border: 1.5px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; text-transform: uppercase; color: ${isRed ? 'red !important' : '#000 !important'}; outline: none; box-shadow: 2px 2px 0px #000; flex-shrink: 0;`;
 
+        // บังคับสีตัวหนังสือในกล่องข้าวหลามตัด (Diamond)
         const leftContent = isDiamond ? `
             <svg viewBox="0 0 100 45" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 0px #000);">
                 <polygon points="50,2 98,22.5 50,43 2,22.5" fill="#fff" stroke="#000" stroke-width="1.5"/>
             </svg>
-            <div contenteditable="true" style="position: absolute; font-weight: 900; font-size: 10px; text-align: center; width: 75%; line-height: 1.1; text-transform: uppercase; outline: none;">${text}</div>
-        ` : `<div contenteditable="true" style="outline:none;">${text}</div>`;
+            <div contenteditable="true" style="position: absolute; font-weight: 900; font-size: 10px; text-align: center; width: 75%; line-height: 1.1; text-transform: uppercase; outline: none; color: #000000 !important;">${text}</div>
+        ` : `<div contenteditable="true" style="outline:none; color: #000000 !important;">${text}</div>`;
 
         return `
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 2px; width: 100%;">
                 <div ${idAttr} style="flex-shrink: 0; ${boxStyle}">${leftContent}</div>
                 <div onclick="const inp=this.querySelector('input'); if(inp) inp.click();" style="flex: 1; height: 58px; border: 1.5px dashed #3b82f6; background: #f8fafc; position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; background-size: contain; background-repeat: no-repeat; background-position: center; border-radius: 4px;">
-                    <div class="photo-placeholder" style="display: flex; align-items: center; gap: 5px; color: #1e40af;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                        <span style="font-size: 10px; color: #1e3a8a; font-weight: 800; letter-spacing: 0.2px;">+ Add Photo</span>
+                    <div class="photo-placeholder" style="display: flex; align-items: center; gap: 5px; color: #1e40af !important;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        <span style="font-size: 10px; color: #1e3a8a !important; font-weight: 800; letter-spacing: 0.2px;">+ Add Photo</span>
                     </div>
                     <input type="file" accept="image/*" style="display:none" onclick="event.stopPropagation()" onchange="if(this.files && this.files[0]){ const reader = new FileReader(); reader.onload=(e)=>{this.parentElement.style.backgroundImage='url('+e.target.result+')'; this.parentElement.style.backgroundSize='contain'; const ph=this.parentElement.querySelector('.photo-placeholder'); if(ph) ph.style.display='none';}; reader.readAsDataURL(this.files[0]); }">
                 </div>
@@ -36538,14 +36645,14 @@ else if (_currentSlide === 5) {
         </div>`;
 
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; color: #000000 !important;">
             
             <!-- HEADER -->
             <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 2px; flex-shrink: 0;">
-                <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000; letter-spacing: -1.5px; outline: none; line-height: 1;">
+                <h1 contenteditable="true" style="font-size: 32px; font-weight: 950; margin: 0; color: #000 !important; letter-spacing: -1.5px; outline: none; line-height: 1;">
                     D4-Identify Root cause and Escape cause
                 </h1>
-                <div style="background: #0000FF; color: white; padding: 3px 14px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px; border-radius: 2px;">
+                <div style="background: #0000FF; color: white !important; padding: 3px 14px; font-weight: 900; font-size: 13px; border: 1.5px solid #000; margin-bottom: 4px; border-radius: 2px;">
                     &lt;Fill by Supplier&gt;
                 </div>
             </div>
@@ -36553,8 +36660,8 @@ else if (_currentSlide === 5) {
 
             <!-- TITLE -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0;">
-                <span contenteditable="true" style="font-size: 18px; font-weight: 900; text-decoration: underline; color: #003366; outline: none;">Process Flow</span>
-                <span style="color: #f59e0b; font-size: 11px; font-weight: 800; margin-right: 10px;">Please fill photo</span>
+                <span contenteditable="true" style="font-size: 18px; font-weight: 900; text-decoration: underline; color: #003366 !important; outline: none;">Process Flow</span>
+                <span style="color: #f59e0b !important; font-size: 11px; font-weight: 800; margin-right: 10px;">Please fill photo</span>
             </div>
 
             <!-- MAIN CHART AREA -->
@@ -37051,27 +37158,29 @@ else if (_currentSlide === 12) {
 }
 
 // ==========================================
-// แผ่นที่ 14: D7-Preventive Recurrence
+// แผ่นที่ 14: D7-Preventive Recurrence - บังคับสีตัวหนังสือให้อ่านออกในโหมดมืด
 // ==========================================
 else if (_currentSlide === 13) {
+    const blackText = 'color: #000000 !important;';
+
     const createConsiderRow = (no, text, updated = "N") => `
         <tr style="height: 20px;">
-            <td style="border: 1px solid #000; padding-left: 8px; font-size: 10px; font-weight: 500; background:#fff;">${no}. ${text}</td>
-            <td contenteditable="true" style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 10.5px; outline: none; background:#fff;">${updated}</td>
-            <td contenteditable="true" style="border: 1px solid #000; outline: none; background:#fff;"></td>
-            <td contenteditable="true" style="border: 1px solid #000; outline: none; background:#fff;"></td>
-            <td contenteditable="true" style="border: 1px solid #000; outline: none; background:#fff;"></td>
+            <td style="border: 1px solid #000; padding-left: 8px; font-size: 10px; font-weight: 500; background:#fff; ${blackText}">${no}. ${text}</td>
+            <td contenteditable="true" style="border: 1px solid #000; text-align: center; font-weight: bold; font-size: 10.5px; outline: none; background:#fff; ${blackText}">${updated}</td>
+            <td contenteditable="true" style="border: 1px solid #000; outline: none; background:#fff; ${blackText}"></td>
+            <td contenteditable="true" style="border: 1px solid #000; outline: none; background:#fff; ${blackText}"></td>
+            <td contenteditable="true" style="border: 1px solid #000; outline: none; background:#fff; ${blackText}"></td>
         </tr>`;
 
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; ${blackText}">
             
             <!-- 1. Header (ชิดบน) -->
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 38px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; color: #000; outline: none;">
+                    <h1 contenteditable="true" style="font-size: 26px; font-weight: 800; margin: 0; ${blackText} outline: none;">
                         D7-Preventive Recurrence
                     </h1>
-                    <div style="background: #1e1bff; color: #fff; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
+                    <div style="background: #1e1bff; color: #fff !important; padding: 2px 10px; font-weight: bold; font-size: 12px; border: 1.2px solid #000;">
                         &lt;Fill by Supplier&gt;
                     </div>
                 </div>
@@ -37079,12 +37188,12 @@ else if (_currentSlide === 13) {
                 <div style="width: 100%; height: 5px; background: #003366; margin-bottom: 6px; flex-shrink: 0;"></div>
 
                 <!-- 2. Top Split Section (How to avoid) -->
-                <div style="display: flex; gap: 0; border: 1.2px solid #000; margin-bottom: 6px; flex-shrink: 0;">
+                <div style="display: flex; gap: 0; border: 1.2px solid #000; margin-bottom: 6px; flex-shrink: 0; ${blackText}">
                     <div style="flex: 1.2; border-right: 1.2px solid #000; display: flex; flex-direction: column;">
-                        <div style="background: #b4c7e7; padding: 3px 8px; border-bottom: 1.2px solid #000; font-weight: 800; font-size: 10.5px;">
+                        <div style="background: #b4c7e7; padding: 3px 8px; border-bottom: 1.2px solid #000; font-weight: 800; font-size: 10.5px; ${blackText}">
                             How to avoid recurrence this problem in the future ?
                         </div>
-                        <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 9.5px; line-height: 1.25; outline: none; background: #fff; min-height: 70px;">
+                        <div contenteditable="true" style="flex: 1; padding: 5px; font-size: 9.5px; line-height: 1.25; outline: none; background: #fff; min-height: 70px; ${blackText}">
                             -Add rack packing std.<br>
                             -Rev.WI-SP01-01 to prohibit use of temporary racks...<br>
                             -Provide training WI-SP01-01 to the Production...<br>
@@ -37093,38 +37202,38 @@ else if (_currentSlide === 13) {
                         </div>
                     </div>
                     <div style="flex: 1; display: flex; flex-direction: column;">
-                        <div style="background: #b4c7e7; padding: 3px 8px; border-bottom: 1.2px solid #000; font-weight: 800; font-size: 10px;">
+                        <div style="background: #b4c7e7; padding: 3px 8px; border-bottom: 1.2px solid #000; font-weight: 800; font-size: 10px; ${blackText}">
                             Risk part has similar structure/process and Action plan.
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; flex: 1; font-size: 10px; text-align: center;">
+                        <table style="width: 100%; border-collapse: collapse; flex: 1; font-size: 10px; text-align: center; ${blackText}">
                             <tr style="background: #d9e1f2; font-weight: bold; height: 20px;">
-                                <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; width: 20%;">TTL Q'ty</td>
-                                <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; width: 40%;">Action</td>
-                                <td style="border-bottom: 1px solid #000;">Plan</td>
+                                <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; width: 20%; ${blackText}">TTL Q'ty</td>
+                                <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; width: 40%; ${blackText}">Action</td>
+                                <td style="border-bottom: 1px solid #000; ${blackText}">Plan</td>
                             </tr>
                             <tr style="height: 50px;">
-                                <td contenteditable="true" style="border-right: 1px solid #000; outline: none;"></td>
-                                <td contenteditable="true" style="border-right: 1px solid #000; outline: none;"></td>
-                                <td contenteditable="true" style="outline: none;"></td>
+                                <td contenteditable="true" style="border-right: 1px solid #000; outline: none; ${blackText}"></td>
+                                <td contenteditable="true" style="border-right: 1px solid #000; outline: none; ${blackText}"></td>
+                                <td contenteditable="true" style="outline: none; ${blackText}"></td>
                             </tr>
                         </table>
                     </div>
                 </div>
 
                 <!-- 3. Document Header -->
-                <div style="font-weight: 900; font-size: 12px; margin-bottom: 3px; color: #000; flex-shrink: 0;">
+                <div style="font-weight: 900; font-size: 12px; margin-bottom: 3px; ${blackText} flex-shrink: 0;">
                     Has the necessary document been revised/ updated ?
                 </div>
 
                 <!-- 4. Consideration Table -->
-                <table style="width: 100%; border-collapse: collapse; border: 1.2px solid #000; table-layout: fixed; font-size: 10px;">
+                <table style="width: 100%; border-collapse: collapse; border: 1.2px solid #000; table-layout: fixed; font-size: 10px; ${blackText}">
                     <thead style="background: #b4c7e7; font-weight: bold; text-align: center; height: 22px;">
                         <tr>
-                            <td style="border: 1px solid #000; width: 35%;">Consider</td>
-                            <td style="border: 1px solid #000; width: 10%;">Updated?<br>(Y/N)</td>
-                            <td style="border: 1px solid #000; width: 30%;">Details</td>
-                            <td style="border: 1px solid #000; width: 15%;">Document no.</td>
-                            <td style="border: 1px solid #000; width: 10%;">Due date</td>
+                            <td style="border: 1px solid #000; width: 35%; ${blackText}">Consider</td>
+                            <td style="border: 1px solid #000; width: 10%; ${blackText}">Updated?<br>(Y/N)</td>
+                            <td style="border: 1px solid #000; width: 30%; ${blackText}">Details</td>
+                            <td style="border: 1px solid #000; width: 15%; ${blackText}">Document no.</td>
+                            <td style="border: 1px solid #000; width: 10%; ${blackText}">Due date</td>
                         </tr>
                     </thead>
                     <tbody>
@@ -37143,8 +37252,8 @@ else if (_currentSlide === 13) {
 
                 <!-- 5. Instruction Box -->
                 <div contenteditable="true" style="margin-top: 6px; padding: 5px 8px; background: #ffffcc; border: 1px solid #ccc; font-size: 9.5px; line-height: 1.25; outline: none; cursor: text; flex-shrink: 0;">
-                    <div style="color: red; font-weight: bold; font-style: italic;">7D - Prevent Recurrence</div>
-                    <div style="color: #000;">Ensure the problem does not happen again ANYWHERE by using Foolproof, POKAYOKE etc. Communicate your results to all areas including similar part. Submit revised all related documents to us to review. (if have)</div>
+                    <div style="color: red !important; font-weight: bold; font-style: italic;">7D - Prevent Recurrence</div>
+                    <div style="color: #000 !important; font-weight: 600;">Ensure the problem does not happen again ANYWHERE by using Foolproof, POKAYOKE etc. Communicate your results to all areas including similar part. Submit revised all related documents to us to review. (if have)</div>
                 </div>
         </div>
     `;
