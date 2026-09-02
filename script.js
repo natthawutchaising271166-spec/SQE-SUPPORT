@@ -6259,7 +6259,7 @@ if (document.readyState === 'loading') {
 }
 
 /* ============================================================
-   ✏️ QC EVIDENCE IMAGE ANNOTATOR & MARKUP SYSTEM (100% MATCH)
+   ✏️ QC EVIDENCE IMAGE ANNOTATOR & MARKUP SYSTEM (100% COMPLETE & ROBUST)
    ============================================================ */
 window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
     if (!imageUrl) return;
@@ -6272,7 +6272,7 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
     overlay.className = 'annotator-modal-overlay';
     
     overlay.innerHTML = `
-        <div class="annotator-container">
+        <div class="annotator-container" id="image-annotator-panel">
             <!-- Header Bar (Cyber Dark Glassmorphism) -->
             <div class="annotator-header">
                 <div class="annotator-header-left">
@@ -6282,12 +6282,12 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
                             Evidence Defect Annotator (ใส่สัญลักษณ์ & ข้อความชี้จุดบกพร่อง)
                         </div>
                         <div class="annotator-subtitle">
-                            ลากวาดลูกศร, วงกลม, กรอบสี่เหลี่ยม, เส้นตรง, ปากกา, พิมพ์ข้อความ พร้อมระบบ Pan & Zoom ส่องตรวจความละเอียดสูง
+                            ลากวาดลูกศร, วงกลม, กรอบสี่เหลี่ยม, เส้นตรง, ปากกา, พิมพ์ข้อความ • เลือก & เคลื่อนย้ายวัตถุได้อิสระ • ครอบตัดภาพ (Crop) • Pan & Zoom
                         </div>
                     </div>
                 </div>
                 <div class="annotator-header-actions">
-                    <button type="button" id="annotator-close-btn" class="annotator-header-btn btn-close-modal" title="ปิดหน้าต่าง">
+                    <button type="button" id="annotator-close-btn" class="annotator-header-btn btn-close-modal" title="ปิดหน้าต่าง (Esc)">
                         ✕ ปิด
                     </button>
                     <button type="button" id="annotator-save-btn" class="annotator-header-btn btn-save-modal" title="บันทึกลงเอกสาร">
@@ -6301,76 +6301,83 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
                 <div class="annotator-floating-toolbar">
                     <!-- Tool Selection Group -->
                     <div class="annotator-pill-group tool-selection-group">
-                        <button type="button" class="annotator-pill-btn active" data-tool="arrow" title="วาดลูกศร (Arrow)">
+                        <button type="button" class="annotator-pill-btn" data-tool="select" title="เครื่องมือเมาส์: เลือก, ย้าย & ขยายขนาด (Select, Move & Resize) [V]" style="color:#38bdf8;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M4 2l16 8.5-7.5 2.5-3.5 7.5L4 2z"/></svg>
+                            <span class="tool-label" style="display:none; sm:display:inline; font-weight:800; font-size:11px;">เมาส์/ย้าย</span>
+                        </button>
+                        <button type="button" class="annotator-pill-btn active" data-tool="arrow" title="วาดลูกศรชี้จุด (Arrow) [1]">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                         </button>
-                        <button type="button" class="annotator-pill-btn" data-tool="circle" title="วาดวงกลม / วงรี (Circle / Oval)">
+                        <button type="button" class="annotator-pill-btn" data-tool="circle" title="วาดวงกลม / วงรี (Circle / Oval) [2]">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"></circle></svg>
                         </button>
-                        <button type="button" class="annotator-pill-btn" data-tool="rect" title="วาดกรอบสี่เหลี่ยม (Rectangle)">
+                        <button type="button" class="annotator-pill-btn" data-tool="rect" title="วาดกรอบสี่เหลี่ยม (Rectangle) [3]">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
                         </button>
-                        <button type="button" class="annotator-pill-btn" data-tool="line" title="วาดเส้นตรง (Straight Line)">
+                        <button type="button" class="annotator-pill-btn" data-tool="line" title="วาดเส้นตรง (Straight Line) [4]">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"></line></svg>
                         </button>
-                        <button type="button" class="annotator-pill-btn" data-tool="pen" title="ปากกาวาดอิสระ (Freehand Pen)">
+                        <button type="button" class="annotator-pill-btn" data-tool="pen" title="ปากกาวาดอิสระ (Freehand Pen) [5]">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                         </button>
-                        <button type="button" class="annotator-pill-btn" data-tool="text" title="พิมพ์ข้อความชี้จุด (Text / Label)">
-                            <span style="font-size:12px; font-weight:900; font-family:sans-serif;">abc</span>
+                        <button type="button" class="annotator-pill-btn" data-tool="text" title="พิมพ์ข้อความ / แท็กบกพร่อง (Text Tag) [6]">
+                            <span style="font-size:12px; font-weight:900; font-family:sans-serif; background:rgba(255,255,255,0.15); padding:1px 4px; border-radius:4px; border:1px solid rgba(255,255,255,0.3);">abc</span>
                         </button>
-                        <button type="button" class="annotator-pill-btn" data-tool="crop" title="ตัดเฉพาะส่วน (Crop)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+                        <button type="button" class="annotator-pill-btn" data-tool="crop" title="ครอบตัดภาพเฉพาะส่วน (Crop Image) [7 หรือ C]" style="color:#fbbf24;">
+                            <span style="font-size:13px;">✂️</span>
+                            <span class="tool-label" style="display:none; sm:display:inline;">ตัดภาพ</span>
                         </button>
-                        <button type="button" class="annotator-pill-btn" data-tool="pan" title="เลื่อนภาพ (Hand / Pan Tool)">
+                        <button type="button" class="annotator-pill-btn" data-tool="pan" title="เลื่อนภาพ (Hand / Pan Tool) [Space]">
                             <span style="font-size:13px;">✋</span>
                         </button>
                     </div>
 
-
-<div class="annotator-pill-group">
-
-<button type="button" class="annotator-pill-btn" id="annotator-rotate-left-btn" title="หมุนซ้าย 90°">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 2v6h6"></path>
-        <path d="M3 13a9 9 0 1 0 3-7.7L3 8"></path>
-    </svg>
-</button>
-
-
-<button type="button" class="annotator-pill-btn" id="annotator-rotate-right-btn" title="หมุนขวา 90°">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 2v6h-6"></path>
-        <path d="M21 13a9 9 0 1 1-3-7.7L21 8"></path>
-    </svg>
-</button>
-</div>
+                    <!-- Rotate Buttons Group -->
+                    <div class="annotator-pill-group">
+                        <button type="button" class="annotator-pill-btn" id="annotator-rotate-left-btn" title="หมุนซ้าย 90°">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 2v6h6"></path>
+                                <path d="M3 13a9 9 0 1 0 3-7.7L3 8"></path>
+                            </svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" id="annotator-rotate-right-btn" title="หมุนขวา 90°">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 2v6h-6"></path>
+                                <path d="M21 13a9 9 0 1 1-3-7.7L21 8"></path>
+                            </svg>
+                        </button>
+                    </div>
 
                     <!-- Color Picker Group -->
                     <div class="annotator-pill-group color-picker-group" style="position:relative;">
-                        <button type="button" class="annotator-pill-btn" id="annotator-color-trigger" style="display:inline-flex; align-items:center; gap:5px; font-weight:800; font-size:11.5px; color:#334155; padding:4px 10px;" title="เลือกสีลายเส้นและข้อความ">
-                            <span id="current-color-dot" style="width:11px; height:11px; border-radius:50%; background:#ef4444; display:inline-block; border:1px solid rgba(0,0,0,0.15);"></span>
+                        <button type="button" class="annotator-pill-btn" id="annotator-color-trigger" style="display:inline-flex; align-items:center; gap:5px; font-weight:800; font-size:11.5px; color:#f8fafc; padding:4px 10px; cursor:pointer;" title="เลือกสีลายเส้นและข้อความ (คลิกเพื่อเปิด/ปิด)">
+                            <span id="current-color-dot" style="width:12px; height:12px; border-radius:50%; background:#ef4444; display:inline-block; border:1.5px solid rgba(255,255,255,0.4); box-shadow:0 0 6px rgba(239,68,68,0.8);"></span>
                             <span style="font-size:13px;">🎨</span> สี
                         </button>
                         <input type="color" id="native-color-picker" value="#ef4444" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;" />
                         <div id="annotator-color-palette" class="annotator-color-popover" style="display:none;">
-                            <div class="color-swatch active" data-color="#ef4444" style="background:#ef4444;" title="แดง"></div>
-                            <div class="color-swatch" data-color="#f97316" style="background:#f97316;" title="ส้ม"></div>
-                            <div class="color-swatch" data-color="#eab308" style="background:#eab308;" title="เหลือง"></div>
-                            <div class="color-swatch" data-color="#22c55e" style="background:#22c55e;" title="เขียว"></div>
-                            <div class="color-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="ฟ้า"></div>
-                            <div class="color-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="น้ำเงิน"></div>
-                            <div class="color-swatch" data-color="#a855f7" style="background:#a855f7;" title="ม่วง"></div>
-                            <div class="color-swatch" data-color="#ffffff" style="background:#ffffff; border:1px solid #cbd5e1;" title="ขาว"></div>
-                            <div class="color-swatch" data-color="#000000" style="background:#000000;" title="ดำ"></div>
+                            <div class="annotator-color-grid">
+                                <div class="color-swatch active" data-color="#ef4444" style="background:#ef4444;" title="แดง (Critical/NG)"></div>
+                                <div class="color-swatch" data-color="#f97316" style="background:#f97316;" title="ส้ม (Major/Warning)"></div>
+                                <div class="color-swatch" data-color="#eab308" style="background:#eab308;" title="เหลือง (Minor/Caution)"></div>
+                                <div class="color-swatch" data-color="#22c55e" style="background:#22c55e;" title="เขียว (OK/Pass)"></div>
+                                <div class="color-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="ฟ้า (Dimension)"></div>
+                                <div class="color-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="น้ำเงิน (Standard)"></div>
+                                <div class="color-swatch" data-color="#a855f7" style="background:#a855f7;" title="ม่วง (Highlight)"></div>
+                                <div class="color-swatch" data-color="#ffffff" style="background:#ffffff; border:1px solid #cbd5e1;" title="ขาว"></div>
+                                <div class="color-swatch" data-color="#000000" style="background:#000000; border:1px solid rgba(255,255,255,0.3);" title="ดำ"></div>
+                            </div>
+                            <button type="button" id="btn-custom-color" style="width:100%; margin-top:4px; padding:5px 8px; font-size:10.5px; font-weight:800; background:rgba(255,255,255,0.08); color:#93c5fd; border:1px dashed #3b82f6; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; transition:background 0.15s;">
+                                🌈 กำหนดสีเอง...
+                            </button>
                         </div>
                     </div>
 
                     <!-- Stroke Width Group -->
                     <div class="annotator-pill-group stroke-size-group">
-                        <button type="button" class="annotator-pill-btn" data-size="2" title="ขนาดเส้น 2px">2px</button>
-                        <button type="button" class="annotator-pill-btn active" data-size="4" title="ขนาดเส้น 4px">4px</button>
-                        <button type="button" class="annotator-pill-btn" data-size="7" title="ขนาดเส้น 7px">7px</button>
+                        <button type="button" class="annotator-pill-btn" data-size="2" title="ขนาดเส้น 2px (Fine)">2px</button>
+                        <button type="button" class="annotator-pill-btn active" data-size="4" title="ขนาดเส้น 4px (Standard)">4px</button>
+                        <button type="button" class="annotator-pill-btn" data-size="7" title="ขนาดเส้น 7px (Bold)">7px</button>
                     </div>
 
                     <!-- Zoom Controls Group -->
@@ -6378,7 +6385,7 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
                         <button type="button" class="annotator-pill-btn" id="annotator-zoom-out-btn" title="ซูมออก (−)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         </button>
-                        <span id="annotator-zoom-label" class="annotator-zoom-display" title="ระดับการซูมปัจจุบัน">100%</span>
+                        <span id="annotator-zoom-label" class="annotator-zoom-display" title="ระดับการซูมปัจจุบัน (คลิกเพื่อรีเซ็ต 100%)" style="cursor:pointer;">100%</span>
                         <button type="button" class="annotator-pill-btn" id="annotator-zoom-in-btn" title="ซูมเข้า (+)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         </button>
@@ -6387,35 +6394,33 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
                         </button>
                     </div>
 
-                    <!-- Rotate & Action Group -->
-                    <!-- Rotate & Action Group (เปลี่ยนเป็น Undo, Redo, Clear) -->
-
-
-<div class="annotator-pill-group action-tools-group">
-    <!-- ปุ่ม Undo (ย้อนกลับ) - เปลี่ยนเป็นลูกศรชี้ซ้ายแบบตรง -->
-    <button type="button" class="annotator-pill-btn" id="annotator-undo-action-btn" title="ย้อนกลับ (Undo)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 12H5"></path>
-            <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-    </button>
-
-    <!-- ปุ่ม Redo (ทำซ้ำ) - เปลี่ยนเป็นลูกศรชี้ขวาแบบตรง -->
-    <button type="button" class="annotator-pill-btn" id="annotator-redo-action-btn" title="ทำซ้ำ (Redo)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M5 12h14"></path>
-            <polyline points="12 5 19 12 12 19"></polyline>
-        </svg>
-    </button>
-
-    <!-- ปุ่มล้าง (ถังขยะ) คงเดิม -->
-    <button type="button" class="annotator-pill-btn btn-clear-canvas" id="annotator-clear-btn" title="ล้างการวาดทั้งหมด">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-    </button>
-</div>
+                    <!-- Undo, Redo, Delete Selected, Clear Group -->
+                    <div class="annotator-pill-group action-tools-group">
+                        <button type="button" class="annotator-pill-btn" id="annotator-undo-action-btn" title="ย้อนกลับ (Undo) [Ctrl+Z]">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19 12H5"></path>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" id="annotator-redo-action-btn" title="ทำซ้ำ (Redo) [Ctrl+Y]">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 12h14"></path>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn" id="annotator-delete-shape-btn" title="ลบวัตถุที่เลือก (Delete Selected Shape) [Delete/Backspace]" style="color:#f87171;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                        <button type="button" class="annotator-pill-btn btn-clear-canvas" id="annotator-clear-btn" title="ล้างการวาดทั้งหมด (Clear All)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 3l18 18"></path>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -6424,12 +6429,31 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
                 <div class="annotator-stage" id="annotator-stage">
                     <canvas id="annotator-canvas"></canvas>
                 </div>
+
+                <!-- Floating Crop Confirmation Box -->
+                <div id="crop-floating-panel" style="display:none; position:absolute; z-index:100; background:rgba(15,23,42,0.96); backdrop-filter:blur(18px); padding:8px 12px; border-radius:14px; border:1.5px solid #38bdf8; box-shadow:0 14px 40px rgba(0,0,0,0.8); gap:8px; align-items:center; flex-wrap:wrap;">
+                    <span style="color:#7dd3fc; font-size:12px; font-weight:800; white-space:nowrap;" id="crop-dimension-text">✂️ ครอบตัด</span>
+                    
+                    <div style="display:inline-flex; align-items:center; background:rgba(255,255,255,0.07); border-radius:8px; padding:2px; gap:2px;">
+                        <button type="button" class="crop-ratio-btn active" data-ratio="free" style="background:#38bdf8; color:#0f172a; border:none; border-radius:6px; padding:3px 8px; font-size:10.5px; font-weight:800; cursor:pointer;">อิสระ</button>
+                        <button type="button" class="crop-ratio-btn" data-ratio="1:1" style="background:none; color:#cbd5e1; border:none; border-radius:6px; padding:3px 7px; font-size:10.5px; font-weight:700; cursor:pointer;">1:1</button>
+                        <button type="button" class="crop-ratio-btn" data-ratio="4:3" style="background:none; color:#cbd5e1; border:none; border-radius:6px; padding:3px 7px; font-size:10.5px; font-weight:700; cursor:pointer;">4:3</button>
+                        <button type="button" class="crop-ratio-btn" data-ratio="16:9" style="background:none; color:#cbd5e1; border:none; border-radius:6px; padding:3px 7px; font-size:10.5px; font-weight:700; cursor:pointer;">16:9</button>
+                    </div>
+
+                    <button type="button" id="btn-apply-crop" style="padding:6px 14px; background:linear-gradient(135deg, #0284c7, #0369a1); color:white; border:none; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 10px rgba(2,132,199,0.6);">
+                        ✂️ ครอบตัดภาพ
+                    </button>
+                    <button type="button" id="btn-cancel-crop" style="padding:6px 10px; background:rgba(239,68,68,0.2); color:#fca5a5; border:1px solid rgba(239,68,68,0.4); border-radius:8px; font-size:11px; font-weight:700; cursor:pointer;">
+                        ✕ ยกเลิก
+                    </button>
+                </div>
             </div>
 
             <!-- Bottom Floating Help Bar -->
             <div class="annotator-bottom-help">
                 <div class="help-pill">
-                    <span style="font-size:13px;">💡</span> หมุนล้อเมาส์เพื่อซูมเข้า-ออก | กด Spacebar ค้างไว้หรือเลือก ✋ เพื่อลากเลื่อนภาพ (Pan)
+                    <span style="font-size:13px;">💡</span> <b>✂️ ตัดภาพ (Crop)</b>: ลากเลือกกรอบ ปรับขนาดจุดมุม หรือย้ายตำแหน่ง แล้วกด <b>ครอบตัดภาพ (Enter)</b> เพื่อตัดภาพต้นฉบับทันที | <b>V</b> โหมดเมาส์ | <b>Spacebar</b> เลื่อนภาพ
                 </div>
             </div>
         </div>
@@ -6446,12 +6470,19 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
     const colorPopover = overlay.querySelector('#annotator-color-palette');
     const colorTrigger = overlay.querySelector('#annotator-color-trigger');
     const nativeColorPicker = overlay.querySelector('#native-color-picker');
+    const cropPanel = overlay.querySelector('#crop-floating-panel');
+    const cropDimensionText = overlay.querySelector('#crop-dimension-text');
+    const btnApplyCrop = overlay.querySelector('#btn-apply-crop');
+    const btnCancelCrop = overlay.querySelector('#btn-cancel-crop');
+    const btnCustomColor = overlay.querySelector('#btn-custom-color');
+    const btnDeleteShape = overlay.querySelector('#annotator-delete-shape-btn');
 
-    let currentTool = 'arrow'; // 'arrow' | 'circle' | 'rect' | 'line' | 'pen' | 'text' | 'crop' | 'pan'
+    let currentTool = 'arrow';
     let currentColor = '#ef4444';
     let currentLineWidth = 4;
     let isDrawing = false;
     let isPanning = false;
+    let isCropping = false;
     let spacePressed = false;
     let startX = 0;
     let startY = 0;
@@ -6460,13 +6491,65 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
     let currentZoom = 1.0;
     let panX = 0;
     let panY = 0;
-    let rotationAngle = 0;
+    let pendingCrop = null;
 
-    let history = []; // Canvas snapshot states
+    // Crop interaction state
+    let isMovingCrop = false;
+    let isResizingCrop = false;
+    let activeCropHandle = null;
+    let cropMoveStart = null;
+    let cropInitialBox = null;
+    let cropResizeStartCoords = null;
+    let cropSelectedRatio = 'free';
+
+    // Vector Shapes & Selection State
+    let shapes = [];
+    let selectedShapeId = null;
+    let currentDrawingShape = null;
+    let isDraggingShape = false;
+    let dragShapeStartCoords = null;
+    let dragShapeInitialState = null;
+
+    // Resizing State with 8 bounding box handles
+    let isResizingShape = false;
+    let activeResizeHandle = null;
+    let resizeStartCoords = null;
+    let resizeInitialBounds = null;
+    let resizeInitialShape = null;
+
+    let history = [];
     let redoStack = [];
 
-    const baseImage = new Image();
+    let baseImage = new Image();
     baseImage.crossOrigin = 'anonymous';
+
+    function setActiveTool(toolName) {
+        if (toolName !== 'crop') {
+            hideCropPanel();
+        }
+        currentTool = toolName;
+        overlay.querySelectorAll('[data-tool]').forEach(b => {
+            b.classList.toggle('active', b.getAttribute('data-tool') === toolName);
+        });
+
+        if (currentTool === 'pan') {
+            viewport.style.cursor = 'grab';
+        } else if (currentTool === 'select') {
+            viewport.style.cursor = 'default';
+        } else if (currentTool === 'crop') {
+            viewport.style.cursor = 'crosshair';
+            if (!pendingCrop) {
+                // Initialize default crop rectangle (80% of canvas centered)
+                const defaultW = Math.round(canvas.width * 0.8);
+                const defaultH = Math.round(canvas.height * 0.8);
+                const defaultX = Math.round((canvas.width - defaultW) / 2);
+                const defaultY = Math.round((canvas.height - defaultH) / 2);
+                showCropPanel(defaultX, defaultY, defaultW, defaultH);
+            }
+        } else {
+            viewport.style.cursor = 'crosshair';
+        }
+    }
 
     function updateTransform() {
         if (!stage) return;
@@ -6483,225 +6566,52 @@ window.openEvidenceImageAnnotator = function(imageUrl, onSave) {
         const availH = Math.max(200, viewport.clientHeight - pad);
         const scaleX = availW / canvas.width;
         const scaleY = availH / canvas.height;
-        currentZoom = Math.min(1.5, Math.max(0.2, Math.min(scaleX, scaleY)));
+        currentZoom = Math.min(1.5, Math.max(0.15, Math.min(scaleX, scaleY)));
         panX = 0;
         panY = 0;
         updateTransform();
     }
 
-    function saveHistory() {
-        if (history.length > 30) history.shift();
-        history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    function saveState() {
+        if (history.length > 50) history.shift();
+        history.push({
+            baseImageSrc: baseImage.src,
+            canvasWidth: canvas.width,
+            canvasHeight: canvas.height,
+            shapes: JSON.parse(JSON.stringify(shapes))
+        });
         redoStack = [];
+    }
+
+    function applyState(state) {
+        if (!state) return;
+        canvas.width = state.canvasWidth;
+        canvas.height = state.canvasHeight;
+        shapes = JSON.parse(JSON.stringify(state.shapes || []));
+        selectedShapeId = null;
+
+        if (baseImage.src !== state.baseImageSrc) {
+            baseImage = new Image();
+            baseImage.crossOrigin = 'anonymous';
+            baseImage.onload = () => {
+                renderCanvas();
+            };
+            baseImage.src = state.baseImageSrc;
+        } else {
+            renderCanvas();
+        }
     }
 
     baseImage.onload = () => {
         canvas.width = baseImage.naturalWidth || baseImage.width || 1200;
         canvas.height = baseImage.naturalHeight || baseImage.height || 800;
-        ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
-        saveHistory();
+        renderCanvas();
+        saveState();
         setTimeout(fitToScreen, 50);
     };
     baseImage.src = imageUrl;
 
-    // Tool switching
-    overlay.querySelectorAll('[data-tool]').forEach(btn => {
-        btn.onclick = () => {
-            overlay.querySelectorAll('[data-tool]').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentTool = btn.getAttribute('data-tool');
-            if (currentTool === 'pan') {
-                viewport.style.cursor = 'grab';
-            } else {
-                viewport.style.cursor = 'crosshair';
-            }
-        };
-    });
-
-    // Stroke width
-    overlay.querySelectorAll('[data-size]').forEach(btn => {
-        btn.onclick = () => {
-            overlay.querySelectorAll('[data-size]').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentLineWidth = parseInt(btn.getAttribute('data-size'), 10) || 4;
-        };
-    });
-
-    // Color picker
-    if (colorTrigger && colorPopover) {
-        colorTrigger.onclick = (e) => {
-            e.stopPropagation();
-            colorPopover.style.display = colorPopover.style.display === 'flex' ? 'none' : 'flex';
-        };
-
-        colorPopover.querySelectorAll('.color-swatch').forEach(sw => {
-            sw.onclick = (e) => {
-                e.stopPropagation();
-                colorPopover.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-                sw.classList.add('active');
-                currentColor = sw.getAttribute('data-color');
-                if (colorDot) colorDot.style.background = currentColor;
-                colorPopover.style.display = 'none';
-            };
-        });
-
-        document.addEventListener('click', (e) => {
-            if (!colorPopover.contains(e.target) && e.target !== colorTrigger) {
-                colorPopover.style.display = 'none';
-            }
-        });
-    }
-
-    // Zoom Controls
-    const zoomInBtn = overlay.querySelector('#annotator-zoom-in-btn');
-    const zoomOutBtn = overlay.querySelector('#annotator-zoom-out-btn');
-    const zoomFitBtn = overlay.querySelector('#annotator-zoom-fit-btn');
-
-    if (zoomInBtn) {
-        zoomInBtn.onclick = () => {
-            currentZoom = Math.min(4.0, currentZoom + 0.15);
-            updateTransform();
-        };
-    }
-    if (zoomOutBtn) {
-        zoomOutBtn.onclick = () => {
-            currentZoom = Math.max(0.15, currentZoom - 0.15);
-            updateTransform();
-        };
-    }
-    if (zoomFitBtn) {
-        zoomFitBtn.onclick = () => {
-            fitToScreen();
-        };
-    }
-
-    // Wheel Zoom
-    viewport.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
-        const newZoom = Math.min(4.0, Math.max(0.15, currentZoom * zoomFactor));
-        currentZoom = newZoom;
-        updateTransform();
-    }, { passive: false });
-
-    // Rotate Actions
-    async function rotateCanvas(angleDeg) {
-        const offCanvas = document.createElement('canvas');
-        const offCtx = offCanvas.getContext('2d');
-        const is90or270 = Math.abs(angleDeg % 180) === 90;
-        offCanvas.width = is90or270 ? canvas.height : canvas.width;
-        offCanvas.height = is90or270 ? canvas.width : canvas.height;
-
-        offCtx.translate(offCanvas.width / 2, offCanvas.height / 2);
-        offCtx.rotate((angleDeg * Math.PI) / 180);
-        offCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-
-        canvas.width = offCanvas.width;
-        canvas.height = offCanvas.height;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(offCanvas, 0, 0);
-
-        saveHistory();
-        fitToScreen();
-    }
-
-    const rotLeftBtn = overlay.querySelector('#annotator-rotate-left-btn');
-    const rotRightBtn = overlay.querySelector('#annotator-rotate-right-btn');
-    if (rotLeftBtn) rotLeftBtn.onclick = () => rotateCanvas(-90);
-    if (rotRightBtn) rotRightBtn.onclick = () => rotateCanvas(90);
-
-    // Flip horizontal
-    const flipBtn = overlay.querySelector('#annotator-flip-btn');
-    if (flipBtn) {
-        flipBtn.onclick = () => {
-            const offCanvas = document.createElement('canvas');
-            const offCtx = offCanvas.getContext('2d');
-            offCanvas.width = canvas.width;
-            offCanvas.height = canvas.height;
-            offCtx.translate(canvas.width, 0);
-            offCtx.scale(-1, 1);
-            offCtx.drawImage(canvas, 0, 0);
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(offCanvas, 0, 0);
-            saveHistory();
-        };
-    }
-
-    // --- ส่วนควบคุมปุ่มกลุ่มขวาใหม่ ---
-
-// ปุ่ม Undo (ย้อนกลับ)
-const undoActionBtn = overlay.querySelector('#annotator-undo-action-btn');
-if (undoActionBtn) {
-    undoActionBtn.onclick = () => {
-        if (history.length > 1) {
-            const popped = history.pop();
-            redoStack.push(popped);
-            const prevState = history[history.length - 1];
-            canvas.width = prevState.width;
-            canvas.height = prevState.height;
-            ctx.putImageData(prevState, 0, 0);
-        }
-    };
-}
-
-// ปุ่ม Redo (ทำซ้ำ)
-const redoActionBtn = overlay.querySelector('#annotator-redo-action-btn');
-if (redoActionBtn) {
-    redoActionBtn.onclick = () => {
-        if (redoStack.length > 0) {
-            const nextState = redoStack.pop();
-            history.push(nextState);
-            canvas.width = nextState.width;
-            canvas.height = nextState.height;
-            ctx.putImageData(nextState, 0, 0);
-        }
-    };
-}
-
-// ปุ่มล้างทั้งหมด (ถังขยะ)
-const clearBtn = overlay.querySelector('#annotator-clear-btn');
-if (clearBtn) {
-    clearBtn.onclick = () => {
-        if (history.length > 0) {
-            const initial = history[0]; // กลับไปที่รูปภาพต้นฉบับ
-            canvas.width = initial.width;
-            canvas.height = initial.height;
-            ctx.putImageData(initial, 0, 0);
-            history = [initial];
-            redoStack = [];
-            toast('🗑️ ล้างการวาดทั้งหมดเรียบร้อยแล้ว', 'info');
-        }
-    };
-}
-
-    // Spacebar Pan Key Listener
-    window.addEventListener('keydown', (e) => {
-        if (e.code === 'Space' && !spacePressed && e.target.tagName !== 'INPUT') {
-            spacePressed = true;
-            viewport.style.cursor = 'grab';
-        }
-    });
-
-    window.addEventListener('keyup', (e) => {
-        if (e.code === 'Space') {
-            spacePressed = false;
-            if (currentTool !== 'pan') {
-                viewport.style.cursor = 'crosshair';
-            }
-        }
-    });
-
-    function getCanvasCoordinates(clientX, clientY) {
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        return {
-            x: (clientX - rect.left) * scaleX,
-            y: (clientY - rect.top) * scaleY
-        };
-    }
-
+    // Drawing Primitives
     function drawArrow(targetCtx, fromx, fromy, tox, toy, headlen, color, width) {
         const angle = Math.atan2(toy - fromy, tox - fromx);
         targetCtx.beginPath();
@@ -6725,8 +6635,8 @@ if (clearBtn) {
     function drawCircle(targetCtx, x1, y1, x2, y2, color, width) {
         const centerX = (x1 + x2) / 2;
         const centerY = (y1 + y2) / 2;
-        const radiusX = Math.abs(x2 - x1) / 2;
-        const radiusY = Math.abs(y2 - y1) / 2;
+        const radiusX = Math.max(1, Math.abs(x2 - x1) / 2);
+        const radiusY = Math.max(1, Math.abs(y2 - y1) / 2);
 
         targetCtx.beginPath();
         targetCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
@@ -6754,41 +6664,1006 @@ if (clearBtn) {
         targetCtx.stroke();
     }
 
-    // Text tool input creation
-    function promptAddText(coords) {
-        const textStr = prompt('✏️ กรอกข้อความที่ต้องการใส่บนภาพ (Defect Note):', 'จุดบกพร่อง');
-        if (!textStr || !textStr.trim()) return;
-
-        const fontSize = Math.max(16, currentLineWidth * 6);
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        const textMetrics = ctx.measureText(textStr);
-        const padding = 8;
-        const boxWidth = textMetrics.width + (padding * 2);
-        const boxHeight = fontSize + (padding * 2);
-
-        // Draw pill label background
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-        ctx.strokeStyle = currentColor;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(coords.x, coords.y - boxHeight, boxWidth, boxHeight, 8);
-        ctx.fill();
-        ctx.stroke();
-
-        // Draw text
-        ctx.fillStyle = currentColor === '#ffffff' ? '#ffffff' : '#ffffff';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(textStr, coords.x + padding, coords.y - (boxHeight / 2));
-
-        saveHistory();
+    // Shape Geometry & Hit-Testing
+    function getShapeBounds(shape) {
+        if (!shape) return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+        if (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'arrow' || shape.type === 'line') {
+            const minX = Math.min(shape.x1, shape.x2);
+            const minY = Math.min(shape.y1, shape.y2);
+            const maxX = Math.max(shape.x1, shape.x2);
+            const maxY = Math.max(shape.y1, shape.y2);
+            return { minX, minY, maxX, maxY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+        }
+        if (shape.type === 'pen') {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            (shape.points || []).forEach(p => {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            });
+            if (minX === Infinity) return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+            return { minX, minY, maxX, maxY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+        }
+        if (shape.type === 'text') {
+            const padding = 10;
+            const fontSize = shape.fontSize || Math.max(16, (shape.width || 4) * 5);
+            ctx.save();
+            ctx.font = `bold ${fontSize}px 'Prompt', 'Plus Jakarta Sans', sans-serif`;
+            const metrics = ctx.measureText(shape.text || '');
+            ctx.restore();
+            const w = metrics.width + padding * 2;
+            const h = fontSize + padding * 2;
+            return {
+                minX: shape.x,
+                minY: shape.y - h,
+                maxX: shape.x + w,
+                maxY: shape.y,
+                width: Math.max(1, w),
+                height: Math.max(1, h)
+            };
+        }
+        return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
     }
 
-    // Mouse & Touch events
+    function getShapeHandles(shape) {
+        if (!shape) return [];
+        const b = getShapeBounds(shape);
+        const pad = 6;
+        const minX = b.minX - pad;
+        const minY = b.minY - pad;
+        const maxX = b.maxX + pad;
+        const maxY = b.maxY + pad;
+        const midX = (minX + maxX) / 2;
+        const midY = (minY + maxY) / 2;
+
+        return [
+            { id: 'tl', x: minX, y: minY, cursor: 'nwse-resize' },
+            { id: 'tr', x: maxX, y: minY, cursor: 'nesw-resize' },
+            { id: 'bl', x: minX, y: maxY, cursor: 'nesw-resize' },
+            { id: 'br', x: maxX, y: maxY, cursor: 'nwse-resize' },
+            { id: 'tm', x: midX, y: minY, cursor: 'ns-resize' },
+            { id: 'bm', x: midX, y: maxY, cursor: 'ns-resize' },
+            { id: 'lm', x: minX, y: midY, cursor: 'ew-resize' },
+            { id: 'rm', x: maxX, y: midY, cursor: 'ew-resize' }
+        ];
+    }
+
+    function findHandleAt(shape, px, py) {
+        if (!shape) return null;
+        const handles = getShapeHandles(shape);
+        const hitRadius = Math.max(8, Math.min(22, 10 / currentZoom));
+        for (const h of handles) {
+            if (Math.hypot(px - h.x, py - h.y) <= hitRadius) {
+                return h;
+            }
+        }
+        return null;
+    }
+
+    function distToSegment(px, py, x1, y1, x2, y2) {
+        const l2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+        if (l2 === 0) return Math.hypot(px - x1, py - y1);
+        let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+    }
+
+    function isPointNearShape(shape, px, py) {
+        const tol = Math.max(12, (shape.width || 4) + 8);
+        const b = getShapeBounds(shape);
+        if (px < b.minX - tol || px > b.maxX + tol || py < b.minY - tol || py > b.maxY + tol) {
+            return false;
+        }
+        if (shape.type === 'text') {
+            return px >= b.minX && px <= b.maxX && py >= b.minY && py <= b.maxY;
+        }
+        if (shape.type === 'rect') {
+            const inOuter = px >= b.minX - tol && px <= b.maxX + tol && py >= b.minY - tol && py <= b.maxY + tol;
+            const inInner = px >= b.minX + tol && px <= b.maxX - tol && py >= b.minY + tol && py <= b.maxY - tol;
+            return inOuter && (!inInner || (b.width < 40 || b.height < 40));
+        }
+        if (shape.type === 'circle') {
+            const cx = (shape.x1 + shape.x2) / 2;
+            const cy = (shape.y1 + shape.y2) / 2;
+            const rx = Math.max(4, Math.abs(shape.x2 - shape.x1) / 2);
+            const ry = Math.max(4, Math.abs(shape.y2 - shape.y1) / 2);
+            const normDist = Math.pow((px - cx) / (rx + tol), 2) + Math.pow((py - cy) / (ry + tol), 2);
+            return normDist <= 1.15;
+        }
+        if (shape.type === 'line' || shape.type === 'arrow') {
+            return distToSegment(px, py, shape.x1, shape.y1, shape.x2, shape.y2) <= tol;
+        }
+        if (shape.type === 'pen') {
+            const pts = shape.points || [];
+            for (let i = 0; i < pts.length - 1; i++) {
+                if (distToSegment(px, py, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y) <= tol) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return false;
+    }
+
+    function moveShape(shape, dx, dy) {
+        if (!shape) return;
+        if (shape.type === 'arrow' || shape.type === 'line' || shape.type === 'rect' || shape.type === 'circle') {
+            shape.x1 += dx;
+            shape.y1 += dy;
+            shape.x2 += dx;
+            shape.y2 += dy;
+        } else if (shape.type === 'text') {
+            shape.x += dx;
+            shape.y += dy;
+        } else if (shape.type === 'pen') {
+            (shape.points || []).forEach(p => {
+                p.x += dx;
+                p.y += dy;
+            });
+        }
+    }
+
+    function renderShape(targetCtx, shape) {
+        targetCtx.save();
+        if (shape.type === 'arrow') {
+            drawArrow(targetCtx, shape.x1, shape.y1, shape.x2, shape.y2, (shape.width || 4) * 4.5, shape.color, shape.width);
+        } else if (shape.type === 'circle') {
+            drawCircle(targetCtx, shape.x1, shape.y1, shape.x2, shape.y2, shape.color, shape.width);
+        } else if (shape.type === 'rect') {
+            drawRect(targetCtx, shape.x1, shape.y1, shape.x2, shape.y2, shape.color, shape.width);
+        } else if (shape.type === 'line') {
+            drawLine(targetCtx, shape.x1, shape.y1, shape.x2, shape.y2, shape.color, shape.width);
+        } else if (shape.type === 'pen') {
+            if (shape.points && shape.points.length > 1) {
+                targetCtx.beginPath();
+                targetCtx.moveTo(shape.points[0].x, shape.points[0].y);
+                for (let i = 1; i < shape.points.length; i++) {
+                    targetCtx.lineTo(shape.points[i].x, shape.points[i].y);
+                }
+                targetCtx.strokeStyle = shape.color;
+                targetCtx.lineWidth = shape.width;
+                targetCtx.lineCap = 'round';
+                targetCtx.lineJoin = 'round';
+                targetCtx.stroke();
+            }
+        } else if (shape.type === 'text') {
+            const padding = 10;
+            const fontSize = shape.fontSize || Math.max(16, (shape.width || 4) * 5);
+            targetCtx.font = `bold ${fontSize}px 'Prompt', 'Plus Jakarta Sans', sans-serif`;
+            const textMetrics = targetCtx.measureText(shape.text);
+            const boxWidth = textMetrics.width + (padding * 2);
+            const boxHeight = fontSize + (padding * 2);
+
+            targetCtx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+            targetCtx.strokeStyle = shape.color;
+            targetCtx.lineWidth = Math.max(2, (shape.width || 4) * 0.75);
+            targetCtx.beginPath();
+            if (targetCtx.roundRect) {
+                targetCtx.roundRect(shape.x, shape.y - boxHeight, boxWidth, boxHeight, 8);
+            } else {
+                targetCtx.rect(shape.x, shape.y - boxHeight, boxWidth, boxHeight);
+            }
+            targetCtx.fill();
+            targetCtx.stroke();
+
+            targetCtx.fillStyle = (shape.color === '#ffffff' || shape.color === '#000000') ? '#ffffff' : shape.color;
+            targetCtx.textBaseline = 'middle';
+            targetCtx.fillText(shape.text, shape.x + padding, shape.y - (boxHeight / 2));
+        }
+        targetCtx.restore();
+    }
+
+    function renderSelectionBox(targetCtx, shape) {
+        const b = getShapeBounds(shape);
+        const pad = 6;
+        const minX = b.minX - pad;
+        const minY = b.minY - pad;
+        const width = b.width + (pad * 2);
+        const height = b.height + (pad * 2);
+
+        targetCtx.save();
+        targetCtx.strokeStyle = '#38bdf8';
+        targetCtx.lineWidth = Math.max(1.5, 2 / currentZoom);
+        targetCtx.setLineDash([6, 4]);
+        targetCtx.strokeRect(minX, minY, width, height);
+        targetCtx.setLineDash([]);
+
+        const handles = getShapeHandles(shape);
+        const handleRadius = Math.max(3.5, Math.min(7, 5 / currentZoom));
+
+        handles.forEach(h => {
+            targetCtx.beginPath();
+            targetCtx.arc(h.x, h.y, handleRadius, 0, Math.PI * 2);
+            targetCtx.fillStyle = '#ffffff';
+            targetCtx.fill();
+            targetCtx.strokeStyle = '#0284c7';
+            targetCtx.lineWidth = Math.max(1.5, 2 / currentZoom);
+            targetCtx.stroke();
+        });
+        targetCtx.restore();
+    }
+
+    function renderCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (baseImage && baseImage.complete && baseImage.naturalWidth) {
+            ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
+        }
+
+        shapes.forEach(shape => {
+            renderShape(ctx, shape);
+            if (shape.id === selectedShapeId) {
+                renderSelectionBox(ctx, shape);
+            }
+        });
+
+        if (currentDrawingShape) {
+            renderShape(ctx, currentDrawingShape);
+        }
+
+        if (pendingCrop) {
+            renderCropBox(ctx, pendingCrop);
+        }
+    }
+
+    function getCropHandles(crop) {
+        if (!crop) return [];
+        const { x, y, w, h } = crop;
+        const minX = x;
+        const maxX = x + w;
+        const minY = y;
+        const maxY = y + h;
+        const midX = x + w / 2;
+        const midY = y + h / 2;
+        return [
+            { id: 'tl', x: minX, y: minY, cursor: 'nwse-resize' },
+            { id: 'tr', x: maxX, y: minY, cursor: 'nesw-resize' },
+            { id: 'bl', x: minX, y: maxY, cursor: 'nesw-resize' },
+            { id: 'br', x: maxX, y: maxY, cursor: 'nwse-resize' },
+            { id: 'tm', x: midX, y: minY, cursor: 'ns-resize' },
+            { id: 'bm', x: midX, y: maxY, cursor: 'ns-resize' },
+            { id: 'lm', x: minX, y: midY, cursor: 'ew-resize' },
+            { id: 'rm', x: maxX, y: midY, cursor: 'ew-resize' }
+        ];
+    }
+
+    function findCropHandleAt(crop, px, py) {
+        if (!crop) return null;
+        const handles = getCropHandles(crop);
+        const radius = Math.max(9, 10 / currentZoom);
+        for (const h of handles) {
+            const dist = Math.hypot(px - h.x, py - h.y);
+            if (dist <= radius) return h;
+        }
+        return null;
+    }
+
+    function isPointInsideCrop(crop, px, py) {
+        if (!crop) return false;
+        return px >= crop.x && px <= crop.x + crop.w && py >= crop.y && py <= crop.y + crop.h;
+    }
+
+    function renderCropBox(targetCtx, crop) {
+        if (!crop) return;
+        const { x, y, w, h } = crop;
+        targetCtx.save();
+
+        // 1. Darken region outside crop box
+        targetCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        targetCtx.fillRect(0, 0, canvas.width, y);
+        targetCtx.fillRect(0, y + h, canvas.width, canvas.height - (y + h));
+        targetCtx.fillRect(0, y, x, h);
+        targetCtx.fillRect(x + w, y, canvas.width - (x + w), h);
+
+        // 2. Dashed crop boundary
+        targetCtx.strokeStyle = '#38bdf8';
+        targetCtx.lineWidth = Math.max(1.5, 2 / currentZoom);
+        targetCtx.setLineDash([6, 4]);
+        targetCtx.strokeRect(x, y, w, h);
+        targetCtx.setLineDash([]);
+
+        // 3. Rule-of-thirds grid
+        targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        targetCtx.lineWidth = Math.max(1, 1 / currentZoom);
+        targetCtx.beginPath();
+        targetCtx.moveTo(x + w / 3, y); targetCtx.lineTo(x + w / 3, y + h);
+        targetCtx.moveTo(x + (2 * w) / 3, y); targetCtx.lineTo(x + (2 * w) / 3, y + h);
+        targetCtx.moveTo(x, y + h / 3); targetCtx.lineTo(x + w, y + h / 3);
+        targetCtx.moveTo(x, y + (2 * h) / 3); targetCtx.lineTo(x + w, y + (2 * h) / 3);
+        targetCtx.stroke();
+
+        // 4. Corner L-Brackets
+        const cornerLen = Math.min(22, Math.min(w, h) / 4);
+        targetCtx.strokeStyle = '#38bdf8';
+        targetCtx.lineWidth = Math.max(3, 3.5 / currentZoom);
+        targetCtx.lineCap = 'square';
+        // TL
+        targetCtx.beginPath(); targetCtx.moveTo(x, y + cornerLen); targetCtx.lineTo(x, y); targetCtx.lineTo(x + cornerLen, y); targetCtx.stroke();
+        // TR
+        targetCtx.beginPath(); targetCtx.moveTo(x + w - cornerLen, y); targetCtx.lineTo(x + w, y); targetCtx.lineTo(x + w, y + cornerLen); targetCtx.stroke();
+        // BL
+        targetCtx.beginPath(); targetCtx.moveTo(x, y + h - cornerLen); targetCtx.lineTo(x, y + h); targetCtx.lineTo(x + cornerLen, y + h); targetCtx.stroke();
+        // BR
+        targetCtx.beginPath(); targetCtx.moveTo(x + w - cornerLen, y + h); targetCtx.lineTo(x + w, y + h); targetCtx.lineTo(x + w, y + h - cornerLen); targetCtx.stroke();
+
+        // 5. 8 Resize handle circles
+        const handleRadius = Math.max(4.5, 5 / currentZoom);
+        const handles = getCropHandles(crop);
+        handles.forEach(hd => {
+            targetCtx.beginPath();
+            targetCtx.arc(hd.x, hd.y, handleRadius, 0, Math.PI * 2);
+            targetCtx.fillStyle = '#ffffff';
+            targetCtx.fill();
+            targetCtx.strokeStyle = '#0284c7';
+            targetCtx.lineWidth = Math.max(1.5, 2 / currentZoom);
+            targetCtx.stroke();
+        });
+
+        // 6. Dimension tag badge
+        const badgeText = `${Math.round(w)} × ${Math.round(h)} px`;
+        targetCtx.font = `bold ${Math.max(11, Math.round(12 / currentZoom))}px sans-serif`;
+        const textWidth = targetCtx.measureText(badgeText).width;
+        const badgeY = y > 26 ? y - 24 : y + 6;
+        const badgeX = x + 6;
+        targetCtx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        targetCtx.beginPath();
+        if (targetCtx.roundRect) {
+            targetCtx.roundRect(badgeX, badgeY, textWidth + 14, 20, 5);
+        } else {
+            targetCtx.rect(badgeX, badgeY, textWidth + 14, 20);
+        }
+        targetCtx.fill();
+        targetCtx.fillStyle = '#38bdf8';
+        targetCtx.fillText(badgeText, badgeX + 7, badgeY + 14);
+
+        targetCtx.restore();
+    }
+
+    // Tool switching
+    overlay.querySelectorAll('[data-tool]').forEach(btn => {
+        btn.onclick = () => {
+            const tool = btn.getAttribute('data-tool');
+            setActiveTool(tool);
+        };
+    });
+
+    // Stroke width
+    overlay.querySelectorAll('[data-size]').forEach(btn => {
+        btn.onclick = () => {
+            overlay.querySelectorAll('[data-size]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentLineWidth = parseInt(btn.getAttribute('data-size'), 10) || 4;
+
+            if (selectedShapeId) {
+                const sel = shapes.find(s => s.id === selectedShapeId);
+                if (sel) {
+                    sel.width = currentLineWidth;
+                    if (sel.type === 'text') sel.fontSize = Math.max(16, currentLineWidth * 5);
+                    renderCanvas();
+                    saveState();
+                }
+            }
+        };
+    });
+
+    // Color picker
+    function setColor(color) {
+        currentColor = color;
+        if (colorDot) {
+            colorDot.style.background = color;
+            colorDot.style.boxShadow = `0 0 6px ${color}`;
+        }
+        if (colorPopover) {
+            colorPopover.querySelectorAll('.color-swatch').forEach(s => {
+                s.classList.toggle('active', s.getAttribute('data-color') === color);
+            });
+        }
+
+        if (selectedShapeId) {
+            const sel = shapes.find(s => s.id === selectedShapeId);
+            if (sel) {
+                sel.color = color;
+                renderCanvas();
+                saveState();
+            }
+        }
+    }
+
+    function toggleColorPopover(force) {
+        if (!colorPopover) return;
+        if (typeof force === 'boolean') {
+            colorPopover.classList.toggle('show', force);
+            colorPopover.style.display = force ? 'flex' : 'none';
+        } else {
+            const isShown = colorPopover.classList.toggle('show');
+            colorPopover.style.display = isShown ? 'flex' : 'none';
+        }
+    }
+
+    if (colorTrigger && colorPopover) {
+        colorTrigger.onclick = (e) => {
+            e.stopPropagation();
+            toggleColorPopover();
+        };
+
+        colorPopover.querySelectorAll('.color-swatch').forEach(sw => {
+            sw.onclick = (e) => {
+                e.stopPropagation();
+                setColor(sw.getAttribute('data-color'));
+                toggleColorPopover(false);
+            };
+        });
+
+        if (btnCustomColor && nativeColorPicker) {
+            btnCustomColor.onclick = (e) => {
+                e.stopPropagation();
+                nativeColorPicker.click();
+            };
+            nativeColorPicker.oninput = (e) => {
+                setColor(e.target.value);
+            };
+            nativeColorPicker.onchange = (e) => {
+                setColor(e.target.value);
+                toggleColorPopover(false);
+            };
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!colorPopover.contains(e.target) && !colorTrigger.contains(e.target)) {
+                toggleColorPopover(false);
+            }
+        });
+    }
+
+    // Zoom Controls
+    const zoomInBtn = overlay.querySelector('#annotator-zoom-in-btn');
+    const zoomOutBtn = overlay.querySelector('#annotator-zoom-out-btn');
+    const zoomFitBtn = overlay.querySelector('#annotator-zoom-fit-btn');
+
+    if (zoomInBtn) {
+        zoomInBtn.onclick = () => {
+            currentZoom = Math.min(5.0, currentZoom + 0.2);
+            updateTransform();
+        };
+    }
+    if (zoomOutBtn) {
+        zoomOutBtn.onclick = () => {
+            currentZoom = Math.max(0.1, currentZoom - 0.2);
+            updateTransform();
+        };
+    }
+    if (zoomFitBtn) {
+        zoomFitBtn.onclick = fitToScreen;
+    }
+    if (zoomLabel) {
+        zoomLabel.onclick = () => {
+            currentZoom = 1.0;
+            updateTransform();
+        };
+    }
+
+    // Wheel Zoom
+    viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+        currentZoom = Math.min(5.0, Math.max(0.1, currentZoom * zoomFactor));
+        updateTransform();
+    }, { passive: false });
+
+    // Rotate Actions
+    async function rotateCanvas(angleDeg) {
+        hideCropPanel();
+        const offCanvas = document.createElement('canvas');
+        const offCtx = offCanvas.getContext('2d');
+        const is90or270 = Math.abs(angleDeg % 180) === 90;
+        const oldW = canvas.width;
+        const oldH = canvas.height;
+        offCanvas.width = is90or270 ? oldH : oldW;
+        offCanvas.height = is90or270 ? oldW : oldH;
+
+        offCtx.translate(offCanvas.width / 2, offCanvas.height / 2);
+        offCtx.rotate((angleDeg * Math.PI) / 180);
+        offCtx.drawImage(baseImage, -oldW / 2, -oldH / 2);
+
+        // Transform shape coordinates
+        shapes.forEach(shape => {
+            if (angleDeg === 90) {
+                if (shape.type === 'text') {
+                    const nx = oldH - shape.y;
+                    const ny = shape.x;
+                    shape.x = nx;
+                    shape.y = ny;
+                } else if (shape.type === 'pen') {
+                    shape.points.forEach(p => {
+                        const nx = oldH - p.y;
+                        const ny = p.x;
+                        p.x = nx;
+                        p.y = ny;
+                    });
+                } else {
+                    const nx1 = oldH - shape.y1;
+                    const ny1 = shape.x1;
+                    const nx2 = oldH - shape.y2;
+                    const ny2 = shape.x2;
+                    shape.x1 = nx1; shape.y1 = ny1;
+                    shape.x2 = nx2; shape.y2 = ny2;
+                }
+            } else if (angleDeg === -90) {
+                if (shape.type === 'text') {
+                    const nx = shape.y;
+                    const ny = oldW - shape.x;
+                    shape.x = nx;
+                    shape.y = ny;
+                } else if (shape.type === 'pen') {
+                    shape.points.forEach(p => {
+                        const nx = p.y;
+                        const ny = oldW - p.x;
+                        p.x = nx;
+                        p.y = ny;
+                    });
+                } else {
+                    const nx1 = shape.y1;
+                    const ny1 = oldW - shape.x1;
+                    const nx2 = shape.y2;
+                    const ny2 = oldW - shape.x2;
+                    shape.x1 = nx1; shape.y1 = ny1;
+                    shape.x2 = nx2; shape.y2 = ny2;
+                }
+            }
+        });
+
+        canvas.width = offCanvas.width;
+        canvas.height = offCanvas.height;
+
+        const rotatedSrc = offCanvas.toDataURL('image/png');
+        baseImage = new Image();
+        baseImage.crossOrigin = 'anonymous';
+        baseImage.onload = () => {
+            renderCanvas();
+            saveState();
+            fitToScreen();
+        };
+        baseImage.src = rotatedSrc;
+    }
+
+    const rotLeftBtn = overlay.querySelector('#annotator-rotate-left-btn');
+    const rotRightBtn = overlay.querySelector('#annotator-rotate-right-btn');
+    if (rotLeftBtn) rotLeftBtn.onclick = () => rotateCanvas(-90);
+    if (rotRightBtn) rotRightBtn.onclick = () => rotateCanvas(90);
+
+    // Delete selected shape
+    function deleteSelectedShape() {
+        if (!selectedShapeId) {
+            if (typeof toast === 'function') toast('💡 คลิกเลือกวัตถุที่ต้องการลบก่อน', 'info');
+            return;
+        }
+        shapes = shapes.filter(s => s.id !== selectedShapeId);
+        selectedShapeId = null;
+        renderCanvas();
+        saveState();
+        if (typeof toast === 'function') toast('🗑️ ลบวัตถุที่เลือกเรียบร้อยแล้ว', 'info');
+    }
+
+    if (btnDeleteShape) {
+        btnDeleteShape.onclick = deleteSelectedShape;
+    }
+
+    // Undo, Redo, Clear
+    const undoActionBtn = overlay.querySelector('#annotator-undo-action-btn');
+    if (undoActionBtn) {
+        undoActionBtn.onclick = () => {
+            hideCropPanel();
+            if (history.length > 1) {
+                const popped = history.pop();
+                redoStack.push(popped);
+                const prevState = history[history.length - 1];
+                applyState(prevState);
+            }
+        };
+    }
+
+    const redoActionBtn = overlay.querySelector('#annotator-redo-action-btn');
+    if (redoActionBtn) {
+        redoActionBtn.onclick = () => {
+            hideCropPanel();
+            if (redoStack.length > 0) {
+                const nextState = redoStack.pop();
+                history.push(nextState);
+                applyState(nextState);
+            }
+        };
+    }
+
+    const clearBtn = overlay.querySelector('#annotator-clear-btn');
+    if (clearBtn) {
+        clearBtn.onclick = () => {
+            hideCropPanel();
+            if (shapes.length > 0) {
+                shapes = [];
+                selectedShapeId = null;
+                renderCanvas();
+                saveState();
+                if (typeof toast === 'function') toast('🗑️ ล้างการวาดและข้อความทั้งหมดแล้ว', 'info');
+            }
+        };
+    }
+
+    // Crop UI & Handling
+    function hideCropPanel() {
+        if (cropPanel) cropPanel.style.display = 'none';
+        pendingCrop = null;
+        isMovingCrop = false;
+        isResizingCrop = false;
+        isCropping = false;
+        activeCropHandle = null;
+        renderCanvas();
+    }
+
+    function positionCropFloatingPanel() {
+        if (!cropPanel || !pendingCrop) return;
+        cropPanel.style.display = 'flex';
+        if (cropDimensionText) {
+            cropDimensionText.textContent = `✂️ ครอบตัด (${Math.round(pendingCrop.w)} × ${Math.round(pendingCrop.h)} px)`;
+        }
+        const vpRect = viewport.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        const screenCropCenterX = canvasRect.left + (pendingCrop.x + pendingCrop.w / 2) * (canvasRect.width / canvas.width);
+        const screenCropBottomY = canvasRect.top + (pendingCrop.y + pendingCrop.h) * (canvasRect.height / canvas.height);
+
+        let left = screenCropCenterX - vpRect.left - 130;
+        let top = screenCropBottomY - vpRect.top + 16;
+
+        left = Math.max(10, Math.min(vpRect.width - 320, left));
+        top = Math.max(10, Math.min(vpRect.height - 70, top));
+        cropPanel.style.left = `${left}px`;
+        cropPanel.style.top = `${top}px`;
+    }
+
+    function applyRatioToPendingCrop() {
+        if (!pendingCrop) return;
+        let { x, y, w, h } = pendingCrop;
+        if (cropSelectedRatio === '1:1') {
+            const side = Math.min(w, h, canvas.width - x, canvas.height - y);
+            pendingCrop.w = Math.max(20, side);
+            pendingCrop.h = Math.max(20, side);
+        } else if (cropSelectedRatio === '4:3') {
+            let targetH = w * (3 / 4);
+            if (y + targetH > canvas.height) {
+                targetH = canvas.height - y;
+                w = targetH * (4 / 3);
+            }
+            pendingCrop.w = Math.max(20, Math.min(canvas.width - x, w));
+            pendingCrop.h = Math.max(20, Math.min(canvas.height - y, targetH));
+        } else if (cropSelectedRatio === '16:9') {
+            let targetH = w * (9 / 16);
+            if (y + targetH > canvas.height) {
+                targetH = canvas.height - y;
+                w = targetH * (16 / 9);
+            }
+            pendingCrop.w = Math.max(20, Math.min(canvas.width - x, w));
+            pendingCrop.h = Math.max(20, Math.min(canvas.height - y, targetH));
+        }
+    }
+
+    function showCropPanel(x, y, w, h) {
+        pendingCrop = { x, y, w, h };
+        applyRatioToPendingCrop();
+        renderCanvas();
+        positionCropFloatingPanel();
+    }
+
+    if (cropPanel) {
+        cropPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+        cropPanel.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+        cropPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+        cropPanel.addEventListener('click', (e) => e.stopPropagation());
+    }
+
+    overlay.querySelectorAll('.crop-ratio-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            overlay.querySelectorAll('.crop-ratio-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'none';
+                b.style.color = '#cbd5e1';
+            });
+            btn.classList.add('active');
+            btn.style.background = '#38bdf8';
+            btn.style.color = '#0f172a';
+
+            cropSelectedRatio = btn.getAttribute('data-ratio');
+            if (pendingCrop) {
+                applyRatioToPendingCrop();
+                renderCanvas();
+                positionCropFloatingPanel();
+            }
+        };
+    });
+
+    function applyCrop() {
+        if (!pendingCrop) return;
+        
+        let cx = Math.round(Math.max(0, Math.min(pendingCrop.x, canvas.width - 10)));
+        let cy = Math.round(Math.max(0, Math.min(pendingCrop.y, canvas.height - 10)));
+        let cw = Math.round(Math.min(pendingCrop.w, canvas.width - cx));
+        let ch = Math.round(Math.min(pendingCrop.h, canvas.height - cy));
+
+        if (cw < 10 || ch < 10) return;
+
+        // Crop underlying baseImage onto offscreen canvas
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = cw;
+        cropCanvas.height = ch;
+        const cropCtx = cropCanvas.getContext('2d');
+        cropCtx.drawImage(baseImage, cx, cy, cw, ch, 0, 0, cw, ch);
+
+        // Shift existing shapes coordinates to relative crop box
+        shapes.forEach(shape => {
+            moveShape(shape, -cx, -cy);
+        });
+
+        // Filter out shapes that are completely outside the crop area
+        shapes = shapes.filter(shape => {
+            const b = getShapeBounds(shape);
+            return b.maxX >= 0 && b.minX <= cw && b.maxY >= 0 && b.minY <= ch;
+        });
+
+        selectedShapeId = null;
+        canvas.width = cw;
+        canvas.height = ch;
+
+        let croppedDataUrl;
+        try {
+            croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.98);
+        } catch (err) {
+            croppedDataUrl = cropCanvas.toDataURL();
+        }
+
+        baseImage = new Image();
+        baseImage.crossOrigin = 'anonymous';
+        baseImage.onload = () => {
+            renderCanvas();
+            saveState();
+            fitToScreen();
+            setActiveTool('select');
+        };
+        baseImage.src = croppedDataUrl;
+
+        hideCropPanel();
+        if (typeof toast === 'function') {
+            toast('✂️ ครอบตัดภาพสำเร็จเรียบร้อยแล้ว', 'success');
+        }
+    }
+
+    if (btnApplyCrop) {
+        btnApplyCrop.onclick = (e) => {
+            if (e) e.stopPropagation();
+            applyCrop();
+        };
+    }
+
+    if (btnCancelCrop) {
+        btnCancelCrop.onclick = (e) => {
+            if (e) e.stopPropagation();
+            hideCropPanel();
+            setActiveTool('select');
+        };
+    }
+
+    // Interactive Defect Tag / Text Tool
+    function promptAddOrEditText(coords, screenX, screenY, existingTextShape = null) {
+        const existingPrompt = document.getElementById('annotator-text-prompt-box');
+        if (existingPrompt) existingPrompt.remove();
+
+        const promptBox = document.createElement('div');
+        promptBox.id = 'annotator-text-prompt-box';
+        promptBox.style.cssText = `
+            position: fixed;
+            z-index: 99999999;
+            background: #0f172a;
+            border: 1.5px solid #38bdf8;
+            border-radius: 14px;
+            padding: 12px 14px;
+            box-shadow: 0 20px 45px rgba(0,0,0,0.85);
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-family: 'Prompt', sans-serif;
+            color: white;
+            animation: popoverFadeIn 0.15s ease-out;
+        `;
+
+        let left = Math.max(20, Math.min(window.innerWidth - 320, screenX - 20));
+        let top = Math.max(20, Math.min(window.innerHeight - 240, screenY + 10));
+        promptBox.style.left = `${left}px`;
+        promptBox.style.top = `${top}px`;
+
+        const initialVal = existingTextShape ? existingTextShape.text : 'จุดบกพร่อง';
+        const titleText = existingTextShape ? '✏️ แก้ไขข้อความ / แท็กชี้จุด' : '🏷️ ใส่ข้อความ / แท็กชี้จุดบกพร่อง';
+
+        promptBox.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:12px; font-weight:800; color:#7dd3fc;">${titleText}</span>
+                <button type="button" id="close-tag-prompt" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:14px; font-weight:bold;">✕</button>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
+                <button type="button" class="quick-defect-tag" data-text="[NG]" style="background:#ef4444; color:white; border:none; border-radius:6px; padding:3px 8px; font-size:10px; font-weight:900; cursor:pointer;">[NG]</button>
+                <button type="button" class="quick-defect-tag" data-text="[OK]" style="background:#22c55e; color:white; border:none; border-radius:6px; padding:3px 8px; font-size:10px; font-weight:900; cursor:pointer;">[OK]</button>
+                <button type="button" class="quick-defect-tag" data-text="[Defect]" style="background:#f97316; color:white; border:none; border-radius:6px; padding:3px 8px; font-size:10px; font-weight:900; cursor:pointer;">[Defect]</button>
+                <button type="button" class="quick-defect-tag" data-text="รอยแตก (Crack)" style="background:#1e293b; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:3px 7px; font-size:10px; font-weight:700; cursor:pointer;">รอยแตก</button>
+                <button type="button" class="quick-defect-tag" data-text="รอยขีดข่วน (Scratch)" style="background:#1e293b; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:3px 7px; font-size:10px; font-weight:700; cursor:pointer;">รอยขูด</button>
+                <button type="button" class="quick-defect-tag" data-text="Label NG" style="background:#1e293b; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:3px 7px; font-size:10px; font-weight:700; cursor:pointer;">Label NG</button>
+                <button type="button" class="quick-defect-tag" data-text="Pin ผิดรูป" style="background:#1e293b; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:3px 7px; font-size:10px; font-weight:700; cursor:pointer;">Pin งอ</button>
+            </div>
+            <input type="text" id="defect-tag-input" placeholder="พิมพ์ข้อความที่ต้องการ..." value="${initialVal}" style="width:100%; box-sizing:border-box; padding:7px 10px; background:#1e293b; border:1px solid #475569; border-radius:8px; color:white; font-size:12px; outline:none;" />
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                <span style="font-size:9.5px; color:#94a3b8;">* ลากย้ายได้อิสระหลังวาง</span>
+                <button type="button" id="confirm-defect-tag" style="background:#0284c7; color:white; border:none; border-radius:6px; padding:6px 14px; font-size:11px; font-weight:800; cursor:pointer;">
+                    ✓ ${existingTextShape ? 'บันทึกแก้ไข' : 'วางข้อความ'}
+                </button>
+            </div>
+        `;
+
+        document.body.appendChild(promptBox);
+        const tagInput = promptBox.querySelector('#defect-tag-input');
+        tagInput.focus();
+        tagInput.select();
+
+        promptBox.querySelectorAll('.quick-defect-tag').forEach(btn => {
+            btn.onclick = () => {
+                applyTagText(btn.getAttribute('data-text'));
+            };
+        });
+
+        function applyTagText(textStr) {
+            if (!textStr || !textStr.trim()) return;
+            const cleanText = textStr.trim();
+
+            if (existingTextShape) {
+                existingTextShape.text = cleanText;
+                existingTextShape.color = currentColor;
+                selectedShapeId = existingTextShape.id;
+            } else {
+                const newShape = {
+                    id: 'text_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                    type: 'text',
+                    x: coords.x,
+                    y: coords.y,
+                    text: cleanText,
+                    color: currentColor,
+                    fontSize: Math.max(16, currentLineWidth * 5),
+                    width: currentLineWidth
+                };
+                shapes.push(newShape);
+                selectedShapeId = newShape.id;
+            }
+
+            setActiveTool('select');
+            renderCanvas();
+            saveState();
+            promptBox.remove();
+        }
+
+        promptBox.querySelector('#confirm-defect-tag').onclick = () => {
+            applyTagText(tagInput.value);
+        };
+
+        tagInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                applyTagText(tagInput.value);
+            } else if (e.key === 'Escape') {
+                promptBox.remove();
+            }
+        };
+
+        promptBox.querySelector('#close-tag-prompt').onclick = () => {
+            promptBox.remove();
+        };
+    }
+
+    // Keyboard Shortcuts
+    const keydownHandler = (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        if (e.code === 'Space' && !spacePressed) {
+            spacePressed = true;
+            viewport.style.cursor = 'grab';
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault();
+            deleteSelectedShape();
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                if (redoActionBtn) redoActionBtn.click();
+            } else {
+                if (undoActionBtn) undoActionBtn.click();
+            }
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+            e.preventDefault();
+            if (redoActionBtn) redoActionBtn.click();
+        } else if (e.key.toLowerCase() === 'v') {
+            setActiveTool('select');
+        } else if (e.key === '1') {
+            setActiveTool('arrow');
+        } else if (e.key === '2') {
+            setActiveTool('circle');
+        } else if (e.key === '3') {
+            setActiveTool('rect');
+        } else if (e.key === '4') {
+            setActiveTool('line');
+        } else if (e.key === '5') {
+            setActiveTool('pen');
+        } else if (e.key === '6') {
+            setActiveTool('text');
+        } else if (e.key === '7') {
+            setActiveTool('crop');
+        } else if (e.key === 'Enter') {
+            if (pendingCrop) {
+                e.preventDefault();
+                applyCrop();
+            }
+        } else if (e.key === 'Escape') {
+            if (pendingCrop) {
+                hideCropPanel();
+                setActiveTool('select');
+            } else if (selectedShapeId) {
+                selectedShapeId = null;
+                renderCanvas();
+            } else {
+                closeAnnotator();
+            }
+        }
+    };
+
+    const keyupHandler = (e) => {
+        if (e.code === 'Space') {
+            spacePressed = false;
+            if (currentTool !== 'pan') {
+                viewport.style.cursor = currentTool === 'select' ? 'default' : 'crosshair';
+            }
+        }
+    };
+
+    window.addEventListener('keydown', keydownHandler);
+    window.addEventListener('keyup', keyupHandler);
+
+    function getCanvasCoordinates(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
+    }
+
+    // Find Shape At Point (top to bottom)
+    function findShapeAt(px, py) {
+        for (let i = shapes.length - 1; i >= 0; i--) {
+            if (isPointNearShape(shapes[i], px, py)) {
+                return shapes[i];
+            }
+        }
+        return null;
+    }
+
+    // Double Click to Edit Text
+    viewport.addEventListener('dblclick', (e) => {
+        const clientX = e.clientX;
+        const clientY = e.clientY;
+        const coords = getCanvasCoordinates(clientX, clientY);
+        const hit = findShapeAt(coords.x, coords.y);
+        if (hit && hit.type === 'text') {
+            promptAddOrEditText(coords, clientX, clientY, hit);
+        }
+    });
+
+    // Pointer Events (Mouse + Touch)
     function handlePointerDown(e) {
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-        // Check if middle click or spacebar or pan tool
         if (e.button === 1 || e.button === 2 || spacePressed || currentTool === 'pan') {
             isPanning = true;
             panStartX = clientX - panX;
@@ -6804,21 +7679,131 @@ if (clearBtn) {
         startX = coords.x;
         startY = coords.y;
 
-        if (currentTool === 'text') {
-            promptAddText(coords);
+        // 1. Check if clicking on a resize handle of the selected shape
+        if (selectedShapeId) {
+            const sel = shapes.find(s => s.id === selectedShapeId);
+            if (sel) {
+                const hitHandle = findHandleAt(sel, coords.x, coords.y);
+                if (hitHandle) {
+                    isResizingShape = true;
+                    activeResizeHandle = hitHandle.id;
+                    resizeStartCoords = { x: coords.x, y: coords.y };
+                    resizeInitialBounds = getShapeBounds(sel);
+                    resizeInitialShape = JSON.parse(JSON.stringify(sel));
+                    viewport.style.cursor = hitHandle.cursor;
+                    setActiveTool('select');
+                    return;
+                }
+            }
+        }
+
+        // Check crop interaction if pendingCrop exists
+        if (pendingCrop) {
+            const hitCropHandle = findCropHandleAt(pendingCrop, coords.x, coords.y);
+            if (hitCropHandle) {
+                isResizingCrop = true;
+                activeCropHandle = hitCropHandle.id;
+                cropResizeStartCoords = { x: coords.x, y: coords.y };
+                cropInitialBox = { ...pendingCrop };
+                viewport.style.cursor = hitCropHandle.cursor;
+                return;
+            }
+            if (isPointInsideCrop(pendingCrop, coords.x, coords.y)) {
+                isMovingCrop = true;
+                cropMoveStart = { x: coords.x, y: coords.y };
+                cropInitialBox = { ...pendingCrop };
+                viewport.style.cursor = 'move';
+                return;
+            }
+        }
+
+        if (currentTool === 'crop') {
+            hideCropPanel();
+            isCropping = true;
             return;
         }
 
+        // 2. Check if clicking on any existing shape -> Select it and switch to mouse/move mode immediately!
+        const hitShape = findShapeAt(coords.x, coords.y);
+        if (hitShape && (currentTool === 'select' || currentTool === 'text' || !['pen', 'arrow', 'circle', 'rect', 'line'].includes(currentTool) || hitShape.id === selectedShapeId)) {
+            selectedShapeId = hitShape.id;
+            isDraggingShape = true;
+            dragShapeStartCoords = { x: coords.x, y: coords.y };
+            dragShapeInitialState = JSON.parse(JSON.stringify(hitShape));
+            setActiveTool('select');
+            viewport.style.cursor = 'move';
+            renderCanvas();
+            return;
+        }
+
+        if (currentTool === 'select') {
+            if (hitShape) {
+                selectedShapeId = hitShape.id;
+                isDraggingShape = true;
+                dragShapeStartCoords = { x: coords.x, y: coords.y };
+                dragShapeInitialState = JSON.parse(JSON.stringify(hitShape));
+                viewport.style.cursor = 'move';
+            } else {
+                selectedShapeId = null;
+                viewport.style.cursor = 'default';
+            }
+            renderCanvas();
+            return;
+        }
+
+        if (currentTool === 'text') {
+            selectedShapeId = null;
+            renderCanvas();
+            promptAddOrEditText(coords, clientX, clientY);
+            return;
+        }
+
+        // Start drawing vector shape
+        selectedShapeId = null;
         isDrawing = true;
 
         if (currentTool === 'pen') {
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = currentLineWidth;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+            currentDrawingShape = {
+                id: 'pen_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                type: 'pen',
+                points: [{ x: startX, y: startY }],
+                color: currentColor,
+                width: currentLineWidth
+            };
+        } else if (currentTool === 'arrow') {
+            currentDrawingShape = {
+                id: 'arrow_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                type: 'arrow',
+                x1: startX, y1: startY, x2: startX, y2: startY,
+                color: currentColor,
+                width: currentLineWidth
+            };
+        } else if (currentTool === 'circle') {
+            currentDrawingShape = {
+                id: 'circle_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                type: 'circle',
+                x1: startX, y1: startY, x2: startX, y2: startY,
+                color: currentColor,
+                width: currentLineWidth
+            };
+        } else if (currentTool === 'rect') {
+            currentDrawingShape = {
+                id: 'rect_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                type: 'rect',
+                x1: startX, y1: startY, x2: startX, y2: startY,
+                color: currentColor,
+                width: currentLineWidth
+            };
+        } else if (currentTool === 'line') {
+            currentDrawingShape = {
+                id: 'line_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                type: 'line',
+                x1: startX, y1: startY, x2: startX, y2: startY,
+                color: currentColor,
+                width: currentLineWidth
+            };
         }
+        renderCanvas();
     }
 
     function handlePointerMove(e) {
@@ -6832,38 +7817,300 @@ if (clearBtn) {
             return;
         }
 
-        if (!isDrawing) return;
-
         const coords = getCanvasCoordinates(clientX, clientY);
 
-        if (currentTool === 'pen') {
-            ctx.lineTo(coords.x, coords.y);
-            ctx.stroke();
-        } else {
-            // Restore snapshot to preview shape
-            const lastState = history[history.length - 1];
-            if (lastState) ctx.putImageData(lastState, 0, 0);
+        // Handle active Resizing of Crop Box
+        if (isResizingCrop && pendingCrop && activeCropHandle && cropResizeStartCoords && cropInitialBox) {
+            const dx = coords.x - cropResizeStartCoords.x;
+            const dy = coords.y - cropResizeStartCoords.y;
+            const init = cropInitialBox;
 
-            if (currentTool === 'arrow') {
-                drawArrow(ctx, startX, startY, coords.x, coords.y, currentLineWidth * 4.5, currentColor, currentLineWidth);
-            } else if (currentTool === 'circle') {
-                drawCircle(ctx, startX, startY, coords.x, coords.y, currentColor, currentLineWidth);
-            } else if (currentTool === 'rect') {
-                drawRect(ctx, startX, startY, coords.x, coords.y, currentColor, currentLineWidth);
-            } else if (currentTool === 'line') {
-                drawLine(ctx, startX, startY, coords.x, coords.y, currentColor, currentLineWidth);
+            let nx = init.x;
+            let ny = init.y;
+            let nw = init.w;
+            let nh = init.h;
+
+            if (activeCropHandle === 'tl') {
+                nx = Math.min(init.x + init.w - 20, Math.max(0, init.x + dx));
+                ny = Math.min(init.y + init.h - 20, Math.max(0, init.y + dy));
+                nw = init.x + init.w - nx;
+                nh = init.y + init.h - ny;
+            } else if (activeCropHandle === 'tr') {
+                ny = Math.min(init.y + init.h - 20, Math.max(0, init.y + dy));
+                nw = Math.min(canvas.width - init.x, Math.max(20, init.w + dx));
+                nh = init.y + init.h - ny;
+            } else if (activeCropHandle === 'bl') {
+                nx = Math.min(init.x + init.w - 20, Math.max(0, init.x + dx));
+                nw = init.x + init.w - nx;
+                nh = Math.min(canvas.height - init.y, Math.max(20, init.h + dy));
+            } else if (activeCropHandle === 'br') {
+                nw = Math.min(canvas.width - init.x, Math.max(20, init.w + dx));
+                nh = Math.min(canvas.height - init.y, Math.max(20, init.h + dy));
+            } else if (activeCropHandle === 'tm') {
+                ny = Math.min(init.y + init.h - 20, Math.max(0, init.y + dy));
+                nh = init.y + init.h - ny;
+            } else if (activeCropHandle === 'bm') {
+                nh = Math.min(canvas.height - init.y, Math.max(20, init.h + dy));
+            } else if (activeCropHandle === 'lm') {
+                nx = Math.min(init.x + init.w - 20, Math.max(0, init.x + dx));
+                nw = init.x + init.w - nx;
+            } else if (activeCropHandle === 'rm') {
+                nw = Math.min(canvas.width - init.x, Math.max(20, init.w + dx));
+            }
+
+            pendingCrop = { x: nx, y: ny, w: nw, h: nh };
+            if (cropSelectedRatio !== 'free') applyRatioToPendingCrop();
+            renderCanvas();
+            positionCropFloatingPanel();
+            return;
+        }
+
+        // Handle active Moving of Crop Box
+        if (isMovingCrop && pendingCrop && cropMoveStart && cropInitialBox) {
+            const dx = coords.x - cropMoveStart.x;
+            const dy = coords.y - cropMoveStart.y;
+            const init = cropInitialBox;
+
+            let nx = Math.max(0, Math.min(canvas.width - init.w, init.x + dx));
+            let ny = Math.max(0, Math.min(canvas.height - init.h, init.y + dy));
+
+            pendingCrop.x = nx;
+            pendingCrop.y = ny;
+            renderCanvas();
+            positionCropFloatingPanel();
+            return;
+        }
+
+        // Handle active Resizing of shape
+        if (isResizingShape && selectedShapeId && activeResizeHandle && resizeStartCoords && resizeInitialBounds && resizeInitialShape) {
+            const sel = shapes.find(s => s.id === selectedShapeId);
+            if (sel) {
+                const dx = coords.x - resizeStartCoords.x;
+                const dy = coords.y - resizeStartCoords.y;
+                const initB = resizeInitialBounds;
+                const initS = resizeInitialShape;
+
+                let newMinX = initB.minX;
+                let newMaxX = initB.maxX;
+                let newMinY = initB.minY;
+                let newMaxY = initB.maxY;
+
+                if (activeResizeHandle === 'tl') { newMinX += dx; newMinY += dy; }
+                else if (activeResizeHandle === 'tr') { newMaxX += dx; newMinY += dy; }
+                else if (activeResizeHandle === 'bl') { newMinX += dx; newMaxY += dy; }
+                else if (activeResizeHandle === 'br') { newMaxX += dx; newMaxY += dy; }
+                else if (activeResizeHandle === 'tm') { newMinY += dy; }
+                else if (activeResizeHandle === 'bm') { newMaxY += dy; }
+                else if (activeResizeHandle === 'lm') { newMinX += dx; }
+                else if (activeResizeHandle === 'rm') { newMaxX += dx; }
+
+                // Minimum 10px constraint
+                if (newMaxX - newMinX < 10) {
+                    if (activeResizeHandle.includes('l')) newMinX = newMaxX - 10;
+                    else newMaxX = newMinX + 10;
+                }
+                if (newMaxY - newMinY < 10) {
+                    if (activeResizeHandle.includes('t') || activeResizeHandle === 'tm') newMinY = newMaxY - 10;
+                    else newMaxY = newMinY + 10;
+                }
+
+                const newW = newMaxX - newMinX;
+                const newH = newMaxY - newMinY;
+                const scaleX = newW / Math.max(1, initB.width);
+                const scaleY = newH / Math.max(1, initB.height);
+
+                if (sel.type === 'rect' || sel.type === 'circle') {
+                    sel.x1 = (initS.x1 <= initS.x2) ? newMinX : newMaxX;
+                    sel.x2 = (initS.x1 <= initS.x2) ? newMaxX : newMinX;
+                    sel.y1 = (initS.y1 <= initS.y2) ? newMinY : newMaxY;
+                    sel.y2 = (initS.y1 <= initS.y2) ? newMaxY : newMinY;
+                } else if (sel.type === 'line' || sel.type === 'arrow') {
+                    sel.x1 = newMinX + (initS.x1 - initB.minX) * scaleX;
+                    sel.x2 = newMinX + (initS.x2 - initB.minX) * scaleX;
+                    sel.y1 = newMinY + (initS.y1 - initB.minY) * scaleY;
+                    sel.y2 = newMinY + (initS.y2 - initB.minY) * scaleY;
+                } else if (sel.type === 'text') {
+                    const scale = Math.max(0.4, Math.min(6, scaleY));
+                    sel.fontSize = Math.max(12, Math.round((initS.fontSize || Math.max(16, (initS.width || 4) * 5)) * scale));
+                    sel.x = newMinX;
+                    sel.y = newMaxY;
+                } else if (sel.type === 'pen') {
+                    sel.points = initS.points.map(p => ({
+                        x: newMinX + (p.x - initB.minX) * scaleX,
+                        y: newMinY + (p.y - initB.minY) * scaleY
+                    }));
+                }
+
+                renderCanvas();
+            }
+            return;
+        }
+
+        // Handle active Dragging of shape
+        if (isDraggingShape && selectedShapeId && dragShapeStartCoords && dragShapeInitialState) {
+            const sel = shapes.find(s => s.id === selectedShapeId);
+            if (sel) {
+                const dx = coords.x - dragShapeStartCoords.x;
+                const dy = coords.y - dragShapeStartCoords.y;
+
+                if (sel.type === 'arrow' || sel.type === 'line' || sel.type === 'rect' || sel.type === 'circle') {
+                    sel.x1 = dragShapeInitialState.x1 + dx;
+                    sel.y1 = dragShapeInitialState.y1 + dy;
+                    sel.x2 = dragShapeInitialState.x2 + dx;
+                    sel.y2 = dragShapeInitialState.y2 + dy;
+                } else if (sel.type === 'text') {
+                    sel.x = dragShapeInitialState.x + dx;
+                    sel.y = dragShapeInitialState.y + dy;
+                } else if (sel.type === 'pen') {
+                    sel.points = dragShapeInitialState.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+                }
+                renderCanvas();
+            }
+            return;
+        }
+
+        if (isCropping) {
+            const x = Math.max(0, Math.min(startX, coords.x));
+            const y = Math.max(0, Math.min(startY, coords.y));
+            const w = Math.min(canvas.width - x, Math.abs(coords.x - startX));
+            const h = Math.min(canvas.height - y, Math.abs(coords.y - startY));
+            pendingCrop = { x, y, w, h };
+            if (cropSelectedRatio !== 'free') applyRatioToPendingCrop();
+            renderCanvas();
+            return;
+        }
+
+        if (isDrawing && currentDrawingShape) {
+            if (currentDrawingShape.type === 'pen') {
+                currentDrawingShape.points.push({ x: coords.x, y: coords.y });
+            } else {
+                currentDrawingShape.x2 = coords.x;
+                currentDrawingShape.y2 = coords.y;
+            }
+            renderCanvas();
+            return;
+        }
+
+        // Hover cursor styling
+        if (!isDrawing && !isPanning && !isCropping && !isDraggingShape && !isResizingShape && !isMovingCrop && !isResizingCrop) {
+            if (pendingCrop) {
+                const cropH = findCropHandleAt(pendingCrop, coords.x, coords.y);
+                if (cropH) {
+                    viewport.style.cursor = cropH.cursor;
+                    return;
+                }
+                if (isPointInsideCrop(pendingCrop, coords.x, coords.y)) {
+                    viewport.style.cursor = 'move';
+                    return;
+                }
+                if (currentTool === 'crop') {
+                    viewport.style.cursor = 'crosshair';
+                    return;
+                }
+            }
+
+            if (selectedShapeId) {
+                const sel = shapes.find(s => s.id === selectedShapeId);
+                if (sel) {
+                    const handle = findHandleAt(sel, coords.x, coords.y);
+                    if (handle) {
+                        viewport.style.cursor = handle.cursor;
+                        return;
+                    }
+                }
+            }
+
+            const hovered = findShapeAt(coords.x, coords.y);
+            if (hovered && (currentTool === 'select' || hovered.id === selectedShapeId)) {
+                viewport.style.cursor = 'move';
+            } else if (currentTool === 'pan' || spacePressed) {
+                viewport.style.cursor = 'grab';
+            } else if (currentTool === 'select') {
+                viewport.style.cursor = hovered ? 'move' : 'default';
+            } else {
+                viewport.style.cursor = 'crosshair';
             }
         }
     }
 
     function handlePointerUp(e) {
+        const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+        const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+
         if (isPanning) {
             isPanning = false;
-            viewport.style.cursor = (spacePressed || currentTool === 'pan') ? 'grab' : 'crosshair';
+            viewport.style.cursor = (spacePressed || currentTool === 'pan') ? 'grab' : (currentTool === 'select' ? 'default' : 'crosshair');
         }
-        if (!isDrawing) return;
-        isDrawing = false;
-        saveHistory();
+
+        if (isResizingCrop) {
+            isResizingCrop = false;
+            activeCropHandle = null;
+            cropResizeStartCoords = null;
+            cropInitialBox = null;
+            positionCropFloatingPanel();
+            return;
+        }
+
+        if (isMovingCrop) {
+            isMovingCrop = false;
+            cropMoveStart = null;
+            cropInitialBox = null;
+            positionCropFloatingPanel();
+            return;
+        }
+
+        if (isResizingShape) {
+            isResizingShape = false;
+            activeResizeHandle = null;
+            resizeStartCoords = null;
+            resizeInitialBounds = null;
+            resizeInitialShape = null;
+            saveState();
+            return;
+        }
+
+        if (isDraggingShape) {
+            isDraggingShape = false;
+            dragShapeStartCoords = null;
+            dragShapeInitialState = null;
+            saveState();
+            return;
+        }
+
+        if (isCropping) {
+            isCropping = false;
+            if (pendingCrop && pendingCrop.w > 15 && pendingCrop.h > 15) {
+                positionCropFloatingPanel();
+            } else {
+                hideCropPanel();
+            }
+            return;
+        }
+
+        if (isDrawing && currentDrawingShape) {
+            isDrawing = false;
+            const minSize = currentDrawingShape.type === 'pen' ? 2 : 5;
+            let isValid = false;
+
+            if (currentDrawingShape.type === 'pen') {
+                isValid = currentDrawingShape.points && currentDrawingShape.points.length >= minSize;
+            } else {
+                const dx = Math.abs(currentDrawingShape.x2 - currentDrawingShape.x1);
+                const dy = Math.abs(currentDrawingShape.y2 - currentDrawingShape.y1);
+                isValid = dx >= minSize || dy >= minSize;
+            }
+
+            if (isValid) {
+                shapes.push(currentDrawingShape);
+                selectedShapeId = currentDrawingShape.id;
+                // Automatically switch to select/mouse cursor tool so user can immediately move or resize!
+                setActiveTool('select');
+                saveState();
+            }
+
+            currentDrawingShape = null;
+            renderCanvas();
+        }
     }
 
     viewport.addEventListener('mousedown', handlePointerDown);
@@ -6876,26 +8123,32 @@ if (clearBtn) {
 
     viewport.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    // Close
-    overlay.querySelector('#annotator-close-btn').onclick = () => {
+    // Cleanup & Close
+    function closeAnnotator() {
+        window.removeEventListener('keydown', keydownHandler);
+        window.removeEventListener('keyup', keyupHandler);
         window.removeEventListener('mousemove', handlePointerMove);
         window.removeEventListener('mouseup', handlePointerUp);
         window.removeEventListener('touchmove', handlePointerMove);
         window.removeEventListener('touchend', handlePointerUp);
+        const pBox = document.getElementById('annotator-text-prompt-box');
+        if (pBox) pBox.remove();
         overlay.remove();
-    };
+    }
 
-    // Save
+    overlay.querySelector('#annotator-close-btn').onclick = closeAnnotator;
+
+    // Save with all vector shapes rendered cleanly on image
     overlay.querySelector('#annotator-save-btn').onclick = () => {
+        hideCropPanel();
+        selectedShapeId = null;
+        renderCanvas();
+
         const annotatedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
         if (typeof onSave === 'function') {
             onSave(annotatedDataUrl);
         }
-        window.removeEventListener('mousemove', handlePointerMove);
-        window.removeEventListener('mouseup', handlePointerUp);
-        window.removeEventListener('touchmove', handlePointerMove);
-        window.removeEventListener('touchend', handlePointerUp);
-        overlay.remove();
+        closeAnnotator();
         if (typeof toast === 'function') {
             toast('💾 บันทึกรูปภาพหลักฐานและมาร์กจุดบกพร่องลงเอกสารเรียบร้อย', 'success');
         }
@@ -7679,10 +8932,15 @@ window.addEventListener('load', () => {
         setInterval(updateUserPresence, 300000); // แจ้งสถานะออนไลน์ทุก 5 นาที
     }
 
-    // 7. ลงทะเบียน PWA Service Worker (เพื่อการใช้งานออฟไลน์)
+    // 7. ลงทะเบียน PWA Service Worker (เพื่อการใช้งานออฟไลน์ + อัปเดตสดทันที)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js')
-            .then(() => console.log("📦 ServiceWorker: Ready"))
+            .then(reg => {
+                console.log("📦 ServiceWorker: Ready");
+                if (reg && typeof reg.update === 'function') {
+                    reg.update().catch(() => {});
+                }
+            })
             .catch(err => console.warn("📦 ServiceWorker: Failed", err));
     }
 
@@ -16493,13 +17751,13 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                         <!-- Row 3: Integrated Toggles Side-by-Side right after Quantities -->
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:2px;">
                             <!-- 1. Toggle: Special Jobs (Blue Theme) -->
-                            <div style="padding:8px 12px; background:rgba(59, 130, 246, 0.04); border:1px dashed rgba(59, 130, 246, 0.3); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;" id="sync-container">
+                            <div style="padding:8px 12px; background:rgba(59, 130, 246, 0.08); border:1px dashed rgba(59, 130, 246, 0.45); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;" id="sync-container">
                                 <div style="display:flex; align-items:center; gap:8px; flex:1;">
-                                    <div style="width:28px; height:28px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#3b82f6; flex-shrink:0;">
+                                    <div class="toggle-icon-badge" style="width:28px; height:28px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#3b82f6; flex-shrink:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
                                         <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                     </div>
                                     <div style="flex:1;">
-                                        <p style="font-size:10.5px; font-weight:800; color:#1e293b; margin:0; text-transform:uppercase;">บันทึกเป็นภารกิจพิเศษ</p>
+                                        <p class="special-mission-label" style="font-size:10.5px; font-weight:800; color:#0f172a; margin:0; text-transform:uppercase; letter-spacing:0.01em;">บันทึกเป็นภารกิจพิเศษ</p>
 <div style="margin-top:3px; display:none;" id="commander-input-wrap">
     <!-- ใช้โครงสร้างเดียวกับ Part No เพื่อให้ Dropdown แสดงผลตรงตำแหน่ง -->
     <div class="form-input-wrap" style="position:relative;">
@@ -16524,13 +17782,13 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                             </div>
 
                             <!-- 2. Toggle: 8D Report (Red Theme) -->
-                            <div style="padding:8px 12px; background:rgba(225, 29, 72, 0.04); border:1px dashed rgba(225, 29, 72, 0.3); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;" id="8d-container">
+                            <div style="padding:8px 12px; background:rgba(225, 29, 72, 0.08); border:1px dashed rgba(225, 29, 72, 0.45); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;" id="8d-container">
                                 <div style="display:flex; align-items:center; gap:8px; flex:1;">
-                                    <div style="width:28px; height:28px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#e11d48; flex-shrink:0; font-weight:950; font-size:12px;">
+                                    <div class="toggle-icon-badge" style="width:28px; height:28px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#e11d48; flex-shrink:0; font-weight:950; font-size:12px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
                                         8D
                                     </div>
                                     <div style="flex:1;">
-                                        <p style="font-size:10.5px; font-weight:800; color:#1e293b; margin:0; text-transform:uppercase;">เปิดเคสวิเคราะห์ 8D Report</p>
+                                        <p class="d8-report-label" style="font-size:10.5px; font-weight:800; color:#0f172a; margin:0; text-transform:uppercase; letter-spacing:0.01em;">เปิดเคสวิเคราะห์ 8D Report</p>
                                     </div>
                                 </div>
                                 <label class="premium-toggle">
@@ -17288,29 +18546,45 @@ const renderMultiGrid = () => {
     multiImages.forEach((imgData, idx) => {
         const card = document.createElement('div');
         card.className = 'evidence-thumb-card';
-        card.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#f1f5f9; box-sizing:border-box;';
+        card.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:10px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#0f172a; box-sizing:border-box;';
         
         card.innerHTML = `
-            <img src="${imgData}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Evidence ${idx + 1}" />
+            <img src="${imgData}" style="width:100%; height:100%; object-fit:cover; display:block; cursor:pointer;" alt="Evidence ${idx + 1}" title="คลิกเพื่อดูภาพขนาดเต็ม" />
             
-            <!-- แถบเครื่องมือจัดการภาพ (เพิ่มปุ่มเลื่อนลำดับ) -->
-            <div style="position:absolute; top:5px; right:5px; left:5px; display:flex; justify-content:space-between; z-index:2;">
-                <!-- กลุ่มปุ่มเลื่อนลำดับ (ซ้าย) -->
-                <div style="display:flex; gap:4px;">
-                    <button type="button" class="btn-move-left" title="เลื่อนไปข้างหน้า" 
-                        style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(37, 99, 235, 0.85); color:white; font-size:10px; cursor:pointer; display:${idx === 0 ? 'none' : 'flex'}; align-items:center; justify-content:center;">◀</button>
-                    <button type="button" class="btn-move-right" title="เลื่อนไปข้างหลัง" 
-                        style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(37, 99, 235, 0.85); color:white; font-size:10px; cursor:pointer; display:${idx === multiImages.length - 1 ? 'none' : 'flex'}; align-items:center; justify-content:center;">▶</button>
+            <!-- ป้ายกำกับลำดับภาพ (มุมบนซ้าย ขนาดกะทัดรัด) -->
+            <span style="position:absolute; top:4px; left:4px; background:rgba(15,23,42,0.78); backdrop-filter:blur(4px); color:#f8fafc; padding:1.5px 5.5px; border-radius:4px; font-size:8.5px; font-weight:800; z-index:2; pointer-events:none; border:1px solid rgba(255,255,255,0.15); box-shadow:0 1px 3px rgba(0,0,0,0.3);">รูปที่ ${idx + 1}</span>
+
+            <!-- แถบเครื่องมือจัดการภาพด้านล่าง (เรียงสวยงาม ย่อขนาดกะทัดรัด ไม่บดบังรูป) -->
+            <div style="position:absolute; bottom:0; left:0; right:0; padding:4px 5px; background:linear-gradient(to top, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.72) 75%, transparent 100%); display:flex; align-items:center; justify-content:space-between; gap:3px; z-index:3; box-sizing:border-box;">
+                <!-- กลุ่มปุ่มเลื่อนลำดับภาพ (ซ้าย) -->
+                <div style="display:flex; align-items:center; gap:2.5px;">
+                    <button type="button" class="btn-move-left" title="เลื่อนไปข้างหน้า (ซ้าย)" 
+                        style="width:20px; height:20px; border-radius:4px; border:none; background:rgba(37, 99, 235, 0.9); color:white; font-size:9px; cursor:pointer; display:${idx === 0 ? 'none' : 'flex'}; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">◀</button>
+                    <button type="button" class="btn-move-right" title="เลื่อนไปข้างหลัง (ขวา)" 
+                        style="width:20px; height:20px; border-radius:4px; border:none; background:rgba(37, 99, 235, 0.9); color:white; font-size:9px; cursor:pointer; display:${idx === multiImages.length - 1 ? 'none' : 'flex'}; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">▶</button>
                 </div>
 
-                <!-- กลุ่มปุ่มจัดการเดิม (ขวา) -->
-                <div style="display:flex; gap:4px;">
-                    <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">↻</button>
-                    <button type="button" class="evidence-thumb-delete-btn" title="ลบรูป" style="width:24px; height:24px; border-radius:6px; border:none; background:rgba(239,68,68,0.85); backdrop-filter:blur(4px); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+                <!-- กลุ่มปุ่มจัดการภาพ: แก้ไข, หมุน, ลบ (ขวา) -->
+                <div style="display:flex; align-items:center; gap:2.5px;">
+                    <button type="button" class="evidence-thumb-edit-btn" title="แก้ไข / วาดมาร์กจุดบกพร่องรูปนี้" 
+                        style="width:20px; height:20px; border-radius:4px; border:none; background:#10b981; color:white; font-size:9.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">✏️</button>
+                    <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป 90°" 
+                        style="width:20px; height:20px; border-radius:4px; border:none; background:rgba(71, 85, 105, 0.9); color:white; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">↻</button>
+                    <button type="button" class="evidence-thumb-delete-btn" title="ลบรูปภาพนี้" 
+                        style="width:20px; height:20px; border-radius:4px; border:none; background:rgba(239, 68, 68, 0.95); color:white; font-size:9.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">✕</button>
                 </div>
             </div>
-            <span style="position:absolute; bottom:5px; left:5px; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); color:white; padding:2px 7px; border-radius:5px; font-size:9px; font-weight:800; z-index:2;">รูปที่ ${idx + 1}</span>
         `;
+
+        // --- เพิ่ม Event คลิกรูปเพื่อดูภาพขนาดเต็ม (Lightbox) ---
+        const imgEl = card.querySelector('img');
+        if (imgEl) {
+            imgEl.onclick = () => {
+                if (typeof window.openLightbox === 'function') {
+                    window.openLightbox(multiImages[idx]);
+                }
+            };
+        }
 
         // --- เพิ่ม Event ลำดับภาพ ---
         const moveLeft = card.querySelector('.btn-move-left');
@@ -17319,7 +18593,24 @@ const renderMultiGrid = () => {
         const moveRight = card.querySelector('.btn-move-right');
         if (moveRight) moveRight.onclick = (e) => { e.stopPropagation(); moveImage(idx, idx + 1); };
 
-        // --- Event เดิม (หมุน/ลบ) ---
+        // --- เพิ่ม Event ปุ่มแก้ไขรูปภาพ (เปิด Defect Annotator สำหรับรูปนี้โดยเฉพาะ) ---
+        const editBtn = card.querySelector('.evidence-thumb-edit-btn');
+        if (editBtn) {
+            editBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (typeof window.openEvidenceImageAnnotator === 'function') {
+                    window.openEvidenceImageAnnotator(multiImages[idx], async (annotatedImage) => {
+                        multiImages[idx] = annotatedImage;
+                        await handleMultiImagesChange();
+                        toast(`🎨 แก้ไขและบันทึกรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'success');
+                    });
+                } else {
+                    toast('⚠️ ไม่พบเครื่องมือแก้ไขรูปภาพ', 'warning');
+                }
+            };
+        }
+
+        // --- Event หมุนภาพ ---
         const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
         if (rotBtn) {
             rotBtn.onclick = async (e) => {
@@ -17332,6 +18623,7 @@ const renderMultiGrid = () => {
             };
         }
 
+        // --- Event ลบภาพ ---
         const delBtn = card.querySelector('.evidence-thumb-delete-btn');
         if (delBtn) {
             delBtn.onclick = async (e) => {
@@ -18363,21 +19655,26 @@ function _openViewModal(id) {
     if (!item) return;
     _viewing = item;
 
-    // --- ตรวจสอบโหมดปัจจุบันและกำหนดชุดสี (เน้นสีน้ำเงินสว่างที่ Header ในโหมดมืด) ---
+    // --- ตรวจสอบโหมดปัจจุบันและกำหนดชุดสี Cyber High-Tech Luxury ---
     const isDark = document.body.classList.contains('dark-mode');
     const theme = {
-        modalBg: isDark ? '#0f172a' : '#ffffff',
-        // ส่วนที่ปรับปรุง: สีน้ำเงินสว่าง (Bright Blue Gradient) สำหรับโหมดมืด
-        headerBg: isDark ? 'linear-gradient(90deg, #1e40af, #3b82f6)' : '#1e293b', 
-        contentBg: isDark ? '#0f172a' : '#f8fafc',
-        bannerBg: isDark ? '#1e293b' : '#1e2235',
-        border: isDark ? '#334155' : '#e2e8f0',
+        modalBg: isDark ? '#060a14' : '#ffffff',
+        modalBorder: isDark ? 'rgba(56, 189, 248, 0.35)' : '#cbd5e1',
+        modalShadow: isDark ? '0 0 60px rgba(14, 165, 233, 0.25), 0 35px 85px rgba(0, 0, 0, 0.9)' : '0 25px 60px -12px rgba(0,0,0,0.25)',
+        headerBg: isDark 
+            ? 'linear-gradient(110deg, #1e3a8a 0%, #2563eb 30%, #0284c7 65%, #4f46e5 100%)' 
+            : 'linear-gradient(110deg, #1d4ed8 0%, #2563eb 50%, #3b82f6 100%)', 
+        contentBg: isDark ? '#060a14' : '#f8fafc',
+        bannerBg: isDark ? 'linear-gradient(145deg, #0f1a30 0%, #091122 100%)' : '#1e2235',
+        bannerBorder: isDark ? 'rgba(56, 189, 248, 0.25)' : '#e2e8f0',
+        border: isDark ? 'rgba(56, 189, 248, 0.2)' : '#e2e8f0',
         textMain: isDark ? '#f8fafc' : '#1e293b',
         textDim: isDark ? '#94a3b8' : '#64748b',
-        remarkBg: isDark ? 'rgba(245, 158, 11, 0.05)' : '#fffbeb',
-        remarkBorder: isDark ? '#b45309' : '#fde68a',
-        remarkText: isDark ? '#ffedd5' : '#d97706',
-        imgBorder: isDark ? '#334155' : '#cbd5e1'
+        remarkBg: isDark ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(180, 83, 9, 0.04) 100%)' : '#fffbeb',
+        remarkBorder: isDark ? '#f59e0b' : '#fde68a',
+        remarkText: isDark ? '#fef3c7' : '#d97706',
+        imgBorder: isDark ? 'rgba(56, 189, 248, 0.3)' : '#cbd5e1',
+        imgBg: isDark ? '#020617' : '#0f172a'
     };
 
     // --- 1. ดึงข้อมูลตัวเลขจริงและการคำนวณ ---
@@ -18398,123 +19695,140 @@ function _openViewModal(id) {
     const rawRemark = (item.remark || "").trim();
     let formattedRemarkHtml = '';
     if (!rawRemark) {
-        formattedRemarkHtml = `<div style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; opacity:0.85;">ไม่มีหมายเหตุเพิ่มเติม</div>`;
+        formattedRemarkHtml = `<div style="color:${theme.remarkText}; font-size:12.5px; font-weight:600; opacity:0.85; line-height:1.6;">ไม่มีหมายเหตุเพิ่มเติม</div>`;
     } else {
         let normalizedRemark = rawRemark;
         // หากมีหัวข้อ bullet (•) ติดกันโดยไม่มีเว้นบรรทัด ให้แยกขึ้นบรรทัดใหม่อัตโนมัติ
         normalizedRemark = normalizedRemark.replace(/([^\n])\s*•\s*/g, '$1\n• ');
         const lines = normalizedRemark.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
         if (lines.length > 1) {
-            formattedRemarkHtml = `<div style="display:flex; flex-direction:column; gap:4px; width:100%;">
+            formattedRemarkHtml = `<div style="display:flex; flex-direction:column; gap:6px; width:100%;">
                 ${lines.map(line => `
-                    <div style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; line-height:1.45; word-break:break-word;">
+                    <div style="color:${theme.remarkText}; font-size:12.5px; font-weight:600; line-height:1.6; word-break:break-word;">
                         ${escapeHtml(line)}
                     </div>
                 `).join('')}
             </div>`;
         } else {
-            formattedRemarkHtml = `<div style="color:${theme.remarkText}; font-size:11.5px; font-weight:600; line-height:1.45; word-break:break-word; white-space:pre-line; width:100%;">
-                ${escapeHtml(rawRemark)}
+            // เมื่อเลือกแค่ 1 หัวข้อ ให้แสดงผลตรงหัวข้อ NOTE พอดีเสมอ
+            const singleLine = (lines[0] || rawRemark).replace(/^•\s*/, '').trim();
+            formattedRemarkHtml = `<div style="color:${theme.remarkText}; font-size:12.5px; font-weight:600; line-height:1.6; word-break:break-word; width:100%;">
+                ${escapeHtml(singleLine)}
             </div>`;
         }
     }
 
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    modal.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);padding:20px;`;
+    modal.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:16px;`;
     
     modal.innerHTML = `
-    <div style="background:${theme.modalBg}; border:1px solid ${theme.border}; border-radius:12px; width:100%; max-width:860px; max-height:94vh; overflow-y:auto; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); font-family:'Inter', 'Kanit', sans-serif;">
+    <div style="background:${theme.modalBg}; border:1px solid ${theme.modalBorder}; border-radius:14px; width:100%; max-width:920px; max-height:96vh; overflow-y:auto; display:flex; flex-direction:column; box-shadow:${theme.modalShadow}; font-family:'Inter', 'Kanit', sans-serif; position:relative;">
         
-        <!-- 1. Header (ปรับเป็นสีน้ำเงินสว่างตามคำขอ) -->
-        <div style="background:${theme.headerBg}; padding:8px 20px; display:flex; justify-content:space-between; align-items:center; height:36px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="display:flex; align-items:center; gap:8px;">
-                <!-- ปรับไอคอนให้สีขาวสว่าง -->
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                <span style="color:#fff; font-size:13px; font-weight:900; text-transform:uppercase; letter-spacing:1px; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">Record Details</span>
+        <!-- 1. Header (Premium Iridescent Cyber Bar) -->
+        <div style="background:${theme.headerBg}; padding:10px 22px; display:flex; justify-content:space-between; align-items:center; min-height:48px; position:relative; overflow:hidden; border-bottom:1px solid rgba(255,255,255,0.22); box-shadow:0 4px 20px rgba(14,165,233,0.35), inset 0 1px 1px rgba(255,255,255,0.4);">
+            
+            <!-- Shimmer Highlight Ambient Light -->
+            <div style="position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent); pointer-events:none;"></div>
+            <div style="position:absolute; bottom:0; left:15%; right:15%; height:1px; background:linear-gradient(90deg, transparent, rgba(56,189,248,0.7), transparent); pointer-events:none;"></div>
+
+            <div style="display:flex; align-items:center; gap:12px; position:relative; z-index:1;">
+                <div style="width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.08) 100%); display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.4); box-shadow:0 0 14px rgba(56,189,248,0.6), inset 0 1px 2px rgba(255,255,255,0.5);">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </div>
+                <div style="display:flex; flex-direction:column;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="color:#ffffff; font-size:14.5px; font-weight:950; text-transform:uppercase; letter-spacing:1.8px; text-shadow:0 2px 8px rgba(0,0,0,0.5), 0 0 16px rgba(14,165,233,0.8);">RECORD DETAILS</span>
+                        <span style="background:rgba(255,255,255,0.18); color:#e0f2fe; border:1px solid rgba(255,255,255,0.3); font-size:9.5px; font-weight:900; padding:1px 7px; border-radius:10px; text-transform:uppercase; letter-spacing:0.8px; text-shadow:0 1px 2px rgba(0,0,0,0.3);">LIVE HUD</span>
+                    </div>
+                </div>
             </div>
-            <button  onclick="this.closest('.modal-overlay').remove()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; width:26px; height:26px; border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:0.2s;" title="This.Closest" aria-label="This.Closest">✕</button>
+
+            <button onclick="this.closest('.modal-overlay').remove()" style="position:relative; z-index:1; background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.35); color:#ffffff; width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:14px; font-weight:900; display:flex; align-items:center; justify-content:center; transition:all 0.2s; box-shadow:0 2px 8px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.3);" onmouseover="this.style.background='rgba(255,255,255,0.35)'; this.style.transform='scale(1.08)';" onmouseout="this.style.background='rgba(255,255,255,0.18)'; this.style.transform='scale(1)';" title="Close" aria-label="Close">✕</button>
         </div>
 
-        <div style="padding:12px; background:${theme.contentBg};">
+        <div style="padding:18px 22px; background:${theme.contentBg};">
             
-            <!-- 2. Dark Banner (Horizontal Streamlined) -->
-            <div style="background:${theme.bannerBg}; border:1px solid ${theme.border}; border-radius:8px; padding:15px 20px; display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:10px;">
+            <!-- 2. Cyber HUD Problem Banner -->
+            <div style="background:${theme.bannerBg}; border:1px solid ${theme.bannerBorder}; border-radius:10px; padding:16px 22px; display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:14px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
                 
                 <div style="flex: 1; min-width: 0;">
-                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
-                        <span style="color:#f59e0b; font-size:8px; font-weight:950; text-transform:uppercase; letter-spacing:0.8px;">⚠️ PROBLEM</span>
-                        <span style="color:#94a3b8; font-size:9.5px; font-weight:700; display:flex; align-items:center; gap:4px;">
-                            <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M3 10h18"/></svg> ${eventDate}
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                        <span style="background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.4); padding:2px 8px; border-radius:5px; font-size:9.5px; font-weight:950; text-transform:uppercase; letter-spacing:1px; text-shadow:0 0 10px rgba(245,158,11,0.4);">⚠️ PROBLEM</span>
+                        <span style="color:#94a3b8; font-size:11px; font-weight:700; display:flex; align-items:center; gap:5px;">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M3 10h18"/></svg> ${eventDate}
                         </span>
                     </div>
                     
-                    <h2 style="color:#fff; font-size:14px; font-weight:700; line-height:1.5; margin:0 0 10px 0; white-space: normal; word-wrap: break-word;">
+                    <h2 style="color:#ffffff; font-size:15.5px; font-weight:700; line-height:1.5; margin:0 0 12px 0; white-space: normal; word-wrap: break-word; text-shadow:0 1px 2px rgba(0,0,0,0.4);">
                         ${displaySentence}
                     </h2>
 
-                    <div style="display:flex; align-items:center; gap:5px;">
-                        <span style="background:rgba(124,58,237,0.15); color:#a78bfa; padding:1px 8px; border-radius:4px; font-size:9px; font-weight:800; border:1px solid rgba(124,58,237,0.2);">● ${item.part}</span>
-                        <span style="background:rgba(37,99,235,0.15); color:#60a5fa; padding:1px 8px; border-radius:4px; font-size:9px; font-weight:800; border:1px solid rgba(37,99,235,0.2);">🔧 ${actionTaken}</span>
-                        <span style="background:#fff; color:#1e40af; padding:1px 8px; border-radius:4px; font-size:9px; font-weight:950; text-transform:uppercase; border:1px solid #dbeafe;">${reportType}</span>
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span style="background:rgba(139,92,246,0.2); color:#c4b5fd; padding:3.5px 12px; border-radius:6px; font-size:10px; font-weight:800; border:1px solid rgba(167,139,250,0.35); box-shadow:0 0 12px rgba(139,92,246,0.15);">● ${item.part}</span>
+                        <span style="background:rgba(14,165,233,0.2); color:#7dd3fc; padding:3.5px 12px; border-radius:6px; font-size:10px; font-weight:800; border:1px solid rgba(56,189,248,0.35); box-shadow:0 0 12px rgba(14,165,233,0.15);">🔧 ${actionTaken}</span>
+                        <span style="background:#ffffff; color:#1e3a8a; padding:3.5px 12px; border-radius:6px; font-size:10px; font-weight:950; text-transform:uppercase; border:1px solid #dbeafe; box-shadow:0 2px 10px rgba(255,255,255,0.25);">${reportType}</span>
                     </div>
                 </div>
 
-                <!-- KPI Side -->
-                <div style="display:flex; flex-direction:column; align-items:center; gap:6px; border-left:1px solid ${theme.border}; padding-left:20px; flex-shrink:0;">
-                    <div style="display:flex; align-items:center; gap:15px;">
-                        <div style="text-align:center; min-width:38px;">
-                            <div style="font-size:16px; font-weight:950; color:#a78bfa; line-height:1;">${totalQty}</div>
-                            <div style="font-size:6.5px; font-weight:800; color:${theme.textDim}; margin-top:2px;">TOTAL</div>
+                <!-- KPI Side (Digital Telemetry) -->
+                <div style="display:flex; flex-direction:column; align-items:center; gap:8px; border-left:1px solid ${theme.border}; padding-left:22px; flex-shrink:0;">
+                    <div style="display:flex; align-items:center; gap:18px;">
+                        <div style="text-align:center; min-width:44px;">
+                            <div style="font-size:20px; font-weight:950; color:#c084fc; line-height:1; text-shadow:0 0 14px rgba(192,132,252,0.45);">${totalQty}</div>
+                            <div style="font-size:8px; font-weight:900; color:${theme.textDim}; margin-top:4px; letter-spacing:0.8px;">TOTAL</div>
                         </div>
-                        <div style="text-align:center; border-left:1px solid ${theme.border}; padding-left:10px; min-width:38px;">
-                            <div style="font-size:16px; font-weight:950; color:#10b981; line-height:1;">${okQty}</div>
-                            <div style="font-size:6.5px; font-weight:800; color:${theme.textDim}; margin-top:2px;">PASS</div>
+                        <div style="text-align:center; border-left:1px solid ${theme.border}; padding-left:16px; min-width:44px;">
+                            <div style="font-size:20px; font-weight:950; color:#34d399; line-height:1; text-shadow:0 0 14px rgba(52,211,153,0.45);">${okQty}</div>
+                            <div style="font-size:8px; font-weight:900; color:${theme.textDim}; margin-top:4px; letter-spacing:0.8px;">PASS</div>
                         </div>
-                        <div style="text-align:center; border-left:1px solid ${theme.border}; padding-left:10px; min-width:38px;">
-                            <div style="font-size:16px; font-weight:950; color:#ef4444; line-height:1;">${ngQty}</div>
-                            <div style="font-size:6.5px; font-weight:800; color:${theme.textDim}; margin-top:2px;">FAIL</div>
+                        <div style="text-align:center; border-left:1px solid ${theme.border}; padding-left:16px; min-width:44px;">
+                            <div style="font-size:20px; font-weight:950; color:#f87171; line-height:1; text-shadow:0 0 14px rgba(248,113,113,0.45);">${ngQty}</div>
+                            <div style="font-size:8px; font-weight:900; color:${theme.textDim}; margin-top:4px; letter-spacing:0.8px;">FAIL</div>
                         </div>
                     </div>
                     
-                    <div style="width:100%; margin-top:2px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
-                            <span style="color:${theme.textDim}; font-size:7px; font-weight:800; text-transform:uppercase;">Yield Status</span>
-                            <span style="color:${ngRate > 0 ? '#ef4444' : '#10b981'}; font-size:9px; font-weight:900;">${ngRate}% NG</span>
+                    <div style="width:100%; margin-top:4px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <span style="color:${theme.textDim}; font-size:8.5px; font-weight:850; text-transform:uppercase; letter-spacing:0.5px;">YIELD STATUS</span>
+                            <span style="color:${ngRate > 0 ? '#f87171' : '#34d399'}; font-size:10.5px; font-weight:950; text-shadow:0 0 8px ${ngRate > 0 ? 'rgba(248,113,113,0.4)' : 'rgba(52,211,153,0.4)'};">${ngRate}% NG</span>
                         </div>
-                        <div style="width:100%; height:4px; background:rgba(255,255,255,0.1); border-radius:10px; overflow:hidden;">
-                            <div style="width:${ngRate}%; height:100%; background:#ef4444; box-shadow:0 0 5px rgba(239, 68, 68, 0.4);"></div>
+                        <div style="width:100%; height:7px; background:rgba(255,255,255,0.08); border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.05);">
+                            <div style="width:${ngRate}%; height:100%; background:linear-gradient(90deg, #ef4444 0%, #f97316 100%); box-shadow:0 0 8px rgba(239, 68, 68, 0.7); border-radius:10px;"></div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Image Section (Edge-to-edge snugly without top/bottom empty space) -->
-            <div style="width:100%; border:1px solid ${theme.imgBorder}; border-radius:8px; overflow:hidden; margin-bottom:10px; box-shadow:0 4px 12px rgba(0,0,0,0.15); line-height:0; background:${isDark ? '#020617' : '#0f172a'};">
-                ${item.imageUrl 
-                    ? `
+            <!-- Image Section (Zero empty space top/bottom, high-tech bezel) -->
+            ${item.imageUrl 
+                ? `
+                <div style="width:100%; border:1px solid ${theme.imgBorder}; border-radius:10px; overflow:hidden; margin-bottom:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); background:${theme.imgBg};">
                     <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
                         onerror="handleImgError(this)"
                         onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
                         data-img-url="${escapeHtml(item.imageUrl)}"
-                        style="width:100%; height:auto; display:block; cursor:zoom-in; image-rendering:-webkit-optimize-contrast;" 
-                        alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">` 
-                    : `<div style="padding:30px; text-align:center; color:${theme.textDim}; font-size:11px; font-weight:800; text-transform:uppercase; line-height:1.5;">No Evidence Photo</div>`
-                }
-            </div>
+                        style="width:100%; height:auto; display:block; cursor:zoom-in; image-rendering:-webkit-optimize-contrast; transition:transform 0.25s;" 
+                        alt="Evidence Photo" title="คลิกที่รูปเพื่อดูรูปภาพขยายเต็มจอ">
+                </div>` 
+                : `<div style="width:100%; padding:32px 16px; text-align:center; color:${theme.textDim}; font-size:12px; font-weight:800; text-transform:uppercase; line-height:1.6; border:1px dashed ${theme.border}; border-radius:10px; margin-bottom:14px; background:rgba(255,255,255,0.02);">No Evidence Photo</div>`
+            }
 
-            <!-- Remark Section -->
-            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:8px; padding:10px 15px; display:flex; align-items:flex-start; gap:10px;">
-                <span style="color:${isDark ? '#f59e0b' : '#b45309'}; font-size:9.5px; font-weight:950; text-transform:uppercase; flex-shrink:0; margin-top:2px; letter-spacing:0.5px;">NOTE:</span>
-                <div style="flex:1; min-width:0;">
+            <!-- Remark Section (Glowing Amber Directive Box) -->
+            <div style="background:${theme.remarkBg}; border:1px solid ${theme.remarkBorder}; border-radius:10px; padding:13px 18px; display:flex; align-items:flex-start; gap:10px; box-shadow:0 0 16px rgba(245,158,11,0.08);">
+                <span style="color:${isDark ? '#fbbf24' : '#b45309'}; font-size:10.5px; font-weight:950; text-transform:uppercase; flex-shrink:0; letter-spacing:1px; line-height:1.6; align-self:flex-start; text-shadow:0 0 10px rgba(245,158,11,0.3);">NOTE:</span>
+                <div style="flex:1; min-width:0; line-height:1.6;">
                     ${formattedRemarkHtml}
                 </div>
             </div>
 
             <!-- Footer -->
-            <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; padding:0 4px;">
-                <span style="font-size:8px; font-weight:800; color:${theme.textDim}; text-transform:uppercase;">Record Initialized By</span>
-                <span style="font-size:9px; font-weight:900; color:${isDark ? '#cbd5e1' : '#475569'}; text-transform:uppercase;">${inspector.split('@')[0]}</span>
+            <div style="margin-top:14px; display:flex; justify-content:space-between; align-items:center; padding:0 6px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <div style="width:6px; height:6px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></div>
+                    <span style="font-size:9.5px; font-weight:850; color:${theme.textDim}; text-transform:uppercase; letter-spacing:1.2px;">RECORD INITIALIZED BY</span>
+                </div>
+                <span style="font-size:10.5px; font-weight:900; color:${isDark ? '#f1f5f9' : '#334155'}; text-transform:uppercase; letter-spacing:1px; text-shadow:0 0 10px rgba(255,255,255,0.2);">${inspector.split('@')[0]}</span>
             </div>
 
         </div>
@@ -18682,25 +19996,53 @@ function _openViewModal(id) {
         lightbox.innerHTML = `
             <div class="lightbox-content">
                 <div class="lightbox-toolbar">
-                    <a href="${escapeHtml(safeUrl)}" target="_blank" download="evidence-image.jpg" class="lightbox-btn" title="ดาวน์โหลดรูปภาพขนาดเต็ม" onclick="event.stopPropagation()">
-                        ⬇️ ดาวน์โหลดรูป
-                    </a>
-                    <a href="${escapeHtml(safeUrl)}" target="_blank" class="lightbox-btn" title="เปิดรูปในแท็บใหม่เพื่อดูความละเอียดสูงสุด" onclick="event.stopPropagation()">
-                        🔗 เปิดในแท็บใหม่ (100% HD)
-                    </a>
-                    <button class="lightbox-close" title="ปิดหน้าต่าง (Close)" aria-label="Close Preview">✕</button>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <button class="lightbox-btn" id="lb-zoom-out" title="ซูมออก (−)">🔍−</button>
+                        <button class="lightbox-btn" id="lb-zoom-reset" title="ขนาดจริง (100%)">100%</button>
+                        <button class="lightbox-btn" id="lb-zoom-in" title="ซูมเข้า (+)">🔍+</button>
+                        <button class="lightbox-btn" id="lb-rotate" title="หมุนรูป 90°">🔄 หมุน</button>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <a href="${escapeHtml(safeUrl)}" target="_blank" download="evidence-image.jpg" class="lightbox-btn" title="ดาวน์โหลดรูปภาพขนาดเต็ม" onclick="event.stopPropagation()">
+                            ⬇️ ดาวน์โหลด
+                        </a>
+                        <a href="${escapeHtml(safeUrl)}" target="_blank" class="lightbox-btn" title="เปิดรูปในแท็บใหม่เพื่อดูความละเอียดสูงสุด" onclick="event.stopPropagation()">
+                            🔗 HD แท็บใหม่
+                        </a>
+                        <button class="lightbox-close" title="ปิดหน้าต่าง (Esc)" aria-label="Close Preview">✕</button>
+                    </div>
                 </div>
-                <div class="lightbox-img-wrapper">
-                    <img src="${escapeHtml(safeUrl)}" onerror="handleImgError(this)" class="lightbox-img" alt="Evidence Photo Full Screen" title="รูปภาพหลักฐานขนาดเต็ม">
+                <div class="lightbox-img-wrapper" style="overflow:auto; max-height:82vh; text-align:center;">
+                    <img src="${escapeHtml(safeUrl)}" onerror="handleImgError(this)" id="lb-main-image" class="lightbox-img" alt="Evidence Photo Full Screen" title="รูปภาพหลักฐานขนาดเต็ม" style="transition:transform 0.15s ease; cursor:grab; transform-origin:center center;">
                 </div>
                 <div style="text-align:center; color:white; margin-top:8px;">
-                    <p style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; opacity:0.9; margin:0;">Case Image Preview (Full Screen)</p>
-                    <p style="font-size:10px; opacity:0.6; margin:3px 0 0 0;">กดปุ่ม ✕ หรือคลิกที่ใดก็ได้นอกรูปภาพเพื่อปิด</p>
+                    <p style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; opacity:0.9; margin:0;">Case Image Preview (Full Screen HD)</p>
+                    <p style="font-size:10px; opacity:0.6; margin:3px 0 0 0;">กดปุ่ม ✕ หรือปุ่ม Esc เพื่อปิด | ใช้ปุ่มซูมและหมุนภาพเพื่อตรวจสอบรายละเอียด</p>
                 </div>
             </div>
         `;
 
         document.body.appendChild(lightbox);
+
+        let lbZoom = 1.0;
+        let lbRotation = 0;
+        const imgEl = lightbox.querySelector('#lb-main-image');
+
+        function updateImgTransform() {
+            if (imgEl) {
+                imgEl.style.transform = `scale(${lbZoom}) rotate(${lbRotation}deg)`;
+            }
+        }
+
+        const zIn = lightbox.querySelector('#lb-zoom-in');
+        const zOut = lightbox.querySelector('#lb-zoom-out');
+        const zRes = lightbox.querySelector('#lb-zoom-reset');
+        const rot = lightbox.querySelector('#lb-rotate');
+
+        if (zIn) zIn.onclick = (e) => { e.stopPropagation(); lbZoom = Math.min(4.0, lbZoom + 0.25); updateImgTransform(); };
+        if (zOut) zOut.onclick = (e) => { e.stopPropagation(); lbZoom = Math.max(0.25, lbZoom - 0.25); updateImgTransform(); };
+        if (zRes) zRes.onclick = (e) => { e.stopPropagation(); lbZoom = 1.0; updateImgTransform(); };
+        if (rot) rot.onclick = (e) => { e.stopPropagation(); lbRotation = (lbRotation + 90) % 360; updateImgTransform(); };
 
         requestAnimationFrame(() => {
             lightbox.style.opacity = '1';
@@ -18709,20 +20051,28 @@ function _openViewModal(id) {
         });
 
         const closeLB = () => {
+            document.removeEventListener('keydown', handleEsc);
             lightbox.style.opacity = '0';
             const cnt = lightbox.querySelector('.lightbox-content');
             if (cnt) cnt.style.transform = 'scale(0.95)';
             setTimeout(() => lightbox.remove(), 250);
         };
 
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') closeLB();
+        };
+        document.addEventListener('keydown', handleEsc);
+
         lightbox.onclick = (e) => {
-            if (e.target === lightbox || e.target.classList.contains('lightbox-close') || e.target.classList.contains('lightbox-img-wrapper')) {
+            if (e.target === lightbox || e.target.classList.contains('lightbox-close')) {
                 closeLB();
             }
         };
         const closeBtn = lightbox.querySelector('.lightbox-close');
         if (closeBtn) closeBtn.onclick = closeLB;
     }
+
+    window.openLightbox = _openLightbox;
 
     function setSearch(val) {
         _search = val || '';
@@ -20647,11 +21997,22 @@ function editAttRecord(id) {
 }
 
 
-let _targetValue = 100; // ค่าเริ่มต้น
+let _targetValue = (function() {
+    const saved = localStorage.getItem('wap_ot_target_limit') || localStorage.getItem('carrier_ot_target_hours') || localStorage.getItem('wap_ot_limit_hours');
+    return (saved !== null && !isNaN(parseFloat(saved)) && parseFloat(saved) > 0) ? parseFloat(saved) : 100;
+})();
 
 function updateTarget(val) {
-    _targetValue = parseFloat(val) || 0;
-    updateUI(); // สั่งอัปเดตหน้าจอทันที
+    if (window.WapOTManagement && typeof window.WapOTManagement.updateTarget === 'function') {
+        window.WapOTManagement.updateTarget(val);
+    } else {
+        _targetValue = parseFloat(val) || 0;
+        try {
+            localStorage.setItem('wap_ot_target_limit', String(_targetValue));
+            localStorage.setItem('carrier_ot_target_hours', String(_targetValue));
+            localStorage.setItem('wap_ot_limit_hours', String(_targetValue));
+        } catch(e) {}
+    }
 }
 
 const WapOTManagement = (function() {
@@ -20659,16 +22020,23 @@ const WapOTManagement = (function() {
     let _charts = { trend: null, dist: null };
     let _allRecords = [];      // ข้อมูลดิบทั้งหมดจาก DB
     let _filteredRecords = []; // ข้อมูลที่ผ่านการกรองวันที่แล้ว
-    let _targetValue = 100;    // ค่าเป้าหมายตั้งต้น
+    let _targetValue = (function() {
+        const saved = localStorage.getItem('wap_ot_target_limit') || localStorage.getItem('carrier_ot_target_hours') || localStorage.getItem('wap_ot_limit_hours');
+        return (saved !== null && !isNaN(parseFloat(saved)) && parseFloat(saved) > 0) ? parseFloat(saved) : 100;
+    })();
 
     async function init() {
         // 1. ตั้งค่าวันที่เริ่มต้นในฟอร์มเป็นวันนี้
         const dateInput = $id('ot-f-date');
         if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
         
-        // 2. ดึงค่า Target จาก Input (ถ้ามี)
+        // 2. ดึงค่า Target จาก Storage หรือ Input ให้ตรงกันเสมอ
+        const saved = localStorage.getItem('wap_ot_target_limit') || localStorage.getItem('carrier_ot_target_hours') || localStorage.getItem('wap_ot_limit_hours');
+        if (saved !== null && !isNaN(parseFloat(saved)) && parseFloat(saved) > 0) {
+            _targetValue = parseFloat(saved);
+        }
         const targetIn = $id('ot-target-input');
-        if (targetIn) _targetValue = parseFloat(targetIn.value) || 100;
+        if (targetIn) targetIn.value = _targetValue;
 
         await fetchRecords();
     }
@@ -21254,8 +22622,21 @@ function renderTable() {
 
 // ฟังก์ชันนี้จะถูกเรียกจาก oninput ใน HTML
 function updateTarget(val) {
-    const newTarget = parseFloat(val) || 0;
+    const num = parseFloat(val);
+    const newTarget = (!isNaN(num) && num > 0) ? num : (val === '' ? 0 : 100);
+    _targetValue = newTarget;
     
+    try {
+        localStorage.setItem('wap_ot_target_limit', String(newTarget));
+        localStorage.setItem('carrier_ot_target_hours', String(newTarget));
+        localStorage.setItem('wap_ot_limit_hours', String(newTarget));
+    } catch (e) {}
+
+    const targetIn = $id('ot-target-input');
+    if (targetIn && String(targetIn.value) !== String(newTarget) && val !== '') {
+        targetIn.value = newTarget;
+    }
+
     // อัปเดตเฉพาะส่วน Annotation และแกน Y ของกราฟเดิม ไม่ต้องทำลายกราฟสร้างใหม่ (จะลื่นไหลกว่า)
     if (_charts.trend) {
         _charts.trend.updateOptions({
@@ -21309,11 +22690,6 @@ async function remove(id) {
                 }
             }
         });
-    }
-
-    function updateTarget(val) {
-        _targetValue = parseFloat(val) || 100;
-        updateUI();
     }
 
     return { 
@@ -22669,7 +24045,12 @@ setInterval(enforceMaintenanceMode, 30000);
     if ('serviceWorker' in navigator) {
         try {
             navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('PWA: Service Worker Registered!'))
+                .then(reg => {
+                    console.log('PWA: Service Worker Registered!');
+                    if (reg && typeof reg.update === 'function') {
+                        reg.update().catch(() => {});
+                    }
+                })
                 .catch(err => console.log('PWA: Registration Failed', err));
         } catch (e) {
             console.log('PWA: Registration Error', e);
@@ -29769,6 +31150,8 @@ let tempAvatarBase64 = null; // ตัวแปรพักรูปภาพ
  */
 function renderModalAC(type, inputEl) {
     if (!inputEl || inputEl._suppressAC) return;
+
+    const isDark = document.body.classList.contains('dark-mode') || document.documentElement.classList.contains('dark') || localStorage.getItem('carrier_theme') === 'dark';
     
     // 1. ปิดดรอปดาวน์ตัวอื่นทั้งหมดในหน้าจอทันที เพื่อให้แสดงเฉพาะช่องล่าสุดที่คลิกเสมอ
     document.querySelectorAll('.modal-ac-dropdown').forEach(dd => {
@@ -29789,11 +31172,19 @@ function renderModalAC(type, inputEl) {
     wrap.style.position = 'relative';
     wrap.style.zIndex = '999999';
 
+    const isAlreadyOpen = (dd.style.display === 'block');
+    if (isAlreadyOpen) {
+        dd.classList.add('no-anim');
+    } else {
+        dd.classList.remove('no-anim');
+    }
+
     dd.style.cssText = `
-        position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: min(420px, calc(100vw - 32px));
-        max-height: 290px; overflow-y: auto; background: #ffffff;
+        position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: min(440px, calc(100vw - 32px));
+        max-height: 290px; overflow-y: auto; background: ${isDark ? '#0f172a' : '#ffffff'};
         border: 1.5px solid #3b82f6; border-radius: 12px;
-        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.3), 0 4px 12px rgba(0, 0, 0, 0.12); z-index: 9999999; display: none;
+        box-shadow: ${isDark ? '0 20px 45px rgba(0, 0, 0, 0.75), 0 0 20px rgba(59, 130, 246, 0.25)' : '0 20px 45px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(0, 0, 0, 0.1)'};
+        z-index: 9999999; display: ${isAlreadyOpen ? 'block' : 'none'};
     `;
 
     // Smart right-alignment if near right edge of screen OR near right edge of modal/form container
@@ -29814,6 +31205,12 @@ function renderModalAC(type, inputEl) {
 
     const query = inputEl.value.trim().toLowerCase();
     let htmlContent = '';
+
+    const itemTextColor = isDark ? '#f8fafc' : '#1e293b';
+    const itemSubColor = isDark ? '#94a3b8' : '#64748b';
+    const itemBorder = isDark ? 'rgba(255,255,255,0.07)' : '#f1f5f9';
+    const hoverBg = isDark ? 'rgba(37,99,235,0.35)' : '#eff6ff';
+    const hoverColor = isDark ? '#93c5fd' : '#1d4ed8';
 
     // ============================================================
     // ✍️ กรณีการลงนาม (Sign-off): ISSUE BY | CONFIRM BY | APPROVED BY
@@ -29934,15 +31331,15 @@ function renderModalAC(type, inputEl) {
             return `
                 <div class="modal-ac-item" 
                      data-value="${prefixedName.replace(/"/g, '&quot;')}"
-                     style="padding: 10px 14px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s;"
-                     onmouseenter="this.style.background='#eff6ff'; this.style.color='#1d4ed8';"
-                     onmouseleave="this.style.background='transparent'; this.style.color='#1e293b';"
+                     style="padding: 10px 14px; font-size: 11.5px; font-weight: 700; color: ${itemTextColor}; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid ${itemBorder}; transition: background 0.12s, color 0.12s;"
+                     onmouseenter="this.style.background='${hoverBg}'; this.style.color='${hoverColor}';"
+                     onmouseleave="this.style.background='transparent'; this.style.color='${itemTextColor}';"
                      onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('staff', '${prefixedName.replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
                     <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
-                        <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: #0f172a; white-space: nowrap;">
+                        <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: ${itemTextColor}; white-space: nowrap;">
                             <span>${icon}</span> ${prefixedName}
                         </span>
-                        <span style="font-size: 9px; color: #64748b; padding-left: 18px; font-family: monospace; overflow: hidden; text-overflow: ellipsis;">${finalEmail}</span>
+                        <span style="font-size: 9px; color: ${itemSubColor}; padding-left: 18px; font-family: monospace; overflow: hidden; text-overflow: ellipsis;">${finalEmail}</span>
                     </div>
                     <span style="font-size: 8px; background: ${color}; color: #fff; padding: 2px 7px; border-radius: 4px; font-weight: 900; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;">
                         ${label}
@@ -29957,9 +31354,9 @@ function renderModalAC(type, inputEl) {
             const matrixTitle = isRP 
                 ? "🔬 IQC ENGINEER (ผู้จัดทำรายงาน RP: ตาม VENDOR MATRIX)" 
                 : "⚙️ SQE ENGINEER (ผู้จัดทำรายงาน VF: ตาม VENDOR MATRIX)";
-            const headerColor = isRP ? "#0284c7" : "#2563eb";
-            const headerBg = isRP ? "#f0f9ff" : "#eff6ff";
-            const headerBorder = isRP ? "#bae6fd" : "#bfdbfe";
+            const headerColor = isDark ? "#93c5fd" : (isRP ? "#0284c7" : "#2563eb");
+            const headerBg = isDark ? "rgba(30, 41, 59, 0.9)" : (isRP ? "#f0f9ff" : "#eff6ff");
+            const headerBorder = isDark ? "rgba(59, 130, 246, 0.35)" : (isRP ? "#bae6fd" : "#bfdbfe");
 
             htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${headerColor}; background: ${headerBg}; border-bottom: 1.5px solid ${headerBorder}; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between;">
                 <span>${matrixTitle}</span>
@@ -29988,9 +31385,9 @@ function renderModalAC(type, inputEl) {
 
             if (renderedCount === 0) {
                 htmlContent += `
-                    <div style="padding: 12px 14px; font-size: 11px; color: #991b1b; background: #fef2f2; border: 1px dashed #f87171; border-radius: 8px; margin: 4px; text-align: center;">
+                    <div style="padding: 12px 14px; font-size: 11px; color: ${isDark ? '#fca5a5' : '#991b1b'}; background: ${isDark ? 'rgba(153, 27, 27, 0.2)' : '#fef2f2'}; border: 1px dashed ${isDark ? '#ef4444' : '#f87171'}; border-radius: 8px; margin: 4px; text-align: center;">
                         <div style="font-weight: 800; font-size: 11.5px; margin-bottom: 2px;">⚠️ ไม่พบวิศวกรผู้จัดทำสำหรับ Vendor: <strong>${vendorName || 'ยังไม่ระบุ'}</strong></div>
-                        <div style="font-size: 10px; color: #64748b;">
+                        <div style="font-size: 10px; color: ${itemSubColor};">
                             เอกสาร: <strong>${isRP ? 'RP (IQC Engineer)' : 'VF (SQE Engineer)'}</strong><br>
                             กรุณากำหนดรายชื่อใน Approval Matrix (Admin User Control)
                         </div>
@@ -30005,9 +31402,9 @@ function renderModalAC(type, inputEl) {
             const title = isRP 
                 ? "🟢 CONFIRM RP (ผู้ยืนยันรายงาน RP: ตาม VENDOR MATRIX)" 
                 : "🔵 CONFIRM VF (ผู้ยืนยันรายงาน VF: ตาม VENDOR MATRIX)";
-            const color = isRP ? "#059669" : "#1e40af";
-            const bg = isRP ? "#f0fdf4" : "#eff6ff";
-            const border = isRP ? "#bbf7d0" : "#bfdbfe";
+            const color = isRP ? (isDark ? "#34d399" : "#059669") : (isDark ? "#60a5fa" : "#1e40af");
+            const bg = isDark ? "rgba(30, 41, 59, 0.9)" : (isRP ? "#f0fdf4" : "#eff6ff");
+            const border = isDark ? "rgba(59, 130, 246, 0.35)" : (isRP ? "#bbf7d0" : "#bfdbfe");
 
             htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: ${bg}; border-bottom: 1.5px solid ${border}; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between;">
                 <span>🛡️ ${title}</span>
@@ -30036,9 +31433,9 @@ function renderModalAC(type, inputEl) {
 
             if (renderedCount === 0) {
                 htmlContent += `
-                    <div style="padding: 12px 14px; font-size: 11px; color: #991b1b; background: #fef2f2; border: 1px dashed #f87171; border-radius: 8px; margin: 4px; text-align: center;">
+                    <div style="padding: 12px 14px; font-size: 11px; color: ${isDark ? '#fca5a5' : '#991b1b'}; background: ${isDark ? 'rgba(153, 27, 27, 0.2)' : '#fef2f2'}; border: 1px dashed ${isDark ? '#ef4444' : '#f87171'}; border-radius: 8px; margin: 4px; text-align: center;">
                         <div style="font-weight: 800; font-size: 11.5px; margin-bottom: 2px;">⚠️ ไม่พบผู้ยืนยันสำหรับ Vendor: <strong>${vendorName || 'ยังไม่ระบุ'}</strong></div>
-                        <div style="font-size: 10px; color: #64748b;">
+                        <div style="font-size: 10px; color: ${itemSubColor};">
                             เอกสาร: <strong>${isRP ? 'Confirm RP (Return Part)' : 'Confirm VF (Vendor Failure)'}</strong><br>
                             กรุณากำหนดรายชื่อใน Approval Matrix (Admin User Control)
                         </div>
@@ -30053,9 +31450,9 @@ function renderModalAC(type, inputEl) {
             const title = isRP 
                 ? "🟢 APPROVE RP (ผู้อนุมัติรายงาน RP: ตาม VENDOR MATRIX)" 
                 : "🔵 APPROVE VF (ผู้อนุมัติรายงาน VF: ตาม VENDOR MATRIX)";
-            const color = isRP ? "#059669" : "#1e40af";
-            const bg = isRP ? "#f0fdf4" : "#eff6ff";
-            const border = isRP ? "#bbf7d0" : "#bfdbfe";
+            const color = isRP ? (isDark ? "#34d399" : "#059669") : (isDark ? "#60a5fa" : "#1e40af");
+            const bg = isDark ? "rgba(30, 41, 59, 0.9)" : (isRP ? "#f0fdf4" : "#eff6ff");
+            const border = isDark ? "rgba(59, 130, 246, 0.35)" : (isRP ? "#bbf7d0" : "#bfdbfe");
 
             htmlContent += `<div style="padding: 7px 12px; font-size: 9.5px; font-weight: 950; color: ${color}; background: ${bg}; border-bottom: 1.5px solid ${border}; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between;">
                 <span>👑 ${title}</span>
@@ -30100,9 +31497,9 @@ function renderModalAC(type, inputEl) {
 
             if (renderedCount === 0) {
                 htmlContent += `
-                    <div style="padding: 12px 14px; font-size: 11px; color: #991b1b; background: #fef2f2; border: 1px dashed #f87171; border-radius: 8px; margin: 4px; text-align: center;">
+                    <div style="padding: 12px 14px; font-size: 11px; color: ${isDark ? '#fca5a5' : '#991b1b'}; background: ${isDark ? 'rgba(153, 27, 27, 0.2)' : '#fef2f2'}; border: 1px dashed ${isDark ? '#ef4444' : '#f87171'}; border-radius: 8px; margin: 4px; text-align: center;">
                         <div style="font-weight: 800; font-size: 11.5px; margin-bottom: 2px;">⚠️ ไม่พบผู้อนุมัติสำหรับ Vendor: <strong>${vendorName || 'ยังไม่ระบุ'}</strong></div>
-                        <div style="font-size: 10px; color: #64748b;">
+                        <div style="font-size: 10px; color: ${itemSubColor};">
                             เอกสาร: <strong>${isRP ? 'Approve RP (Return Part)' : 'Approve VF (Vendor Failure)'}</strong><br>
                             กรุณากำหนดรายชื่อใน Approval Matrix (Admin User Control)
                         </div>
@@ -30199,61 +31596,62 @@ function renderModalAC(type, inputEl) {
         } else if (typeLower === 'report') {
             source = ["VF Report", "RP Report", "Records"];
         }
-// เพิ่มเงื่อนไขนี้เข้าไปในฟังก์ชัน renderModalAC
-if (type === 'commander') {
-    const allStaffNames = new Set();
 
-    // 1. ดึงจากพนักงานที่ลงทะเบียนไว้ใน Master
-    if (typeof MASTER_STAFF_USERS !== 'undefined') {
-        MASTER_STAFF_USERS.forEach(u => { if(u.name) allStaffNames.add(u.name.trim()); });
-    }
+        if (type === 'commander') {
+            const allStaffNames = new Set();
 
-    // 2. ดึงจาก Agents ที่ Admin เพิ่มใหม่ (ดึงสดจากหน่วยความจำหน้า Admin)
-    if (window.WapAdminSystem && window.WapAdminSystem._data && window.WapAdminSystem._data.users) {
-        window.WapAdminSystem._data.users.forEach(u => {
-            const name = (u.display_name || u.name || "").trim();
-            if (name) allStaffNames.add(name);
-        });
-    }
+            // 1. ดึงจากพนักงานที่ลงทะเบียนไว้ใน Master
+            if (typeof MASTER_STAFF_USERS !== 'undefined') {
+                MASTER_STAFF_USERS.forEach(u => { if(u.name) allStaffNames.add(u.name.trim()); });
+            }
 
-    const list = Array.from(allStaffNames).sort();
-    // กรองตามที่พิมพ์ (ถ้ามี)
-    const matched = query ? list.filter(v => v.toLowerCase().includes(query)) : list;
+            // 2. ดึงจาก Agents ที่ Admin เพิ่มใหม่ (ดึงสดจากหน่วยความจำหน้า Admin)
+            if (window.WapAdminSystem && window.WapAdminSystem._data && window.WapAdminSystem._data.users) {
+                window.WapAdminSystem._data.users.forEach(u => {
+                    const name = (u.display_name || u.name || "").trim();
+                    if (name) allStaffNames.add(name);
+                });
+            }
 
-    if (matched.length > 0) {
-        htmlContent = matched.map((v, idx) => `
-            <div class="modal-ac-item" 
-                 data-value="${v.replace(/"/g, '&quot;')}"
-                 style="padding: 10px 14px; font-size: 11.5px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.12s ease;"
-                 onmouseenter="this.style.background='#eff6ff'; this.style.color='#1d4ed8';"
-                 onmouseleave="this.style.background='transparent'; this.style.color='#1e293b';"
-                 onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('commander', '${v.replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                <span style="margin-right:8px;">👤</span> ${v}
-            </div>
-        `).join('');
-    }
-}
-        // กรองและเรียงลำดับ
-        let matched = query ? source.filter(v => v && v.toString().toLowerCase().includes(query)) : source;
-        matched.sort((a, b) => {
-            if (!query) return 0;
-            const aStart = a.toString().toLowerCase().startsWith(query) ? 0 : 1;
-            const bStart = b.toString().toLowerCase().startsWith(query) ? 0 : 1;
-            return aStart - bStart;
-        });
-        matched = matched.slice(0, 18);
+            const list = Array.from(allStaffNames).sort();
+            // กรองตามที่พิมพ์ (ถ้ามี)
+            const matched = query ? list.filter(v => v.toLowerCase().includes(query)) : list;
 
-        if (matched.length > 0) {
-            htmlContent = matched.map((v, idx) => `
-                <div class="modal-ac-item" 
-                     data-value="${v.toString().replace(/"/g, '&quot;')}"
-                     style="padding: 10px 14px; font-size: 12px; font-weight: 700; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.12s ease; ${idx === 0 ? 'border-top-left-radius: 10px; border-top-right-radius: 10px;' : ''} ${idx === matched.length - 1 ? 'border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; border-bottom: none;' : ''}"
-                     onmouseenter="this.style.background='#eff6ff'; this.style.color='#1d4ed8';"
-                     onmouseleave="this.style.background='transparent'; this.style.color='#1e293b';"
-                     onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('${type}', '${v.toString().replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
-                    ${v}
-                </div>
-            `).join('');
+            if (matched.length > 0) {
+                htmlContent = matched.map((v, idx) => `
+                    <div class="modal-ac-item" 
+                         data-value="${v.replace(/"/g, '&quot;')}"
+                         style="padding: 10px 14px; font-size: 11.5px; font-weight: 700; color: ${itemTextColor}; cursor: pointer; border-bottom: 1px solid ${itemBorder}; transition: all 0.12s ease;"
+                         onmouseenter="this.style.background='${hoverBg}'; this.style.color='${hoverColor}';"
+                         onmouseleave="this.style.background='transparent'; this.style.color='${itemTextColor}';"
+                         onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('commander', '${v.replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                        <span style="margin-right:8px;">👤</span> ${v}
+                    </div>
+                `).join('');
+            }
+        } else {
+            // กรองและเรียงลำดับ
+            let matched = query ? source.filter(v => v && v.toString().toLowerCase().includes(query)) : source;
+            matched.sort((a, b) => {
+                if (!query) return 0;
+                const aStart = a.toString().toLowerCase().startsWith(query) ? 0 : 1;
+                const bStart = b.toString().toLowerCase().startsWith(query) ? 0 : 1;
+                return aStart - bStart;
+            });
+            matched = matched.slice(0, 18);
+
+            if (matched.length > 0) {
+                htmlContent = matched.map((v, idx) => `
+                    <div class="modal-ac-item" 
+                         data-value="${v.toString().replace(/"/g, '&quot;')}"
+                         style="padding: 10px 14px; font-size: 12px; font-weight: 700; color: ${itemTextColor}; cursor: pointer; border-bottom: 1px solid ${itemBorder}; transition: all 0.12s ease; ${idx === 0 ? 'border-top-left-radius: 10px; border-top-right-radius: 10px;' : ''} ${idx === matched.length - 1 ? 'border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; border-bottom: none;' : ''}"
+                         onmouseenter="this.style.background='${hoverBg}'; this.style.color='${hoverColor}';"
+                         onmouseleave="this.style.background='transparent'; this.style.color='${itemTextColor}';"
+                         onmousedown="event.preventDefault(); event.stopPropagation(); applyModalAC('${type}', '${v.toString().replace(/'/g, "\\'").replace(/"/g, '&quot;')}', document.getElementById('${inputEl.id}'))">
+                        ${v}
+                    </div>
+                `).join('');
+            }
         }
     }
 
@@ -30828,10 +32226,10 @@ function formatDetailSentence(c) {
     if (/^IQC incoming inspection/i.test(cleanTitle)) {
         const iqcMatch = cleanTitle.match(/\.?\s*(IQC judgement rejected q'ty.*?)$/i);
         const iqcSuffix = iqcMatch ? `. ${iqcMatch[1]}` : '';
-        return `IQC incoming inspection found problem about <span style="color:#2563eb; font-weight: 900;">${partDetail}</span> <span style="color:red; font-weight:900;">${defectStr}</span>${iqcSuffix}`;
+        return `IQC incoming inspection found problem about <span style="color:#0000FF !important; font-weight: 900;">${partDetail}</span> <span style="color:#FF0000 !important; font-weight:900;">${defectStr}</span>${iqcSuffix}`;
     }
 
-    return `On <span style="color:#2563eb; font-weight: 900;">${dateStr}</span> inform quality problem about <span style="color:#2563eb; font-weight: 900;">${partDetail}</span> found defect <span style="color:red; font-weight:900;">${defectStr}</span>`;
+    return `On <span style="color:#0000FF !important; font-weight: 900;">${dateStr}</span> inform quality problem about <span style="color:#0000FF !important; font-weight: 900;">${partDetail}</span> found defect <span style="color:#FF0000 !important; font-weight:900;">${defectStr}</span>`;
 }
 
 function parseProblemTitleForD2(rawTitle, caseData = {}) {
@@ -36456,14 +37854,14 @@ else if (_currentSlide === 3) {
     }
 
     mainContent = `
-        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%;">
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; color: #000000 !important;">
             <!-- 1. Header -->
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 5px; flex-shrink: 0;">
-                    <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000; outline: none; letter-spacing: -1.5px; line-height: 1;">
-                        D2-Define the Problem <span style="color:#003366; font-size: 24px; font-weight: 700;">[Further Detail]</span>
+                    <h1 contenteditable="true" style="font-size: 38px; font-weight: 950; margin: 0; color: #000000 !important; outline: none; letter-spacing: -1.5px; line-height: 1;">
+                        D2-Define the Problem <span style="color:#003366 !important; font-size: 24px; font-weight: 700;">[Further Detail]</span>
                     </h1>
                     
-                    <div contenteditable="true" style="background: #0000FF; color: #FFFF00; padding: 3px 12px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1;">
+                    <div contenteditable="true" style="background: #0000FF; color: #FFFF00 !important; padding: 3px 12px; font-weight: 950; font-size: 14px; border: 1.5px solid #000; text-transform: uppercase; outline: none; margin-bottom: 5px; line-height: 1;">
                         &lt;Fill by CTC &gt;
                     </div>
                 </div>
@@ -36486,16 +37884,16 @@ else if (_currentSlide === 3) {
                         
                         <!-- Block: Detail (ข้อมูลเบื้องต้น) -->
                         <div>
-                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">DETAIL</h3>
-                            <p contenteditable="true" style="font-size: 15px; color: #000; line-height: 1.5; outline: none; margin: 0; font-weight: 600;">
+                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; color: #000000 !important; border-bottom: 3.5px solid #003366; display: inline-block; outline: none; text-transform: uppercase; letter-spacing: 0.5px;">DETAIL</h3>
+                            <p contenteditable="true" style="font-size: 15px; color: #000000 !important; line-height: 1.55; outline: none; margin: 0; font-weight: 600;">
                                 ${formatDetailSentence(c)}
                             </p>
                         </div>
 
                         <!-- Block: TEMPORARY ACTIONS -->
                         <div>
-                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; border-bottom: 3px solid #003366; display: inline-block; outline: none; text-transform: uppercase;">TEMPORARY ACTIONS</h3>
-                            <div contenteditable="true" style="font-size: 14px; color: #1e293b; line-height: 1.6; outline: none; font-weight: 600;">
+                            <h3 contenteditable="true" style="font-size: 18px; font-weight: 950; margin: 0 0 8px 0; color: #000000 !important; border-bottom: 3.5px solid #003366; display: inline-block; outline: none; text-transform: uppercase; letter-spacing: 0.5px;">TEMPORARY ACTIONS</h3>
+                            <div contenteditable="true" style="font-size: 14.5px; color: #000000 !important; line-height: 1.65; outline: none; font-weight: 600;">
                                 ${tempActionContent}
                             </div>
                         </div>

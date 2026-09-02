@@ -73,7 +73,25 @@
     </script>
 
     <!-- 4. Local Stylesheet -->
-    <link rel="stylesheet" href="styles.css?v=20260901_2">
+    <link rel="stylesheet" href="styles.css?v=3.5.0">
+    <script>
+        // Automatic Service Worker version synchronization & cache flush
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                console.log('⚡ New Service Worker activated, reloading for latest build...');
+            });
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.getRegistration().then(reg => {
+                    if (reg) {
+                        reg.update();
+                        if (reg.waiting) {
+                            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                    }
+                }).catch(() => {});
+            });
+        }
+    </script>
     <style>
         /* ApexCharts Tooltip Universal Adaptive Styling */
         .apexcharts-tooltip,
@@ -397,17 +415,38 @@
         /* Color popover */
         .annotator-color-popover {
             position: absolute !important;
-            top: 48px !important;
+            top: 46px !important;
             left: 50% !important;
             transform: translateX(-50%) !important;
             background: #0f172a !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
-            padding: 8px 10px !important;
-            border-radius: 14px !important;
+            border: 1.5px solid rgba(255, 255, 255, 0.18) !important;
+            padding: 10px !important;
+            border-radius: 16px !important;
+            display: none !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 20px rgba(0, 0, 0, 0.5) !important;
+            z-index: 100 !important;
+            min-width: 170px !important;
+            backdrop-filter: blur(20px) !important;
+            animation: popoverFadeIn 0.15s ease-out !important;
+        }
+
+        .annotator-color-popover.show {
             display: flex !important;
-            gap: 6px !important;
-            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7) !important;
-            z-index: 50 !important;
+        }
+
+        @keyframes popoverFadeIn {
+            from { opacity: 0; transform: translate(-50%, -6px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        .annotator-color-grid {
+            display: grid !important;
+            grid-template-columns: repeat(5, 24px) !important;
+            gap: 8px !important;
+            justify-content: center !important;
+            align-items: center !important;
         }
 
         .color-swatch {
@@ -420,6 +459,207 @@
         }
         .color-swatch:hover { transform: scale(1.2) !important; }
         .color-swatch.active { border-color: #ffffff !important; box-shadow: 0 0 8px rgba(255,255,255,0.6) !important; }
+
+        /* Dark Mode High-Contrast Overrides for Special Mission & 8D Report Toggles */
+        .dark-mode .special-mission-label,
+        .dark .special-mission-label,
+        body.dark-mode .special-mission-label {
+            color: #f8fafc !important;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .dark-mode .d8-report-label,
+        .dark .d8-report-label,
+        body.dark-mode .d8-report-label {
+            color: #f8fafc !important;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .dark-mode #sync-container,
+        .dark #sync-container,
+        body.dark-mode #sync-container {
+            background: rgba(59, 130, 246, 0.16) !important;
+            border-color: rgba(96, 165, 250, 0.6) !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+        }
+
+        .dark-mode #8d-container,
+        .dark #8d-container,
+        body.dark-mode #8d-container {
+            background: rgba(225, 29, 72, 0.16) !important;
+            border-color: rgba(251, 113, 133, 0.6) !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+        }
+
+        .dark-mode .toggle-icon-badge,
+        .dark .toggle-icon-badge,
+        body.dark-mode .toggle-icon-badge {
+            background: #1e293b !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        }
+
+        /* Tool text labels in Annotator Toolbar */
+        .annotator-pill-btn .tool-label {
+            margin-left: 4px;
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        /* ============================================================
+           🌟 HIGH-PRECISION FULLSCREEN LIGHTBOX VIEWER
+           ============================================================ */
+        .lightbox-overlay {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 9999999 !important;
+            background: rgba(3, 7, 18, 0.95) !important;
+            backdrop-filter: blur(24px) saturate(180%) !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding: 16px !important;
+            opacity: 0;
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            font-family: 'Plus Jakarta Sans', 'Prompt', -apple-system, sans-serif !important;
+            user-select: none !important;
+        }
+
+        .lightbox-content {
+            width: 100% !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            position: relative !important;
+            transform: scale(0.96);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+
+        .lightbox-toolbar {
+            width: 100% !important;
+            max-width: 960px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding: 6px 14px !important;
+            background: rgba(15, 23, 42, 0.88) !important;
+            backdrop-filter: blur(16px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.14) !important;
+            border-radius: 9999px !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+            z-index: 20 !important;
+            flex-shrink: 0 !important;
+            gap: 8px !important;
+            flex-wrap: wrap !important;
+        }
+
+        .lightbox-btn-group {
+            display: flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+        }
+
+        .lightbox-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 5px !important;
+            padding: 5px 12px !important;
+            border-radius: 9999px !important;
+            font-size: 11.5px !important;
+            font-weight: 700 !important;
+            color: #cbd5e1 !important;
+            background: rgba(255, 255, 255, 0.07) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            text-decoration: none !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease !important;
+            white-space: nowrap !important;
+        }
+
+        .lightbox-btn:hover {
+            background: rgba(255, 255, 255, 0.18) !important;
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.28) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        .lightbox-zoom-display {
+            color: #38bdf8 !important;
+            font-size: 11.5px !important;
+            font-weight: 800 !important;
+            font-family: 'DM Mono', monospace !important;
+            min-width: 48px !important;
+            text-align: center !important;
+        }
+
+        .lightbox-close {
+            width: 30px !important;
+            height: 30px !important;
+            border-radius: 50% !important;
+            background: rgba(239, 68, 68, 0.2) !important;
+            color: #fca5a5 !important;
+            border: 1px solid rgba(239, 68, 68, 0.4) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 13px !important;
+            font-weight: 900 !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease !important;
+            flex-shrink: 0 !important;
+        }
+
+        .lightbox-close:hover {
+            background: #ef4444 !important;
+            color: #ffffff !important;
+            transform: scale(1.1) !important;
+        }
+
+        .lightbox-img-wrapper {
+            flex: 1 !important;
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            position: relative !important;
+            overflow: hidden !important;
+            cursor: grab !important;
+        }
+
+        .lightbox-img-wrapper.grabbing {
+            cursor: grabbing !important;
+        }
+
+        .lightbox-img {
+            max-width: 94vw !important;
+            max-height: 76vh !important;
+            object-fit: contain !important;
+            border-radius: 8px !important;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 40px rgba(0, 0, 0, 0.5) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            transition: transform 0.05s linear !important;
+            transform-origin: center center !important;
+            user-select: none !important;
+            pointer-events: auto !important;
+        }
+
+        .lightbox-footer {
+            text-align: center !important;
+            color: white !important;
+            padding: 6px 16px !important;
+            background: rgba(15, 23, 42, 0.78) !important;
+            border-radius: 9999px !important;
+            backdrop-filter: blur(10px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            margin-top: 6px !important;
+            z-index: 20 !important;
+            flex-shrink: 0 !important;
+        }
 
         /* ============================================================
            🖼️ MULTI-IMAGE EVIDENCE GRID & ADD-SLOT GEOMETRY
@@ -567,9 +807,11 @@
         }
 
         /* ============================================================
-           ✍️ MODAL & AUTO-COMPLETE DROPDOWN STYLING (ALWAYS ON TOP)
+           ✍️ MODAL & AUTO-COMPLETE DROPDOWN STYLING (THEMED & NO FLICKER)
            ============================================================ */
-        .modal-ac-dropdown {
+        .modal-ac-dropdown,
+        .ac-dropdown,
+        #sup-part-ac {
             position: absolute !important;
             top: calc(100% + 4px) !important;
             max-height: 290px !important;
@@ -577,13 +819,67 @@
             background: #ffffff !important;
             border: 1.5px solid #3b82f6 !important;
             border-radius: 12px !important;
-            box-shadow: 0 20px 40px -4px rgba(15, 23, 42, 0.25), 0 0 16px rgba(59, 130, 246, 0.18) !important;
+            box-shadow: 0 20px 40px -4px rgba(15, 23, 42, 0.22), 0 0 16px rgba(59, 130, 246, 0.15) !important;
             z-index: 999999 !important;
-            animation: modalACFade 0.12s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+            animation: modalACFade 0.08s ease-out !important;
         }
 
-        .ac-dropdown {
-            z-index: 999999 !important;
+        body.dark-mode .modal-ac-dropdown,
+        [data-theme="dark"] .modal-ac-dropdown,
+        body.dark-mode .ac-dropdown,
+        [data-theme="dark"] .ac-dropdown,
+        body.dark-mode #sup-part-ac,
+        [data-theme="dark"] #sup-part-ac {
+            background: #0f172a !important;
+            border: 1.5px solid #3b82f6 !important;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.7), 0 0 20px rgba(59, 130, 246, 0.25) !important;
+            scrollbar-color: #334155 transparent;
+        }
+
+        .modal-ac-item,
+        .ac-item {
+            padding: 10px 14px;
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #1e293b !important;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.12s ease, color 0.12s ease;
+        }
+
+        .modal-ac-item:hover,
+        .modal-ac-item.active,
+        .ac-item:hover,
+        .ac-item.active {
+            background: #eff6ff !important;
+            color: #1d4ed8 !important;
+        }
+
+        body.dark-mode .modal-ac-item,
+        [data-theme="dark"] .modal-ac-item,
+        body.dark-mode .ac-item,
+        [data-theme="dark"] .ac-item {
+            color: #f1f5f9 !important;
+            border-bottom-color: rgba(255, 255, 255, 0.07) !important;
+        }
+
+        body.dark-mode .modal-ac-item:hover,
+        body.dark-mode .modal-ac-item.active,
+        body.dark-mode .ac-item:hover,
+        body.dark-mode .ac-item.active,
+        [data-theme="dark"] .modal-ac-item:hover,
+        [data-theme="dark"] .modal-ac-item.active,
+        [data-theme="dark"] .ac-item:hover,
+        [data-theme="dark"] .ac-item.active {
+            background: rgba(37, 99, 235, 0.35) !important;
+            color: #93c5fd !important;
+        }
+
+        .modal-ac-dropdown.no-anim,
+        .ac-dropdown.no-anim {
+            animation: none !important;
         }
 
         #login-employee-dropdown,
@@ -847,7 +1143,7 @@
         }
 
         @keyframes modalACFade {
-            from { opacity: 0; transform: translateY(-4px); }
+            from { opacity: 0.3; transform: translateY(-2px); }
             to { opacity: 1; transform: translateY(0); }
         }
     </style>
@@ -3585,7 +3881,7 @@
     </div> <!-- /#dashboard-view -->
 
     <!-- วาง script ไว้ก่อนปิด body เสมอเพื่อให้โหลด DOM เสร็จก่อน -->
-    <script src="vf_rp_seed_rules.js?v=20260901_2"></script>
-    <script src="script.js?v=20260901_2"></script>
+    <script src="vf_rp_seed_rules.js?v=3.6.5"></script>
+    <script src="script.js?v=3.6.5"></script>
 </body>
 </html>
