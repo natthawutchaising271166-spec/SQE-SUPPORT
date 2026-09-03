@@ -614,6 +614,197 @@ window.checkDeepLinkParams = function() {
         };
     } catch (e) { return { caseId: null, mode: null, email: null, ctrl: null }; }
 };
+
+// 📲 รองรับ PWA Launch Queue เมื่อเปิดจากลิงก์ภายนอก (เช่น Outlook/Email) ในแอปที่ติดตั้งแล้ว
+if ('launchQueue' in window && 'files' in window.LaunchParams.prototype === false) {
+    try {
+        window.launchQueue.setConsumer((launchParams) => {
+            if (launchParams && launchParams.targetURL) {
+                console.log("📲 PWA Launch Queue received URL:", launchParams.targetURL);
+                try {
+                    const parsedUrl = new URL(launchParams.targetURL);
+                    if (parsedUrl.search) {
+                        // อัปเดต URL query ปัจจุบันให้ตรงกับ targetURL หากเปิดเข้ามาในหน้าเดิม
+                        window.history.replaceState({}, '', parsedUrl.pathname + parsedUrl.search);
+                        if (typeof window.checkDeepLinkAndAutoLogin === 'function') {
+                            window.checkDeepLinkAndAutoLogin();
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Launch queue URL parse error:", err);
+                }
+            }
+        });
+    } catch (e) {
+        console.warn("LaunchQueue setup:", e);
+    }
+}
+
+// ============================================================
+// 🖥️ BROWSER FULLSCREEN API CONTROLLER & MOBILE AUTO-EXPANDER
+// ============================================================
+const FullScreenManager = {
+    isMobile() {
+        const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+        const isSmallScreen = window.innerWidth <= 1024;
+        return (isMobileUA || (isTouch && isSmallScreen));
+    },
+
+    isFullScreen() {
+        return !!(
+            document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement
+        );
+    },
+
+    async requestFullScreen(targetElement = document.documentElement) {
+        try {
+            if (this.isFullScreen()) return true;
+            
+            const elem = targetElement || document.documentElement;
+            if (elem.requestFullscreen) {
+                await elem.requestFullscreen({ navigationUI: 'hide' }).catch(() => elem.requestFullscreen());
+            } else if (elem.webkitRequestFullscreen) {
+                await elem.webkitRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) {
+                await elem.mozRequestFullScreen();
+            } else if (elem.msRequestFullscreen) {
+                await elem.msRequestFullscreen();
+            }
+            this.updateUI();
+            return true;
+        } catch (err) {
+            console.warn("Fullscreen request error/permission:", err);
+            return false;
+        }
+    },
+
+    async exitFullScreen() {
+        try {
+            if (!this.isFullScreen()) return true;
+            
+            if (document.exitFullscreen) {
+                await document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                await document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                await document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                await document.msExitFullscreen();
+            }
+            this.updateUI();
+            return true;
+        } catch (err) {
+            console.warn("Fullscreen exit error:", err);
+            return false;
+        }
+    },
+
+    async toggle(targetElement = document.documentElement) {
+        if (this.isFullScreen()) {
+            await this.exitFullScreen();
+            if (typeof toast === 'function') toast("🖥️ ออกจากโหมดเต็มจอ (Exited Fullscreen)", "info");
+            return false;
+        } else {
+            const success = await this.requestFullScreen(targetElement);
+            if (success && typeof toast === 'function') {
+                toast("📱 เปิดการแสดงผลเต็มจอ (Full-Screen Enabled)", "success");
+            }
+            return true;
+        }
+    },
+
+    updateUI() {
+        const isFS = this.isFullScreen();
+        const btns = document.querySelectorAll('.btn-fullscreen-toggle, #fullscreen-toggle-btn');
+        btns.forEach(btn => {
+            if (!btn) return;
+            const iconSvg = isFS
+                ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>`
+                : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`;
+            btn.innerHTML = iconSvg;
+            btn.setAttribute('title', isFS ? 'ออกจากโหมดเต็มจอ (Exit Fullscreen)' : 'เปิดโหมดเต็มจอ (Enter Fullscreen)');
+            if (isFS) {
+                btn.classList.add('text-blue-500', 'bg-blue-50', 'dark:bg-blue-900/30');
+                btn.classList.remove('text-slate-400');
+            } else {
+                btn.classList.remove('text-blue-500', 'bg-blue-50', 'dark:bg-blue-900/30');
+                btn.classList.add('text-slate-400');
+            }
+        });
+    },
+
+    // 🚀 ออโต้ขยายเต็มจอบนมือถือเมื่อเปิดจากอีเมลลิงก์ (Auto-Expand Fullscreen on Mobile Deep-Links)
+    initAutoMobileFullScreen() {
+        const linkParams = (typeof window.checkDeepLinkParams === 'function') ? window.checkDeepLinkParams() : null;
+        const isFromEmailLink = !!(linkParams && (linkParams.caseId || linkParams.email || linkParams.ctrl || linkParams.mode));
+        
+        if (!isFromEmailLink && !window.location.search) return;
+        if (!this.isMobile()) return;
+
+        console.log("📱 Mobile deep-link detected: Arming automatic full-screen trigger...");
+
+        // พยายามสั่งเปิดทันที (หากเบราว์เซอร์อนุญาต)
+        this.requestFullScreen().catch(() => {});
+
+        // ติดตั้ง Trigger บนการสัมผัสหรือคลิกแรกของผู้ใช้ (One-time User Gesture Handler)
+        // เพื่อให้สอดคล้องกับข้อกำหนด User Activation ของ Mobile Browsers
+        const armFullScreenGesture = () => {
+            if (!this.isFullScreen()) {
+                this.requestFullScreen().then(success => {
+                    if (success && typeof toast === 'function') {
+                        toast("📱 ปรับการแสดงผลเป็นโหมดเต็มจอสำหรับมือถือเรียบร้อย", "info");
+                    }
+                }).catch(() => {});
+            }
+            window.removeEventListener('touchstart', armFullScreenGesture, { capture: true });
+            window.removeEventListener('pointerdown', armFullScreenGesture, { capture: true });
+            window.removeEventListener('click', armFullScreenGesture, { capture: true });
+        };
+
+        window.addEventListener('touchstart', armFullScreenGesture, { capture: true, once: true });
+        window.addEventListener('pointerdown', armFullScreenGesture, { capture: true, once: true });
+        window.addEventListener('click', armFullScreenGesture, { capture: true, once: true });
+    }
+};
+
+// Global helper functions
+function toggleFullScreen(targetElement) {
+    return FullScreenManager.toggle(targetElement);
+}
+
+function requestFullScreen(targetElement) {
+    return FullScreenManager.requestFullScreen(targetElement);
+}
+
+function exitFullScreen() {
+    return FullScreenManager.exitFullScreen();
+}
+
+function isFullScreenActive() {
+    return FullScreenManager.isFullScreen();
+}
+
+// Attach immediately to window for inline HTML onclick handlers
+if (typeof window !== 'undefined') {
+    window.FullScreenManager = FullScreenManager;
+    window.toggleFullScreen = toggleFullScreen;
+    window.requestFullScreen = requestFullScreen;
+    window.exitFullScreen = exitFullScreen;
+    window.isFullScreenActive = isFullScreenActive;
+}
+
+// ผูก Event Listener ตรวจจับการเปลี่ยนแปลง Fullscreen ของเบราว์เซอร์
+['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evtName => {
+    document.addEventListener(evtName, () => {
+        FullScreenManager.updateUI();
+    });
+});
+
 /* --- หลังจากนี้จึงตามด้วย Code ส่วนที่เหลือของคุณ --- */
 // -------------------------------------
 const VENDOR_MASTER = {
@@ -4852,437 +5043,6 @@ window.generateSignatureSvgDataUrl = generateSignatureSvgDataUrl;
 window.getStaffSignatureImage = getStaffSignatureImage;
 window.SIG_LIBRARY = SIG_LIBRARY;
 
-// ============================================================
-// CALIBRATION INSTRUMENT IMAGE DATABASE (Auto-Fetch from assetsinstruments/)
-// ============================================================
-const resolveInstrumentAssetUrl = (assetPath) => {
-    if (!assetPath || typeof assetPath !== 'string') return '';
-    const trimmed = assetPath.trim();
-    if (!trimmed) return '';
-    if (trimmed.startsWith('data:') || /^https?:\/\//i.test(trimmed)) return trimmed;
-
-    try {
-        if (window.location && window.location.protocol === 'file:') {
-            return new URL(trimmed.startsWith('./') ? trimmed : './' + trimmed, window.location.href).href;
-        }
-    } catch (err) {
-        console.warn('[Instrument Asset Resolver]', err);
-    }
-
-    return trimmed;
-};
-
-const INSTRUMENT_IMAGE_MAP = {
-    // ============================================================
-    // 1. DIAL GAUGES / PROBES / BASIC MEASUREMENT
-    // ============================================================
-    "DG-12M-003": "./assetsinstruments/DG-12M-003.png",
-    "DG-12M-004": "./assetsinstruments/DG-12M-004.png",
-    "DG-12M-006": "./assetsinstruments/DG-12M-006.png",
-    "DG-12M-007": "./assetsinstruments/DG-12M-007.png",
-    "DG-12M-008": "./assetsinstruments/DG-12M-008.png",
-    "DG-1MM-004": "./assetsinstruments/DG-1MM-004.png",
-
-    // ============================================================
-    // 2. PIN GAUGES / PLUG GAUGES (QAP-109 / 111)
-    // ============================================================
-    "QAP-109-039": "./assetsinstruments/QAP-109-039.png",
-    "QAP-109-040": "./assetsinstruments/QAP-109-040.png",
-    "QAP-109-041": "./assetsinstruments/QAP-109-041.png",
-    "QAP-109-042": "./assetsinstruments/QAP-109-039.png", // Mapped to 039
-    "QAP-109-043": "./assetsinstruments/QAP-109-039.png", // Mapped to 039
-    "QAP-111-001": "./assetsinstruments/QAP-111-001.png",
-
-    // ============================================================
-    // 3. THICKNESS & FEELER GAUGES (QAP-118)
-    // ============================================================
-    "QAP-118-005": "./assetsinstruments/QAP-118-005.png",
-    "FEELER GAUGE": "./assetsinstruments/QAP-118-005.png",
-    "FEELER GAUGE SET": "./assetsinstruments/QAP-118-005.png",
-    "THICKNESS GAUGE": "./assetsinstruments/QAP-118-005.png",
-    "THICKNESS GAUGE(FEELER)": "./assetsinstruments/QAP-118-005.png",
-    "THICKNESS GAUGE (FEELER)": "./assetsinstruments/QAP-118-005.png",
-    "QAP-118-007": "./assetsinstruments/QAP-118-007.png",
-    "QAP-118-008": "./assetsinstruments/QAP-118-008.png",
-    "QAP-118-009": "./assetsinstruments/QAP-118-007.png",
-    "CU-THICKNESS-STANDARD": "./assetsinstruments/QAP-118-007.png",
-    "CU THICKNESS STANDARD": "./assetsinstruments/QAP-118-007.png",
-    "FABRIC THICKNESS GAUGE": "./assetsinstruments/QAP-118-008.png",
-
-    // ============================================================
-    // 4. RADIUS GAUGES (QAP-122 / 123)
-    // ============================================================
-    "QAP-122-003": "./assetsinstruments/QAP-122-003.png",
-    "QAP-122-004": "./assetsinstruments/QAP-122-003.png",
-    "QAP-122-005": "./assetsinstruments/QAP-122-003.png",
-    "QAP-122-006": "./assetsinstruments/QAP-122-003.png",
-    "QAP-122-007": "./assetsinstruments/QAP-122-003.png",
-    "RADIUS GAUGE SET": "./assetsinstruments/QAP-122-003.png",
-    "RADIUS GAUGE": "./assetsinstruments/QAP-122-003.png",
-    "QAP-123-001": "./assetsinstruments/QAP-123-001.png",
-    "QAP-123-002": "./assetsinstruments/QAP-123-002.png",
-    "QAP-123-003": "./assetsinstruments/QAP-123-003.png",
-    "QAP-123-004": "./assetsinstruments/QAP-123-004.png",
-    "QAP-123-005": "./assetsinstruments/QAP-123-005.png",
-    "QAP-123-006": "./assetsinstruments/QAP-123-006.png",
-    "QAP-123-007": "./assetsinstruments/QAP-123-007.png",
-    "QAP-123-008": "./assetsinstruments/QAP-123-008.png",
-    "QAP-123-009": "./assetsinstruments/QAP-123-009.png",
-    "QAP-123-010": "./assetsinstruments/QAP-123-010.png",
-    "QAP-123-011": "./assetsinstruments/QAP-123-011.png",
-    "QAP-123-012": "./assetsinstruments/QAP-123-012.png",
-    "QAP-123-013": "./assetsinstruments/QAP-123-013.png",
-
-    // ============================================================
-    // 5. SPECIALIZED INSPECTION (QAP 103, 108, 140, 146 SERIES)
-    // ============================================================
-    "QAP-103-001": "./assetsinstruments/QAP-103-001.png",
-    "QAP-103-002": "./assetsinstruments/QAP-103-002.png",
-    "QAP-108-015": "./assetsinstruments/QAP-108-015.png",
-    "QAP-108-016": "./assetsinstruments/QAP-108-016.png",
-    "QAP-108-018": "./assetsinstruments/QAP-108-018.png",
-    "QAP-108-022": "./assetsinstruments/QAP-108-022.png",
-    "QAP-108-027": "./assetsinstruments/QAP-108-027.png",
-    "QAP-108-028": "./assetsinstruments/QAP-108-028.png",
-    "QAP-140-001": "./assetsinstruments/QAP-140-001.png",
-    "QAP-140-002": "./assetsinstruments/QAP-140-002.png",
-    "QAP-140-003": "./assetsinstruments/QAP-140-003.png",
-    "QAP-140-004": "./assetsinstruments/QAP-140-004.png",
-    "QAP-140-005": "./assetsinstruments/QAP-140-005.png",
-    "QAP-140-006": "./assetsinstruments/QAP-140-006.png",
-    "QAP-140-007": "./assetsinstruments/QAP-140-007.png",
-    "QAP-140-008": "./assetsinstruments/QAP-140-008.png",
-    "QAP-140-009": "./assetsinstruments/QAP-140-009.png",
-    "QAP-140-010": "./assetsinstruments/QAP-140-010.png",
-    "QAP-140-011": "./assetsinstruments/QAP-140-011.png",
-    "QAP-140-012": "./assetsinstruments/QAP-140-012.png",
-    "QAP-140-013": "./assetsinstruments/QAP-140-013.png",
-    "QAP-146-002": "./assetsinstruments/QAP-146-002.png",
-    "QAP-146-003": "./assetsinstruments/QAP-146-003.png",
-    "QAP-146-004": "./assetsinstruments/QAP-146-004.png",
-
-    // ============================================================
-    // 6. HIGH PRECISION (QAP-145 SERIES 001-029)
-    // ============================================================
-    "QAP-145-001": "./assetsinstruments/QAP-145-001.png",
-    "QAP-145-002": "./assetsinstruments/QAP-145-002.png",
-    "QAP-145-003": "./assetsinstruments/QAP-145-003.png",
-    "QAP-145-004": "./assetsinstruments/QAP-145-004.png",
-    "QAP-145-005": "./assetsinstruments/QAP-145-005.png",
-    "QAP-145-006": "./assetsinstruments/QAP-145-006.png",
-    "QAP-145-007": "./assetsinstruments/QAP-145-007.png",
-    "QAP-145-008": "./assetsinstruments/QAP-145-008.png",
-    "QAP-145-009": "./assetsinstruments/QAP-145-009.png",
-    "QAP-145-010": "./assetsinstruments/QAP-145-010.png",
-    "QAP-145-011": "./assetsinstruments/QAP-145-011.png",
-    "QAP-145-012": "./assetsinstruments/QAP-145-012.png",
-    "QAP-145-013": "./assetsinstruments/QAP-145-013.png",
-    "QAP-145-014": "./assetsinstruments/QAP-145-014.png",
-    "QAP-145-015": "./assetsinstruments/QAP-145-015.png",
-    "QAP-145-016": "./assetsinstruments/QAP-145-016.png",
-    "QAP-145-017": "./assetsinstruments/QAP-145-017.png",
-    "QAP-145-018": "./assetsinstruments/QAP-145-018.png",
-    "QAP-145-019": "./assetsinstruments/QAP-145-019.png",
-    "QAP-145-020": "./assetsinstruments/QAP-145-020.png",
-    "QAP-145-021": "./assetsinstruments/QAP-145-021.png",
-    "QAP-145-022": "./assetsinstruments/QAP-145-022.png",
-    "QAP-145-023": "./assetsinstruments/QAP-145-023.png",
-    "QAP-145-024": "./assetsinstruments/QAP-145-024.png",
-    "QAP-145-025": "./assetsinstruments/QAP-145-025.png",
-    "QAP-145-026": "./assetsinstruments/QAP-145-026.png",
-    "QAP-145-027": "./assetsinstruments/QAP-145-027.png",
-    "QAP-145-028": "./assetsinstruments/QAP-145-028.png",
-    "QAP-145-029": "./assetsinstruments/QAP-145-029.png",
-
-    // ============================================================
-    // 7. VERNIER & DIGITAL CALIPERS (VCD / OCC SERIES)
-    // ============================================================
-    "OCC-160-001": "./assetsinstruments/OCC-160-001.png",
-    "VCD-150-019": "./assetsinstruments/VCD-150-019.png",
-    "VCD-150-050": "./assetsinstruments/VCD-150-050.png",
-    "VCD-150-069": "./assetsinstruments/VCD-150-069.png",
-    "VCD-150-073": "./assetsinstruments/VCD-150-073.png",
-    "VCD-150-089": "./assetsinstruments/VCD-150-089.png",
-    "VCD-150-090": "./assetsinstruments/VCD-150-090.png",
-    "VCD-150-098": "./assetsinstruments/VCD-150-098.png",
-    "VCD-150-105": "./assetsinstruments/VCD-150-105.png",
-    "VCD-150-106": "./assetsinstruments/VCD-150-106.png",
-    "VCD-150-107": "./assetsinstruments/VCD-150-107.png",
-    "VCD-150-108": "./assetsinstruments/VCD-150-108.png",
-    "VCD-1M-004": "./assetsinstruments/VCD-1M-004.png",
-    "VCD-300-008": "./assetsinstruments/VCD-300-008.png",
-    "VCD-300-020": "./assetsinstruments/VCD-300-020.png",
-    "VCD-300-022": "./assetsinstruments/VCD-300-022.png",
-    "VCD-300-024": "./assetsinstruments/VCD-300-024.png",
-    "VCD-600-001": "./assetsinstruments/VCD-600-001.png",
-
-    // ============================================================
-    // 8. OTHER QAP SERIES (160, 201, 205, 206, 207, 212, 217, 226, 251, 311, 400+)
-    // ============================================================
-    "QAP-160-001": "./assetsinstruments/QAP-160-001.png",
-    "QAP-160-002": "./assetsinstruments/QAP-160-002.png",
-    "QAP-160-003": "./assetsinstruments/QAP-160-003.png",
-    "QAP-201-004": "./assetsinstruments/QAP-201-004.png",
-    "QAP-201-005": "./assetsinstruments/QAP-201-005.png",
-    "QAP-201-006": "./assetsinstruments/QAP-201-006.png",
-    "QAP-201-007": "./assetsinstruments/QAP-201-007.png",
-    "QAP-205-001": "./assetsinstruments/QAP-205-001.png",
-    "QAP-205-002": "./assetsinstruments/QAP-205-002.png",
-    "QAP-205-003": "./assetsinstruments/QAP-205-003.png",
-    "QAP-205-004": "./assetsinstruments/QAP-205-004.png",
-    "QAP-205-005": "./assetsinstruments/QAP-205-005.png",
-    "QAP-205-006": "./assetsinstruments/QAP-205-006.png",
-    "QAP-206-001": "./assetsinstruments/QAP-206-001.png",
-    "QAP-207-001": "./assetsinstruments/QAP-207-001.png",
-    "QAP-212-001": "./assetsinstruments/QAP-212-001.png",
-    "QAP-217-001": "./assetsinstruments/QAP-217-001.png",
-    "QAP-226-003": "./assetsinstruments/QAP-226-003.png",
-    "QAP-226-004": "./assetsinstruments/QAP-226-004.png",
-    "QAP-226-005": "./assetsinstruments/QAP-226-005.png",
-    "QAP-226-006": "./assetsinstruments/QAP-226-006.png",
-    "QAP-226-007": "./assetsinstruments/QAP-226-007.png",
-    "QAP-226-008": "./assetsinstruments/QAP-226-008.png",
-    "QAP-226-009": "./assetsinstruments/QAP-226-009.png",
-    "QAP-251-001": "./assetsinstruments/QAP-251-001.png",
-    "QAP-311-002": "./assetsinstruments/QAP-311-002.png",
-    "QAP-311-003": "./assetsinstruments/QAP-311-003.png",
-    "QAP-311-004": "./assetsinstruments/QAP-311-004.png",
-    "QAP-402-001": "./assetsinstruments/QAP-402-001.png",
-    "QAP-402-002": "./assetsinstruments/QAP-402-002.png",
-    "QAP-418-001": "./assetsinstruments/QAP-418-001.png",
-    "QAP-418-002": "./assetsinstruments/QAP-418-002.png",
-    "QAP-427-001": "./assetsinstruments/QAP-427-001.png",
-    "QAP-430-001": "./assetsinstruments/QAP-430-001.png",
-    "QAP-432-001": "./assetsinstruments/QAP-432-001.png",
-    "QAP-432-002": "./assetsinstruments/QAP-432-002.png",
-    "QAP-433-001": "./assetsinstruments/QAP-433-001.png",
-    "QAP NO. 002": "./assetsinstruments/QAP NO. 002.png",
-    "QAP NO.002": "./assetsinstruments/QAP NO. 002.png",
-    "QAP NO 002": "./assetsinstruments/QAP NO. 002.png",
-    "QAP-NO-002": "./assetsinstruments/QAP-NO-002.png",
-    "QAP-NO.-002": "./assetsinstruments/QAP-NO-002.png",
-    "QAP-002": "./assetsinstruments/QAP-002.png",
-    "QAP002": "./assetsinstruments/QAP-002.png",
-    "QAP 002": "./assetsinstruments/QAP-002.png",
-    "MVB-385SD": "./assetsinstruments/MVB-385SD.png",
-    "MVB385SD": "./assetsinstruments/MVB-385SD.png",
-    "VIBRATION DATA RECORDER": "./assetsinstruments/QAP-NO-002.png",
-    "VIBRATION RECORDER": "./assetsinstruments/QAP-NO-002.png",
-    "VIBRATION METER": "./assetsinstruments/QAP-NO-002.png",
-    // ============================================================
-    // 9. MICROMETERS (OM) & HARDNESS (HLD) & OTHER TOOLS
-    // ============================================================
-    "OM-025-059": "./assetsinstruments/OM-025-059.png",
-    "OM-025-060": "./assetsinstruments/OM-025-060.png",
-    "OM-050-013": "./assetsinstruments/OM-050-013.png",
-    "OM-075-004": "./assetsinstruments/OM-075-004.png",
-    "HLD-010-081": "./assetsinstruments/HLD-010-081.png",
-    "HLD-239-001": "./assetsinstruments/HLD-239-001.png",
-    "GR-0M3-001": "./assetsinstruments/GR-0M3-001.png",
-    "GR-0M3-002": "./assetsinstruments/GR-0M3-002.png",
-    "GR-0M4-001": "./assetsinstruments/GR-0M4-001.png",
-    "GR-0M4-002": "./assetsinstruments/GR-0M4-002.png",
-    "GR-0M6-001": "./assetsinstruments/GR-0M6-001.png",
-    "GR-0M6-002": "./assetsinstruments/GR-0M6-002.png",
-    "GS-0M3-001": "./assetsinstruments/GS-0M3-001.png",
-    "GS-0M4-001": "./assetsinstruments/GS-0M4-001.png",
-    "GS-0M6-001": "./assetsinstruments/GS-0M6-001.png",
-    "OS-2.5G-001": "./assetsinstruments/OS-2.5G-001.png",
-    "SLM-130-007": "./assetsinstruments/SLM-130-007.png",
-    "VC-1M-002": "./assetsinstruments/VC-1M-002.png",
-    "AA-05A-001": "./assetsinstruments/AA-05A-001.png",
-    "CMO-5KV-114": "./assetsinstruments/CMO-5KV-114.png",
-
-    // ============================================================
-    // 10. ELECTRONIC BALANCES / SCALES (EB SERIES)
-    // ============================================================
-    "EB-15K-012": "./assetsinstruments/EB-15K-012.png",
-    "EB-500-001": "./assetsinstruments/EB-500-001.png",
-    "EB-120-001": "./assetsinstruments/EB-120-001.png",
-
-    // ============================================================
-    // 11. SPECIAL CASE NAMES
-    // ============================================================
-    // ============================================================
-    // 12. TORQUE, FORCE, CALIBRATORS & ELECTRICAL
-    // ============================================================
-    "TCS2-127": "./assetsinstruments/TCS2-127.png",
-    "TCS2-128": "./assetsinstruments/TCS2-128.png",
-    "TCS2-129": "./assetsinstruments/TCS2-129.png",
-    "DHG-600-004": "./assetsinstruments/DHG-600-004.png",
-    "DHG-1M-001": "./assetsinstruments/DHG-1M-001.png",
-    "DIGIMATIC HEIGHT GAUGE": "./assetsinstruments/DHG-600-004.png",
-    "DIGIMATIC HEIGHT GAGE": "./assetsinstruments/DHG-600-004.png",
-    "HEIGHT GAUGE": "./assetsinstruments/DHG-600-004.png",
-    "HEIGHT GAGE": "./assetsinstruments/DHG-600-004.png",
-    "DHG": "./assetsinstruments/DHG-600-004.png",
-    "DMO-1KV-003": "./assetsinstruments/DMO-1KV-003.png",
-    "DMO-1KV-018": "./assetsinstruments/DMO-1KV-018.png",
-    "DMO-1KV-024": "./assetsinstruments/DMO-1KV-024.png",
-    "CSS-10K-056": "./assetsinstruments/CSS-10K-056.png",
-    "QAP-104-001": "./assetsinstruments/QAP-104-001.png",
-   "QAP-108-001": "./assetsinstruments/QAP-108-001.png",
-   "QAP-108-023": "./assetsinstruments/QAP-108-023.png",
-   "QAP-108-025": "./assetsinstruments/QAP-108-025.png",
-   "QAP-108-019": "./assetsinstruments/QAP-108-019.png",
-   "QAP-108-020": "./assetsinstruments/QAP-108-020.png",
-   "QAP-108-021": "./assetsinstruments/QAP-108-021.png",
-   "DBD-025-001": "./assetsinstruments/DBD-025-001.png",
-   "QAP-108-026": "./assetsinstruments/QAP-108-026.png"
-};
-
-function getInstrumentImageUrl(item) {
-    if (!item) return "";
-    
-    // หากส่งเข้ามาเป็น string (เช่น Code หรือ Path)
-    if (typeof item === 'string') {
-        const trimmed = item.trim();
-        if (!trimmed) return "";
-        if (INSTRUMENT_IMAGE_MAP[trimmed]) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP[trimmed]);
-        const directKey = Object.keys(INSTRUMENT_IMAGE_MAP).find(k => k.toLowerCase() === trimmed.toLowerCase());
-        if (directKey) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP[directKey]);
-        return resolveInstrumentAssetUrl(trimmed);
-    }
-
-    // หาก item มี imageUrl ที่เป็น base64 หรือ URL อื่นๆ ที่กำหนดไว้ชัดเจน
-    if (item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim() !== "") {
-        const urlTrimmed = item.imageUrl.trim();
-        if (urlTrimmed.startsWith('data:') || /^https?:\/\//i.test(urlTrimmed) || urlTrimmed.startsWith('assetsinstruments/') || urlTrimmed.startsWith('./assetsinstruments/')) {
-            return resolveInstrumentAssetUrl(urlTrimmed);
-        }
-    }
-
-    const clean = (val) => String(val || "").trim().toUpperCase();
-    const normalize = (val) => clean(val).replace(/[^A-Z0-9]/g, "");
-
-    const codeNo = clean(item.code_no);
-    const id = clean(item.id);
-    const barcode = clean(item.code_barcode);
-    const model = clean(item.model);
-    const serial = clean(item.serial);
-    const name = clean(item.name);
-
-    // 1. ตรวจสอบกับ INSTRUMENT_IMAGE_MAP แบบจับคู่ตรงเป๊ะ (Exact or Normalized Key)
-    const imgMapEntries = (typeof INSTRUMENT_IMAGE_MAP !== 'undefined' && INSTRUMENT_IMAGE_MAP) ? Object.entries(INSTRUMENT_IMAGE_MAP) : [];
-    for (const [key, path] of imgMapEntries) {
-        const kUpper = key.toUpperCase();
-        const kNorm = normalize(key);
-        if (
-            (codeNo && (codeNo === kUpper || normalize(codeNo) === kNorm)) ||
-            (id && (id === kUpper || normalize(id) === kNorm)) ||
-            (barcode && (barcode === kUpper || normalize(barcode) === kNorm)) ||
-            (model && (model === kUpper || normalize(model) === kNorm)) ||
-            (serial && (serial === kUpper || normalize(serial) === kNorm))
-        ) {
-            return resolveInstrumentAssetUrl(path);
-        }
-    }
-
-    // 2. ตรวจสอบแบบมี Substring ใน Code No, ID, Barcode, Serial, หรือ Model
-    for (const [key, path] of imgMapEntries) {
-        const kUpper = key.toUpperCase();
-        if (
-            (codeNo && codeNo.includes(kUpper)) ||
-            (id && id.includes(kUpper)) ||
-            (barcode && barcode.includes(kUpper)) ||
-            (model && model.includes(kUpper)) ||
-            (serial && serial.includes(kUpper))
-        ) {
-            return resolveInstrumentAssetUrl(path);
-        }
-    }
-
-    // 3. Fallback: RADIUS GAUGE SET / RADIUS GAUGE / QAP-122-003 -> QAP-122-003.png
-    if (
-        name.includes("RADIUS GAUGE") ||
-        name.includes("RADIUS") ||
-        codeNo.includes("QAP-122-003") || id.includes("QAP-122-003") ||
-        codeNo.includes("122-003") || id.includes("122-003") ||
-        codeNo.startsWith("QAP-122") || id.startsWith("QAP-122")
-    ) {
-        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-122-003"] || "./assetsinstruments/QAP-122-003.png");
-    }
-
-    // 4. Fallback: CU THICKNESS STANDARD / COATING THICKNESS GAUGE -> QAP-118-007.png
-    if (
-        name.includes("CU THICKNESS") ||
-        name.includes("CU-THICKNESS") ||
-        name.includes("THICKNESS STANDARD") ||
-        name.includes("COATING") ||
-        codeNo.includes("QAP-118-007") || id.includes("QAP-118-007") ||
-        codeNo.includes("QAP-118-009") || id.includes("QAP-118-009") ||
-        codeNo.includes("118-007") || id.includes("118-007") ||
-        codeNo.includes("118-009") || id.includes("118-009")
-    ) {
-        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-118-007"] || "./assetsinstruments/QAP-118-007.png");
-    }
-
-    // 4. Fallback: FABRIC THICKNESS GAUGE / QAP-118-008 -> QAP-118-008.png
-    if (
-        name.includes("FABRIC") ||
-        codeNo.includes("QAP-118-008") || id.includes("QAP-118-008") ||
-        codeNo.includes("118-008") || id.includes("118-008")
-    ) {
-        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-118-008"] || "./assetsinstruments/QAP-118-008.png");
-    }
-
-    // 5. Fallback: THICKNESS GAUGE(FEELER) / FEELER GAUGE / กลุ่ม QAP-118 -> QAP-118-005.png
-    if (
-        name.includes("THICKNESS GAUGE") || 
-        name.includes("FEELER") || 
-        name.includes("THICKNESS") ||
-        codeNo.startsWith("QAP-118") || 
-        id.startsWith("QAP-118")
-    ) {
-        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-118-005"] || "./assetsinstruments/QAP-118-005.png");
-    }
-
-    // 5. Fallback: PIN GAUGE หรือกลุ่ม QAP-109
-    if (name.includes("PIN GAUGE") || name.includes("PINGAUGE") || codeNo.startsWith("QAP-109") || id.startsWith("QAP-109")) {
-        if (codeNo.includes("040") || id.includes("040")) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-109-040"]);
-        if (codeNo.includes("041") || id.includes("041")) return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-109-041"]);
-        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP-109-039"] || "./assetsinstruments/QAP-109-039.png");
-    }
-
-    // 6. Fallback: DIGIMATIC HEIGHT GAUGE / HEIGHT GAUGE / DHG
-    if (
-        name.includes("DIGIMATIC HEIGHT") ||
-        name.includes("HEIGHT GAUGE") ||
-        name.includes("HEIGHT GAGE") ||
-        name.includes("DHG") ||
-        codeNo.startsWith("DHG") ||
-        id.startsWith("DHG")
-    ) {
-        if (codeNo.includes("1M") || id.includes("1M") || name.includes("1M") || name.includes("1000")) {
-            return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["DHG-1M-001"] || "./assetsinstruments/DHG-1M-001.png");
-        }
-        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["DHG-600-004"] || "./assetsinstruments/DHG-600-004.png");
-    }
-
-    // 7. Fallback: QAP NO. 002 / VIBRATION DATA RECORDER / LUTRON MVB-385SD
-    if (
-        codeNo.includes("QAP NO. 002") || id.includes("QAP NO. 002") ||
-        codeNo.includes("QAP NO.002") || id.includes("QAP NO.002") ||
-        codeNo.includes("QAP NO 002") || id.includes("QAP NO 002") ||
-        codeNo.includes("QAP-NO-002") || id.includes("QAP-NO-002") ||
-        codeNo.includes("QAP-NO.-002") || id.includes("QAP-NO.-002") ||
-        codeNo.includes("QAP-002") || id.includes("QAP-002") ||
-        codeNo.includes("QAP002") || id.includes("QAP002") ||
-        codeNo.includes("NO. 002") || id.includes("NO. 002") ||
-        codeNo.includes("NO.002") || id.includes("NO.002") ||
-        model.includes("MVB-385SD") || model.includes("MVB385SD") || model.includes("MVB-385") || model.includes("MVB") ||
-        name.includes("VIBRATION DATA RECORDER") || name.includes("VIBRATION RECORDER") || name.includes("VIBRATION") ||
-        name.includes("SD CARD DATA LOGGER")
-    ) {
-        return resolveInstrumentAssetUrl(INSTRUMENT_IMAGE_MAP["QAP NO. 002"] || "./assetsinstruments/QAP-NO-002.png");
-    }
-
-    return item.imageUrl ? resolveInstrumentAssetUrl(item.imageUrl) : "";
-}
-
-window.INSTRUMENT_IMAGE_MAP = INSTRUMENT_IMAGE_MAP;
-window.getInstrumentImageUrl = getInstrumentImageUrl;
-window.resolveInstrumentAssetUrl = resolveInstrumentAssetUrl;
 // --- ฟังก์ชันทำความสะอาดชื่อ (ลบ Mr. Ms. ฯลฯ) ---
 function cleanSignatureName(name) {
     if (!name) return "";
@@ -5397,8 +5157,7 @@ const localDB = new Dexie("CarrierOfflineDB");
 localDB.version(2).stores({
     pendingClaims: "id, date, sync_status",
     pendingOT: "id, date, sync_status",
-    pending5S: "id, month, sync_status",
-    calibrationMaster: "id, name, next_due" // <--- เพิ่มบรรทัดนี้
+    pending5S: "id, month, sync_status"
 });
 
 // ฟังก์ชันตรวจสอบสถานะเน็ตแบบ Real-time
@@ -5472,18 +5231,459 @@ let aiBrain = { partNoMap: {}, partNameMap: {}, defectToRemarkMap: {}, supplierP
 
 
 const defectDict = {
-    'flash': 'พบครีบ/ฟิล์มเกินบริเวณชิ้นงาน',
-    'burr': 'พบเสี้ยน/ขอบคมจากการตัด',
-    'clog': 'พบการอุดตันของรู/ช่องทาง',
-    'scratch': 'พบรอยขีดข่วนบนผิวชิ้นงาน',
-    'crack': 'พบรอยร้าวบนชิ้นงาน',
-    'dent': 'พบรอยบุบ/ยุบตัว',
-    'stain': 'พบคราบสกปรก/รอยเปื้อน',
-    'short': 'พบขนาดสั้นกว่ามาตรฐาน',
-    'bend': 'พบการโก่งงอผิดรูป',
-    'discolor': 'พบสีเพี้ยนจากมาตรฐาน',
-    'crooked': 'พบชิ้นงานเบี้ยว/ไม่ตรงแนว',
-    'peel': 'พบการหลุดล่อน/ลอกของผิวชิ้นงาน'
+    // 1. Burr / เสี้ยน / ขอบคม
+    'burr': 'พบเสี้ยน/ขอบคมจากการตัดเกินมาตรฐาน (Burr found at cut edge)',
+    'burrs': 'พบเสี้ยน/ขอบคมจากการตัดเกินมาตรฐาน (Burr found at cut edge)',
+    'edge burr': 'พบเสี้ยนบริเวณขอบตัดชิ้นงาน (Edge burr found)',
+    'sharp edge': 'พบขอบคมอันตรายเกินมาตรฐาน (Sharp edge defect)',
+    'เสี้ยน': 'พบเสี้ยน/ขอบคมจากการตัดเกินมาตรฐาน (Burr found at cut edge)',
+    'ขอบคม': 'พบขอบคมจากการตัดหรือปั๊มชิ้นงาน (Sharp edge defect)',
+    'คม': 'พบคม/เสี้ยนเกินมาตรฐานบนชิ้นงาน (Burr / Sharp edge defect)',
+
+    // 2. Flash / ครีบ / เนื้อปลิ้น
+    'flash': 'พบครีบ/ฟิล์มพลาสติกเกินบริเวณรอยประกบแม่พิมพ์ (Excess Flash found)',
+    'flashing': 'พบครีบ/ฟิล์มพลาสติกเกินบริเวณรอยประกบแม่พิมพ์ (Excess Flash found)',
+    'parting line flash': 'พบครีบเกินตามแนวรอยประกบแม่พิมพ์ (Parting line flash)',
+    'ครีบ': 'พบครีบ/ฟิล์มพลาสติกเกินบริเวณรอยประกบแม่พิมพ์ (Excess Flash found)',
+    'ครีบเกิน': 'พบครีบเกินมาตรฐานบริเวณชิ้นงาน (Excess flash on part)',
+    'เนื้อปลิ้น': 'พบเนื้อพลาสติก/ยางปลิ้นเกินขนาด (Flash / Overflow defect)',
+
+    // 3. Scratch / รอยขีดข่วน / รอยถลอก
+    'scratch': 'พบรอยขีดข่วน/รอยขูดขีดบนผิวชิ้นงาน (Surface scratch found on part)',
+    'scratches': 'พบรอยขีดข่วน/รอยขูดขีดบนผิวชิ้นงาน (Surface scratches found)',
+    'scratched': 'พบรอยขีดข่วน/รอยขูดขีดบนผิวชิ้นงาน (Surface scratch found)',
+    'scuff': 'พบรอยถลอก/รอยครูดบนผิวชิ้นงาน (Scuff / Abrasion mark found)',
+    'รอยขีดข่วน': 'พบรอยขีดข่วน/รอยขูดขีดบนผิวชิ้นงาน (Surface scratch found on part)',
+    'รอยขีด': 'พบรอยขีดข่วนบนผิวชิ้นงาน (Scratch mark found on surface)',
+    'รอยขูด': 'พบรอยขูดขีดบนผิวชิ้นงาน (Scratch / Scuff mark found)',
+    'เป็นรอย': 'พบรอยขีดข่วน/รอยตำหนิบนผิวชิ้นงาน (Surface mark / Scratch found)',
+    'ถลอก': 'พบรอยถลอกบนพื้นผิวชิ้นงาน (Abrasion / Scuff mark found)',
+
+    // 4. Crack / แตก / ร้าว / หัก / ฉีกขาด
+    'crack': 'พบรอยแตกร้าวบนเนื้อชิ้นงาน (Crack found on part)',
+    'cracked': 'พบรอยแตกร้าวบนเนื้อชิ้นงาน (Crack found on part)',
+    'cracking': 'พบรอยแตกร้าวบนเนื้อชิ้นงาน (Cracking defect)',
+    'broken': 'พบชิ้นงานแตกหักชำรุดเสียหาย (Broken part defect)',
+    'fracture': 'พบการแตกหักเสียหายของโครงสร้างชิ้นงาน (Structural fracture defect)',
+    'tear': 'พบรอยฉีกขาดของชิ้นงาน (Torn / Tear defect)',
+    'torn': 'พบรอยฉีกขาดของชิ้นงาน (Torn / Tear defect)',
+    'รอยแตก': 'พบรอยแตกบนชิ้นงาน (Crack found on part)',
+    'รอยร้าว': 'พบรอยร้าวบนเนื้อชิ้นงาน (Crack / Fracture found on part)',
+    'ร้าว': 'พบรอยแตกร้าวบนเนื้อชิ้นงาน (Crack found on part)',
+    'แตก': 'พบชิ้นงานแตกร้าวเสียหาย (Broken / Cracked part)',
+    'แตกหัก': 'พบชิ้นงานแตกหักชำรุดเสียหาย (Broken / Damaged part)',
+    'หัก': 'พบชิ้นงานหักชำรุด (Broken component / Fracture defect)',
+    'ฉีกขาด': 'พบรอยฉีกขาดของชิ้นงาน (Tear / Ripped defect)',
+
+    // 5. Dent / บุบ / ยุบ / รอยกระแทก
+    'dent': 'พบรอยบุบ/รอยยุบตัวจากการกระแทก (Dent / Impact mark found)',
+    'dented': 'พบรอยบุบ/รอยยุบตัวจากการกระแทก (Dent / Impact mark found)',
+    'impact mark': 'พบรอยกระแทก/รอยกดทับบนชิ้นงาน (Impact / Press mark found)',
+    'บุบ': 'พบรอยบุบ/รอยยุบตัวจากการกระแทก (Dent / Impact mark found)',
+    'รอยบุบ': 'พบรอยบุบ/รอยยุบตัวจากการกระแทก (Dent / Impact mark found)',
+    'ยุบ': 'พบรอยยุบตัวผิดรูปบนชิ้นงาน (Dent / Sink mark found)',
+    'รอยกระแทก': 'พบรอยกระแทกเสียหายบนชิ้นงาน (Impact damage found)',
+    'รอยกดทับ': 'พบรอยกดทับบนผิวชิ้นงาน (Press / Indentation mark)',
+
+    // 6. Bend / Warp / Deform / โก่ง / งอ / บิดเบี้ยว / ผิดรูป
+    'bend': 'พบการโก่งงอผิดรูปไม่ได้ระนาบ (Bending / Warpage defect)',
+    'bent': 'พบการโก่งงอผิดรูปไม่ได้ระนาบ (Bending / Warpage defect)',
+    'bending': 'พบการโก่งงอผิดรูปไม่ได้ระนาบ (Bending / Warpage defect)',
+    'warp': 'พบการบิดงอ/เสียรูปไม่ได้ระนาบ (Warpage / Distorted part)',
+    'warped': 'พบการบิดงอ/เสียรูปไม่ได้ระนาบ (Warpage / Distorted part)',
+    'warpage': 'พบการบิดงอ/เสียรูปไม่ได้ระนาบ (Warpage / Distorted part)',
+    'deform': 'พบชิ้นงานผิดรูปทรง/ไม่ได้สัดส่วนตามสเปก (Deformed part / Out of shape)',
+    'deformed': 'พบชิ้นงานผิดรูปทรง/ไม่ได้สัดส่วนตามสเปก (Deformed part / Out of shape)',
+    'deformation': 'พบชิ้นงานผิดรูปทรง/ไม่ได้สัดส่วนตามสเปก (Deformed part / Out of shape)',
+    'twist': 'พบการบิดเบี้ยวไม่ได้แนวระนาบ (Twisted / Distorted part)',
+    'crooked': 'พบชิ้นงานเบี้ยว/ไม่ตรงแนวมาตรฐาน (Crooked / Misaligned part)',
+    'โก่ง': 'พบการโก่งงอผิดรูปไม่ได้ระนาบ (Bending / Warpage defect)',
+    'โก่งงอ': 'พบการโก่งงอผิดรูปไม่ได้ระนาบ (Bending / Warpage defect)',
+    'งอ': 'พบการงอผิดรูปของชิ้นงาน (Bending defect)',
+    'บิดงอ': 'พบการบิดงอ/เสียรูปไม่ได้ระนาบ (Warpage / Twisted part)',
+    'บิดเบี้ยว': 'พบการบิดเบี้ยวไม่ได้แนวระนาบ (Twisted / Distorted part)',
+    'เบี้ยว': 'พบชิ้นงานเบี้ยว/ไม่ได้ฉากหรือแนวตรง (Crooked / Misaligned part)',
+    'ผิดรูป': 'พบชิ้นงานผิดรูปทรง/เสียรูป (Deformed part / Out of shape)',
+    'คด': 'พบชิ้นงานคดงอไม่ได้แนวตรง (Curved / Distorted part)',
+
+    // 7. Rust / สนิม / ออกไซด์
+    'rust': 'พบคราบสนิม/ออกไซด์บนผิวชิ้นงาน (Rust / Oxidation found on surface)',
+    'rusty': 'พบคราบสนิม/ออกไซด์บนผิวชิ้นงาน (Rust / Oxidation found on surface)',
+    'oxidation': 'พบการเกิดคราบออกไซด์บนผิวโลหะ (Oxidation layer found on surface)',
+    'corrosion': 'พบการกัดกร่อน/สนิมบนผิวชิ้นงาน (Corrosion / Rust defect)',
+    'สนิม': 'พบคราบสนิม/ออกไซด์บนผิวชิ้นงาน (Rust / Oxidation found on surface)',
+    'ขึ้นสนิม': 'พบคราบสนิมขึ้นบนผิวชิ้นงาน (Rust defect found on surface)',
+    'คราบสนิม': 'พบคราบสนิม/ออกไซด์บนผิวชิ้นงาน (Rust / Oxidation found on surface)',
+    'ออกไซด์': 'พบคราบออกไซด์บนผิวชิ้นงาน (Oxidation layer found on surface)',
+
+    // 8. Stain / Dirty / Oil / คราบ / สกปรก / คราบน้ำมัน
+    'oil stain': 'พบคราบน้ำมันเปรอะเปื้อนบนชิ้นงาน (Oil stain contamination found)',
+    'oil leak': 'พบคราบน้ำมันรั่วซึมเปรอะเปื้อน (Oil leakage / Stain contamination)',
+    'stain': 'พบคราบสกปรก/รอยเปื้อนบนผิวชิ้นงาน (Stain / Surface contamination)',
+    'stained': 'พบคราบสกปรก/รอยเปื้อนบนผิวชิ้นงาน (Stain / Surface contamination)',
+    'dirty': 'พบคราบสิ่งสกปรกเปรอะเปื้อน (Dirty / Contaminated surface)',
+    'smudge': 'พบคราบเปื้อน/รอยหมองคล้ำบนผิวงาน (Smudge / Dirty mark found)',
+    'contamination': 'พบสิ่งแปลกปลอม/สิ่งเจือปนในชิ้นงาน (Foreign material / Contamination found)',
+    'foreign material': 'พบสิ่งแปลกปลอมเจือปนในชิ้นงาน (Foreign material contamination)',
+    'foreign matter': 'พบสิ่งแปลกปลอมเจือปนในชิ้นงาน (Foreign matter contamination)',
+    'คราบน้ำมัน': 'พบคราบน้ำมันเปรอะเปื้อนบนชิ้นงาน (Oil stain contamination found)',
+    'น้ำมัน': 'พบคราบน้ำมันเปรอะเปื้อนบนชิ้นงาน (Oil stain found on part)',
+    'สกปรก': 'พบคราบสกปรก/รอยเปื้อนบนผิวชิ้นงาน (Dirty / Stain contamination)',
+    'คราบ': 'พบคราบสกปรก/รอยเปื้อนบนผิวชิ้นงาน (Stain / Contamination found)',
+    'เปื้อน': 'พบคราบเปื้อนบนผิวชิ้นงาน (Stain / Smudge mark found)',
+    'เลอะ': 'พบคราบเปรอะเปื้อนบนผิวชิ้นงาน (Contamination / Dirty mark)',
+    'สิ่งแปลกปลอม': 'พบสิ่งแปลกปลอมเจือปนในชิ้นงาน (Foreign material contamination)',
+    'ปนเปื้อน': 'พบการปนเปื้อนสิ่งแปลกปลอมในชิ้นงาน (Contamination found)',
+
+    // 9. Clog / ตัน / อุดตัน
+    'clog': 'พบการอุดตันของรู/ช่องทางการไหล (Clogged hole / Blocked passage)',
+    'clogged': 'พบการอุดตันของรู/ช่องทางการไหล (Clogged hole / Blocked passage)',
+    'blockage': 'พบการอุดตันกีดขวางช่องทาง (Blocked passage / Clogging defect)',
+    'blocked': 'พบการอุดตันกีดขวางช่องทาง (Blocked passage defect)',
+    'ตัน': 'พบการอุดตันของรู/ช่องทางการไหล (Clogged hole / Blocked passage)',
+    'อุดตัน': 'พบการอุดตันของรู/ช่องทางการไหล (Clogged hole / Blocked passage)',
+    'รูตัน': 'พบรูทางเดินอุดตัน (Clogged hole defect)',
+    'ท่อตัน': 'พบท่อทางเดินอุดตัน (Clogged tube/pipe defect)',
+
+    // 10. Short shot / สั้น / ขาด / ไม่เต็ม
+    'short shot': 'พบชิ้นงานฉีดไม่เต็ม/เนื้อหายจากการขึ้นรูป (Short shot / Incomplete molding)',
+    'short mold': 'พบชิ้นงานฉีดไม่เต็ม/เนื้อหายจากการขึ้นรูป (Short shot / Incomplete molding)',
+    'incomplete molding': 'พบเนื้อชิ้นงานขึ้นรูปไม่สมบูรณ์ (Incomplete molding defect)',
+    'short': 'พบขนาดสั้นกว่ามาตรฐาน/ต่ำกว่าพิกัดแบบ (Undersized / Short dimension)',
+    'undersize': 'พบขนาดเล็กกว่ามาตรฐาน/ต่ำกว่าพิกัดแบบ (Undersized dimension)',
+    'undersized': 'พบขนาดเล็กกว่ามาตรฐาน/ต่ำกว่าพิกัดแบบ (Undersized dimension)',
+    'ฉีดไม่เต็ม': 'พบชิ้นงานฉีดไม่เต็ม/เนื้อหายจากการขึ้นรูป (Short shot / Incomplete molding)',
+    'หล่อไม่เต็ม': 'พบเนื้อชิ้นงานหล่อขึ้นรูปไม่เต็ม (Incomplete casting / Short shot)',
+    'ไม่เต็ม': 'พบชิ้นงานขึ้นรูปไม่เต็มเนื้อ (Short shot / Incomplete form)',
+    'สั้น': 'พบขนาดสั้นกว่ามาตรฐาน/ต่ำกว่าพิกัดแบบ (Undersized / Short dimension)',
+    'สั้นกว่าแบบ': 'พบขนาดความยาวสั้นกว่าสเปก (Short length / Undersize)',
+
+    // 11. Long / Oversize / ยาวเกิน / ขนาดเกิน
+    'oversize': 'พบขนาดใหญ่เกินมาตรฐาน/เกินพิกัดแบบ (Oversized dimension defect)',
+    'oversized': 'พบขนาดใหญ่เกินมาตรฐาน/เกินพิกัดแบบ (Oversized dimension defect)',
+    'over length': 'พบความยาวเกินพิกัดมาตรฐาน (Over-length dimension defect)',
+    'long': 'พบขนาดยาวกว่ามาตรฐาน/เกินพิกัดแบบ (Over-length / Oversized dimension)',
+    'ยาว': 'พบขนาดยาวกว่ามาตรฐาน/เกินพิกัดแบบ (Over-length / Oversized dimension)',
+    'ยาวเกิน': 'พบความยาวเกินพิกัดมาตรฐาน (Over-length dimension defect)',
+    'ขนาดเกิน': 'พบขนาดชิ้นงานใหญ่เกินมาตรฐานกำหนด (Oversized dimension defect)',
+    'เกินสเปก': 'พบขนาดชิ้นงานเกินเกณฑ์มาตรฐาน (Out of specification / Oversize)',
+
+    // 12. Discolor / Color NG / สีเพี้ยน / สีด่าง / สีตก
+    'discolor': 'พบสีเพี้ยน/เฉดสีไม่สม่ำเสมอนอกมาตรฐาน (Discoloration / Color defect)',
+    'discolored': 'พบสีเพี้ยน/เฉดสีไม่สม่ำเสมอนอกมาตรฐาน (Discoloration / Color defect)',
+    'discoloration': 'พบสีเพี้ยน/เฉดสีไม่สม่ำเสมอนอกมาตรฐาน (Discoloration / Color defect)',
+    'color ng': 'พบเฉดสีไม่ตรงตามมาตรฐาน (Color NG / Color mismatch)',
+    'wrong color': 'พบสีชิ้นงานผิดจากสเปกมาตรฐาน (Wrong color defect)',
+    'color mismatch': 'พบเฉดสีไม่ตรงตามมาตรฐาน (Color mismatch defect)',
+    'fade': 'พบสีซีดจางผิดปกติ (Faded color defect)',
+    'faded': 'พบสีซีดจางผิดปกติ (Faded color defect)',
+    'สีเพี้ยน': 'พบสีเพี้ยน/เฉดสีไม่สม่ำเสมอนอกมาตรฐาน (Discoloration / Color defect)',
+    'สีผิด': 'พบสีชิ้นงานผิดจากสเปกมาตรฐาน (Wrong color defect)',
+    'สีด่าง': 'พบสีด่างไม่สม่ำเสมอบนผิวชิ้นงาน (Uneven color / Blotchy surface)',
+    'สีไม่สม่ำเสมอ': 'พบเฉดสีไม่สม่ำเสมอนอกมาตรฐาน (Uneven color tone defect)',
+    'สีซีด': 'พบสีซีดจางผิดปกติ (Faded color defect)',
+
+    // 13. Sink Mark / รอยยุบตัว
+    'sink mark': 'พบรอยยุบตัวของเนื้อวัสดุบนผิวชิ้นงาน (Sink mark defect)',
+    'sinkmark': 'พบรอยยุบตัวของเนื้อวัสดุบนผิวชิ้นงาน (Sink mark defect)',
+    'sink': 'พบรอยยุบตัวของเนื้อวัสดุบนผิวชิ้นงาน (Sink mark defect)',
+    'shrinkage': 'พบการหดตัวยุบตัวของเนื้อวัสดุ (Material shrinkage / Sink mark)',
+    'รอยยุบ': 'พบรอยยุบตัวของเนื้อวัสดุบนผิวชิ้นงาน (Sink mark defect)',
+    'ยุบตัว': 'พบการยุบตัวของเนื้อวัสดุบนผิวชิ้นงาน (Sink mark / Shrinkage)',
+    'เนื้อยุบ': 'พบเนื้อชิ้นงานยุบตัวผิดรูป (Sink mark defect)',
+
+    // 14. Pin hole / Void / Porosity / รูทะลุ / ตามด
+    'pinhole': 'พบรูตามด/โพรงฟองอากาศในเนื้อชิ้นงาน (Pinhole / Porosity defect)',
+    'pin hole': 'พบรูตามด/โพรงฟองอากาศในเนื้อชิ้นงาน (Pinhole / Porosity defect)',
+    'porosity': 'พบรูพรุนตามดในเนื้อวัสดุ (Porosity / Internal void defect)',
+    'void': 'พบโพรงอากาศในเนื้อชิ้นงาน (Void / Cavity defect)',
+    'blowhole': 'พบโพรงฟองอากาศในเนื้อโลหะหรือพลาสติก (Blowhole defect)',
+    'puncture': 'พบรูทะลุเสียหายบนชิ้นงาน (Puncture / Hole defect)',
+    'ตามด': 'พบรูตามด/โพรงฟองอากาศในเนื้อชิ้นงาน (Pinhole / Porosity defect)',
+    'รูตามด': 'พบรูตามด/โพรงฟองอากาศในเนื้อชิ้นงาน (Pinhole defect)',
+    'รูพรุน': 'พบรูพรุนตามดในเนื้อวัสดุ (Porosity defect)',
+    'รูทะลุ': 'พบรูทะลุเสียหายบนชิ้นงาน (Puncture / Through hole defect)',
+    'เป็นรู': 'พบชิ้นงานมีรูทะลุผิดปกติ (Hole defect found)',
+    'ทะลุ': 'พบการทะลุเสียหายบนชิ้นงาน (Puncture / Pierced defect)',
+
+    // 15. Leak / รั่ว / ซึม
+    'leak': 'พบการรั่วซึม/ตรวจสอบพบจุดรั่วไหล (Leakage detected)',
+    'leaking': 'พบการรั่วซึม/ตรวจสอบพบจุดรั่วไหล (Leakage detected)',
+    'leakage': 'พบการรั่วซึม/ตรวจสอบพบจุดรั่วไหล (Leakage detected)',
+    'seep': 'พบการซึมของของเหลว/สารเคมี (Seepage defect)',
+    'seepage': 'พบการซึมของของเหลว/สารเคมี (Seepage defect)',
+    'รั่ว': 'พบการรั่วซึม/ตรวจสอบพบจุดรั่วไหล (Leakage detected)',
+    'รั่วซึม': 'พบการรั่วซึม/ตรวจสอบพบจุดรั่วไหล (Leakage detected)',
+    'น้ำรั่ว': 'พบการรั่วไหลของน้ำ/ของเหลว (Water leakage detected)',
+    'น้ำยาแอร์รั่ว': 'พบการรั่วไหลของสารทำความเย็น (Refrigerant leakage detected)',
+    'แก๊สรั่ว': 'พบการรั่วไหลของแก๊ส (Gas leakage detected)',
+    'ซึม': 'พบการซึมของของเหลว/สารเคมี (Seepage defect)',
+
+    // 16. Loose / หลวม / คลอน
+    'loose': 'พบชิ้นงานหลวมคลอน/ประกอบไม่แน่นหนา (Loose assembly / Poor fit)',
+    'looseness': 'พบชิ้นงานหลวมคลอน/ประกอบไม่แน่นหนา (Loose assembly / Poor fit)',
+    'wobble': 'พบชิ้นงานโยกคลอนไม่มั่นคง (Wobbling / Loose assembly)',
+    'wobbly': 'พบชิ้นงานโยกคลอนไม่มั่นคง (Wobbling / Loose assembly)',
+    'หลวม': 'พบชิ้นงานหลวมคลอน/ประกอบไม่แน่นหนา (Loose assembly / Poor fit)',
+    'คลอน': 'พบชิ้นงานโยกคลอนไม่แน่น (Loose / Wobbling part)',
+    'โยก': 'พบชิ้นงานโยกคลอนไม่แน่นหนา (Loose assembly defect)',
+    'ไม่แน่น': 'พบชิ้นงานประกอบไม่แน่นหนา (Loose assembly defect)',
+
+    // 17. Tight / ฝืด / แน่นเกินไป
+    'tight fit': 'พบชิ้นงานฝืดแน่นเกินขนาดมาตรฐาน (Tight fit defect)',
+    'tight': 'พบชิ้นงานฝืดแน่นเกินขนาดมาตรฐาน (Tight fit / High friction)',
+    'stiff': 'พบการเคลื่อนไหวฝืดแข็งผิดปกติ (Stiff / High resistance defect)',
+    'hard to turn': 'พบการหมุนฝืดติดขัด (Hard to turn / Stiff rotation)',
+    'ฝืด': 'พบชิ้นงานฝืดแน่นเกินขนาดมาตรฐาน (Tight fit / High friction)',
+    'แน่น': 'พบชิ้นงานแน่นเกินขนาดมาตรฐานประกอบยาก (Tight fit defect)',
+    'แน่นเกินไป': 'พบชิ้นงานแน่นเกินขนาดมาตรฐานประกอบยาก (Tight fit defect)',
+    'หมุนฝืด': 'พบการหมุนฝืดติดขัดเกินมาตรฐาน (Stiff rotation defect)',
+
+    // 18. Missing / ขาดหาย / ชิ้นส่วนไม่ครบ
+    'missing part': 'พบชิ้นส่วนสูญหาย/ประกอบไม่ครบถ้วน (Missing component defect)',
+    'missing component': 'พบชิ้นส่วนสูญหาย/ประกอบไม่ครบถ้วน (Missing component defect)',
+    'missing': 'พบชิ้นส่วนสูญหาย/ประกอบไม่ครบถ้วน (Missing component defect)',
+    'lost': 'พบชิ้นส่วนสูญหาย (Lost / Missing part)',
+    'no part': 'พบไม่มีชิ้นส่วนประกอบมาด้วย (No part / Missing component)',
+    'incomplete part': 'พบชิ้นส่วนประกอบไม่ครบถ้วน (Incomplete assembly)',
+    'ขาด': 'พบชิ้นส่วนสูญหาย/ประกอบไม่ครบถ้วน (Missing component defect)',
+    'หาย': 'พบชิ้นส่วนสูญหาย (Missing part defect)',
+    'ไม่มี': 'พบไม่มีชิ้นส่วนติดตั้งมาด้วย (Missing component)',
+    'ไม่ครบ': 'พบชิ้นส่วนประกอบไม่ครบถ้วน (Incomplete assembly defect)',
+    'ของไม่ครบ': 'พบชิ้นส่วนประกอบไม่ครบถ้วน (Incomplete assembly defect)',
+    'ชิ้นส่วนขาด': 'พบชิ้นส่วนสูญหาย/ประกอบไม่ครบถ้วน (Missing component defect)',
+
+    // 19. Wrong Part / Mixed / ผิดรุ่น / ผิดสเปค / ปะปน
+    'wrong part': 'พบชิ้นงานผิดรุ่น/ผิดสเปก/มีการปะปน (Wrong part / Mixed model)',
+    'wrong model': 'พบชิ้นงานผิดรุ่นจากใบสั่งผลิต (Wrong model defect)',
+    'wrong spec': 'พบชิ้นงานผิดสเปกจากข้อกำหนด (Incorrect specification defect)',
+    'mixed part': 'พบชิ้นงานปะปนรุ่นหรือสเปกอื่นมา (Mixed part defect)',
+    'mixed': 'พบชิ้นงานปะปนรุ่นหรือสเปกอื่นมา (Mixed part defect)',
+    'ผิดรุ่น': 'พบชิ้นงานผิดรุ่น/ผิดสเปก/มีการปะปน (Wrong part / Mixed model)',
+    'ผิดสเปค': 'พบชิ้นงานผิดสเปกจากข้อกำหนด (Incorrect specification defect)',
+    'ผิดสเปก': 'พบชิ้นงานผิดสเปกจากข้อกำหนด (Incorrect specification defect)',
+    'ผิดแบบ': 'พบชิ้นงานผิดแบบจาก Drawing (Wrong drawing spec defect)',
+    'ผิดเบอร์': 'พบชิ้นงานผิดเบอร์/ผิดรหัส (Wrong part number defect)',
+    'ปะปน': 'พบชิ้นงานปะปนรุ่นหรือสเปกอื่นมา (Mixed part defect)',
+    'ปนรุ่น': 'พบชิ้นงานปนรุ่นอื่นเข้ามาในล็อต (Mixed model defect)',
+
+    // 20. Rough / ผิวหยาบ / ขรุขระ
+    'rough surface': 'พบผิวสัมผัสหยาบ/ขรุขระไม่ได้มาตรฐาน (Rough surface defect)',
+    'rough': 'พบผิวสัมผัสหยาบ/ขรุขระไม่ได้มาตรฐาน (Rough surface defect)',
+    'uneven': 'พบพื้นผิวไม่เรียบสม่ำเสมอ (Uneven surface defect)',
+    'หยาบ': 'พบผิวสัมผัสหยาบ/ขรุขระไม่ได้มาตรฐาน (Rough surface defect)',
+    'ผิวหยาบ': 'พบผิวสัมผัสหยาบ/ขรุขระไม่ได้มาตรฐาน (Rough surface defect)',
+    'ขรุขระ': 'พบพื้นผิวขรุขระไม่ได้มาตรฐาน (Rough / Uneven surface defect)',
+    'ไม่เรียบ': 'พบพื้นผิวไม่เรียบสม่ำเสมอ (Uneven surface defect)',
+
+    // 21. Bubble / Blister / ฟองอากาศ / ผิวพอง
+    'air bubble': 'พบฟองอากาศในเนื้อหรือผิวชิ้นงาน (Air bubble defect)',
+    'bubble': 'พบฟองอากาศในเนื้อหรือผิวชิ้นงาน (Air bubble defect)',
+    'blister': 'พบผิวพองบวมเป็นตุ่มฟอง (Blister defect on surface)',
+    'พอง': 'พบผิวพองบวมเป็นตุ่มฟอง (Blister defect on surface)',
+    'ฟองอากาศ': 'พบฟองอากาศในเนื้อหรือผิวชิ้นงาน (Air bubble defect)',
+    'ผิวพอง': 'พบผิวพองบวมเป็นตุ่มฟอง (Blister defect on surface)',
+    'ผิวบวม': 'พบผิวบวมพองผิดรูป (Blister / Bulge defect)',
+
+    // 22. Gap / ช่องว่าง / อ้า / ไม่แนบ
+    'gap': 'พบช่องว่าง/ชิ้นงานประกอบไม่แนบสนิท (Gap / Improper alignment)',
+    'not flush': 'พบชิ้นงานประกอบไม่เรียบสนิทเป็นแนวเดียวกัน (Not flush defect)',
+    'clearance': 'พบช่องว่างระยะห่างไม่ได้ตามแบบ (Improper gap / clearance)',
+    'ห่าง': 'พบช่องว่าง/ชิ้นงานประกอบห่างเกินสเปก (Excessive gap defect)',
+    'อ้า': 'พบชิ้นงานอ้าออก/ประกอบไม่แนบสนิท (Gap / Not flush defect)',
+    'ช่องว่าง': 'พบช่องว่าง/ชิ้นงานประกอบไม่แนบสนิท (Gap / Improper alignment)',
+    'ไม่แนบ': 'พบชิ้นงานประกอบไม่แนบสนิท (Not flush / Gap defect)',
+    'ไม่ชิด': 'พบชิ้นงานประกอบไม่แนบชิดตามสเปก (Gap / Improper alignment)',
+
+    // 23. Thread NG / เกลียวหวาน / เกลียวล้ม / ไม่มีเกลียว
+    'no thread': 'พบชิ้นงานไม่มีเกลียว/ไม่ได้ต๊าปเกลียว (No thread / Missing thread)',
+    'thread missing': 'พบชิ้นงานไม่มีเกลียว/ไม่ได้ต๊าปเกลียว (No thread / Missing thread)',
+    'stripped thread': 'พบเกลียวหวาน/เกลียวรูดขันไม่ได้ (Stripped thread defect)',
+    'damaged thread': 'พบเกลียวล้ม/เกลียวชำรุดเสียหาย (Damaged thread defect)',
+    'cross thread': 'พบปัญหาปีนเกลียว/เกลียวขัด (Cross thread defect)',
+    'thread ng': 'พบปัญหาเกลียวชำรุด/เกลียวหวานไม่ได้มาตรฐาน (Thread NG defect)',
+    'ไม่มีเกลียว': 'พบชิ้นงานไม่มีเกลียว/ไม่ได้ต๊าปเกลียว (No thread / Missing thread)',
+    'ลืมต๊าปเกลียว': 'พบชิ้นงานไม่ได้ต๊าปเกลียว (Missing thread tapping defect)',
+    'เกลียวหวาน': 'พบเกลียวหวาน/เกลียวรูดขันไม่แน่น (Stripped thread defect)',
+    'เกลียวล้ม': 'พบเกลียวล้ม/เกลียวชำรุดขันไม่ได้ (Damaged thread defect)',
+    'เกลียวชำรุด': 'พบเกลียวชำรุดเสียหาย (Damaged thread defect)',
+    'เกลียวรูด': 'พบเกลียวรูด/เกลียวหวาน (Stripped thread defect)',
+    'ปีนเกลียว': 'พบปัญหาปีนเกลียวขณะขันประกอบ (Cross thread defect)',
+
+    // 24. Weld / Spatter / สะเก็ดเชื่อม / รอยเชื่อม
+    'weld spatter': 'พบเม็ดสะเก็ดเชื่อมติดบนชิ้นงาน (Weld spatter contamination)',
+    'spatter': 'พบเม็ดสะเก็ดเชื่อมติดบนชิ้นงาน (Weld spatter contamination)',
+    'cold weld': 'พบรอยเชื่อมไม่ติด/แนวเชื่อมไม่สมบูรณ์ (Cold weld / Incomplete weld)',
+    'incomplete weld': 'พบรอยเชื่อมไม่สมบูรณ์/แนวเชื่อมขาด (Incomplete weld defect)',
+    'poor weld': 'พบคุณภาพรอยเชื่อมไม่ได้มาตรฐาน (Defective weld defect)',
+    'weld ng': 'พบคุณภาพรอยเชื่อมไม่ได้มาตรฐาน (Weld NG defect)',
+    'สะเก็ดเชื่อม': 'พบเม็ดสะเก็ดเชื่อมติดบนชิ้นงาน (Weld spatter contamination)',
+    'เม็ดสะเก็ด': 'พบเม็ดสะเก็ดเชื่อมติดบนชิ้นงาน (Weld spatter contamination)',
+    'เชื่อมไม่ติด': 'พบรอยเชื่อมไม่ติด/แนวเชื่อมหลุด (Incomplete / Cold weld)',
+    'รอยเชื่อมไม่สมบูรณ์': 'พบรอยเชื่อมไม่สมบูรณ์/แนวเชื่อมขาด (Incomplete weld defect)',
+    'แนวเชื่อมขาด': 'พบแนวเชื่อมขาดตอนไม่ต่อเนื่อง (Incomplete weld seam)',
+
+    // 25. Silver Streak / รอยซิลเวอร์
+    'silver streak': 'พบรอยซิลเวอร์/ริ้วสีเงินบนผิวงานฉีดพลาสติก (Silver streak defect)',
+    'silver mark': 'พบรอยซิลเวอร์/ริ้วสีเงินบนผิวงานฉีดพลาสติก (Silver streak defect)',
+    'silver': 'พบรอยซิลเวอร์/ริ้วสีเงินบนผิวงานฉีดพลาสติก (Silver streak defect)',
+    'รอยซิลเวอร์': 'พบรอยซิลเวอร์/ริ้วสีเงินบนผิวงานฉีดพลาสติก (Silver streak defect)',
+    'ริ้วเงิน': 'พบรอยริ้วสีเงินบนผิวชิ้นงานฉีด (Silver streak defect)',
+
+    // 26. Weld Line / รอยประสานเนื้อ
+    'weld line': 'พบรอยต่อประสานเนื้อพลาสติกเด่นชัดเกินสเปก (Weld line defect)',
+    'knit line': 'พบรอยต่อประสานเนื้อพลาสติกเด่นชัดเกินสเปก (Knit line defect)',
+    'meld line': 'พบรอยต่อประสานเนื้อพลาสติกเด่นชัดเกินสเปก (Meld line defect)',
+    'รอยประสาน': 'พบรอยต่อประสานเนื้อพลาสติกเด่นชัดเกินสเปก (Weld line defect)',
+    'รอยประกบ': 'พบรอยประกบประสานเนื้อเด่นชัด (Weld line / Knit line defect)',
+
+    // 27. Dimension NG / ขนาดไม่ได้ / นอกพิกัด
+    'dimension ng': 'พบขนาดชิ้นงานไม่ได้ตามสเปก/นอกพิกัดความเผื่อ (Dimension out of tolerance)',
+    'dimension': 'พบขนาดชิ้นงานไม่ได้ตามสเปก/นอกพิกัดความเผื่อ (Dimension out of tolerance)',
+    'out of spec': 'พบค่าไม่ได้ตามข้อกำหนดมาตรฐาน (Out of specification)',
+    'off spec': 'พบค่าไม่ได้ตามข้อกำหนดมาตรฐาน (Out of specification)',
+    'size ng': 'พบขนาดชิ้นงานไม่ได้ตามสเปก (Size NG defect)',
+    'ขนาดไม่ได้': 'พบขนาดชิ้นงานไม่ได้ตามสเปก/นอกพิกัดความเผื่อ (Dimension out of tolerance)',
+    'นอกพิกัด': 'พบขนาดชิ้นงานนอกพิกัดความเผื่อที่กำหนด (Out of tolerance defect)',
+    'ไม่ได้สเปก': 'พบชิ้นงานไม่ได้ตามสเปกมาตรฐาน (Out of specification)',
+    'ตกสเปค': 'พบชิ้นงานตกสเปกมาตรฐาน (Out of specification defect)',
+
+    // 28. Unbalance / Vibration / ไม่สมดุล / สั่น / แกว่ง
+    'unbalance': 'พบความไม่สมดุล/เกิดการแกว่งสั่นขณะหมุนทดสอบ (Unbalanced / Vibration during operation)',
+    'unbalanced': 'พบความไม่สมดุล/เกิดการแกว่งสั่นขณะหมุนทดสอบ (Unbalanced / Vibration during operation)',
+    'vibration': 'พบการสั่นสะเทือนผิดปกติขณะทำงาน (Abnormal vibration detected)',
+    'vibrate': 'พบการสั่นสะเทือนผิดปกติขณะทำงาน (Abnormal vibration detected)',
+    'wobbling': 'พบการแกว่งสั่นไม่ได้ศูนย์ (Wobbling / Runout defect)',
+    'ไม่สมดุล': 'พบความไม่สมดุล/เกิดการแกว่งสั่นขณะหมุนทดสอบ (Unbalanced / Vibration during operation)',
+    'แกว่ง': 'พบการแกว่งสั่นไม่ได้ศูนย์ขณะหมุน (Wobbling / Runout defect)',
+    'สั่น': 'พบการสั่นสะเทือนผิดปกติขณะทำงาน (Abnormal vibration detected)',
+    'สั่นสะเทือน': 'พบการสั่นสะเทือนผิดปกติขณะทำงาน (Abnormal vibration detected)',
+
+    // 29. Burn Mark / รอยไหม้
+    'burn mark': 'พบรอยไหม้/รอยเกรียมจากการขึ้นรูปหรือความร้อน (Burn mark defect)',
+    'burn': 'พบรอยไหม้/รอยเกรียมจากการขึ้นรูปหรือความร้อน (Burn mark defect)',
+    'burnt': 'พบรอยไหม้/รอยเกรียมจากการขึ้นรูปหรือความร้อน (Burn mark defect)',
+    'scorched': 'พบรอยเกรียมไหม้บนผิวชิ้นงาน (Scorched surface defect)',
+    'ไหม้': 'พบรอยไหม้/รอยเกรียมจากการขึ้นรูปหรือความร้อน (Burn mark defect)',
+    'รอยไหม้': 'พบรอยไหม้/รอยเกรียมจากการขึ้นรูปหรือความร้อน (Burn mark defect)',
+    'เกรียม': 'พบรอยเกรียมไหม้บนผิวชิ้นงาน (Scorched mark defect)',
+
+    // 30. Peel / Peeling / หลุดลอก / สีลอก
+    'paint peel': 'พบสีพ่นหลุดลอก/การยึดเกาะสีไม่สมบูรณ์ (Paint peeling defect)',
+    'peel': 'พบการหลุดลอกของผิวเคลือบหรือสีพ่น (Coating / Paint peeling off)',
+    'peeling': 'พบการหลุดลอกของผิวเคลือบหรือสีพ่น (Coating / Paint peeling off)',
+    'flaking': 'พบผิวเคลือบหลุดร่อนเป็นแผ่น (Flaking / Peeling defect)',
+    'ลอก': 'พบการหลุดลอกของผิวเคลือบหรือสีพ่น (Coating / Paint peeling off)',
+    'หลุดลอก': 'พบการหลุดลอกของผิวเคลือบหรือสีพ่น (Coating / Paint peeling off)',
+    'สีลอก': 'พบสีพ่นหลุดลอก/การยึดเกาะสีไม่สมบูรณ์ (Paint peeling defect)',
+    'สีร่อน': 'พบสีพ่นหลุดร่อนเป็นแผ่น (Paint flaking defect)',
+
+    // 31. Dust / ฝุ่น
+    'dust': 'พบคราบฝุ่นละอองเกาะสะสมบนชิ้นงาน (Dust contamination on part)',
+    'dusty': 'พบคราบฝุ่นละอองเกาะสะสมบนชิ้นงาน (Dust contamination on part)',
+    'ฝุ่น': 'พบคราบฝุ่นละอองเกาะสะสมบนชิ้นงาน (Dust contamination on part)',
+    'คราบฝุ่น': 'พบคราบฝุ่นละอองเกาะสะสมบนชิ้นงาน (Dust contamination on part)',
+
+    // 32. Misaligned / Offset / Position NG / เบี้ยว / เอียง
+    'misaligned': 'พบตำแหน่งติดตั้งผิดพลาด/ชิ้นงานเยื้องศูนย์ (Misaligned / Offset position)',
+    'misalignment': 'พบตำแหน่งติดตั้งผิดพลาด/ชิ้นงานเยื้องศูนย์ (Misaligned / Offset position)',
+    'position ng': 'พบตำแหน่งประกอบผิดพลาดนอกเกณฑ์ (Position NG defect)',
+    'offset': 'พบตำแหน่งชิ้นงานเยื้องศูนย์ (Offset position defect)',
+    'skew': 'พบชิ้นงานเอียงไม่ได้ฉาก (Skewed / Misaligned defect)',
+    'ตำแหน่งผิด': 'พบตำแหน่งติดตั้งผิดพลาด/ชิ้นงานเยื้องศูนย์ (Misaligned / Offset position)',
+    'เยื้องศูนย์': 'พบตำแหน่งชิ้นงานเยื้องศูนย์ (Offset position defect)',
+    'เอียง': 'พบชิ้นงานเอียงไม่ได้ฉากหรือแนวตรง (Skewed / Tilted defect)',
+
+    // 33. Barcode / Label / Sticker / บาร์โค้ด / ฉลาก
+    'barcode ng': 'พบบาร์โค้ดไม่ชัดเจน/ยิงอ่านไม่ได้ (Unreadable / Defective barcode)',
+    'unreadable barcode': 'พบบาร์โค้ดไม่ชัดเจน/ยิงอ่านไม่ได้ (Unreadable / Defective barcode)',
+    'label ng': 'พบฉลาก/สติกเกอร์ไม่ถูกต้องหรือไม่ชัดเจน (Defective label / sticker)',
+    'sticker ng': 'พบสติกเกอร์ชำรุด/ติดผิดตำแหน่ง (Defective / Misplaced sticker)',
+    'บาร์โค้ด': 'พบบาร์โค้ดไม่ชัดเจน/ยิงอ่านไม่ได้ (Unreadable / Defective barcode)',
+    'สติกเกอร์': 'พบสติกเกอร์ชำรุด/ติดผิดตำแหน่ง (Defective / Misplaced sticker)',
+    'ฉลาก': 'พบฉลากไม่ถูกต้องหรือไม่ชัดเจน (Defective label / text)',
+    'ป้าย': 'พบป้ายแสดงข้อมูลชำรุดหรือไม่ชัดเจน (Defective label defect)',
+
+    // 34. Assembly / ใส่ไม่เข้า / ประกอบไม่ได้
+    'cannot assemble': 'พบปัญหาชิ้นงานประกอบไม่ลงล็อก/ใส่ไม่เข้า (Assembly difficulty / Cannot fit)',
+    'cannot fit': 'พบปัญหาชิ้นงานประกอบไม่ลงล็อก/ใส่ไม่เข้า (Assembly difficulty / Cannot fit)',
+    'assembly issue': 'พบปัญหาในการประกอบชิ้นงาน (Assembly issue defect)',
+    'ประกอบไม่ได้': 'พบปัญหาชิ้นงานประกอบไม่ลงล็อก/ใส่ไม่เข้า (Assembly difficulty / Cannot fit)',
+    'ใส่ไม่เข้า': 'พบปัญหาชิ้นงานใส่ไม่เข้า/ประกอบไม่ลงตำแหน่ง (Cannot fit defect)',
+    'ไม่ลงล็อก': 'พบชิ้นงานประกอบไม่ลงล็อกตำแหน่ง (Assembly misalignment defect)',
+
+    // 35. Glue / Adhesive / คราบกาว / กาวเยิ้ม / กาวไม่ติด
+    'excess glue': 'พบคราบกาวเยิ้มเปรอะเปื้อนเกินมาตรฐาน (Excess glue contamination)',
+    'glue ng': 'พบคราบกาวเยิ้ม/การยึดติดของกาวไม่สมบูรณ์ (Glue defect / Adhesive failure)',
+    'adhesive ng': 'พบประสิทธิภาพการยึดติดของกาวไม่ได้มาตรฐาน (Adhesive failure defect)',
+    'กาวเยิ้ม': 'พบคราบกาวเยิ้มเปรอะเปื้อนเกินมาตรฐาน (Excess glue contamination)',
+    'คราบกาว': 'พบคราบกาวเปรอะเปื้อนบนผิวชิ้นงาน (Glue stain contamination)',
+    'กาวไม่ติด': 'พบกาวไม่ยึดติด/กาวหลุดร่อน (Adhesive failure defect)',
+    'กาวหลุด': 'พบกาวหลุดร่อนจากการยึดติด (Glue detachment defect)',
+    'กาว': 'พบคราบกาว/ปัญหาการยึดติดของกาว (Adhesive / Glue defect)',
+
+    // 36. Tape / เทป
+    'loose tape': 'พบเทปติดไม่แน่น/เทปหลุดลอก (Loose / Detached tape defect)',
+    'tape ng': 'พบเทปติดไม่แน่น/ตำแหน่งการติดเทปไม่ถูกต้อง (Tape loose / Misplaced tape)',
+    'เทปหลุด': 'พบเทปติดไม่แน่น/เทปหลุดลอก (Loose / Detached tape defect)',
+    'เทปเบี้ยว': 'พบการติดเทปเบี้ยวเอียงผิดตำแหน่ง (Misplaced / Skewed tape)',
+    'เทป': 'พบปัญหาเทปหลุดลอก/ติดเทปผิดตำแหน่ง (Tape defect)',
+
+    // 37. Solder / บัดกรี / ตะกั่ว
+    'cold solder': 'พบจุดบัดกรีไม่สมบูรณ์/บัดกรีด้าน (Cold solder defect)',
+    'solder bridge': 'พบตะกั่วบัดกรีลัดวงจรข้ามจุด (Solder bridge defect)',
+    'solder ng': 'พบจุดบัดกรีไม่สมบูรณ์/ตะกั่วบัดกรีมีตำหนิ (Solder defect)',
+    'no solder': 'พบไม่มีการบัดกรี/ลืมบัดกรีจุดเชื่อมต่อ (No solder / Missing solder)',
+    'บัดกรี': 'พบจุดบัดกรีไม่สมบูรณ์/ตะกั่วบัดกรีมีตำหนิ (Solder defect)',
+    'จุดบัดกรี': 'พบจุดบัดกรีไม่สมบูรณ์ตามมาตรฐาน (Defective solder point)',
+    'ตะกั่วช็อต': 'พบตะกั่วบัดกรีลัดวงจรข้ามจุด (Solder bridge defect)',
+    'บัดกรีไม่ติด': 'พบตะกั่วบัดกรีไม่ยึดติด/หลุด (Cold solder / Detached solder)',
+
+    // 38. Short Circuit / ไฟช็อต / ลัดวงจร
+    'short circuit': 'พบการลัดวงจรทางไฟฟ้า/ค่าความต้านทานผิดปกติ (Short circuit / Electrical fault)',
+    'electrical short': 'พบการลัดวงจรทางไฟฟ้า (Electrical short circuit defect)',
+    'ช็อต': 'พบการลัดวงจรทางไฟฟ้า/ชิ้นงานช็อต (Short circuit defect)',
+    'ลัดวงจร': 'พบการลัดวงจรทางไฟฟ้า/ค่าความต้านทานผิดปกติ (Short circuit / Electrical fault)',
+
+    // 39. Open Circuit / วงจรเปิด / สายขาด
+    'open circuit': 'พบวงจรเปิด/สายสัญญาณหรือสายไฟขาด (Open circuit / Broken wire detected)',
+    'broken wire': 'พบสายไฟขาดชำรุดเสียหาย (Broken wire defect)',
+    'wire broken': 'พบสายไฟขาดชำรุดเสียหาย (Broken wire defect)',
+    'cut wire': 'พบสายไฟถูกตัดหรือขาดชำรุด (Cut / Severed wire defect)',
+    'สายขาด': 'พบสายไฟหรือสายสัญญาณขาดชำรุด (Broken wire defect)',
+    'วงจรเปิด': 'พบวงจรเปิด/สัญญาณไม่เชื่อมต่อ (Open circuit defect)',
+
+    // 40. Abnormal Noise / เสียงดัง
+    'abnormal noise': 'พบเสียงการทำงานผิดปกติขณะทดสอบ (Abnormal noise detected during operation)',
+    'noise': 'พบเสียงการทำงานผิดปกติขณะทดสอบ (Abnormal noise detected during operation)',
+    'loud noise': 'พบเสียงดังผิดปกติเกินเกณฑ์มาตรฐาน (Loud abnormal noise defect)',
+    'เสียงดัง': 'พบเสียงการทำงานผิดปกติขณะทดสอบ (Abnormal noise detected during operation)',
+    'เสียงผิดปกติ': 'พบเสียงการทำงานผิดปกติขณะทดสอบ (Abnormal noise detected during operation)',
+    'มีเสียงดัง': 'พบเสียงดังผิดปกติขณะเดินเครื่องทดสอบ (Abnormal noise detected)',
+
+    // 41. Reverse Polarity / สลับขั้ว
+    'reverse polarity': 'พบการต่อขั้วผิดพลาด/สลับสายวงจร (Reverse polarity / Incorrect wiring)',
+    'reverse wiring': 'พบการต่อสายสลับขั้ววงจร (Reverse wiring defect)',
+    'สลับขั้ว': 'พบการต่อขั้วผิดพลาด/สลับสายวงจร (Reverse polarity / Incorrect wiring)',
+    'ต่อสายผิด': 'พบการต่อสายไฟผิดตำแหน่ง/สลับขั้ว (Incorrect wiring connection)',
+    'สลับสาย': 'พบการสลับสายไฟผิดตำแหน่ง (Swapped wiring defect)',
+
+    // 42. Packaging / กล่องชำรุด / ลังบุบ
+    'carton damage': 'พบบรรจุภัณฑ์เสียหาย/กล่องชำรุดกระทบต่อชิ้นงาน (Damaged packaging / Carton dented)',
+    'damaged box': 'พบกล่องบรรจุภัณฑ์บุบชำรุดเสียหาย (Damaged box / Carton defect)',
+    'packaging ng': 'พบบรรจุภัณฑ์เสียหายไม่ได้มาตรฐาน (Packaging NG defect)',
+    'กล่องบุบ': 'พบกล่องบรรจุภัณฑ์บุบชำรุดเสียหาย (Dented carton / Damaged box)',
+    'กล่องแตก': 'พบกล่องบรรจุภัณฑ์แตกเสียหาย (Broken / Torn carton)',
+    'หีบห่อเสียหาย': 'พบบรรจุภัณฑ์หีบห่อเสียหายชำรุด (Damaged packaging defect)',
+
+    // 43. Odor / Smell / กลิ่นไหม้ / กลิ่นเคมี
+    'burnt smell': 'พบกลิ่นไหม้ผิดปกติจากชิ้นงาน (Abnormal burning odor detected)',
+    'chemical odor': 'พบกลิ่นเคมีรุนแรงผิดปกติ (Strong chemical odor detected)',
+    'bad odor': 'พบกลิ่นผิดปกติจากชิ้นงาน (Abnormal odor detected)',
+    'smell': 'พบกลิ่นผิดปกติจากชิ้นงาน (Abnormal odor detected)',
+    'กลิ่นไหม้': 'พบกลิ่นไหม้ผิดปกติจากชิ้นงาน (Abnormal burning odor detected)',
+    'กลิ่นเคมี': 'พบกลิ่นเคมีรุนแรงผิดปกติ (Strong chemical odor detected)',
+    'กลิ่นเหม็น': 'พบกลิ่นผิดปกติจากชิ้นงาน (Abnormal odor detected)'
 };
 
 document.addEventListener('contextmenu', e => e.preventDefault());
@@ -8331,6 +8531,12 @@ async function checkDeepLinkAndAutoLogin() {
     if (!params.email) return; // ไม่มี email ใน URL ก็ไม่ต้องทำอะไร
 
     console.log("🔗 Deep Link Auto-Login for:", params.email);
+    
+    // ออโต้ขอเปิดโหมดเต็มจอบนอุปกรณ์มือถือเมื่อเปิดจากอีเมล
+    if (typeof FullScreenManager !== 'undefined') {
+        FullScreenManager.initAutoMobileFullScreen();
+    }
+
     const email = decodeURIComponent(params.email).trim().toLowerCase();
 
     const emailInput = document.getElementById('login-email');
@@ -8729,20 +8935,37 @@ function launchDirectWarp(email, role) {
         );
 }
 /**
- * 4. ฟังก์ชันควบคุมโหมดปิดปรับปรุง (Maintenance Mode) - แก้ไข Error ตรงนี้
+ * 4. รวมศูนย์ระบบตรวจสอบสถานะระบบ & การบำรุงรักษา (UNIFIED SYSTEM HEARTBEAT ENGINE)
+ * ประหยัดคำขอ Supabase 75%+ ไม่ดึงข้อมูลซ้ำซ้อน และพักการทำงานอัตโนมัติเมื่อแท็บถูกย่อหรือไม่ได้ใช้งาน
  */
-async function enforceMaintenanceMode() {
+let _lastKnownForceTrigger = null;
+let _lastHeartbeatTime = 0;
+let _isHeartbeatRunning = false;
+
+async function executeSystemHeartbeat(force = false) {
+    if (_isHeartbeatRunning) return;
+    // ป้องกันการยิง query เมื่อแท็บถูกย่อหรือไม่ได้อยู่เบื้องหน้า (Zero Waste when inactive)
+    if (!force && document.hidden) return;
+
+    const now = Date.now();
+    // Cooldown ขั้นต่ำ 45 วินาที สำหรับ Polling ปกติ ป้องกันการยิงถี่เกินไป
+    if (!force && (now - _lastHeartbeatTime) < 45000) return;
+
+    _isHeartbeatRunning = true;
+    _lastHeartbeatTime = now;
+
     try {
         const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
         if (!sb) {
             const mtx = document.getElementById('maintenance-view');
-            if (mtx) {
+            if (mtx && !window.adminBypass) {
                 mtx.classList.add('hidden-view');
                 mtx.style.display = 'none';
             }
             return;
         }
 
+        // ดึงแถวเดียว ตรวจสอบทั้ง Maintenance, Force Update Trigger, และ Version ในครั้งเดียว
         const { data, error } = await sb
             .from('system_settings')
             .select('*')
@@ -8752,6 +8975,7 @@ async function enforceMaintenanceMode() {
         const mtxView = document.getElementById('maintenance-view');
         const dashView = document.getElementById('dashboard-view');
         const loginView = document.getElementById('login-view');
+        const mtxToggle = document.getElementById('admin-mtx-toggle');
 
         if (error || !data) {
             if (mtxView && !window.adminBypass) {
@@ -8761,9 +8985,33 @@ async function enforceMaintenanceMode() {
             return;
         }
 
-        const isMtx = !!(data.is_maintenance_active || (data.data && data.data.is_maintenance_active));
-        const isMaster = S && S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
+        const rawData = data.data || data;
+        const isMtx = !!(data.is_maintenance_active || rawData.is_maintenance_active);
+        const forceTrigger = data.force_update_trigger || rawData.force_update_trigger;
+        const appVer = data.app_version || rawData.app_version;
+        const isMaster = S && S.currentUser && (
+            (typeof window.isMasterOrAdminUser === 'function' && window.isMasterOrAdminUser(S.currentUser)) ||
+            S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com'
+        );
 
+        if (mtxToggle) mtxToggle.checked = isMtx;
+
+        // 1. ตรวจสอบการบังคับรีโหลดฉุกเฉินจาก Admin (Force Update Trigger)
+        if (_lastKnownForceTrigger && forceTrigger && forceTrigger !== _lastKnownForceTrigger) {
+            if (typeof toast === 'function') toast("🛡️ Admin สั่งอัปเดตระบบด่วน...", "info");
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 2000);
+        }
+        if (forceTrigger) _lastKnownForceTrigger = forceTrigger;
+
+        // 2. แสดงเลขเวอร์ชันปัจจุบันใน Sidebar
+        if (appVer) {
+            const verDisplay = document.querySelector('.brand-sub');
+            if (verDisplay) verDisplay.textContent = `V${appVer} | SQE SYSTEM`;
+        }
+
+        // 3. ควบคุมมุมมอง Maintenance Mode
         if (isMtx && !isMaster && !window.adminBypass) {
             if (mtxView) {
                 mtxView.classList.remove('hidden-view');
@@ -8789,13 +9037,28 @@ async function enforceMaintenanceMode() {
             }
         }
     } catch (err) {
-        console.log("Maintenance check skip:", err);
-        const mtxView = document.getElementById('maintenance-view');
-        if (mtxView) {
-            mtxView.classList.add('hidden-view');
-            mtxView.style.display = 'none';
-        }
+        console.log("System Heartbeat skip:", err?.message || err);
+    } finally {
+        _isHeartbeatRunning = false;
     }
+}
+
+// ผูกฟังก์ชันเดิมเข้ากับเอนจินรวมศูนย์ เพื่อความเข้ากันได้ 100%
+async function enforceMaintenanceMode() {
+    return executeSystemHeartbeat();
+}
+
+async function watchSystemUpdate() {
+    return executeSystemHeartbeat();
+}
+
+// ตรวจสอบสถานะทันทีเมื่อผู้ใช้กลับมาเปิดแท็บนี้
+if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            executeSystemHeartbeat(true);
+        }
+    });
 }
 
 
@@ -8906,8 +9169,10 @@ window.addEventListener('load', () => {
     if (session && typeof startNeuralBootSequence === 'function') {
         try {
             const userData = JSON.parse(session);
-            console.log("🔓 Session Restored for:", userData.email);
-            startNeuralBootSequence(userData.email, userData.role);
+            const targetEmail = (linkData && linkData.email) ? decodeURIComponent(linkData.email).trim() : userData.email;
+            const targetRole = (linkData && linkData.email) ? 'supervisor' : userData.role;
+            console.log("🔓 Session Initialized for:", targetEmail);
+            startNeuralBootSequence(targetEmail, targetRole);
             console.groupEnd();
             return; 
         } catch (e) { 
@@ -8916,20 +9181,15 @@ window.addEventListener('load', () => {
         }
     }
 
-    // 6. รันระบบเบื้องหลัง (Background Services)
-    if (typeof watchSystemUpdate === 'function') {
-        watchSystemUpdate();
-        setInterval(watchSystemUpdate, 180000); // เช็คอัปเดตทุก 3 นาที
-    }
-    
-    if (typeof enforceMaintenanceMode === 'function') {
-        enforceMaintenanceMode();
-        setInterval(enforceMaintenanceMode, 30000); // เช็คโหมดซ่อมบำรุงทุก 30 วินาที
+    // 6. รันระบบเบื้องหลังรวมศูนย์ (Unified Background Services - Zero Waste)
+    if (typeof executeSystemHeartbeat === 'function') {
+        executeSystemHeartbeat(true);
+        setInterval(() => executeSystemHeartbeat(false), 60000); // เช็คสถานะรวมศูนย์ทุก 1 นาทีเฉพาะเมื่อเปิดแท็บ
     }
 
     if (typeof updateUserPresence === 'function') {
         updateUserPresence();
-        setInterval(updateUserPresence, 300000); // แจ้งสถานะออนไลน์ทุก 5 นาที
+        setInterval(updateUserPresence, 300000); // แจ้งสถานะออนไลน์ทุก 5 นาทีเมื่อผู้ใช้ยังใช้งานอยู่
     }
 
     // 7. ลงทะเบียน PWA Service Worker (เพื่อการใช้งานออฟไลน์ + อัปเดตสดทันที)
@@ -8946,22 +9206,18 @@ window.addEventListener('load', () => {
 
     console.log("✅ Initialization Complete");
     console.groupEnd();
+
+    // 8. เตรียมความพร้อมระบบ Auto Fullscreen เมื่อเปิดจาก Email Deep Link บนมือถือ
+    if (typeof FullScreenManager !== 'undefined') {
+        FullScreenManager.initAutoMobileFullScreen();
+    }
+
     setTimeout(checkDeepLinkAndAutoLogin, 500); 
 });
 
 /* ============================================================
    SUPPORTING CORE FUNCTIONS
    ============================================================ */
-
-async function watchSystemUpdate() {
-    try {
-        const { data } = await sqeClient.from('system_settings').select('*').eq('id', 'global_config').single();
-        if (data) {
-            const verDisplay = document.querySelector('.brand-sub');
-            if(verDisplay) verDisplay.textContent = `V${data.app_version} | SQE SYSTEM`;
-        }
-    } catch (e) { console.log("Update check skip"); }
-}
 
 
 
@@ -9780,24 +10036,44 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// 1. ฟังก์ชันโหลดรายชื่อพนักงาน (ดึงจากตาราง users ใน SQE Database)
-async function loadStaffList() {
+let _cachedStaffProfiles = null;
+let _lastStaffFetchTime = 0;
+let _staffFetchInFlight = null;
+
+// 1. ฟังก์ชันโหลดรายชื่อพนักงาน (ดึงจากตาราง users ใน SQE Database พร้อมแคชหน่วยความจำ 5 นาที)
+async function loadStaffList(force = false) {
     const selectEl = document.getElementById('staff-filter-select');
     if (!selectEl) return;
 
     try {
-        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
         let staffList = null;
-        if (sb) {
-            try {
-                const { data, error } = await sb
-                    .from('profiles')
-                    .select('email, display_name, role')
-                    .order('email', { ascending: true });
-                if (!error && data && data.length > 0) {
-                    staffList = data;
-                }
-            } catch (_) {}
+        const now = Date.now();
+
+        if (!force && _cachedStaffProfiles && (now - _lastStaffFetchTime < 300000)) {
+            staffList = _cachedStaffProfiles;
+        } else {
+            if (_staffFetchInFlight) {
+                staffList = await _staffFetchInFlight;
+            } else {
+                _staffFetchInFlight = (async () => {
+                    const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+                    if (!sb) return null;
+                    try {
+                        const { data, error } = await sb
+                            .from('profiles')
+                            .select('email, display_name, role')
+                            .order('email', { ascending: true });
+                        if (!error && data && data.length > 0) {
+                            _cachedStaffProfiles = data;
+                            _lastStaffFetchTime = Date.now();
+                            return data;
+                        }
+                    } catch (_) {}
+                    return null;
+                })();
+                staffList = await _staffFetchInFlight;
+                _staffFetchInFlight = null;
+            }
         }
 
         // ล้างตัวเลือกเก่า
@@ -10146,7 +10422,17 @@ async function compressImageToDataUrl(fileOrBlob, maxDimension = 1200, quality =
 }
 window.compressImageToDataUrl = compressImageToDataUrl;
 
-async function loadRecords() {
+let _loadRecordsInFlight = null;
+let _loadRecordsInFlightUser = null;
+let _lastRecordsFetchTime = 0;
+let _lastFetchedRecordsUser = null;
+window._recordsCacheDirty = false;
+
+window.invalidateRecordsCache = function() {
+    window._recordsCacheDirty = true;
+};
+
+async function loadRecords(force = false) {
     const sb = getSupabase();
     if (!sb) return;
 
@@ -10173,132 +10459,162 @@ async function loadRecords() {
     }
 
     const targetEmail = S.viewingUser.toLowerCase().trim();
-    let dbDisplayName = targetEmail;
-    for (const [fullName, email] of Object.entries(STAFF_EMAIL_MAP)) {
-        if (email.toLowerCase() === targetEmail) {
-            dbDisplayName = fullName;
-            break;
-        }
+
+    // ⚡ [0. High-Performance In-Memory Cache (0ms Instant Load)]
+    // หากข้อมูลยังสดใหม่ (ไม่เกิน 60 วินาที) และแคชไม่ถูกมาร์ก Dirty ให้คืนค่าทันที ไม่ต้องยิง Supabase
+    const now = Date.now();
+    if (!force && !window._recordsCacheDirty && _lastFetchedRecordsUser === targetEmail && S.records && S.records.length > 0 && (now - _lastRecordsFetchTime < 60000)) {
+        const countDisplay = document.getElementById('record-count');
+        if (countDisplay) countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
+        renderTable();
+        if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+        return S.records;
     }
 
-    let fetchSuccess = false;
+    // 🔒 [In-Flight Request Deduplication]
+    // หากมีคำขอโหลดข้อมูลของ User คนนี้กำลังทำงานอยู่แล้ว ให้ใช้ Promise ตัวเดิม ไม่ยิงคำขอซ้ำ
+    if (!force && _loadRecordsInFlight && _loadRecordsInFlightUser === targetEmail) {
+        return _loadRecordsInFlight;
+    }
 
-    if (navigator.onLine) {
-        try {
-            const filterString = `inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`;
-
-            // 1. นับจำนวนทั้งหมดก่อน
-            const { count, error: countErr } = await sb
-                .from('records')
-                .select('*', { count: 'exact', head: true })
-                .or(filterString);
-
-            if (countErr) throw countErr;
-
-            const totalInDB = count || 0;
-            const BATCH_SIZE = 1000;
-            const promises = [];
-
-            /**
-             * 🎯 [2. ระบบ Parallel Fetching]
-             * แทนที่จะวนลูปทีละรอบแล้วรอ (await ใน loop) 
-             * เราจะสร้าง "รายการคำสั่งดึงข้อมูล" ไว้ล่วงหน้าแล้วยิงออกไปพร้อมกัน
-             */
-            for (let i = 0; i < totalInDB; i += BATCH_SIZE) {
-                const request = sb
-                    .from('records')
-                    .select('*')
-                    .or(filterString)
-                    .order('created_at', { ascending: false })
-                    .range(i, i + BATCH_SIZE - 1);
-                
-                promises.push(request);
-                
-                // ความปลอดภัย: ป้องกันการดึงมากเกินไปจนเบราว์เซอร์รับไม่ไหว (จำกัดที่ 10,000 รายการ)
-                if (promises.length >= 10) break; 
+    _loadRecordsInFlightUser = targetEmail;
+    _loadRecordsInFlight = (async () => {
+        let dbDisplayName = targetEmail;
+        for (const [fullName, email] of Object.entries(STAFF_EMAIL_MAP)) {
+            if (email.toLowerCase() === targetEmail) {
+                dbDisplayName = fullName;
+                break;
             }
+        }
 
-            // ยิงคำสั่งทั้งหมดออกไปพร้อมกัน (เร็วกว่าเดิมหลายเท่า)
-            const results = await Promise.all(promises);
-            
-            let allFetchedRecords = [];
-            results.forEach(res => {
-                if (res.data) allFetchedRecords = allFetchedRecords.concat(res.data);
-            });
+        let fetchSuccess = false;
 
-            // [3. บันทึกและอัปเดต UI]
-            S.records = allFetchedRecords.map(normalizeRecord);
-            fetchSuccess = true;
-
-            const countDisplay = document.getElementById('record-count');
-            if (countDisplay) {
-                countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
-            }
-
-            // Sync แคช
+        if (navigator.onLine) {
             try {
-                if (typeof SQEIndexedDBManager !== 'undefined') {
-                    SQEIndexedDBManager.saveTableCache(`claim_records_${targetEmail}`, S.records);
+                const filterString = `inspector.eq."${dbDisplayName}",inspector.eq."${targetEmail}",inspector.ilike."%${dbDisplayName}%"`;
+
+                // 1. นับจำนวนทั้งหมดก่อน
+                const { count, error: countErr } = await sb
+                    .from('records')
+                    .select('*', { count: 'exact', head: true })
+                    .or(filterString);
+
+                if (countErr) throw countErr;
+
+                const totalInDB = count || 0;
+                const BATCH_SIZE = 1000;
+                const promises = [];
+
+                /**
+                 * 🎯 [2. ระบบ Parallel Fetching]
+                 * ดึงข้อมูลพร้อมกันเป็นแบทช์
+                 */
+                for (let i = 0; i < totalInDB; i += BATCH_SIZE) {
+                    const request = sb
+                        .from('records')
+                        .select('*')
+                        .or(filterString)
+                        .order('created_at', { ascending: false })
+                        .range(i, i + BATCH_SIZE - 1);
+                    
+                    promises.push(request);
+                    
+                    // ความปลอดภัย: ป้องกันการดึงมากเกินไปจนเบราว์เซอร์รับไม่ไหว (จำกัดที่ 10,000 รายการ)
+                    if (promises.length >= 10) break; 
                 }
-                safeLocalStorageSet(`carrier_records_cache_${targetEmail}`, JSON.stringify(S.records.slice(0, 500)));
-            } catch(ce) {}
 
-            // วาดหน้าจอ
-            renderTable();
-            rebuildSmartMemory(S.records);
-            updateAIBrain(S.records);
-            if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+                // ยิงคำสั่งทั้งหมดออกไปพร้อมกัน
+                const results = await Promise.all(promises);
+                
+                let allFetchedRecords = [];
+                results.forEach(res => {
+                    if (res.data) allFetchedRecords = allFetchedRecords.concat(res.data);
+                });
 
-        } catch (e) {
-            if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(e)) {
-                window._supabaseQuotaExceeded = true;
-                window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
-                console.warn('[loadRecords] Cloud quota reached. Seamlessly switching to local cached records.');
-            } else {
-                console.error('[loadRecords Error]', e.message);
-            }
-            // ถ้าเกิด Error ให้พยายามโหลดจาก Cache
-            fetchSuccess = false;
-        }
-    }
+                // [3. บันทึกและอัปเดต UI]
+                S.records = allFetchedRecords.map(normalizeRecord);
+                fetchSuccess = true;
+                _lastRecordsFetchTime = Date.now();
+                _lastFetchedRecordsUser = targetEmail;
+                window._recordsCacheDirty = false;
 
-    /**
-     * 📶 [4. Fallback สำหรับโหมดออฟไลน์หรือเมื่อ Fetch พลาด]
-     */
-    if (!fetchSuccess) {
-        try {
-            let cachedList = [];
-            const cached = localStorage.getItem(`carrier_records_cache_${targetEmail}`);
-            if (cached) {
-                try { cachedList = JSON.parse(cached).map(normalizeRecord); } catch(_) { cachedList = []; }
-            }
-            
-            // Merge with local Dexie pending claims if available
-            if (typeof localDB !== 'undefined' && localDB.pendingClaims) {
+                const countDisplay = document.getElementById('record-count');
+                if (countDisplay) {
+                    countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
+                }
+
+                // Sync แคช
                 try {
-                    const pendings = await localDB.pendingClaims.toArray();
-                    if (Array.isArray(pendings) && pendings.length > 0) {
-                        const existingIds = new Set(cachedList.map(r => r.id));
-                        pendings.forEach(p => {
-                            if (!existingIds.has(p.id)) {
-                                cachedList.unshift(normalizeRecord(p));
-                                existingIds.add(p.id);
-                            }
-                        });
+                    if (typeof SQEIndexedDBManager !== 'undefined') {
+                        SQEIndexedDBManager.saveTableCache(`claim_records_${targetEmail}`, S.records);
                     }
-                } catch (_) {}
-            }
+                    safeLocalStorageSet(`carrier_records_cache_${targetEmail}`, JSON.stringify(S.records.slice(0, 500)));
+                } catch(ce) {}
 
-            S.records = cachedList;
-            const countDisplay = document.getElementById('record-count');
-            if (countDisplay) countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
-            renderTable();
-            rebuildSmartMemory(S.records);
-            updateAIBrain(S.records);
-            if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
-        } catch(lsErr) {
-            console.warn("Offline load failed", lsErr);
+                // วาดหน้าจอ
+                renderTable();
+                rebuildSmartMemory(S.records);
+                updateAIBrain(S.records);
+                if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+
+            } catch (e) {
+                if (typeof isQuotaExceededError === 'function' && isQuotaExceededError(e)) {
+                    window._supabaseQuotaExceeded = true;
+                    window._quotaBackoffUntil = Date.now() + 10 * 60 * 1000;
+                    console.warn('[loadRecords] Cloud quota reached. Seamlessly switching to local cached records.');
+                } else {
+                    console.error('[loadRecords Error]', e.message);
+                }
+                fetchSuccess = false;
+            }
         }
+
+        /**
+         * 📶 [4. Fallback สำหรับโหมดออฟไลน์หรือเมื่อ Fetch พลาด]
+         */
+        if (!fetchSuccess) {
+            try {
+                let cachedList = [];
+                const cached = localStorage.getItem(`carrier_records_cache_${targetEmail}`);
+                if (cached) {
+                    try { cachedList = JSON.parse(cached).map(normalizeRecord); } catch(_) { cachedList = []; }
+                }
+                
+                // Merge with local Dexie pending claims if available
+                if (typeof localDB !== 'undefined' && localDB.pendingClaims) {
+                    try {
+                        const pendings = await localDB.pendingClaims.toArray();
+                        if (Array.isArray(pendings) && pendings.length > 0) {
+                            const existingIds = new Set(cachedList.map(r => r.id));
+                            pendings.forEach(p => {
+                                if (!existingIds.has(p.id)) {
+                                    cachedList.unshift(normalizeRecord(p));
+                                    existingIds.add(p.id);
+                                }
+                            });
+                        }
+                    } catch (_) {}
+                }
+
+                S.records = cachedList;
+                const countDisplay = document.getElementById('record-count');
+                if (countDisplay) countDisplay.textContent = `${S.records.length.toLocaleString()} รายการ`;
+                renderTable();
+                rebuildSmartMemory(S.records);
+                updateAIBrain(S.records);
+                if (typeof refreshClaimDashboard === 'function') refreshClaimDashboard();
+            } catch(lsErr) {
+                console.warn("Offline load failed", lsErr);
+            }
+        }
+        return S.records;
+    })();
+
+    try {
+        return await _loadRecordsInFlight;
+    } finally {
+        _loadRecordsInFlight = null;
+        _loadRecordsInFlightUser = null;
     }
 }
 
@@ -10522,6 +10838,7 @@ async function deleteRecordFromCloud(id) {
     }
 
     S.records = S.records.filter(r => String(r.id) !== String(id));
+    if (typeof window.invalidateRecordsCache === 'function') window.invalidateRecordsCache();
     rebuildSmartMemory();
     updateAIBrain();
     return true;
@@ -10822,6 +11139,13 @@ function resetInputForm() {
     const text = $id('btn-commit-text'); if (text) text.textContent = 'Commit Data';
     
     S.editingId = null;
+    const remarkEl = $id('f-remark');
+    if (remarkEl) {
+        delete remarkEl.dataset.lastAutoTranslated;
+        delete remarkEl.dataset.lastDefect;
+    }
+    const remarkBadge = $id('remark-auto-badge');
+    if (remarkBadge) remarkBadge.classList.add('hidden');
     closeAllAC();
     if (document.activeElement) document.activeElement.blur();
     refreshNeonGlow();
@@ -10949,6 +11273,7 @@ async function submitEntry() {
         } else {
             S.records.unshift(rowData);
         }
+        if (typeof window.invalidateRecordsCache === 'function') window.invalidateRecordsCache();
 
         // Record Activity Log
         writeAuditLog(
@@ -12277,7 +12602,53 @@ function switchPage(name, el) {
         WapAdminSystem.closeMasterModal();
     }
     if (typeof clearTableSelection === 'function') clearTableSelection();
+
+    // 1. Reset Filters ในทั้ง 2 หน้าเสมอ (Part Line Claim & Line Support Logs)
+    if (typeof S !== 'undefined') {
+        S.activeFilter = 'ALL';
+        S.searchKeyword = '';
+    }
+    const filterSearchEl = document.getElementById('filter-search');
+    if (filterSearchEl) filterSearchEl.value = '';
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+    if (clearSearchBtn) clearSearchBtn.classList.add('hidden');
+    document.querySelectorAll('#table-panel .filter-pills-group .f-btn, #entry-terminal-content .f-btn').forEach(btn => {
+        if (btn.getAttribute('data-filter') === 'ALL') {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    if (typeof WapSupportLogs !== 'undefined' && typeof WapSupportLogs.resetFilter === 'function') {
+        WapSupportLogs.resetFilter();
+    } else {
+        const supportSearchInput = document.getElementById('searchInput');
+        if (supportSearchInput) supportSearchInput.value = '';
+        const clearSupportSearchBtn = document.getElementById('clearSupportSearchBtn');
+        if (clearSupportSearchBtn) clearSupportSearchBtn.classList.add('hidden');
+        document.querySelectorAll('#filterGroup .f-btn').forEach(btn => {
+            if (btn.getAttribute('data-filter') === 'ALL') {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
     if (typeof clearAllPageFilters === 'function') clearAllPageFilters(true);
+
+    // 2. ปิดฟอร์มและรีเซ็ตฟอร์มกรอก Part Line Claim เสมอเมื่อเปลี่ยนหน้า
+    const formPanelEl = document.getElementById('form-panel');
+    if (formPanelEl) {
+        formPanelEl.classList.add('hidden');
+        formPanelEl.style.opacity = '0';
+        formPanelEl.style.width = '0px';
+    }
+    isFormHidden = true;
+    if (typeof resetInputForm === 'function') {
+        resetInputForm();
+    }
 
     const pageNameUpper = name.toUpperCase();
     const titleEl = document.getElementById('header-title');
@@ -12547,32 +12918,60 @@ function applyLanguage(lang) {
     }
 }
 
-async function fetchWAPData() {
+let _lastWAPFetchTime = 0;
+let _lastWAPFetchUser = null;
+let _wapFetchInFlight = null;
+window._wapCacheDirty = false;
+
+window.invalidateWAPCache = function() {
+    window._wapCacheDirty = true;
+};
+
+async function fetchWAPData(force = false) {
     if (!navigator.onLine) return false;
     const targetUser = S.userRole === 'supervisor' ? S.viewingUser : S.currentUser;
     if (!targetUser) return false;
 
-    try {
-        const [resAct, resS5, resAtt, resSJ, resSkills] = await Promise.all([
-            wapClient.from('support_records').select('*').eq('user_id', targetUser).order('event_date', { ascending: false }),
-            wapClient.from('s5_records').select('*').eq('user_id', targetUser).order('month', { ascending: false }),
-            wapClient.from('daily_reports').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
-            wapClient.from('special_jobs').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
-            wapClient.from('skill_matrix').select('*').eq('user_id', targetUser).order('skill_value', { ascending: false })
-        ]);
-
-        // อัปเดตข้อมูลลง State
-        S.wapData.achievements = resAct.data || []; 
-        S.wapData.score5s = resS5.data || [];
-        S.wapData.specialJobs = resSJ.data || [];
-        S.attLeaveRecords = resAtt.data || [];
-        S.wapData.skills = resSkills.data || [];
-        
+    const now = Date.now();
+    // คืนค่าทันทีหากข้อมูลดึงมาไม่เกิน 45 วินาที
+    if (!force && !window._wapCacheDirty && _lastWAPFetchUser === targetUser && (now - _lastWAPFetchTime < 45000)) {
         return true;
-    } catch (e) {
-        console.error("WAP Global Fetch Error:", e);
-        return false;
     }
+
+    if (!force && _wapFetchInFlight && _lastWAPFetchUser === targetUser) {
+        return _wapFetchInFlight;
+    }
+
+    _lastWAPFetchUser = targetUser;
+    _wapFetchInFlight = (async () => {
+        try {
+            const [resAct, resS5, resAtt, resSJ, resSkills] = await Promise.all([
+                wapClient.from('support_records').select('*').eq('user_id', targetUser).order('event_date', { ascending: false }),
+                wapClient.from('s5_records').select('*').eq('user_id', targetUser).order('month', { ascending: false }),
+                wapClient.from('daily_reports').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
+                wapClient.from('special_jobs').select('*').eq('user_id', targetUser).order('date', { ascending: false }),
+                wapClient.from('skill_matrix').select('*').eq('user_id', targetUser).order('skill_value', { ascending: false })
+            ]);
+
+            // อัปเดตข้อมูลลง State
+            S.wapData.achievements = resAct.data || []; 
+            S.wapData.score5s = resS5.data || [];
+            S.wapData.specialJobs = resSJ.data || [];
+            S.attLeaveRecords = resAtt.data || [];
+            S.wapData.skills = resSkills.data || [];
+            
+            _lastWAPFetchTime = Date.now();
+            window._wapCacheDirty = false;
+            return true;
+        } catch (e) {
+            console.error("WAP Global Fetch Error:", e);
+            return false;
+        } finally {
+            _wapFetchInFlight = null;
+        }
+    })();
+
+    return _wapFetchInFlight;
 }
 
 // ฟังก์ชันช่วยหาค่าวันที่จากชื่อคอลัมน์ที่อาจเป็นไปได้
@@ -12809,83 +13208,172 @@ function autoFillFromPack(pack) {
     refreshNeonGlow();
 }
 
-function translateDefectToRemark() {
+function translateDefectText(defRaw) {
+    if (!defRaw) return '';
+    const rawTrimmed = String(defRaw).trim();
+    if (!rawTrimmed) return '';
+    const lower = rawTrimmed.toLowerCase();
+
+    // 1. ลองค้นหาจาก AI Brain (Learned defectToRemarkMap) ก่อน
+    if (typeof aiBrain === 'object' && aiBrain && aiBrain.defectToRemarkMap && aiBrain.defectToRemarkMap[lower]) {
+        return aiBrain.defectToRemarkMap[lower];
+    }
+
+    // 2. ดึงรายการ defectDict โดยเรียงลำดับตามความยาวคำจากมากไปน้อย (Longest-match first)
+    const entries = (typeof defectDict === 'object' && defectDict) ? Object.entries(defectDict) : [];
+    entries.sort((a, b) => b[0].length - a[0].length);
+
+    // ตรวจสอบ Exact Match ตรงตัว
+    for (const [key, text] of entries) {
+        if (lower === key.toLowerCase()) {
+            return text;
+        }
+    }
+
+    // รองรับกรณีระบุหลายอาการพร้อมกัน เช่น "crack and dent", "เสี้ยน + รอยขีดข่วน", "burr, scratch"
+    const separatorRegex = /\s*(?:and|\+|&|และ|กับ|,|\/)\s*/i;
+    if (separatorRegex.test(lower)) {
+        const parts = lower.split(separatorRegex).map(p => p.trim()).filter(Boolean);
+        const translatedParts = [];
+        const seenTexts = new Set();
+
+        for (const p of parts) {
+            let matchedText = null;
+            for (const [key, text] of entries) {
+                if (p === key.toLowerCase() || p.includes(key.toLowerCase())) {
+                    matchedText = text;
+                    break;
+                }
+            }
+            if (matchedText && !seenTexts.has(matchedText)) {
+                seenTexts.add(matchedText);
+                translatedParts.push(matchedText);
+            } else if (!matchedText && p) {
+                translatedParts.push(`พบปัญหา: ${p}`);
+            }
+        }
+
+        if (translatedParts.length > 1) {
+            return translatedParts.join('\n');
+        } else if (translatedParts.length === 1) {
+            return translatedParts[0];
+        }
+    }
+
+    // ตรวจสอบ Substring Match ในข้อความที่พิมพ์
+    for (const [key, text] of entries) {
+        if (lower.includes(key.toLowerCase())) {
+            return text;
+        }
+    }
+
+    // กรณีไม่มีในพจนานุกรม แปลงเป็นข้อความทางการ QC
+    return `พบปัญหาอาการผิดปกติ: ${rawTrimmed} (ตรวจสอบพบในกระบวนการผลิต)`;
+}
+
+function translateDefectToRemark(force = false) {
     const defectIn = $id('f-defect');
     const remarkIn = $id('f-remark');
     const partIn = $id('f-part');
     const jdgSelect = $id('judgmentSelect');
+    const badge = $id('remark-auto-badge');
     
-    if (!defectIn || !remarkIn || !partIn || !jdgSelect) return;
+    if (!defectIn || !remarkIn) return;
 
-    const defVal = defectIn.value.trim().toLowerCase();
-    const partVal = partIn.value.trim();
+    const rawDefVal = defectIn.value.trim();
+    const defVal = rawDefVal.toLowerCase();
+    const partVal = partIn ? partIn.value.trim() : '';
 
-    // 1. ถ้าไม่มีข้อมูลอาการเสีย ให้หยุดทำงาน
-    if (defVal === '') return;
+    if (rawDefVal === '') {
+        if (badge) badge.classList.add('hidden');
+        return;
+    }
 
-    // --- ส่วนที่ 1: แปลอาการเสียเป็นคำอธิบาย (Logic เดิมที่ฉลาดขึ้น) ---
-    let translated = null;
-    
-    // ลองหาจากฐานประวัติ AI Brain ก่อน
-    if (aiBrain.defectToRemarkMap && aiBrain.defectToRemarkMap[defVal]) {
-        translated = aiBrain.defectToRemarkMap[defVal];
-    } else {
-        // ถ้าไม่เจอ ให้หาจากพจนานุกรมคำหลัก (Keyword)
-        const dEntries = (typeof defectDict !== 'undefined' && defectDict) ? Object.entries(defectDict) : [];
-        for (const [key, t] of dEntries) {
-            if (defVal.includes(key)) {
-                translated = t;
-                break;
+    // แปลงปัญหาเป็นข้อความหมายเหตุอัตโนมัติทันที
+    const translated = translateDefectText(rawDefVal);
+    if (translated) {
+        const currentRemark = remarkIn.value;
+        const currentLines = currentRemark.split('\n');
+        
+        // แยกบรรทัด Preset (ที่ขึ้นต้นด้วย '•') ออกมา
+        const presetLines = currentLines.filter(line => line.trim().startsWith('•'));
+        const nonPresetLines = currentLines.filter(line => !line.trim().startsWith('•') && line.trim() !== '');
+
+        const lastAuto = remarkIn.dataset.lastAutoTranslated || '';
+        const isRemarkEmpty = currentRemark.trim() === '';
+        const hasOnlyAutoText = (lastAuto && nonPresetLines.join('\n').trim() === lastAuto.trim()) || nonPresetLines.length === 0;
+
+        // อัปเดตทันทีถ้า: กดปุ่มบังคับแปล (force), ช่องยังว่าง, หรือช่องมีเฉพาะข้อความที่แปลอัตโนมัติรอบก่อน/ปุ่มพรีเซ็ต
+        if (force || isRemarkEmpty || hasOnlyAutoText) {
+            let newRemark = translated;
+            if (presetLines.length > 0) {
+                newRemark = translated + '\n' + presetLines.join('\n');
+            }
+            remarkIn.value = newRemark;
+            remarkIn.dataset.lastAutoTranslated = translated;
+            remarkIn.dataset.lastDefect = rawDefVal;
+
+            // แสดง Badge แจ้งเตือนการแปลอัตโนมัติ
+            if (badge) {
+                badge.classList.remove('hidden');
+                clearTimeout(window._remarkBadgeTimer);
+                window._remarkBadgeTimer = setTimeout(() => {
+                    if (badge) badge.classList.add('hidden');
+                }, 3000);
+            }
+
+            // Visual Feedback: ไฮไลท์สีเขียวละมุน
+            remarkIn.style.transition = 'background-color 0.3s ease, border-color 0.3s ease';
+            remarkIn.style.backgroundColor = 'rgba(16, 185, 129, 0.12)';
+            remarkIn.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+            clearTimeout(window._remarkGlowTimer);
+            window._remarkGlowTimer = setTimeout(() => {
+                if (remarkIn) {
+                    remarkIn.style.backgroundColor = '';
+                    remarkIn.style.borderColor = '';
+                }
+            }, 800);
+
+            if (force && typeof toast === 'function') {
+                const shortPreview = translated.split('\n')[0];
+                toast(`⚡ แปลหมายเหตุเรียบร้อย: ${shortPreview.substring(0, 40)}${shortPreview.length > 40 ? '...' : ''}`, 'success');
             }
         }
     }
 
-    // เติมคำอธิบายลงช่อง Remark อัตโนมัติ (เฉพาะกรณีที่ช่องยังว่างอยู่)
-    if (translated && !remarkIn.value.trim()) {
-        remarkIn.value = translated;
-        // กิมมิก: วาบแสงสีเขียวที่ช่อง Remark เพื่อบอกว่าระบบเติมให้
-        remarkIn.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
-        setTimeout(() => { remarkIn.style.backgroundColor = ''; }, 800);
-    }
-
-    // --- ส่วนที่ 2: [NEW] AI Smart Judgment (เดาใจจากประวัติ) ---
-    if (partVal !== '') {
-        // ค้นหาในประวัติ (S.records) ว่าพาร์ทนี้ อาการเสียนี้ ปกติเราตัดสินใจเป็นอะไร
-        const historyMatches = S.records.filter(r => 
+    // --- ส่วนที่ 2: AI Smart Judgment (แนะนำผลตัดสินจากประวัติ) ---
+    if (partVal !== '' && jdgSelect) {
+        const historyMatches = (Array.isArray(S.records) ? S.records : []).filter(r => 
             r.partNo === partVal && 
             (r.defect || "").toLowerCase().includes(defVal)
         );
 
-        if (historyMatches.length > 0) {
-            // นับความถี่ของ Judgment ที่เคยเลือก
+        if (historyMatches.length > 0 && !jdgSelect.value) {
             const counts = {};
             historyMatches.forEach(r => {
                 const j = r.judgment;
-                counts[j] = (counts[j] || 0) + 1;
+                if (j) counts[j] = (counts[j] || 0) + 1;
             });
 
-            // หา Judgment ที่พบบ่อยที่สุด (Mode)
-            const suggestedJdg = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-
-            // บังคับเลือก Judgment นั้นให้ทันที
-            jdgSelect.value = suggestedJdg;
-            
-            // เรียกฟังก์ชันเปลี่ยนสีปุ่มตาม Judgment (ที่มีอยู่ในโค้ดเดิมของคุณ)
-            handleJudgment(suggestedJdg);
-
-            // --- กิมมิก: Visual Feedback (บอกให้รู้ว่า AI เลือกให้) ---
-            // 1. เรืองแสงสีน้ำเงินที่ช่อง Judgment
-            gsap.fromTo(jdgSelect, 
-                { boxShadow: "0 0 0px rgba(59, 130, 246, 0)" }, 
-                { boxShadow: "0 0 20px rgba(59, 130, 246, 0.6)", duration: 0.4, yoyo: true, repeat: 1 }
-            );
-
-            // 2. แจ้งเตือนสั้นๆ (Optional)
-            toast(`AI: แนะนำ ${suggestedJdg} จากประวัติ ${historyMatches.length} รายการ`, "info");
+            const keys = Object.keys(counts);
+            if (keys.length > 0) {
+                const suggestedJdg = keys.reduce((a, b) => counts[a] > counts[b] ? a : b);
+                if (suggestedJdg) {
+                    jdgSelect.value = suggestedJdg;
+                    if (typeof handleJudgment === 'function') handleJudgment(suggestedJdg);
+                    if (typeof gsap === 'object' && gsap.fromTo) {
+                        gsap.fromTo(jdgSelect, 
+                            { boxShadow: "0 0 0px rgba(59, 130, 246, 0)" }, 
+                            { boxShadow: "0 0 16px rgba(59, 130, 246, 0.5)", duration: 0.35, yoyo: true, repeat: 1 }
+                        );
+                    }
+                }
+            }
         }
     }
 
     refreshNeonGlow();
+    if (typeof triggerClaimFormAutoDraft === 'function') triggerClaimFormAutoDraft();
 }
 
 function insertClaimRemarkPreset(presetText) {
@@ -13001,6 +13489,9 @@ function showAC(type, inputEl) {
 function onACInput(type, inputEl) {
     if (type === 'partNo' || (inputEl && inputEl.id === 'f-part')) {
         setPartLoading(true, 350);
+    }
+    if (type === 'defect' || (inputEl && inputEl.id === 'f-defect')) {
+        translateDefectToRemark();
     }
     renderACDropdown(type, inputEl);
     updateInputResetButton();
@@ -13147,7 +13638,7 @@ function applyACPick(type, value, inputEl) {
     else if (type === 'partName') autoFillFromPack(getMostFrequentPack(smartMemory.byPartName[key]));
     else if (type === 'supplier') autoFillFromPack(getMostFrequentPack(smartMemory.bySupplier[key]));
     else if (type === 'line') autoFillFromPack(getMostFrequentPack(smartMemory.byLine[key]));
-    else if (type === 'defect') translateDefectToRemark();
+    else if (type === 'defect') translateDefectToRemark(true);
     
     updateInputResetButton();
 
@@ -14191,7 +14682,10 @@ window.addEventListener('DOMContentLoaded', () => {
         $id('f-remark').addEventListener('input', refreshNeonGlow);
     }
 
-    if ($id('f-defect')) $id('f-defect').addEventListener('change', translateDefectToRemark);
+    if ($id('f-defect')) {
+        $id('f-defect').addEventListener('input', () => translateDefectToRemark());
+        $id('f-defect').addEventListener('change', () => translateDefectToRemark());
+    }
 
     // --- ผูก Event ของ Date Picker ใน Header ---
     const headerStart = document.getElementById('cd-start-date');
@@ -18529,149 +19023,252 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
             return canvas.toDataURL('image/jpeg', 0.98);
         }
 
-        // --- ฟังก์ชันช่วยเหลือสำหรับสลับตำแหน่ง Array ---
-const moveImage = (fromIndex, toIndex) => {
-    if (toIndex < 0 || toIndex >= multiImages.length) return;
-    const temp = multiImages[fromIndex];
-    multiImages[fromIndex] = multiImages[toIndex];
-    multiImages[toIndex] = temp;
-    handleMultiImagesChange(); // เรียกฟังก์ชันเดิมของคุณเพื่อ Update ภาพรวม
-};
+        // --- ฟังก์ชันจัดการลากและวางสลับตำแหน่งรูปภาพ (Drag & Drop Reordering) ---
+        let draggedImageIdx = null;
 
-const renderMultiGrid = () => {
-    if (!multiGrid) return;
-    multiGrid.innerHTML = '';
-
-    // 1. วาดรายการรูปภาพที่มีอยู่
-    multiImages.forEach((imgData, idx) => {
-        const card = document.createElement('div');
-        card.className = 'evidence-thumb-card';
-        card.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:10px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#0f172a; box-sizing:border-box;';
-        
-        card.innerHTML = `
-            <img src="${imgData}" style="width:100%; height:100%; object-fit:cover; display:block; cursor:pointer;" alt="Evidence ${idx + 1}" title="คลิกเพื่อดูภาพขนาดเต็ม" />
+        const reorderMultiImages = async (fromIndex, toIndex) => {
+            if (fromIndex === null || toIndex === null || fromIndex === toIndex) return;
+            if (fromIndex < 0 || fromIndex >= multiImages.length || toIndex < 0 || toIndex >= multiImages.length) return;
             
-            <!-- ป้ายกำกับลำดับภาพ (มุมบนซ้าย ขนาดกะทัดรัด) -->
-            <span style="position:absolute; top:4px; left:4px; background:rgba(15,23,42,0.78); backdrop-filter:blur(4px); color:#f8fafc; padding:1.5px 5.5px; border-radius:4px; font-size:8.5px; font-weight:800; z-index:2; pointer-events:none; border:1px solid rgba(255,255,255,0.15); box-shadow:0 1px 3px rgba(0,0,0,0.3);">รูปที่ ${idx + 1}</span>
-
-            <!-- แถบเครื่องมือจัดการภาพด้านล่าง (เรียงสวยงาม ย่อขนาดกะทัดรัด ไม่บดบังรูป) -->
-            <div style="position:absolute; bottom:0; left:0; right:0; padding:4px 5px; background:linear-gradient(to top, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.72) 75%, transparent 100%); display:flex; align-items:center; justify-content:space-between; gap:3px; z-index:3; box-sizing:border-box;">
-                <!-- กลุ่มปุ่มเลื่อนลำดับภาพ (ซ้าย) -->
-                <div style="display:flex; align-items:center; gap:2.5px;">
-                    <button type="button" class="btn-move-left" title="เลื่อนไปข้างหน้า (ซ้าย)" 
-                        style="width:20px; height:20px; border-radius:4px; border:none; background:rgba(37, 99, 235, 0.9); color:white; font-size:9px; cursor:pointer; display:${idx === 0 ? 'none' : 'flex'}; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">◀</button>
-                    <button type="button" class="btn-move-right" title="เลื่อนไปข้างหลัง (ขวา)" 
-                        style="width:20px; height:20px; border-radius:4px; border:none; background:rgba(37, 99, 235, 0.9); color:white; font-size:9px; cursor:pointer; display:${idx === multiImages.length - 1 ? 'none' : 'flex'}; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">▶</button>
-                </div>
-
-                <!-- กลุ่มปุ่มจัดการภาพ: แก้ไข, หมุน, ลบ (ขวา) -->
-                <div style="display:flex; align-items:center; gap:2.5px;">
-                    <button type="button" class="evidence-thumb-edit-btn" title="แก้ไข / วาดมาร์กจุดบกพร่องรูปนี้" 
-                        style="width:20px; height:20px; border-radius:4px; border:none; background:#10b981; color:white; font-size:9.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">✏️</button>
-                    <button type="button" class="evidence-thumb-rotate-btn" title="หมุนรูป 90°" 
-                        style="width:20px; height:20px; border-radius:4px; border:none; background:rgba(71, 85, 105, 0.9); color:white; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">↻</button>
-                    <button type="button" class="evidence-thumb-delete-btn" title="ลบรูปภาพนี้" 
-                        style="width:20px; height:20px; border-radius:4px; border:none; background:rgba(239, 68, 68, 0.95); color:white; font-size:9.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 2px rgba(0,0,0,0.3);">✕</button>
-                </div>
-            </div>
-        `;
-
-        // --- เพิ่ม Event คลิกรูปเพื่อดูภาพขนาดเต็ม (Lightbox) ---
-        const imgEl = card.querySelector('img');
-        if (imgEl) {
-            imgEl.onclick = () => {
-                if (typeof window.openLightbox === 'function') {
-                    window.openLightbox(multiImages[idx]);
-                }
-            };
-        }
-
-        // --- เพิ่ม Event ลำดับภาพ ---
-        const moveLeft = card.querySelector('.btn-move-left');
-        if (moveLeft) moveLeft.onclick = (e) => { e.stopPropagation(); moveImage(idx, idx - 1); };
-
-        const moveRight = card.querySelector('.btn-move-right');
-        if (moveRight) moveRight.onclick = (e) => { e.stopPropagation(); moveImage(idx, idx + 1); };
-
-        // --- เพิ่ม Event ปุ่มแก้ไขรูปภาพ (เปิด Defect Annotator สำหรับรูปนี้โดยเฉพาะ) ---
-        const editBtn = card.querySelector('.evidence-thumb-edit-btn');
-        if (editBtn) {
-            editBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (typeof window.openEvidenceImageAnnotator === 'function') {
-                    window.openEvidenceImageAnnotator(multiImages[idx], async (annotatedImage) => {
-                        multiImages[idx] = annotatedImage;
-                        await handleMultiImagesChange();
-                        toast(`🎨 แก้ไขและบันทึกรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'success');
-                    });
-                } else {
-                    toast('⚠️ ไม่พบเครื่องมือแก้ไขรูปภาพ', 'warning');
-                }
-            };
-        }
-
-        // --- Event หมุนภาพ ---
-        const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
-        if (rotBtn) {
-            rotBtn.onclick = async (e) => {
-                e.stopPropagation();
-                rotBtn.textContent = '⏳';
-                const rotated = await rotateImageDataUrl(multiImages[idx]);
-                multiImages[idx] = rotated;
-                await handleMultiImagesChange();
-                toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
-            };
-        }
-
-        // --- Event ลบภาพ ---
-        const delBtn = card.querySelector('.evidence-thumb-delete-btn');
-        if (delBtn) {
-            delBtn.onclick = async (e) => {
-                e.stopPropagation();
-                multiImages.splice(idx, 1);
-                await handleMultiImagesChange();
-                toast(`🗑️ ลบรูปภาพที่ ${idx + 1} เรียบร้อย`, 'info');
-            };
-        }
-
-        multiGrid.appendChild(card);
-    });
-
-    // 2. ช่องกดเพิ่มรูปภาพ
-    if (multiImages.length < 5) {
-        const addSlot = document.createElement('div');
-        addSlot.className = 'evidence-add-slot';
-        addSlot.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:2px dashed #93c5fd; background:#f8fafc; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; cursor:pointer; color:#2563eb; transition:all 0.2s ease; box-sizing:border-box; padding:6px;';
-        addSlot.innerHTML = `
-            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" style="margin-bottom:3px; color:#2563eb;">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-            </svg>
-            <span style="font-size:10.5px; font-weight:800; color:#1e40af; line-height:1.2;">+ เพิ่มรูปภาพ</span>
-            <span style="font-size:8.5px; color:#64748b; margin-top:2px;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
-        `;
-        addSlot.onclick = () => {
-            if (imgMultiInput) {
-                imgMultiInput.value = '';
-                imgMultiInput.click();
+            // สลับตำแหน่งใน Array โดยใช้ splice
+            const [moved] = multiImages.splice(fromIndex, 1);
+            multiImages.splice(toIndex, 0, moved);
+            
+            await handleMultiImagesChange();
+            if (typeof toast === 'function') {
+                toast(`✨ จัดเรียงรูปภาพเป็น ลำดับที่ ${toIndex + 1} เรียบร้อยแล้ว`, 'info');
             }
         };
-        multiGrid.appendChild(addSlot);
-    }
 
-    // อัปเดต Badge จำนวนภาพ
-    if (multiCountBadge) {
-        if (multiImages.length >= 3 && multiImages.length <= 5) {
-            multiCountBadge.textContent = `✔ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ครบเกณฑ์)`;
-            multiCountBadge.style.background = '#059669';
-        } else if (multiImages.length === 0) {
-            multiCountBadge.textContent = `(อัปโหลดแล้ว 0/5 รูป)`;
-            multiCountBadge.style.background = '#d97706';
-        } else {
-            multiCountBadge.textContent = `⚠️ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ต้องการ 3-5 รูป)`;
-            multiCountBadge.style.background = '#d97706';
-        }
-    }
-};
+        const renderMultiGrid = () => {
+            if (!multiGrid) return;
+            multiGrid.innerHTML = '';
+
+            // 1. วาดรายการรูปภาพที่มีอยู่ พร้อมระบบ Drag & Drop
+            multiImages.forEach((imgData, idx) => {
+                const card = document.createElement('div');
+                card.className = 'evidence-thumb-card';
+                card.setAttribute('draggable', 'true');
+                card.setAttribute('data-index', String(idx));
+                card.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:10px; overflow:hidden; border:1.5px solid #cbd5e1; box-shadow:0 2px 6px rgba(0,0,0,0.06); background:#0f172a; box-sizing:border-box; cursor:grab;';
+                
+                card.innerHTML = `
+                    <img src="${imgData}" draggable="false" style="width:100%; height:100%; object-fit:cover; display:block; cursor:pointer;" alt="Evidence ${idx + 1}" title="คลิกเพื่อดูภาพขนาดเต็ม / ลากเพื่อจัดเรียงลำดับ" />
+                    
+                    <!-- ป้ายกำกับลำดับภาพ + ไอคอนจับลาก (Grip Handle) -->
+                    <div class="evidence-drag-handle" style="position:absolute; top:4px; left:4px; z-index:2; cursor:grab;" title="ลากเพื่อสลับลำดับภาพ (Drag & Drop to reorder)">
+                        <span style="font-size:11px; opacity:0.85; line-height:1; user-select:none;">⠿</span>
+                        <span style="user-select:none;">รูปที่ ${idx + 1}</span>
+                    </div>
+
+                    <!-- แถบเครื่องมือจัดการภาพด้านล่าง: แก้ไข, หมุน, ลบ -->
+                    <div style="position:absolute; bottom:0; left:0; right:0; padding:4px 6px; background:linear-gradient(to top, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.7) 70%, transparent 100%); display:flex; align-items:center; justify-content:flex-end; gap:3.5px; z-index:3; box-sizing:border-box;">
+                        <button type="button" class="evidence-thumb-edit-btn" draggable="false" title="แก้ไข / วาดมาร์กจุดบกพร่องรูปนี้" 
+                            style="width:22px; height:22px; border-radius:5px; border:none; background:#10b981; color:white; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.3); transition:transform 0.15s ease;">✏️</button>
+                        <button type="button" class="evidence-thumb-rotate-btn" draggable="false" title="หมุนรูป 90°" 
+                            style="width:22px; height:22px; border-radius:5px; border:none; background:rgba(71, 85, 105, 0.9); color:white; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.3); transition:transform 0.15s ease;">↻</button>
+                        <button type="button" class="evidence-thumb-delete-btn" draggable="false" title="ลบรูปภาพนี้" 
+                            style="width:22px; height:22px; border-radius:5px; border:none; background:rgba(239, 68, 68, 0.95); color:white; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.3); transition:transform 0.15s ease;">✕</button>
+                    </div>
+                `;
+
+                // --- คลิกรูปเพื่อดูภาพขนาดเต็ม (Lightbox) โดยไม่ตีกับการลาก ---
+                const imgEl = card.querySelector('img');
+                let isDraggingNow = false;
+                card.addEventListener('mousedown', () => { isDraggingNow = false; });
+                card.addEventListener('mousemove', () => { isDraggingNow = true; });
+                if (imgEl) {
+                    imgEl.onclick = (e) => {
+                        if (!isDraggingNow && typeof window.openLightbox === 'function') {
+                            window.openLightbox(multiImages[idx]);
+                        }
+                    };
+                }
+
+                // --- 🖱️ HTML5 Drag & Drop Events สำหรับ Desktop ---
+                card.addEventListener('dragstart', (e) => {
+                    draggedImageIdx = idx;
+                    card.classList.add('is-dragging');
+                    if (e.dataTransfer) {
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', String(idx));
+                    }
+                });
+
+                card.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+                    if (draggedImageIdx !== null && draggedImageIdx !== idx) {
+                        card.classList.add('drag-over');
+                    }
+                });
+
+                card.addEventListener('dragleave', (e) => {
+                    if (!card.contains(e.relatedTarget)) {
+                        card.classList.remove('drag-over');
+                    }
+                });
+
+                card.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    multiGrid.querySelectorAll('.evidence-thumb-card').forEach(c => {
+                        c.classList.remove('is-dragging', 'drag-over');
+                    });
+                    
+                    let fromIdx = draggedImageIdx;
+                    if (fromIdx === null && e.dataTransfer) {
+                        const parsed = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                        if (!isNaN(parsed)) fromIdx = parsed;
+                    }
+                    
+                    if (fromIdx !== null && fromIdx !== idx) {
+                        await reorderMultiImages(fromIdx, idx);
+                    }
+                    draggedImageIdx = null;
+                });
+
+                card.addEventListener('dragend', () => {
+                    draggedImageIdx = null;
+                    multiGrid.querySelectorAll('.evidence-thumb-card').forEach(c => {
+                        c.classList.remove('is-dragging', 'drag-over');
+                    });
+                });
+
+                // --- 📱 Touch Events สำหรับ Mobile / Tablet ---
+                let touchStartX = 0;
+                let touchStartY = 0;
+                let isTouchDragging = false;
+                let currentTouchTarget = null;
+
+                card.addEventListener('touchstart', (e) => {
+                    if (e.target.closest('button')) return;
+                    const touch = e.touches[0];
+                    touchStartX = touch.clientX;
+                    touchStartY = touch.clientY;
+                    isTouchDragging = false;
+                }, { passive: true });
+
+                card.addEventListener('touchmove', (e) => {
+                    if (e.target.closest('button')) return;
+                    const touch = e.touches[0];
+                    const dx = touch.clientX - touchStartX;
+                    const dy = touch.clientY - touchStartY;
+                    
+                    if (!isTouchDragging && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+                        isTouchDragging = true;
+                        card.classList.add('is-dragging');
+                    }
+
+                    if (isTouchDragging) {
+                        e.preventDefault();
+                        const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                        const targetCard = elemBelow ? elemBelow.closest('.evidence-thumb-card') : null;
+                        
+                        multiGrid.querySelectorAll('.evidence-thumb-card').forEach(c => {
+                            if (c !== card && c === targetCard) {
+                                c.classList.add('drag-over');
+                            } else {
+                                c.classList.remove('drag-over');
+                            }
+                        });
+                        currentTouchTarget = targetCard;
+                    }
+                }, { passive: false });
+
+                card.addEventListener('touchend', async (e) => {
+                    if (isTouchDragging && currentTouchTarget && currentTouchTarget !== card) {
+                        const toIdx = parseInt(currentTouchTarget.getAttribute('data-index'), 10);
+                        if (!isNaN(toIdx) && toIdx !== idx) {
+                            await reorderMultiImages(idx, toIdx);
+                        }
+                    }
+                    multiGrid.querySelectorAll('.evidence-thumb-card').forEach(c => {
+                        c.classList.remove('is-dragging', 'drag-over');
+                    });
+                    isTouchDragging = false;
+                    currentTouchTarget = null;
+                });
+
+                // --- เพิ่ม Event ปุ่มแก้ไขรูปภาพ (Defect Annotator) ---
+                const editBtn = card.querySelector('.evidence-thumb-edit-btn');
+                if (editBtn) {
+                    editBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (typeof window.openEvidenceImageAnnotator === 'function') {
+                            window.openEvidenceImageAnnotator(multiImages[idx], async (annotatedImage) => {
+                                multiImages[idx] = annotatedImage;
+                                await handleMultiImagesChange();
+                                toast(`🎨 แก้ไขและบันทึกรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'success');
+                            });
+                        } else {
+                            toast('⚠️ ไม่พบเครื่องมือแก้ไขรูปภาพ', 'warning');
+                        }
+                    };
+                }
+
+                // --- Event หมุนภาพ 90° ---
+                const rotBtn = card.querySelector('.evidence-thumb-rotate-btn');
+                if (rotBtn) {
+                    rotBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        rotBtn.textContent = '⏳';
+                        const rotated = await rotateImageDataUrl(multiImages[idx]);
+                        multiImages[idx] = rotated;
+                        await handleMultiImagesChange();
+                        toast(`🔄 หมุนรูปที่ ${idx + 1} เรียบร้อยแล้ว`, 'info');
+                    };
+                }
+
+                // --- Event ลบภาพ ---
+                const delBtn = card.querySelector('.evidence-thumb-delete-btn');
+                if (delBtn) {
+                    delBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        multiImages.splice(idx, 1);
+                        await handleMultiImagesChange();
+                        toast(`🗑️ ลบรูปภาพที่ ${idx + 1} เรียบร้อย`, 'info');
+                    };
+                }
+
+                multiGrid.appendChild(card);
+            });
+
+            // 2. ช่องกดเพิ่มรูปภาพ
+            if (multiImages.length < 5) {
+                const addSlot = document.createElement('div');
+                addSlot.className = 'evidence-add-slot';
+                addSlot.style.cssText = 'position:relative; aspect-ratio:4/3; width:100%; border-radius:12px; overflow:hidden; border:2px dashed #93c5fd; background:#f8fafc; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; cursor:pointer; color:#2563eb; transition:all 0.2s ease; box-sizing:border-box; padding:6px;';
+                addSlot.innerHTML = `
+                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" style="margin-bottom:3px; color:#2563eb;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span style="font-size:10.5px; font-weight:800; color:#1e40af; line-height:1.2;">+ เพิ่มรูปภาพ</span>
+                    <span style="font-size:8.5px; color:#64748b; margin-top:2px;">(อัปโหลดแล้ว ${multiImages.length}/5 รูป)</span>
+                `;
+                addSlot.onclick = () => {
+                    if (imgMultiInput) {
+                        imgMultiInput.value = '';
+                        imgMultiInput.click();
+                    }
+                };
+                multiGrid.appendChild(addSlot);
+            }
+
+            // อัปเดต Badge จำนวนภาพ
+            if (multiCountBadge) {
+                if (multiImages.length >= 3 && multiImages.length <= 5) {
+                    multiCountBadge.textContent = `✔ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ครบเกณฑ์)`;
+                    multiCountBadge.style.background = '#059669';
+                } else if (multiImages.length === 0) {
+                    multiCountBadge.textContent = `(อัปโหลดแล้ว 0/5 รูป)`;
+                    multiCountBadge.style.background = '#d97706';
+                } else {
+                    multiCountBadge.textContent = `⚠️ (อัปโหลดแล้ว ${multiImages.length}/5 รูป - ต้องการ 3-5 รูป)`;
+                    multiCountBadge.style.background = '#d97706';
+                }
+            }
+        };
 /**
  * ฟังก์ชันสลับตำแหน่งภาพใน Array
  * @param {number} index - ตำแหน่งปัจจุบันของภาพ
@@ -20084,13 +20681,33 @@ function _openViewModal(id) {
         applyDateFilter();
     }
 
+    function resetFilter() {
+        _filter = 'ALL';
+        _search = '';
+        if ($.filterGrp) {
+            $.filterGrp.querySelectorAll('.f-btn').forEach(p => {
+                if (p.getAttribute('data-filter') === 'ALL') {
+                    p.classList.add('active');
+                } else {
+                    p.classList.remove('active');
+                }
+            });
+        }
+        if ($.search) {
+            $.search.value = '';
+            const clearBtn = document.getElementById('clearSupportSearchBtn');
+            if (clearBtn) clearBtn.classList.add('hidden');
+        }
+        applyDateFilter();
+    }
+
     function destroy() {
         _alive = false;
         if ($.tbody) $.tbody.innerHTML = '';
     }
 
 return {
-        init, destroy, applyDateFilter, setSearch,
+        init, destroy, applyDateFilter, setSearch, resetFilter,
         _openViewModal,
         _openFormModal,
         _confirmDelete,
@@ -21403,14 +22020,15 @@ function renderRadar() {
                 type: 'bar',
                 height: 310,
                 toolbar: { show: false },
-                parentHeightOffset: 0
+                parentHeightOffset: 0,
+                animations: { enabled: true, easing: 'easeinout', speed: 800 }
             },
             plotOptions: {
                 bar: {
-                    borderRadius: 6,
+                    borderRadius: 8,
                     horizontal: true,
                     distributed: true,
-                    barHeight: '62%',
+                    barHeight: '65%',
                     dataLabels: { position: 'top' }
                 }
             },
@@ -21418,7 +22036,7 @@ function renderRadar() {
             dataLabels: {
                 enabled: true,
                 textAnchor: 'start',
-                style: { colors: ['#ffffff'], fontSize: '10px', fontWeight: '900' },
+                style: { colors: ['#ffffff'], fontSize: '10px', fontWeight: '900', fontFamily: 'Inter, Sarabun, sans-serif' },
                 formatter: (val) => val + "%",
                 offsetX: 6
             },
@@ -21431,7 +22049,7 @@ function renderRadar() {
             yaxis: {
                 labels: {
                     maxWidth: 150,
-                    style: { colors: isDark ? '#cbd5e1' : '#334155', fontSize: '9px', fontWeight: '800' },
+                    style: { colors: isDark ? '#cbd5e1' : '#334155', fontSize: '9.5px', fontWeight: '800', fontFamily: 'Inter, Sarabun, sans-serif' },
                     formatter: function(val) {
                         if (!val) return '';
                         return val.length > 20 ? val.substring(0, 18) + '…' : val;
@@ -21441,10 +22059,36 @@ function renderRadar() {
             grid: {
                 borderColor: isDark ? '#1e293b' : '#f1f5f9',
                 strokeDashArray: 3,
-                padding: { left: 10, right: 15 }
+                padding: { left: 10, right: 15, top: 5, bottom: 5 }
             },
             legend: { show: false },
-            tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (val) => val + "%" } }
+            tooltip: {
+                enabled: true,
+                followCursor: true,
+                theme: isDark ? 'dark' : 'light',
+                custom: function({ series, seriesIndex, dataPointIndex }) {
+                    const skillName = categories[dataPointIndex] || 'Skill';
+                    const val = series[seriesIndex][dataPointIndex] || 0;
+                    const color = colors[dataPointIndex] || '#3b82f6';
+                    let tierText = 'Basic Level (พื้นฐาน)';
+                    if (val >= 80) tierText = 'Expert (ชำนาญการพิเศษ)';
+                    else if (val >= 60) tierText = 'Advanced (ชำนาญการ)';
+                    else if (val >= 40) tierText = 'Intermediate (ปานกลาง)';
+                    
+                    return `
+                        <div class="sj-custom-tooltip">
+                            <div class="sj-tt-header" style="color:${color};">⚡ Skill Proficiency Matrix</div>
+                            <div class="sj-tt-row">
+                                <div class="sj-tt-label">
+                                    <span class="sj-tt-dot" style="background-color:${color}; box-shadow: 0 0 8px ${color}88;"></span>
+                                    <span>${skillName}</span>
+                                </div>
+                                <div class="sj-tt-val">${val}% <small style="display:block; font-size:9px; color:${color}; font-weight:800;">${tierText}</small></div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
         };
 
         _charts.bar = new ApexCharts(chartEl, options);
@@ -22409,44 +23053,57 @@ function renderCharts() {
     const totalSessions = distData.reduce((a, b) => a + b, 0);
 
     // ==========================================
-    // 1. กราฟแท่ง OT Trend (Bar Chart)
+    // 1. กราฟแท่ง OT Trend (Bar Chart - Dynamic Threshold & Glassmorphism)
     // ==========================================
     if (_charts.trend) _charts.trend.destroy();
     
+    // คำนวณสีตามเงื่อนไข (Over Limit vs Within Limit)
+    const barColors = mData.map(val => {
+        if (val > _targetValue) return '#ef4444'; // Over limit: Rose/Red alert
+        if (val > 0) return '#3b82f6'; // Within limit: Royal Blue
+        return isDark ? '#334155' : '#cbd5e1'; // Zero/Inactive
+    });
+
     const trendOptions = {
         series: [{ name: 'OT Hours', data: mData }],
         chart: { 
             type: 'bar', 
             height: '100%', 
+            width: '100%',
             toolbar: { show: false },
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'Inter, Sarabun, sans-serif',
+            parentHeightOffset: 0,
             animations: { enabled: true, easing: 'easeinout', speed: 800 }
         },
         plotOptions: { 
             bar: { 
-                borderRadius: 5, 
-                columnWidth: '50%',
+                borderRadius: 7, 
+                borderRadiusApplication: 'end',
+                columnWidth: '46%',
+                distributed: true,
                 dataLabels: { position: 'top' } 
             } 
         },
         dataLabels: {
             enabled: true,
-            offsetY: -22,
+            offsetY: -20,
             style: { 
                 fontSize: '10px', 
-                colors: [isDark ? '#f8fafc' : '#475569'], // ปรับสีตาม Theme
-                fontWeight: 800 
+                fontFamily: 'Inter, Sarabun, sans-serif',
+                fontWeight: 900 
             },
             formatter: (val) => val > 0 ? val.toFixed(1) : ''
         },
-        colors: [isDark ? '#60a5fa' : '#2563eb'],
+        colors: barColors,
+        legend: { show: false },
         xaxis: { 
             categories: months,
             labels: { 
                 style: { 
                     colors: isDark ? '#94a3b8' : '#64748b', 
                     fontSize: '10px', 
-                    fontWeight: 600 
+                    fontWeight: 700,
+                    fontFamily: 'Inter, Sarabun, sans-serif'
                 } 
             },
             axisBorder: { show: false },
@@ -22458,22 +23115,45 @@ function renderCharts() {
                 style: { 
                     colors: isDark ? '#94a3b8' : '#64748b', 
                     fontSize: '10px', 
-                    fontWeight: 600 
+                    fontWeight: 700,
+                    fontFamily: 'Inter, Sarabun, sans-serif'
                 }
             }
         },
         tooltip: {
             enabled: true,
+            followCursor: true,
             theme: isDark ? 'dark' : 'light',
             custom: function({ series, seriesIndex, dataPointIndex, w }) {
                 const val = series[seriesIndex][dataPointIndex];
-                const monthName = w.globals.labels[dataPointIndex];
+                const monthName = months[dataPointIndex];
+                const isOver = val > _targetValue;
+                const diff = val - _targetValue;
+                const pctOfTarget = _targetValue > 0 ? Math.round((val / _targetValue) * 100) : 0;
+                const accentColor = isOver ? '#ef4444' : (val > 0 ? '#3b82f6' : '#94a3b8');
+                
+                let statusBadge = '';
+                if (val === 0) {
+                    statusBadge = `<span style="font-size:9px; color:#94a3b8; font-weight:800;">ไม่มีบันทึก OT</span>`;
+                } else if (isOver) {
+                    statusBadge = `<span style="font-size:9.5px; color:#ef4444; font-weight:900; background:rgba(239,68,68,0.12); padding:2px 6px; border-radius:6px;">⚠️ เกินเกณฑ์ (+${diff.toFixed(1)} ชม. / ${pctOfTarget}%)</span>`;
+                } else {
+                    statusBadge = `<span style="font-size:9.5px; color:#10b981; font-weight:900; background:rgba(16,185,129,0.12); padding:2px 6px; border-radius:6px;">✅ ตามเกณฑ์ (${pctOfTarget}% of Limit)</span>`;
+                }
+
                 return `
-                    <div class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg shadow-xl">
-                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">${monthName} Analysis</div>
-                        <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full bg-blue-500"></div>
-                            <div class="text-white text-sm font-black">${val.toLocaleString()} <small class="text-[10px] font-normal text-slate-400">HRS</small></div>
+                    <div class="sj-custom-tooltip">
+                        <div class="sj-tt-header" style="color:${accentColor};">📊 ${monthName} Monthly OT Analysis</div>
+                        <div class="sj-tt-row" style="margin-bottom:6px;">
+                            <div class="sj-tt-label">
+                                <span class="sj-tt-dot" style="background-color:${accentColor}; box-shadow:0 0 8px ${accentColor}88;"></span>
+                                <span>ชั่วโมงสะสม</span>
+                            </div>
+                            <div class="sj-tt-val" style="font-size:13px; font-weight:900; color:${isDark ? '#ffffff' : '#0f172a'};">${val.toFixed(1)} <small style="font-size:9px; color:#94a3b8; font-weight:700;">HRS</small></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}; padding-top:6px;">
+                            <span style="font-size:9px; font-weight:700; color:#94a3b8;">สถานะโควต้า (${_targetValue}h):</span>
+                            ${statusBadge}
                         </div>
                     </div>
                 `;
@@ -22482,17 +23162,30 @@ function renderCharts() {
         annotations: {
             yaxis: [{ 
                 y: _targetValue, 
-                borderColor: '#ef4444', 
-                strokeDashArray: 4,
+                borderColor: '#f43f5e', 
+                strokeDashArray: 5,
+                borderWidth: 2,
                 label: { 
-                    text: 'LIMIT: ' + _targetValue + ' HRS',
-                    style: { color: '#fff', background: '#ef4444', fontSize: '10px', fontWeight: 900 }
+                    text: '🎯 TARGET LIMIT: ' + _targetValue + ' HRS',
+                    position: 'right',
+                    textAnchor: 'end',
+                    offsetX: -10,
+                    offsetY: -3,
+                    style: { 
+                        color: '#ffffff', 
+                        background: '#f43f5e', 
+                        fontSize: '9.5px', 
+                        fontFamily: 'Inter, Sarabun, sans-serif',
+                        fontWeight: 900,
+                        padding: { left: 8, right: 8, top: 3, bottom: 3 }
+                    }
                 } 
             }]
         },
         grid: { 
             borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9', 
-            strokeDashArray: 4 
+            strokeDashArray: 4,
+            padding: { top: 10, bottom: 0, left: 10, right: 15 }
         }
     };
 
@@ -22500,96 +23193,137 @@ function renderCharts() {
     _charts.trend.render();
 
     // ==========================================
-    // 2. กราฟวงกลม Distribution (Donut Gauge)
+    // 2. กราฟวงกลม Distribution (Modern Semi-Donut Gauge)
     // ==========================================
-    if (_charts.dist) _charts.dist.destroy();
+    if (_charts.dist) {
+        _charts.dist.destroy();
+        _charts.dist = null;
+    }
 
-    const distOptions = {
-        series: distData,
-        labels: ['วันปกติ (x1.5)', 'วันเสาร์ (x1.0)', 'วันหยุด (x3.0)'],
-        chart: { 
-            type: 'donut', 
-            height: '100%',
-            toolbar: { show: false },
-            animations: { enabled: true, speed: 800 }
-        },
-        colors: ['#3b82f6', '#10b981', '#f59e0b'], // Blue, Emerald, Amber
-        stroke: { 
-            width: isDark ? 2 : 3, 
-            colors: [isDark ? '#1e293b' : '#ffffff'] 
-        },
-        plotOptions: {
-            pie: {
-                startAngle: -90,
-                endAngle: 90,
-                offsetY: 15,
-                donut: {
-                    size: '78%',
-                    labels: {
-                        show: true,
-                        name: {
-                            show: true,
-                            fontSize: '11px',
-                            fontWeight: 800,
-                            color: isDark ? '#94a3b8' : '#64748b',
-                            offsetY: -14
-                        },
-                        value: {
-                            show: true,
-                            fontSize: '22px',
-                            fontWeight: 900,
-                            color: isDark ? '#f8fafc' : '#1e293b',
-                            offsetY: -2,
-                            formatter: (v) => totalSessions > 0 ? Math.round((v / totalSessions) * 100) + '%' : '0%'
-                        },
-                        total: {
-                            show: true,
-                            label: 'OT RATIO',
-                            fontSize: '9px',
-                            fontWeight: 900,
-                            color: '#3b82f6',
-                            formatter: (w) => {
-                                const totals = w.globals.seriesTotals;
-                                const sum = totals ? totals.reduce((a, b) => a + b, 0) : 0;
-                                // คำนวณสัดส่วนของ x1.5 เป็นหลัก (หรือจะปรับเป็นยอดรวมก็ได้)
-                                return sum > 0 ? Math.round((totals[0] / sum) * 100) + '%' : '0%';
+    const distEl = $id('ot-dist-chart');
+    if (distEl) {
+        if (totalSessions === 0) {
+            distEl.innerHTML = `
+                <div class="flex flex-col items-center justify-center w-full h-full text-center py-6">
+                    <div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-2">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    </div>
+                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400">ยังไม่มีบันทึก OT ในช่วงนี้</span>
+                </div>
+            `;
+        } else {
+            const distOptions = {
+                series: distData,
+                labels: ['วันปกติ (x1.5)', 'วันเสาร์ (x1.0)', 'วันหยุด (x3.0)'],
+                chart: { 
+                    type: 'donut', 
+                    height: '100%',
+                    width: '100%',
+                    toolbar: { show: false },
+                    parentHeightOffset: 0,
+                    animations: { enabled: true, easing: 'easeinout', speed: 800 }
+                },
+                colors: ['#2563eb', '#10b981', '#f59e0b'], // Blue, Emerald, Amber
+                stroke: { 
+                    width: isDark ? 2 : 3, 
+                    colors: [isDark ? '#0f172a' : '#ffffff'] 
+                },
+                plotOptions: {
+                    pie: {
+                        startAngle: -90,
+                        endAngle: 90,
+                        offsetY: 14,
+                        customScale: 0.9,
+                        donut: {
+                            size: '72%',
+                            labels: {
+                                show: true,
+                                name: {
+                                    show: true,
+                                    fontSize: '10px',
+                                    fontWeight: 800,
+                                    fontFamily: 'Inter, Sarabun, sans-serif',
+                                    color: isDark ? '#94a3b8' : '#64748b',
+                                    offsetY: -16
+                                },
+                                value: {
+                                    show: true,
+                                    fontSize: '22px',
+                                    fontWeight: 900,
+                                    fontFamily: 'Inter, Sarabun, sans-serif',
+                                    color: isDark ? '#f8fafc' : '#0f172a',
+                                    offsetY: -4,
+                                    formatter: (v) => totalSessions > 0 ? Math.round((v / totalSessions) * 100) + '%' : '0%'
+                                },
+                                total: {
+                                    show: true,
+                                    label: 'TOTAL SESSIONS',
+                                    fontSize: '9px',
+                                    fontWeight: 900,
+                                    fontFamily: 'Inter, Sarabun, sans-serif',
+                                    color: '#2563eb',
+                                    formatter: () => `${totalSessions} รายการ`
+                                }
                             }
                         }
                     }
-                }
-            }
-        },
-        dataLabels: {
-            enabled: true,
-            formatter: (val) => val > 0 ? val.toFixed(0) + "%" : "",
-            style: { fontSize: '9px', fontWeight: 800, colors: ['#ffffff'] },
-            dropShadow: { enabled: false }
-        },
-        legend: { 
-            show: true,
-            position: 'bottom',
-            fontSize: '10px',
-            fontWeight: 700,
-            labels: { colors: isDark ? '#cbd5e1' : '#64748b' },
-            markers: { radius: 12, width: 8, height: 8 },
-            itemMargin: { horizontal: 8, vertical: 0 }
-        },
-        tooltip: { 
-            theme: 'dark',
-            y: { formatter: (v) => v + " รายการ" }
-        },
-        // การปรับแต่งสำหรับมือถือ
-        responsive: [{
-            breakpoint: 480,
-            options: {
-                legend: { fontSize: '9px', itemMargin: { horizontal: 4 } },
-                plotOptions: { pie: { donut: { labels: { value: { fontSize: '18px' } } } } }
-            }
-        }]
-    };
+                },
+                dataLabels: {
+                    enabled: false // ซ่อน label บนเส้นโค้งเพื่อความสะอาดและไม่เบียดบังสายตา
+                },
+                legend: { 
+                    show: true,
+                    position: 'bottom',
+                    offsetY: 2,
+                    fontSize: '10.5px',
+                    fontFamily: 'Inter, Sarabun, sans-serif',
+                    fontWeight: 700,
+                    labels: { colors: isDark ? '#cbd5e1' : '#475569' },
+                    markers: { radius: 99, width: 8, height: 8, offsetX: -2 },
+                    itemMargin: { horizontal: 6, vertical: 2 },
+                    formatter: (seriesName, opts) => {
+                        const val = opts.w.globals.series[opts.seriesIndex];
+                        const pct = totalSessions > 0 ? Math.round((val / totalSessions) * 100) : 0;
+                        return `${seriesName} <b style="font-weight:900; color:${isDark ? '#fff' : '#1e293b'};">${pct}%</b>`;
+                    }
+                },
+                tooltip: { 
+                    enabled: true,
+                    followCursor: true,
+                    theme: isDark ? 'dark' : 'light',
+                    custom: function({ series, seriesIndex, w }) {
+                        const label = w.globals.labels[seriesIndex];
+                        const val = series[seriesIndex];
+                        const color = w.globals.colors[seriesIndex];
+                        const pct = totalSessions > 0 ? Math.round((val / totalSessions) * 100) : 0;
+                        return `
+                            <div class="sj-custom-tooltip">
+                                <div class="sj-tt-header" style="color:${color};">⏱️ OT Type Breakdown</div>
+                                <div class="sj-tt-row">
+                                    <div class="sj-tt-label">
+                                        <span class="sj-tt-dot" style="background-color:${color}; box-shadow: 0 0 8px ${color}88;"></span>
+                                        <span>${label}</span>
+                                    </div>
+                                    <div class="sj-tt-val">${val} <small>รายการ (${pct}%)</small></div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                },
+                // การปรับแต่งสำหรับมือถือ
+                responsive: [{
+                    breakpoint: 480,
+                    options: {
+                        legend: { fontSize: '9px', itemMargin: { horizontal: 4 } },
+                        plotOptions: { pie: { donut: { labels: { value: { fontSize: '18px' } } } } }
+                    }
+                }]
+            };
 
-    _charts.dist = new ApexCharts($id('ot-dist-chart'), distOptions);
-    _charts.dist.render();
+            _charts.dist = new ApexCharts(distEl, distOptions);
+            _charts.dist.render();
+        }
+    }
 }
 
 
@@ -22814,6 +23548,11 @@ function renderTable() {
     const tbody = document.getElementById('sj-table-body');
     if (!tbody) return;
 
+    const countBadge = document.getElementById('sj-table-count');
+    if (countBadge) {
+        countBadge.textContent = `${_filteredRecords.length} RECORDS`;
+    }
+
     if (_filteredRecords.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="py-16 text-center text-slate-300 font-black uppercase tracking-widest text-[10px]">No Special Missions Logged</td></tr>`;
         return;
@@ -22879,153 +23618,232 @@ function renderCharts() {
     });
 
     // ==========================================
-    // 2. กราฟ 1: WORKLOAD DISTRIBUTION (Horizontal Pill Bars)
+    // 2. กราฟ 1: WORKLOAD DISTRIBUTION (Upgraded Elegant Progress Bars)
     // ==========================================
     const assignorEl = document.getElementById('sj-assignor-chart');
     if (assignorEl) {
-        if (_charts.assignor) _charts.assignor.destroy();
-        _charts.assignor = new ApexCharts(assignorEl, {
-            series: [{ name: 'ภารกิจ', data: sorted.map(x => x[1]) }],
-            chart: {
-                type: 'bar',
-                height: '100%',
-                width: '100%',
-                toolbar: { show: false },
-                parentHeightOffset: 0,
-                animations: { enabled: true, easing: 'easeinout', speed: 800 }
-            },
-            plotOptions: {
-                bar: {
-                    horizontal: true,
-                    borderRadius: 6,
-                    distributed: true,
-                    barHeight: '35%',
-                    dataLabels: { position: 'right' }
+        if (_charts.assignor && typeof _charts.assignor.destroy === 'function') {
+            _charts.assignor.destroy();
+            _charts.assignor = null;
+        }
+
+        if (sorted.length === 0) {
+            assignorEl.innerHTML = `
+                <div class="flex flex-col items-center justify-center w-full h-full text-center py-4">
+                    <div class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400">ยังไม่มีข้อมูลภารกิจ</span>
+                </div>
+            `;
+        } else {
+            const maxVal = sorted[0][1] || 1;
+            const totalTasks = sorted.reduce((sum, item) => sum + item[1], 0) || 1;
+
+            const rankThemes = [
+                {
+                    bg: 'linear-gradient(90deg, #6366f1 0%, #818cf8 100%)',
+                    badgeBg: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                    badgeShadow: '0 2px 6px rgba(99, 102, 241, 0.4)',
+                    pctBg: 'rgba(99, 102, 241, 0.1)',
+                    pctColor: '#4f46e5',
+                    glow: '0 2px 8px rgba(99, 102, 241, 0.3)'
+                },
+                {
+                    bg: 'linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%)',
+                    badgeBg: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                    badgeShadow: '0 2px 6px rgba(139, 92, 246, 0.4)',
+                    pctBg: 'rgba(139, 92, 246, 0.1)',
+                    pctColor: '#7c3aed',
+                    glow: '0 2px 8px rgba(139, 92, 246, 0.3)'
+                },
+                {
+                    bg: 'linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%)',
+                    badgeBg: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                    badgeShadow: '0 2px 6px rgba(59, 130, 246, 0.4)',
+                    pctBg: 'rgba(59, 130, 246, 0.1)',
+                    pctColor: '#2563eb',
+                    glow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                },
+                {
+                    bg: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)',
+                    badgeBg: 'linear-gradient(135deg, #10b981, #059669)',
+                    badgeShadow: '0 2px 6px rgba(16, 185, 129, 0.4)',
+                    pctBg: 'rgba(16, 185, 129, 0.1)',
+                    pctColor: '#059669',
+                    glow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                },
+                {
+                    bg: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
+                    badgeBg: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    badgeShadow: '0 2px 6px rgba(245, 158, 11, 0.4)',
+                    pctBg: 'rgba(245, 158, 11, 0.1)',
+                    pctColor: '#d97706',
+                    glow: '0 2px 8px rgba(245, 158, 11, 0.3)'
                 }
-            },
-            colors: ['#6366f1', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b'],
-            xaxis: {
-                categories: sorted.map(x => x[0]),
-                labels: { show: false },
-                axisBorder: { show: false },
-                axisTicks: { show: false }
-            },
-            yaxis: {
-                labels: {
-                    show: true,
-                    style: { 
-                        fontSize: '10px', 
-                        fontWeight: 900, 
-                        colors: '#64748b'
-                    },
-                    maxWidth: 120
-                }
-            },
-            grid: {
-                show: false,
-                padding: { top: -20, right: 60, left: 10, bottom: 0 }
-            },
-            legend: { show: false },
-            dataLabels: {
-                enabled: true,
-                style: { fontSize: '11px', fontWeight: 950, colors: ['#475569'] },
-                offsetX: 45,
-                formatter: (val) => val + " งาน"
-            },
-            // --- [CUSTOM TOOLTIP: WORKLOAD] ---
-            tooltip: {
-                enabled: true,
-                custom: function({ series, seriesIndex, dataPointIndex, w }) {
-                    const name = w.globals.labels[dataPointIndex];
-                    const val = series[seriesIndex][dataPointIndex];
-                    const color = w.globals.colors[dataPointIndex];
-                    return `
-                        <div class="sj-custom-tooltip">
-                            <div class="sj-tt-header">📊 Workload Insight</div>
-                            <div class="sj-tt-row">
-                                <div class="sj-tt-label">
-                                    <span class="sj-tt-dot" style="background-color:${color}; box-shadow: 0 0 8px ${color}66;"></span>
-                                    <span>${name}</span>
+            ];
+
+            assignorEl.innerHTML = `
+                <div class="sj-workload-list" style="width:100%; height:100%; display:flex; flex-direction:column; justify-content:space-evenly; gap:8px; padding:2px 4px; box-sizing:border-box;">
+                    ${sorted.map(([name, count], idx) => {
+                        const theme = rankThemes[idx] || rankThemes[4];
+                        const widthPct = Math.max(6, Math.round((count / maxVal) * 100));
+                        const sharePct = Math.round((count / totalTasks) * 100);
+                        return `
+                            <div class="sj-workload-item" style="width:100%; display:flex; flex-direction:column; gap:4px; padding:4px 8px; border-radius:10px; box-sizing:border-box;" title="${name}: ${count} งาน (${sharePct}%)">
+                                <div class="sj-workload-header" style="display:flex; align-items:center; justify-content:space-between; width:100%; box-sizing:border-box;">
+                                    <div class="sj-workload-person" style="display:flex; align-items:center; gap:8px; min-width:0;">
+                                        <span class="sj-rank-badge" style="width:18px; height:18px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; color:#ffffff; flex-shrink:0; background:${theme.badgeBg}; box-shadow:${theme.badgeShadow};">${idx + 1}</span>
+                                        <span class="sj-person-name" style="font-size:11px; font-weight:800; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</span>
+                                    </div>
+                                    <div class="sj-workload-stats" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                                        <span class="sj-workload-count" style="font-size:11.5px; font-weight:900;">${count}<span class="sj-workload-unit" style="font-size:10px; font-weight:700; color:#94a3b8; margin-left:1px;">งาน</span></span>
+                                        <span class="sj-workload-pct" style="font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:9999px; background:${theme.pctBg}; color:${theme.pctColor};">${sharePct}%</span>
+                                    </div>
                                 </div>
-                                <div class="sj-tt-val">${val} <small>งาน</small></div>
+                                <div class="sj-workload-track" style="width:100%; height:7px; border-radius:9999px; overflow:hidden; position:relative; box-sizing:border-box;">
+                                    <div class="sj-workload-bar" data-width="${widthPct}%" style="width:0%; height:100%; border-radius:9999px; background:${theme.bg}; box-shadow:${theme.glow}; transition:width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);"></div>
+                                </div>
                             </div>
-                        </div>
-                    `;
-                }
-            },
-            states: { hover: { filter: { type: 'lighten', value: 0.1 } } }
-        });
-        _charts.assignor.render();
+                        `;
+                    }).join('')}
+                </div>
+            `;
+
+            // Trigger animation smoothly
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    assignorEl.querySelectorAll('.sj-workload-bar').forEach(bar => {
+                        const targetWidth = bar.getAttribute('data-width') || '0%';
+                        bar.style.width = targetWidth;
+                    });
+                }, 40);
+            });
+        }
     }
 
     // ==========================================
-    // 3. กราฟ 2: VOLUME FREQUENCY (Glowing Area Chart)
+    // 3. กราฟ 2: VOLUME FREQUENCY (Modern Radiant Glow Area Chart)
     // ==========================================
     const volumeEl = document.getElementById('sj-volume-chart');
     if (volumeEl) {
         if (_charts.volume) _charts.volume.destroy();
         _charts.volume = new ApexCharts(volumeEl, {
-            series: [{ name: 'จำนวนงาน', data: mData }],
+            series: [{ name: 'ภารกิจ', data: mData }],
             chart: {
                 type: 'area',
                 height: '100%',
                 width: '100%',
                 toolbar: { show: false },
-                offsetY: -15,
-                sparkline: { enabled: false },
+                parentHeightOffset: 0,
+                animations: { 
+                    enabled: true, 
+                    easing: 'easeinout', 
+                    speed: 800,
+                    animateGradually: { enabled: true, delay: 120 }
+                },
                 dropShadow: {
                     enabled: true,
-                    top: 10, left: 0, blur: 8, 
-                    color: '#3b82f6', opacity: 0.15 
+                    top: 6,
+                    left: 0,
+                    blur: 6,
+                    color: '#2563eb',
+                    opacity: 0.2
                 }
             },
-            stroke: { curve: 'smooth', width: 4, lineCap: 'round' },
+            stroke: { 
+                curve: 'smooth', 
+                width: 3.5, 
+                lineCap: 'round' 
+            },
             fill: {
                 type: 'gradient',
                 gradient: {
-                    shadeIntensity: 1,
+                    shade: 'light',
+                    type: 'vertical',
+                    shadeIntensity: 0.5,
+                    gradientToColors: ['#60a5fa'],
+                    inverseColors: false,
                     opacityFrom: 0.45,
                     opacityTo: 0.02,
-                    stops: [0, 90, 100],
-                    colorStops: [
-                        { offset: 0, color: "#3b82f6", opacity: 0.45 },
-                        { offset: 100, color: "#3b82f6", opacity: 0 }
-                    ]
+                    stops: [0, 85, 100]
                 }
             },
-            colors: ['#3b82f6'],
+            colors: ['#2563eb'],
+            dataLabels: {
+                enabled: false
+            },
             xaxis: {
                 categories: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'],
-                labels: { style: { fontSize: '9px', fontWeight: 700, colors: '#94a3b8' } },
+                labels: { 
+                    style: { 
+                        fontSize: '9.5px', 
+                        fontWeight: 700, 
+                        colors: '#64748b' 
+                    },
+                    offsetY: -2
+                },
                 axisBorder: { show: false },
-                axisTicks: { show: false }
+                axisTicks: { show: false },
+                crosshairs: {
+                    show: true,
+                    width: 1,
+                    stroke: {
+                        color: '#94a3b8',
+                        width: 1,
+                        dashArray: 4
+                    }
+                }
             },
-            yaxis: { show: false },
+            yaxis: {
+                show: true,
+                min: 0,
+                forceNiceScale: true,
+                labels: {
+                    style: {
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        colors: '#94a3b8'
+                    },
+                    formatter: (v) => Math.round(v)
+                }
+            },
             grid: {
                 show: true,
-                borderColor: '#f1f5f9',
-                strokeDashArray: 5,
-                padding: { top: 0, bottom: 0, left: 15, right: 15 }
+                borderColor: 'rgba(226, 232, 240, 0.6)',
+                strokeDashArray: 4,
+                padding: { top: 0, bottom: 0, left: 10, right: 15 },
+                xaxis: { lines: { show: false } },
+                yaxis: { lines: { show: true } }
             },
             markers: { 
-                size: 0, 
-                hover: { size: 6, strokeWidth: 3, strokeColors: '#fff', colors: '#3b82f6' } 
+                size: 0,
+                hover: { 
+                    size: 6, 
+                    strokeWidth: 3, 
+                    strokeColors: '#ffffff', 
+                    colors: '#2563eb' 
+                } 
             },
             // --- [CUSTOM TOOLTIP: VOLUME] ---
             tooltip: {
                 enabled: true,
+                shared: false,
+                intersect: false,
                 custom: function({ series, seriesIndex, dataPointIndex, w }) {
                     const month = w.globals.categoryLabels[dataPointIndex];
                     const val = series[seriesIndex][dataPointIndex];
+                    const total = series[seriesIndex].reduce((a, b) => a + b, 0) || 1;
+                    const pct = Math.round((val / total) * 100);
                     return `
                         <div class="sj-custom-tooltip">
-                            <div class="sj-tt-header">📈 Monthly Frequency</div>
+                            <div class="sj-tt-header">📈 Volume Analytics (${month})</div>
                             <div class="sj-tt-row">
                                 <div class="sj-tt-label">
-                                    <span class="sj-tt-dot" style="background-color:#3b82f6; box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);"></span>
-                                    <span>${month}</span>
+                                    <span class="sj-tt-dot" style="background-color:#2563eb; box-shadow: 0 0 8px rgba(37, 99, 235, 0.6);"></span>
+                                    <span>จำนวนภารกิจ</span>
                                 </div>
-                                <div class="sj-tt-val">${val} <small>ภารกิจ</small></div>
+                                <div class="sj-tt-val">${val} <small>งาน (${pct}%)</small></div>
                             </div>
                         </div>
                     `;
@@ -23942,121 +24760,6 @@ function autoHideBanner() {
         }, 30000); 
     }
 }
-/* ============================================================
-   MASTER INITIALIZATION SYSTEM (Unified Start-up)
-   ============================================================ */
-
-window.addEventListener('load', () => {
-    console.log("SQE & WAP System: Initializing...");
-
-    // 1. ระบบสถานะและการแสดงผลเบื้องต้น
-    if (typeof updateLoginNetStatus === 'function') updateLoginNetStatus();
-    if (typeof autoHideBanner === 'function') autoHideBanner();
-
-    // 2. ระบบจัดการภาษา (ตรวจสอบค่าที่จำไว้ หรือใช้ภาษาของ Browser)
-    const savedLang = localStorage.getItem('carrier_lang');
-    const browserLang = navigator.language.startsWith('th') ? 'th' : 'en';
-    const finalLang = savedLang || browserLang;
-    applyLanguage(finalLang);
-
-    // 3. ระบบจดจำบัญชี (Remember Me)
-    const savedEmail = localStorage.getItem('carrier_remembered_email');
-    if (savedEmail) {
-        const emailIn = document.getElementById('login-email');
-        const rememberCheck = document.getElementById('remember-me');
-        if (emailIn) {
-            emailIn.value = savedEmail;
-            emailIn.classList.add('valid');
-        }
-        if (rememberCheck) rememberCheck.checked = true;
-        // เช็คสถานะทันทีที่เปิดเว็บ
-        let lastKnownTrigger = null;
-
-async function watchSystemUpdate() {
-    try {
-        const { data } = await sqeClient
-            .from('system_settings')
-            .select('*')
-            .eq('id', 'global_config')
-            .maybeSingle();
-
-        if (data) {
-            const forceTrigger = data.force_update_trigger || (data.data && data.data.force_update_trigger);
-            const appVer = data.app_version || (data.data && data.data.app_version);
-
-            // 1. ตรวจสอบการบังคับรีเฟรช (Force Update)
-            if (lastKnownTrigger && forceTrigger && forceTrigger !== lastKnownTrigger) {
-                toast("🛡️ Admin สั่งอัปเดตระบบด่วน...", "info");
-                setTimeout(() => {
-                    window.location.reload(true); // บังคับรีโหลดและล้าง Cache
-                }, 2000);
-            }
-            if (forceTrigger) lastKnownTrigger = forceTrigger;
-
-            // 2. แสดง Change Log ใน Sidebar (Optional)
-            if (appVer) {
-                const verDisplay = document.querySelector('.brand-sub');
-                if(verDisplay) verDisplay.textContent = `V${appVer} | SQE SYSTEM`;
-            }
-        }
-    } catch (e) { console.log("Update check failed"); }
-}
-
-// ตรวจสอบทุกๆ 3 นาที
-setInterval(watchSystemUpdate, 180000);
-// และตรวจทันทีที่เปิดแอป
-watchSystemUpdate();
-enforceMaintenanceMode();
-
-// และเช็คซ้ำทุกๆ 30 วินาที (เพื่อให้หน้าจอคนอื่นล็อคเองอัตโนมัติ)
-setInterval(enforceMaintenanceMode, 30000);
-    }
-
-    // 4. ระบบจัดการคลิกภายนอก (Global Click Events)
-    window.addEventListener('click', (e) => {
-        // ปิดเมนูภาษาเมื่อคลิกข้างนอก
-        const langSelector = document.getElementById('lang-selector');
-        const langMenu = document.getElementById('lang-menu');
-        if (langSelector && !langSelector.contains(e.target)) {
-            if (langMenu) langMenu.classList.remove('show');
-        }
-    });
-
-    // 5. ตรวจสอบ Session เก่า (Auto Login)
-    const session = sessionStorage.getItem('sqe_session');
-    if (session) {
-        try {
-            const userData = JSON.parse(session);
-            console.log("Restoring session for:", userData.email);
-            // เรียกใช้ finalizeLogin เพื่อข้ามหน้า Login ไป Dashboard (พร้อม Warp Effect)
-            finalizeLogin(userData.email, userData.role);
-        } catch (err) {
-            console.error("Session restore failed:", err);
-            sessionStorage.removeItem('sqe_session');
-        }
-    }
-
-    // 6. เริ่มการซิงค์ข้อมูลค้างส่ง (หน่วงเวลา 3 วินาทีเพื่อให้แอปพร้อม)
-    if (typeof syncPendingData === 'function') {
-        setTimeout(syncPendingData, 3000);
-    }
-
-    // 7. การลงทะเบียน PWA Service Worker
-    if ('serviceWorker' in navigator) {
-        try {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => {
-                    console.log('PWA: Service Worker Registered!');
-                    if (reg && typeof reg.update === 'function') {
-                        reg.update().catch(() => {});
-                    }
-                })
-                .catch(err => console.log('PWA: Registration Failed', err));
-        } catch (e) {
-            console.log('PWA: Registration Error', e);
-        }
-    }
-});
 
 function playNeuralFlight() {
     const btn = document.getElementById('btn-commit');
@@ -30187,63 +30890,9 @@ window.onVfDocVendorCodeChange = function(el) {
     }
 };
 
-// ตรวจสอบ Maintenance Mode ทุกๆ 1 นาที และเมื่อโหลดหน้าจอ
+// ซิงค์สถานะ Maintenance Mode ผ่านระบบ Heartbeat รวมศูนย์ (Zero Database Waste)
 async function syncMaintenanceStatus() {
-    try {
-        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
-        if (!sb) return;
-        const { data, error } = await sb
-            .from('system_settings')
-            .select('*')
-            .eq('id', 'global_config')
-            .maybeSingle();
-
-        const mtxView = document.getElementById('maintenance-view');
-        if (error || !data) {
-            if (mtxView && !window.adminBypass) {
-                mtxView.classList.add('hidden-view');
-                mtxView.style.display = 'none';
-            }
-            return;
-        }
-
-        const isMtx = !!(data.is_maintenance_active || (data.data && data.data.is_maintenance_active));
-        
-        // เงื่อนไข: ถ้าเปิดโหมดปรับปรุง และผู้ใช้ไม่ใช่ Natthawut (Master Admin)
-        const isMaster = S && S.currentUser && S.currentUser.toLowerCase() === 'natthawut.chaising@carrier.com';
-
-        if (isMtx && !isMaster && !window.adminBypass) {
-            if (mtxView) {
-                mtxView.classList.remove('hidden-view');
-                mtxView.style.display = 'flex';
-            }
-            // ถ้า User ล็อกอินค้างอยู่ ให้บังคับ Logout ล่องหน (ไม่เคลียร์ Session เผื่อ Admin เปิดระบบกลับมา)
-            const dash = document.getElementById('dashboard-view');
-            if (dash) dash.classList.add('hidden-view');
-        } else {
-            if (mtxView) {
-                mtxView.classList.add('hidden-view');
-                mtxView.style.display = 'none';
-            }
-            // ถ้า Master Admin เข้ามา หรือระบบเปิดปกติ ให้เช็คสถานะการล็อกอินเดิม
-            if (S && S.isLoggedIn) {
-                const dash = document.getElementById('dashboard-view');
-                if (dash) dash.classList.remove('hidden-view');
-            }
-        }
-        
-        // อัปเดตสถานะปุ่มในหน้า Admin (ถ้าเปิดอยู)
-        const mtxToggle = document.getElementById('admin-mtx-toggle');
-        if (mtxToggle) mtxToggle.checked = isMtx;
-
-    } catch (err) {
-        console.error("Maintenance Sync Error:", err);
-        const mtxView = document.getElementById('maintenance-view');
-        if (mtxView && !window.adminBypass) {
-            mtxView.classList.add('hidden-view');
-            mtxView.style.display = 'none';
-        }
-    }
+    return executeSystemHeartbeat(true);
 }
 
 // ฟังก์ชันให้ Admin ปลดล็อคหน้า Maintenance เพื่อไปหน้า Login
@@ -30270,11 +30919,6 @@ function unlockMaintenanceForAdmin() {
     if (typeof toast === 'function') toast("🔓 โหมดเข้าใช้งานพิเศษสำหรับผู้ดูแลระบบ", "info");
 }
 
-
-
-
-// รันตรวจสอบทุก 60 วินาที
-setInterval(syncMaintenanceStatus, 60000);
 // ลงทะเบียน Global
 window.WapAdminSystem = WapAdminSystem;
 window.triggerCSVImport = function() {
@@ -30969,19 +31613,35 @@ async function performArchive() {
     });
 }
 
-// ฟังก์ชันส่งสัญญาณบอกระบบว่า User ยังใช้งานอยู่
+// บันทึกกิจกรรมผู้ใช้ล่าสุด (เพื่อหยุดการยิง Presence ไปยัง Database เมื่อไม่มีการใช้งาน)
+let _lastUserActivityTime = Date.now();
+if (typeof window !== 'undefined') {
+    ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
+        window.addEventListener(evt, () => {
+            _lastUserActivityTime = Date.now();
+        }, { passive: true });
+    });
+}
+
+// ฟังก์ชันส่งสัญญาณบอกระบบว่า User ยังใช้งานอยู่ (ประหยัดพลังงาน & ฐานข้อมูล)
 async function updateUserPresence() {
-    if (!S.isLoggedIn || !S.currentUser) return;
+    if (!S || !S.isLoggedIn || !S.currentUser) return;
+    if (document.hidden) return; // ไม่ส่งถ้าแท็บถูกพับหรือไม่ได้ใช้งาน
+    // ถ้าไม่มีการขยับเมาส์หรือพิมพ์เกิน 10 นาที ถือว่าพักการทำงาน ไม่ส่งคำขอ
+    if (Date.now() - _lastUserActivityTime > 600000) return;
     
     try {
-        await sqeClient
+        const sb = (typeof getSupabase === 'function' ? getSupabase() : null) || sqeClient;
+        if (!sb) return;
+
+        await sb
             .from('profiles')
             .update({ last_seen: new Date().toISOString() })
             .eq('email', S.currentUser);
         
         console.log("📡 Presence updated for:", S.currentUser);
     } catch (e) {
-        console.error("Presence update failed", e);
+        console.warn("Presence update skip:", e?.message || e);
     }
 }
 
@@ -33105,15 +33765,20 @@ THIS IS AN AUTOMATED SYSTEM NOTIFICATION.
 }
 
 function checkDeepLinkParams() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const caseId = urlParams.get('caseId');
-    const mode = urlParams.get('mode'); // 'vf' หรือ '8d'
-
-    if (caseId) {
-        console.log(`🔗 Deep Link Detected: ID=${caseId}, Mode=${mode}`);
-        return { caseId, mode };
+    if (typeof window.checkDeepLinkParams === 'function' && window.checkDeepLinkParams !== checkDeepLinkParams) {
+        return window.checkDeepLinkParams();
     }
-    return null;
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        return {
+            caseId: urlParams.get('caseId'),
+            mode: urlParams.get('mode'),
+            email: urlParams.get('email'),
+            ctrl: urlParams.get('ctrl')
+        };
+    } catch (e) {
+        return { caseId: null, mode: null, email: null, ctrl: null };
+    }
 }
 
 // --- 4. ฟังก์ชันยกเลิกลายเซ็น (กรณีเซ็นผิดคน) ---
@@ -33215,6 +33880,19 @@ function updateSignButtonStates() {
             approvedSignBtn.innerHTML = 'SIGN';
         }
     }
+
+    // 4. บังคับสีพื้นหลังช่องระบุชื่อเป็นแบบโปร่งใส (กลืนกับกระดาษขาวทางการ) ป้องกัน Dark Mode กลืนสีดำ
+    ['prob-issue-by', 'prob-confirm-by', 'prob-approved-by'].forEach(id => {
+        const inp = document.getElementById(id);
+        if (inp) {
+            inp.style.setProperty('background', 'transparent', 'important');
+            inp.style.setProperty('background-color', 'transparent', 'important');
+            inp.style.setProperty('color', '#000000', 'important');
+            inp.style.setProperty('border', 'none', 'important');
+            inp.style.setProperty('outline', 'none', 'important');
+            inp.style.setProperty('box-shadow', 'none', 'important');
+        }
+    });
 }
 window.updateSignButtonStates = updateSignButtonStates;
 
@@ -33288,9 +33966,10 @@ const renderSigCell = (slot, displayName, sigActive, timestamp) => {
             <div style="position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%; padding: 0 4px; box-sizing: border-box; overflow: visible;">
                 <input type="text" id="prob-${slot}-by" class="vf-name-input"
                        value="${displayName || ''}" 
-                       style="width: ${canSignNow ? '65%' : '100%'}; border: none; font-size: 11px; font-weight: 700; color: #1e293b; outline: none; background: transparent; cursor: pointer;" 
-                       onfocus="renderModalAC('staff', this)" 
-                       onclick="renderModalAC('staff', this)"
+                       style="width: ${canSignNow ? '65%' : '100%'}; border: none !important; font-size: 11px; font-weight: 700; color: #000000 !important; outline: none !important; background: transparent !important; background-color: transparent !important; box-shadow: none !important; cursor: pointer;" 
+                       onfocus="this.style.setProperty('background-color', '#eff6ff', 'important'); renderModalAC('staff', this);" 
+                       onblur="this.style.setProperty('background-color', 'transparent', 'important');"
+                       onclick="renderModalAC('staff', this);"
                        oninput="renderModalAC('staff', this);" 
                        placeholder="${placeholder}"
                        autocomplete="off">
@@ -39028,6 +39707,13 @@ if (typeof window !== 'undefined') {
 
         // --- ระบบ Local Data Backup Hub ---
         LocalBackupSystem,
+
+        // --- ระบบ Browser Full-Screen API Controller ---
+        FullScreenManager,
+        toggleFullScreen,
+        requestFullScreen,
+        exitFullScreen,
+        isFullScreenActive,
 
         updateAllModuleFilters, showPartAC, selectPartAC, calcNG,
         filterLoginStaffByDept, updatePassStrength, renderEmployeeLoginDropdown,

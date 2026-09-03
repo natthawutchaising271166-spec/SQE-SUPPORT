@@ -3495,7 +3495,7 @@ table, th, td {
 }
     /* ｹｸｭｸｸｸｸ｡ｪ･ｱ  Form ｸｸ｡ｷｭｸｷｭｸ｣ｲｰ≒ｸｪｸ ｸｸ･ｹｸｭ≒ｸｱｸｭ｢ｹｹ≒ｸ･ｸｧ */
     #show-form-btn, button[onclick="toggleFormPanel()"] {
-    display: none !important;
+    display: flex !important;
 }
 }  
 
@@ -12830,12 +12830,141 @@ body.dark-mode .sj-kpi-val, body.dark-mode h3, body.dark-mode .sj-mission-text {
 }
 
 /* ｸｱ ｸ ｸｱｹ ｸｫｸｸｱｧ Container もｸｭ  ApexCharts もｸ｢ｲ｢ｹ ｸ｡ｸｷｸｸｸｵ  */
-#sj-assignor-chart, #sj-volume-chart {
+/* Container ของ Workload Distribution */
+#sj-assignor-chart {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+}
+#sj-volume-chart {
     width: 100% !important;
     height: 100% !important;
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* ============================================================
+   UPGRADED WORKLOAD DISTRIBUTION COMPONENT
+   ============================================================ */
+.sj-workload-list {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    gap: 8px;
+    padding: 2px 4px;
+}
+.sj-workload-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 10px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sj-workload-item:hover {
+    background: rgba(241, 245, 249, 0.7);
+    transform: translateX(2px);
+}
+body.dark-mode .sj-workload-item:hover {
+    background: rgba(30, 41, 59, 0.7);
+}
+.sj-workload-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+.sj-workload-person {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.sj-rank-badge {
+    width: 18px;
+    height: 18px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 900;
+    color: #ffffff;
+    flex-shrink: 0;
+}
+.sj-person-name {
+    font-size: 11px;
+    font-weight: 800;
+    color: #334155;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body.dark-mode .sj-person-name {
+    color: #e2e8f0;
+}
+.sj-workload-stats {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.sj-workload-count {
+    font-size: 11.5px;
+    font-weight: 900;
+    color: #1e293b;
+}
+body.dark-mode .sj-workload-count {
+    color: #f8fafc;
+}
+.sj-workload-unit {
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-left: 1px;
+}
+.sj-workload-pct {
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 9999px;
+}
+.sj-workload-track {
+    width: 100%;
+    height: 7px;
+    background: #f1f5f9;
+    border-radius: 9999px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+body.dark-mode .sj-workload-track {
+    background: #1e293b;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.sj-workload-bar {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+}
+.sj-workload-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 100%);
+    border-radius: 9999px;
 }
 /* ============================================================
    REFINED KPI CARDS - ELEGANT & PROFESSIONAL
@@ -13361,7 +13490,7 @@ body.dark-mode .s5-kpi-card-styled {
     flex: 1 !important; display: flex; flex-direction: column; gap: 12px; min-width: 0 !important; width: 100% !important; box-sizing: border-box;
 }
 .analytics-card-white {
-    background: #ffffff; border-radius: 20px; border: 1px solid #f1f5f9; padding: 16px 18px; display: flex; flex-direction: column; min-width: 0 !important; box-sizing: border-box; overflow: hidden;
+    background: #ffffff; border-radius: 20px; border: 1px solid #f1f5f9; padding: 16px 18px; display: flex; flex-direction: column; min-width: 0 !important; box-sizing: border-box; overflow: visible;
 }
 .analytics-bottom-split {
     display: flex !important; gap: 12px; min-width: 0 !important; width: 100% !important; box-sizing: border-box; flex: 1 !important; min-height: 0;
@@ -13371,7 +13500,7 @@ body.dark-mode .s5-kpi-card-styled {
     font-size: 11px; font-weight: 950; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;
 }
 .chart-wrap-v2 {
-    flex: 1; width: 100%; height: 100%; min-height: 0; position: relative; overflow: hidden;
+    flex: 1; width: 100%; height: 100%; min-height: 0; position: relative; overflow: visible;
 }
 
 #ot-management-content #ot-dist-chart,
@@ -14686,6 +14815,17 @@ body.dark-mode .s5-tt-header { color: #94a3b8; border-bottom-color: rgba(255, 25
 body.dark-mode .s5-tt-label { color: #cbd5e1; }
 body.dark-mode .s5-tt-val { color: #fbbf24; }
 /* ✨ สไตล์กล่อง Tooltip พรีเมียมสำหรับ Workload Distribution */
+.apexcharts-tooltip {
+    z-index: 999999 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    pointer-events: none !important;
+}
+.apexcharts-canvas {
+    overflow: visible !important;
+}
 .sj-custom-tooltip {
     background: rgba(255, 255, 255, 0.9) !important;
     backdrop-filter: blur(12px) saturate(180%);
@@ -16510,43 +16650,129 @@ body.dark-mode .premium-toggle input[type="checkbox"]:checked::after {
 body.dark-mode .toggle-slider {
     display: none !important;
 }
-/* ปุ่มเลื่อนลำดับภาพในตาราง Multi-Grid */
-.evidence-move-btn {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    border: none;
-    background: rgba(59, 130, 246, 0.8); /* สีน้ำเงินโปร่งแสง */
-    backdrop-filter: blur(4px);
-    color: white;
-    font-size: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
+
+/* ============================================================
+   🖼️ EVIDENCE THUMBNAILS DRAG-AND-DROP REORDERING STYLES
+   ============================================================ */
+.evidence-multi-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 2px !important;
+}
+
+@media (max-width: 640px) {
+    .evidence-multi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+}
+
+.evidence-thumb-card {
+    position: relative;
+    aspect-ratio: 4/3;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1.5px solid #cbd5e1;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    background: #0f172a;
+    box-sizing: border-box;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), 
+                box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1), 
+                border-color 0.2s ease, 
+                opacity 0.2s ease;
+}
+
+.evidence-thumb-card:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+    transform: translateY(-2px);
+}
+
+.evidence-thumb-card:active {
+    cursor: grabbing;
+}
+
+/* ขณะกำลังลาก (Dragging state) */
+.evidence-thumb-card.is-dragging {
+    opacity: 0.45 !important;
+    transform: scale(0.95) !important;
+    border: 2px dashed #3b82f6 !important;
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35) !important;
+    cursor: grabbing !important;
+}
+
+/* จุดเป้าหมายที่กำลังจะวาง (Drop Target Hover) */
+.evidence-thumb-card.drag-over {
+    border: 2px solid #0284c7 !important;
+    transform: scale(1.05) translateY(-3px) !important;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.35), 0 8px 20px rgba(14, 165, 233, 0.4) !important;
+    z-index: 10;
+}
+
+/* Dark mode overrides */
+body.dark-mode .evidence-thumb-card,
+[data-theme="dark"] .evidence-thumb-card {
+    border-color: rgba(56, 189, 248, 0.2);
+    background: #060a14;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .evidence-thumb-card:hover,
+[data-theme="dark"] .evidence-thumb-card:hover {
+    border-color: #38bdf8;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
+}
+
+body.dark-mode .evidence-thumb-card.is-dragging,
+[data-theme="dark"] .evidence-thumb-card.is-dragging {
+    border: 2px dashed #38bdf8 !important;
+    box-shadow: 0 0 25px rgba(56, 189, 248, 0.4) !important;
+}
+
+body.dark-mode .evidence-thumb-card.drag-over,
+[data-theme="dark"] .evidence-thumb-card.drag-over {
+    border: 2px solid #38bdf8 !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 0 20px rgba(56, 189, 248, 0.6) !important;
+}
+
+/* Drag Handle Badge Styling */
+.evidence-drag-handle {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
+    gap: 4.5px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(4px);
+    color: #f8fafc;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 800;
+    cursor: grab;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
-.evidence-move-btn:hover {
-    background: #3b82f6;
-    transform: scale(1.1);
+.evidence-drag-handle:hover {
+    background: rgba(37, 99, 235, 0.95);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: scale(1.02);
 }
 
-.evidence-move-btn:disabled {
-    background: rgba(148, 163, 184, 0.3);
-    color: rgba(255, 255, 255, 0.3);
-    cursor: not-allowed;
-}
-
-/* จัดตำแหน่งปุ่มเครื่องมือด้านบนภาพ */
 .evidence-thumb-actions {
     position: absolute;
     top: 5px;
     left: 5px;
     right: 5px;
     display: flex;
-    justify-content: space-between; /* แยกปุ่มเลื่อนไว้ซ้าย ปุ่มลบ/หมุนไว้ขวา */
+    justify-content: space-between;
     z-index: 5;
 }
 
@@ -16558,4 +16784,80 @@ body.dark-mode .toggle-slider {
 .action-controls {
     display: flex;
     gap: 4px;
+}
+/* ============================================================
+   FIX WORKLOAD DISTRIBUTION FULL-WIDTH LAYOUT
+   ============================================================ */
+
+/* 1. บังคับให้ Card Body และ Container กางเต็มความกว้าง 100% เสมอ */
+.sj-glass-card .card-body,
+#sj-assignor-chart {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important; /* สำคัญ: ป้องกันการหดตัวเข้ากลาง */
+    justify-content: center !important;
+    box-sizing: border-box !important;
+}
+
+/* 2. บังคับให้รายการทั้งหมดและแต่ละแถวกางเต็ม 100% */
+.sj-workload-list {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-evenly !important;
+    gap: 8px !important;
+    padding: 4px 6px !important;
+    box-sizing: border-box !important;
+}
+
+.sj-workload-item {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    box-sizing: border-box !important;
+}
+
+/* 3. แถบชื่อคนและสถิติให้กางหัวท้าย (ซ้าย-ขวา) */
+.sj-workload-header {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+.sj-workload-person {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.sj-workload-stats {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+/* 4. เส้น Track หลอด Progress Bar ให้กว้าง 100% เต็มพื้นที่ */
+.sj-workload-track {
+    width: 100% !important;
+    height: 7px !important;
+    background: #f1f5f9 !important;
+    border-radius: 9999px !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+body.dark-mode .sj-workload-track {
+    background: #1e293b !important;
+}
+
+.sj-workload-bar {
+    height: 100% !important;
+    border-radius: 9999px !important;
+    position: relative !important;
+    transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }

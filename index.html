@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>SQE & WAP Support Portal</title>
 
     <!-- 1. Scripts & External Libraries -->
@@ -70,15 +73,35 @@
             const el = document.getElementById('login-employee-dropdown');
             if (el) el.classList.toggle('hidden');
         };
+        window.toggleFullScreen = window.toggleFullScreen || function(elem) {
+            const el = elem || document.documentElement;
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+        };
+        window.requestFullScreen = window.requestFullScreen || function(elem) {
+            const el = elem || document.documentElement;
+            if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        };
+        window.exitFullScreen = window.exitFullScreen || function() {
+            if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        };
     </script>
 
     <!-- 4. Local Stylesheet -->
-    <link rel="stylesheet" href="styles.css?v=3.5.0">
+    <link rel="stylesheet" href="styles.css?v=3.7.3">
     <script>
         // Automatic Service Worker version synchronization & cache flush
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 console.log('⚡ New Service Worker activated, reloading for latest build...');
+                window.location.reload();
             });
             window.addEventListener('load', () => {
                 navigator.serviceWorker.getRegistration().then(reg => {
@@ -1793,6 +1816,13 @@
                 <polyline points="7 3 7 8 15 8"/>
             </svg>
         </button>
+
+        <!-- [เพิ่มใหม่]: ปุ่ม Toggle Full-Screen API -->
+        <button id="fullscreen-toggle-btn" onclick="toggleFullScreen()" class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-slate-400 hover:text-blue-500 hover:bg-white dark:hover:bg-slate-700 transition-all" title="เปิด/ปิด โหมดเต็มจอ (Toggle Full-Screen)" aria-label="Toggle Full-Screen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+        </button>
     </div>
 </div>
 
@@ -1826,9 +1856,12 @@
             </div>
 
             <div id="vendor-divider" class="hidden w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
-            <select  id="claim-vendor-filter" onchange="updateAllModuleFilters()" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-extrabold text-blue-600 dark:text-blue-400 outline-none h-6 px-1.5 cursor-pointer max-w-[100px] truncate shrink-0" title="Claim Vendor Filter" aria-label="Claim Vendor Filter">
-                <option value="ALL">ALL VENDORS</option>
-            </select>
+            <div id="vendor-filter-container" class="relative flex items-center">
+                <select id="claim-vendor-filter" onchange="updateAllModuleFilters()" class="hidden bg-slate-50 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80 hover:border-blue-400 dark:hover:border-blue-500 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none h-6 pl-2 pr-5 cursor-pointer max-w-[125px] truncate shrink-0 shadow-xs transition-colors" title="Claim Vendor Filter" aria-label="Claim Vendor Filter">
+                    <option value="ALL">ALL VENDORS</option>
+                </select>
+                <svg id="vendor-filter-arrow" class="hidden w-2.5 h-2.5 text-slate-400 dark:text-slate-400 absolute right-1.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
 
             <div class="w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
 
@@ -3172,11 +3205,23 @@
             <!-- Analytics Side -->
             <div class="sj-analytics-col flex-[0.9]">
                 <div class="sj-glass-card h-[49%]">
-                    <div class="card-head"><h3>Workload Distribution</h3></div>
+                    <div class="card-head-flex">
+                        <div class="flex items-center gap-2">
+                            <div class="header-indicator bg-indigo-500"></div>
+                            <h3>Workload Distribution</h3>
+                        </div>
+                        <span class="sj-record-badge">BY ASSIGNOR</span>
+                    </div>
                     <div class="card-body"><div id="sj-assignor-chart"></div></div>
                 </div>
                 <div class="sj-glass-card h-[49%]">
-                    <div class="card-head"><h3>Volume Frequency</h3></div>
+                    <div class="card-head-flex">
+                        <div class="flex items-center gap-2">
+                            <div class="header-indicator bg-blue-500"></div>
+                            <h3>Volume Frequency</h3>
+                        </div>
+                        <span class="sj-record-badge">MONTHLY TREND</span>
+                    </div>
                     <div class="card-body"><div id="sj-volume-chart"></div></div>
                 </div>
             </div>
@@ -3357,7 +3402,13 @@
                 <!-- Bottom Split -->
                 <div class="analytics-bottom-split h-[40%]">
                     <div class="analytics-card-white flex-[1]">
-                        <h3 class="chart-title-v2">OT TYPE DISTRIBUTION</h3>
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="flex items-center gap-2">
+                                <div class="w-1.5 h-3.5 bg-blue-600 rounded-full"></div>
+                                <h3 class="chart-title-v2">OT TYPE DISTRIBUTION</h3>
+                            </div>
+                            <span class="text-[9px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full" id="ot-dist-badge">TYPE RATIO</span>
+                        </div>
                         <div class="chart-wrap-v2"><div id="ot-dist-chart"></div></div>
                     </div>
                     <div class="analytics-card-white flex-[1.4]">
@@ -3881,7 +3932,6 @@
     </div> <!-- /#dashboard-view -->
 
     <!-- วาง script ไว้ก่อนปิด body เสมอเพื่อให้โหลด DOM เสร็จก่อน -->
-    <script src="vf_rp_seed_rules.js?v=3.6.5"></script>
-    <script src="script.js?v=3.6.5"></script>
+    <script src="script.js?v=3.7.3"></script>
 </body>
 </html>
