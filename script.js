@@ -231,9 +231,28 @@ window.handleImgError = function handleImgError(img) {
         return;
     }
 
-    // Smart Retry: ลองค้นหารูปแบบ Path สำรองก่อนถ้ายังไม่ได้ลอง
     const curSrc = img.getAttribute('src') || '';
     const retryCount = parseInt(img.dataset.retried || '0', 10);
+    img.referrerPolicy = 'no-referrer';
+
+    // Retry Strategy 1: Google Drive fallback
+    if (curSrc.includes('googleusercontent.com/d/')) {
+        const gdMatch = curSrc.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (gdMatch && gdMatch[1] && retryCount < 2) {
+            img.dataset.retried = String(retryCount + 1);
+            img.src = `https://drive.google.com/thumbnail?id=${gdMatch[1]}&sz=w1200`;
+            return;
+        }
+    } else if (curSrc.includes('drive.google.com/thumbnail')) {
+        const gdMatch = curSrc.match(/id=([a-zA-Z0-9_-]+)/);
+        if (gdMatch && gdMatch[1] && retryCount < 2) {
+            img.dataset.retried = String(retryCount + 1);
+            img.src = `https://lh3.googleusercontent.com/d/${gdMatch[1]}`;
+            return;
+        }
+    }
+
+    // Retry Strategy 2: Local relative path normalization
     if (retryCount === 0 && curSrc && !curSrc.startsWith('data:') && !curSrc.startsWith('http')) {
         img.dataset.retried = '1';
         if (curSrc.startsWith('./')) {
@@ -254,6 +273,14 @@ window.handleImgError = function handleImgError(img) {
         }
     }
 
+    // Retry Strategy 3: External HTTP/HTTPS URL cross-device CORS/proxy fallback
+    if (retryCount < 2 && curSrc && curSrc.startsWith('http') && !curSrc.includes('images.weserv.nl')) {
+        img.dataset.retried = '3';
+        img.crossOrigin = 'anonymous';
+        img.src = `https://images.weserv.nl/?url=${encodeURIComponent(curSrc)}&w=1200&output=webp`;
+        return;
+    }
+
     img.onerror = null;
     img.src = window.SVG_IMAGE_ERROR_PLACEHOLDER;
 };
@@ -272,12 +299,23 @@ window.formatImageUrl = function formatImageUrl(url) {
         return 'data:image/png;base64,' + trimmed;
     }
     
-    // 2. Upgrade http to https when running under secure https context to prevent Mixed Content Block
+    // 2. Google Drive direct image conversion (แก้ปัญหารูปจาก Google Drive ไม่แสดงผลในอุปกรณ์อื่น)
+    const gdMatch = trimmed.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:[^&]+&)*id=)([a-zA-Z0-9_-]+)/i);
+    if (gdMatch && gdMatch[1]) {
+        return `https://lh3.googleusercontent.com/d/${gdMatch[1]}`;
+    }
+
+    // 3. Dropbox direct image link conversion
+    if (trimmed.includes('dropbox.com/s/') && trimmed.includes('dl=0')) {
+        trimmed = trimmed.replace('dl=0', 'raw=1');
+    }
+
+    // 4. Upgrade http to https when running under secure https context to prevent Mixed Content Block
     if (window.location.protocol === 'https:' && trimmed.startsWith('http://')) {
         trimmed = 'https://' + trimmed.slice(7);
     }
     
-    // 3. Local file protocol resolver
+    // 5. Local file protocol resolver
     if (trimmed.startsWith('assetsinstruments/') || trimmed.startsWith('./assetsinstruments/') || trimmed.startsWith('signatures/') || trimmed.startsWith('./signatures/')) {
         try {
             if (window.location && window.location.protocol === 'file:') {
@@ -10390,9 +10428,10 @@ function safeLocalStorageSet(key, value) {
 async function compressImageToDataUrl(fileOrBlob, maxDimension = 1200, quality = 0.78) {
     return new Promise((resolve) => {
         if (!fileOrBlob) { resolve(''); return; }
-        const reader = new FileReader();
-        reader.onload = (e) => {
+        
+        const processImageSrc = (srcStr) => {
             const img = new Image();
+            img.crossOrigin = 'anonymous';
             img.onload = () => {
                 let width = img.width;
                 let height = img.height;
@@ -10413,8 +10452,18 @@ async function compressImageToDataUrl(fileOrBlob, maxDimension = 1200, quality =
                 const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
                 resolve(compressedDataUrl);
             };
-            img.onerror = () => resolve(e.target.result || '');
-            img.src = e.target.result;
+            img.onerror = () => resolve(srcStr || '');
+            img.src = srcStr;
+        };
+
+        if (typeof fileOrBlob === 'string') {
+            processImageSrc(fileOrBlob);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            processImageSrc(e.target.result);
         };
         reader.onerror = () => resolve('');
         reader.readAsDataURL(fileOrBlob);
@@ -12803,6 +12852,7 @@ function switchPage(name, el) {
         'EXEC DASHBOARD': 'exec-dashboard-content',
         'ATTENDANCE LOGS': 'attendance-logs',
         'LINE SUPPORT LOGS': 'line-support-logs-content',
+        'CALIBRATION': 'calibration-content',
         '5S EXCELLENCE': 'five-s-content',
         'SKILL MATRIX': 'skill-matrix-content',
         'SPECIAL JOBS': 'special-jobs-content',
@@ -12813,12 +12863,15 @@ function switchPage(name, el) {
         'RUNNING NUMBER': 'rn-management-content'
     };
 
-    if (pageNameUpper === 'RUNNING NUMBER') {
-        $id('rn-header-tools').classList.remove('hidden');
-        $id('rn-header-tools').classList.add('flex');
-    } else {
-        $id('rn-header-tools').classList.add('hidden');
-        $id('rn-header-tools').classList.remove('flex');
+    const rnHeader = $id('rn-header-tools');
+    if (rnHeader) {
+        if (pageNameUpper === 'RUNNING NUMBER') {
+            rnHeader.classList.remove('hidden');
+            rnHeader.classList.add('flex');
+        } else {
+            rnHeader.classList.add('hidden');
+            rnHeader.classList.remove('flex');
+        }
     }
 
     const targetId = targetIdMap[pageNameUpper];
@@ -12833,6 +12886,7 @@ function switchPage(name, el) {
             case 'EXEC DASHBOARD': initExecDashboard(); break;
             case 'ATTENDANCE LOGS': initAttDashboard(); break;
             case 'LINE SUPPORT LOGS': WapSupportLogs.init(targetUser); break;
+            case 'CALIBRATION': if (typeof WapCalibrationSystem !== 'undefined') WapCalibrationSystem.init(); break;
             case '5S EXCELLENCE': Wap5SExcellence.init(); break;
             case 'SKILL MATRIX': WapSkillMatrix.init(); break;
             case 'SPECIAL JOBS': WapSpecialJobs.init(); break;
@@ -17327,7 +17381,7 @@ const WapSupportLogs = (function () {
                     if (_user) safeLocalStorageSet(`wap_support_cache_${_user}`, JSON.stringify(stripped));
                     safeLocalStorageSet(`wap_support_cache_last`, JSON.stringify(stripped));
                     if (window.SQEIndexedDBManager && typeof SQEIndexedDBManager.saveTableCache === 'function') {
-                        SQEIndexedDBManager.saveTableCache(`wap_support_${_user}`, stripped);
+                        SQEIndexedDBManager.saveTableCache(`wap_support_${_user}`, _records.slice(0, 300));
                     }
                 }
             } catch (err) {
@@ -17598,7 +17652,7 @@ function applyDateFilter() {
                         <td style="text-align:center;">
                             ${safeImg ?
                                 `<span class="img-thumb" onclick="WapSupportLogs._openViewModal('${item.id}')">
-                                    <img src="${escapeHtml(safeImg)}" onerror="handleImgError(this)" style="width:100%; height:100%; object-fit:cover;" alt="Image" title="Click to view details">
+                                    <img src="${escapeHtml(safeImg)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="handleImgError(this)" style="width:100%; height:100%; object-fit:cover;" alt="Image" title="Click to view details">
                                  </span>` :
                                 `<span style="color:#e2e8f0; font-size:10px; font-weight:700;">N/A</span>`}
                         </td>
@@ -17993,23 +18047,67 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
         modal.id = 'support-form-modal';
-        modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);padding:10px;';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:12px;';
 
         modal.innerHTML = `
-            <div style="background:#fff; border-radius:20px; width:100%; max-width:720px; overflow:hidden; display:flex; flex-direction:column; max-height:92vh; box-shadow:0 25px 50px rgba(0,0,0,0.25); animation:modalPop .2s ease;">
-                <!-- Header -->
-                <div style="background:#1e293b; color:#fff; padding:12px 18px; display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; display:flex; align-items:center; gap:8px; margin:0;">
-                        <span>${isEdit ? '📝 แก้ไขรายงานเคลมผลิต' : '✨ บันทึกรายงานเคลมใหม่'}</span>
-                    </h3>
-                    <button type="button" onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:18px; transition:color 0.2s;" title="Close" aria-label="Close">✕</button>
+            <div style="background:${isDark ? '#060a14' : '#ffffff'}; border:1px solid ${isDark ? 'rgba(56,189,248,0.35)' : '#cbd5e1'}; border-radius:16px; width:100%; max-width:740px; overflow:hidden; display:flex; flex-direction:column; max-height:94vh; box-shadow:${isDark ? '0 0 60px rgba(14,165,233,0.22), 0 35px 85px rgba(0,0,0,0.95)' : '0 25px 60px rgba(0,0,0,0.2)'}; font-family:'Inter', 'Kanit', sans-serif; position:relative; animation:modalPop .2s ease;">
+                
+                <!-- 1. Header (Premium Enterprise Grade) -->
+                <div class="claim-modal-header" style="position:relative; z-index:2; display:flex; justify-content:space-between; align-items:center; min-height:56px;">
+                    <div style="display:flex; align-items:center; gap:12px; z-index:3; position:relative;">
+                        <div style="width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, rgba(56,189,248,0.25) 0%, rgba(37,99,235,0.35) 100%); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(56,189,248,0.4); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.4); flex-shrink:0; position:relative;">
+                            ${isEdit ? `
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            ` : `
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <path d="M9 15l2 2 4-4" stroke="#38bdf8" stroke-width="2.5"></path>
+                                </svg>
+                            `}
+                            <span style="position:absolute; bottom:-2px; right:-2px; width:15px; height:15px; border-radius:50%; background:linear-gradient(135deg, #38bdf8, #2563eb); border:2px solid #0f172a; display:flex; align-items:center; justify-content:center; font-size:9px; color:#ffffff; font-weight:900; box-shadow:0 0 8px rgba(56,189,248,0.8); line-height:1;">
+                                ${isEdit ? '✎' : '+'}
+                            </span>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:2px;">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <h3 style="margin:0; color:#ffffff; font-size:16px; font-weight:850; letter-spacing:0.3px; text-shadow:0 2px 4px rgba(0,0,0,0.25); font-family:'Prompt', sans-serif;">${isEdit ? 'แก้ไขรายงานเคลมชิ้นส่วน' : 'บันทึกรายงานเคลมใหม่'}</h3>
+                                <span style="background:rgba(255,255,255,0.18); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,0.3); color:#ffffff; font-size:9.5px; font-weight:800; padding:2px 8px; border-radius:999px; letter-spacing:0.4px; text-transform:uppercase; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(0,0,0,0.12);">
+                                    <span style="width:6px; height:6px; border-radius:50%; background:#38bdf8; box-shadow:0 0 6px #38bdf8;"></span>
+                                    <span>${isEdit ? 'EDIT RECORD' : 'NEW CLAIM'}</span>
+                                </span>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.85); font-size:11px; font-weight:600; display:flex; align-items:center; gap:6px; letter-spacing:0.2px;">
+                                <span>PARTS QUALITY CLAIM & DEFECT REPORTING</span>
+                                <span style="opacity:0.4;">•</span>
+                                <span style="opacity:0.95; font-weight:700; color:#93c5fd;">SQE & WAP PORTAL</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display:flex; align-items:center; gap:10px; z-index:3; position:relative;">
+                        <button type="button" onclick="this.closest('.modal-overlay').remove()" 
+                                style="background:rgba(255,255,255,0.14); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.25); color:#ffffff; width:34px; height:34px; border-radius:10px; cursor:pointer; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; transition:all 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-shadow:0 2px 8px rgba(0,0,0,0.15);" 
+                                onmouseover="this.style.background='rgba(239,68,68,0.9)'; this.style.borderColor='rgba(239,68,68,1)'; this.style.transform='rotate(90deg) scale(1.05)';" 
+                                onmouseout="this.style.background='rgba(255,255,255,0.14)'; this.style.borderColor='rgba(255,255,255,0.25)'; this.style.transform='none';" 
+                                title="ปิดหน้าต่าง (Close Modal)" aria-label="Close">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 
-                <form id="sup-form" style="padding:14px 18px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; flex:1;">
+                <form id="sup-form" style="padding:16px 20px; display:flex; flex-direction:column; gap:13px; overflow-y:auto; flex:1;">
+                    
                     <!-- Offline Draft Status & Restore Indicator Banner -->
-                    <div id="offline-draft-banner" style="display:none; padding:10px 14px; border-radius:12px; font-size:11px; font-weight:700; align-items:center; justify-content:space-between; gap:10px; transition:all 0.3s ease;">
+                    <div id="offline-draft-banner" style="display:none; padding:10px 14px; border-radius:10px; font-size:11.5px; font-weight:700; align-items:center; justify-content:space-between; gap:10px; background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; transition:all 0.3s ease;">
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <span id="offline-indicator-icon" style="font-size:14px;">📶</span>
+                            <span id="offline-indicator-icon" style="font-size:14px;">💾</span>
                             <span id="offline-indicator-text"></span>
                         </div>
                         <div id="offline-indicator-actions" style="display:flex; align-items:center; gap:6px;"></div>
@@ -18018,82 +18116,92 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                     <!-- ==========================================================
                          หมวดหมู่ 1: ชิ้นส่วน & รายละเอียดปัญหา (Smart Lookup)
                          ========================================================== -->
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
-                            <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
-                                <svg width="14" height="14" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 0-2-2V5a2 2 0 0 0 2-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                🧩 1. ชิ้นส่วน & รายละเอียดปัญหา (Smart Auto-Complete)
+                    <div class="claim-section-card" style="display:flex; flex-direction:column; gap:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(226,232,240,0.8); padding-bottom:6px;">
+                            <label style="font-size:11.5px; font-weight:800; color:#1e40af; text-transform:uppercase; display:flex; align-items:center; gap:7px; margin:0; letter-spacing:0.3px;">
+                                <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:6px; background:rgba(59,130,246,0.15); color:#2563eb; font-size:12px;">🧩</span>
+                                <span>1. ข้อมูลชิ้นส่วน & รายละเอียดปัญหา (SMART AUTO-COMPLETE)</span>
                             </label>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <span id="smart-match-notice" style="display:none; font-size:9.5px; font-weight:800; color:#059669; background:#d1fae5; padding:2px 8px; border-radius:6px; border:1px solid #6ee7b7;"></span>
-                                <span style="font-size:9.5px; font-weight:800; color:#0284c7; background:#e0f2fe; padding:2px 8px; border-radius:6px; border:1px solid #bae6fd; font-family:monospace;">
-                                    <span id="prob-date-badge">${parsedDateStr}</span>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span id="smart-match-notice" style="display:none; font-size:9.5px; font-weight:800; color:#10b981; background:rgba(16,185,129,0.12); padding:2px 8px; border-radius:6px; border:1px solid rgba(16,185,129,0.3);"></span>
+                                <span style="font-size:10px; font-weight:800; color:#2563eb; background:#eff6ff; padding:2px 8px; border-radius:6px; border:1px solid #bfdbfe; font-family:monospace;">
+                                    📅 <span id="prob-date-badge">${parsedDateStr}</span>
                                 </span>
                             </div>
                         </div>
 
-<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-    <!-- 1. ช่องรหัสพาร์ท (Part No.) -->
-    <div>
-        <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔢 รหัสพาร์ท (Part No.) *</label>
-        <div class="form-input-wrap" style="position:relative;"> <!-- เพิ่มตัวครอบเพื่อให้ Dropdown ลอยตรงตำแหน่ง -->
-            <input type="text" id="prob-partno" 
-                   value="${parsedPartNo}" 
-                   placeholder="พิมพ์รหัสพาร์ท..." 
-                   class="form-input" 
-                   style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" 
-                   oninput="renderModalAC('partno', this)" 
-                   onfocus="renderModalAC('partno', this)"
-                   onclick="renderModalAC('partno', this)"
-                   autocomplete="off" 
-                   title="Part No" aria-label="Part No">
-        </div>
-    </div>
-
-    <!-- 2. ช่องชื่อพาร์ท (Part Name) -->
-    <div>
-        <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🧩 ชื่อพาร์ท (Part Name) *</label>
-        <div class="form-input-wrap" style="position:relative;">
-            <input type="text" id="prob-part" 
-                   value="${parsedPart}" 
-                   placeholder="พิมพ์ชื่อพาร์ท..." 
-                   class="form-input" 
-                   style="width:100%; height:32px; font-size:11px; font-weight:700;" 
-                   oninput="renderModalAC('partname', this)" 
-                   onfocus="renderModalAC('partname', this)"
-                   onclick="renderModalAC('partname', this)"
-                   autocomplete="off" 
-                   title="Part Name" aria-label="Part Name">
-        </div>
-    </div>
-
-    <!-- 3. ช่องผู้จำหน่าย (Supplier) -->
-    <div>
-        <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🏭 ผู้จำหน่าย (Supplier)</label>
-        <div class="form-input-wrap" style="position:relative;">
-            <input type="text" id="prob-supplier" name="supplier"
-                   value="${parsedSupplier}" 
-                   placeholder="พิมพ์ชื่อผู้จำหน่าย..." 
-                   class="form-input" 
-                   style="width:100%; height:32px; font-size:11px; font-weight:700; color:#0284c7;" 
-                   oninput="renderModalAC('supplier', this)" 
-                   onfocus="renderModalAC('supplier', this)"
-                   onclick="renderModalAC('supplier', this)"
-                   autocomplete="off" 
-                   title="Supplier Name" aria-label="Supplier Name">
-        </div>
-    </div>
-</div>
-
-                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                        <!-- Part Inputs Grid: Row 1 -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                            <!-- 1. ช่องรหัสพาร์ท (Part No.) -->
                             <div>
-                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📦 หมวดหมู่พาร์ท</label>
+                                <label style="font-size:10.5px; font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                                    <span>🔢 รหัสพาร์ท (Part No.)</span>
+                                    <span style="color:#ef4444;">*</span>
+                                </label>
+                                <div class="form-input-wrap" style="position:relative;">
+                                    <input type="text" id="prob-partno" 
+                                           value="${parsedPartNo}" 
+                                           placeholder="พิมพ์รหัสพาร์ท..." 
+                                           class="form-input" 
+                                           style="width:100%; height:34px; font-size:12px; font-weight:750; font-family:'DM Mono', monospace;" 
+                                           oninput="renderModalAC('partno', this)" 
+                                           onfocus="renderModalAC('partno', this)"
+                                           onclick="renderModalAC('partno', this)"
+                                           autocomplete="off" 
+                                           title="Part No" aria-label="Part No">
+                                </div>
+                            </div>
+
+                            <!-- 2. ช่องชื่อพาร์ท (Part Name) -->
+                            <div>
+                                <label style="font-size:10.5px; font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                                    <span>🧩 ชื่อพาร์ท (Part Name)</span>
+                                    <span style="color:#ef4444;">*</span>
+                                </label>
+                                <div class="form-input-wrap" style="position:relative;">
+                                    <input type="text" id="prob-part" 
+                                           value="${parsedPart}" 
+                                           placeholder="พิมพ์ชื่อพาร์ท..." 
+                                           class="form-input" 
+                                           style="width:100%; height:34px; font-size:12px; font-weight:700;" 
+                                           oninput="renderModalAC('partname', this)" 
+                                           onfocus="renderModalAC('partname', this)"
+                                           onclick="renderModalAC('partname', this)"
+                                           autocomplete="off" 
+                                           title="Part Name" aria-label="Part Name">
+                                </div>
+                            </div>
+
+                            <!-- 3. ช่องผู้จำหน่าย (Supplier) -->
+                            <div>
+                                <label style="font-size:10.5px; font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                                    <span>🏭 ผู้จำหน่าย (Supplier)</span>
+                                </label>
+                                <div class="form-input-wrap" style="position:relative;">
+                                    <input type="text" id="prob-supplier" name="supplier"
+                                           value="${parsedSupplier}" 
+                                           placeholder="พิมพ์ชื่อผู้จำหน่าย..." 
+                                           class="form-input" 
+                                           style="width:100%; height:34px; font-size:12px; font-weight:700;" 
+                                           oninput="renderModalAC('supplier', this)" 
+                                           onfocus="renderModalAC('supplier', this)"
+                                           onclick="renderModalAC('supplier', this)"
+                                           autocomplete="off" 
+                                           title="Supplier Name" aria-label="Supplier Name">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Part Inputs Grid: Row 2 (Category, Area, Defect) -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                            <div>
+                                <label style="font-size:10.5px; font-weight:800; margin-bottom:4px; display:block;">📦 หมวดหมู่พาร์ท</label>
                                 <div class="form-input-wrap" style="position:relative;">
                                     <input type="text" id="f-sup-part-cat" name="part" 
                                            value="${parsedCategory || ''}" 
                                            placeholder="พิมพ์/เลือกหมวดหมู่..." 
                                            class="form-input" 
-                                           style="width:100%; height:32px; font-size:11px; font-weight:600;" 
+                                           style="width:100%; height:34px; font-size:11.5px; font-weight:650;" 
                                            oninput="renderModalAC('category', this)" 
                                            onfocus="renderModalAC('category', this)" 
                                            onclick="renderModalAC('category', this)" 
@@ -18102,70 +18210,87 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                                 </div>
                             </div>
 
-<div>
-    <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📍 ผู้แจ้ง / พื้นที่ (Area/Dept)</label>
-    <div class="form-input-wrap" style="position:relative;"> <!-- เพิ่มตัวครอบ -->
-        <input type="text" id="prob-user" 
-               value="${parsedUser}" 
-               placeholder="เช่น OSA-A1" 
-               class="form-input" 
-               style="width:100%; height:32px; font-size:11px; font-weight:600;" 
-               oninput="renderModalAC('user', this)" 
-               onfocus="renderModalAC('user', this)"
-               onclick="renderModalAC('user', this)"
-               autocomplete="off" 
-               title="User/Area" aria-label="User/Area">
-    </div>
-</div>
-<div>
-    <label style="font-size:10px; font-weight:700; color:#e11d48; margin-bottom:2px; display:block;">⚠️ อาการเสีย (Defect Detail)</label>
-    <div class="form-input-wrap" style="position:relative;"> <!-- เพิ่มตัวครอบ -->
-        <input type="text" id="prob-defect" 
-               value="${parsedDefect}" 
-               placeholder="ระบุอาการเสีย..." 
-               class="form-input" 
-               style="width:100%; height:32px; font-size:11px; font-weight:700; color:#e11d48;" 
-               oninput="renderModalAC('defect', this)" 
-               onfocus="renderModalAC('defect', this)"
-               onclick="renderModalAC('defect', this)"
-               autocomplete="off" 
-               title="Defect" aria-label="Defect">
-    </div>
-</div>
+                            <div>
+                                <label style="font-size:10.5px; font-weight:800; margin-bottom:4px; display:block;">📍 ผู้แจ้ง / พื้นที่ (Area/Dept)</label>
+                                <div class="form-input-wrap" style="position:relative;">
+                                    <input type="text" id="prob-user" 
+                                           value="${parsedUser}" 
+                                           placeholder="เช่น OSA-A1" 
+                                           class="form-input" 
+                                           style="width:100%; height:34px; font-size:11.5px; font-weight:650;" 
+                                           oninput="renderModalAC('user', this)" 
+                                           onfocus="renderModalAC('user', this)" 
+                                           onclick="renderModalAC('user', this)" 
+                                           autocomplete="off" 
+                                           title="User/Area" aria-label="User/Area">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style="font-size:10.5px; font-weight:800; color:#ef4444; margin-bottom:4px; display:block;">⚠️ อาการเสีย (Defect)</label>
+                                <div class="form-input-wrap" style="position:relative;">
+                                    <input type="text" id="prob-defect" 
+                                           value="${parsedDefect}" 
+                                           placeholder="ระบุอาการเสีย..." 
+                                           class="form-input" 
+                                           style="width:100%; height:34px; font-size:12px; font-weight:750; color:#ef4444;" 
+                                           oninput="renderModalAC('defect', this)" 
+                                           onfocus="renderModalAC('defect', this)" 
+                                           onclick="renderModalAC('defect', this)" 
+                                           autocomplete="off" 
+                                           title="Defect" aria-label="Defect">
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Live Preview Banner -->
-                        <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:10.5px; color:#334155; display:flex; align-items:flex-start; gap:8px;">
-                            <span style="font-size:9px; font-weight:800; color:#64748b; text-transform:uppercase; flex-shrink:0; padding-top:1px;">PREVIEW:</span>
-                            <span id="prob-preview-text" style="color:#0f172a; font-weight:700; font-family:monospace; word-break:break-word; white-space:pre-wrap; flex:1; line-height:1.45;"></span>
+                        <!-- Live Problem Preview Card (Neat, Multi-line & Clean Spacing) -->
+                        <div class="problem-preview-card" style="margin-top:4px; padding:10px 14px; border-radius:10px; display:flex; flex-direction:column; gap:8px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; border-bottom:1px solid rgba(226,232,240,0.7); padding-bottom:6px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:10.5px; font-weight:900; color:#2563eb; letter-spacing:0.5px; text-transform:uppercase; display:inline-flex; align-items:center; gap:5px;">
+                                        <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#2563eb;"></span>
+                                        PREVIEW:
+                                    </span>
+                                    <span style="font-size:10px; font-weight:700; color:#64748b; background:rgba(37,99,235,0.08); padding:2px 8px; border-radius:9999px;">ประโยคสรุปปัญหา (Real-time)</span>
+                                </div>
+                                <button type="button" id="btn-copy-problem-sentence" onclick="this.closest('#support-form-modal')._copyProblemSentence()" style="display:inline-flex; align-items:center; gap:5px; background:#ffffff; border:1px solid #cbd5e1; color:#334155; border-radius:6px; font-size:11px; font-weight:750; padding:4px 10px; cursor:pointer; flex-shrink:0; transition:all 0.15s ease;" title="คัดลอกประโยคสรุปปัญหา">
+                                    <span>📋 คัดลอก</span>
+                                </button>
+                            </div>
+                            <div id="prob-preview-text" style="font-size:12px; font-weight:600; font-family:'DM Mono', monospace, Consolas; color:#1e293b; line-height:1.65; word-break:break-word; white-space:pre-wrap; min-height:20px;"></div>
                         </div>
                         <input type="hidden" id="f-sup-problem" name="problem" value="">
                     </div>
 
                     <!-- ==========================================================
-                         หมวดหมู่ 2: ข้อมูลการแก้ไข & จำนวน (Action & Quantities)
+                         หมวดหมู่ 2: วันที่ การแก้ไข & จำนวนชิ้นงาน (Action & Quantities)
                          ========================================================== -->
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;">
-                        <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
-                            ⚙️ 2. วันที่ การแก้ไข & จำนวนชิ้นงาน
-                        </label>
+                    <div class="claim-section-card" style="display:flex; flex-direction:column; gap:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(226,232,240,0.8); padding-bottom:6px;">
+                            <label style="font-size:11.5px; font-weight:850; color:#1e40af; text-transform:uppercase; display:flex; align-items:center; gap:7px; margin:0; letter-spacing:0.3px;">
+                                <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:6px; background:rgba(14,165,233,0.15); color:#0284c7; font-size:12px;">⚙️</span>
+                                <span>2. วันที่ การแก้ไข & จำนวนชิ้นงาน</span>
+                            </label>
+                            <span style="font-size:10px; font-weight:800; color:#64748b; background:#f1f5f9; border:1px solid #e2e8f0; padding:2px 8px; border-radius:6px;">🔢 คำนวณ NG อัตโนมัติ</span>
+                        </div>
 
-<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-    <div>
-        <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📅 วันที่รายงาน</label>
-        <input type="date" id="f-sup-date" name="date" 
-            value="${initialFormDate}" 
-            class="form-input" style="width:100%; height:32px; font-size:11px;" required title="Date" aria-label="Date">
-    </div>
- 
+                        <!-- Date, Action, Report Type Grid -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
                             <div>
-                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">🔧 การแก้ไข (ACTION)</label>
+                                <label style="font-size:10.5px; font-weight:800; margin-bottom:4px; display:block;">📅 วันที่รายงาน</label>
+                                <input type="date" id="f-sup-date" name="date" 
+                                    value="${initialFormDate}" 
+                                    class="form-input" style="width:100%; height:34px; font-size:11.5px; font-weight:700;" required title="Date" aria-label="Date">
+                            </div>
+
+                            <div>
+                                <label style="font-size:10.5px; font-weight:800; margin-bottom:4px; display:block;">🔧 การแก้ไข (ACTION)</label>
                                 <div class="form-input-wrap" style="position:relative;">
                                     <input type="text" id="f-sup-action" name="action" 
                                            value="${isEdit ? (r.action || '') : ''}" 
                                            placeholder="พิมพ์/เลือก ACTION..." 
                                            class="form-input" 
-                                           style="width:100%; height:32px; font-size:11px; font-weight:600;" 
+                                           style="width:100%; height:34px; font-size:11.5px; font-weight:650;" 
                                            oninput="renderModalAC('action', this)" 
                                            onfocus="renderModalAC('action', this)" 
                                            onclick="renderModalAC('action', this)" 
@@ -18173,14 +18298,15 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                                            title="Action" aria-label="Action">
                                 </div>
                             </div>
+
                             <div>
-                                <label style="font-size:10px; font-weight:700; color:#475569; margin-bottom:2px; display:block;">📋 ประเภทรายงาน</label>
+                                <label style="font-size:10.5px; font-weight:800; margin-bottom:4px; display:block;">📋 ประเภทรายงาน</label>
                                 <div class="form-input-wrap" style="position:relative;">
                                     <input type="text" id="f-sup-report" name="report" 
                                            value="${isEdit ? (r.report === 'RP' ? 'RP Report' : (r.report === 'RECORDS' ? 'Records' : (r.report === 'VF' ? 'VF Report' : (r.report || '')))) : ''}" 
                                            placeholder="พิมพ์/เลือกประเภท..." 
                                            class="form-input" 
-                                           style="width:100%; height:32px; font-size:11px; font-weight:600;" 
+                                           style="width:100%; height:34px; font-size:11.5px; font-weight:700;" 
                                            oninput="renderModalAC('report', this); if (this.closest('#support-form-modal')?._handleReportChange) this.closest('#support-form-modal')._handleReportChange(); else if (this.closest('#support-form-modal')?._syncProblemSentence) this.closest('#support-form-modal')._syncProblemSentence();" 
                                            onchange="if (this.closest('#support-form-modal')?._handleReportChange) this.closest('#support-form-modal')._handleReportChange(); else if (this.closest('#support-form-modal')?._syncProblemSentence) this.closest('#support-form-modal')._syncProblemSentence();"
                                            onfocus="renderModalAC('report', this)" 
@@ -18191,27 +18317,31 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                             </div>
                         </div>
 
-                        <!-- Quantities row -->
-                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                        <!-- Quantities Row (Clean, readable inputs) -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                            <!-- LOT QTY -->
                             <div>
-                                <label style="font-size:10px; font-weight:800; color:#475569; margin-bottom:2px; display:block;">📦 LOT NO. (QTY รวม)</label>
-                                <input type="number" id="f-sup-lot" name="lot" value="${r.lot || ''}" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700;" placeholder="0" oninput="WapSupportLogs.calcNG()" title="จำนวนทั้งหมด" aria-label="จำนวนทั้งหมด">
+                                <label style="font-size:10.5px; font-weight:800; margin-bottom:4px; display:block;">📦 LOT NO. (QTY รวม)</label>
+                                <input type="number" id="f-sup-lot" name="lot" value="${r.lot || ''}" class="form-input" style="width:100%; height:34px; font-size:13px; font-weight:800; font-family:'DM Mono', monospace;" placeholder="0" oninput="WapSupportLogs.calcNG()" title="จำนวนทั้งหมด" aria-label="จำนวนทั้งหมด">
                             </div>
+
+                            <!-- OK QTY -->
                             <div>
-                                <label style="font-size:10px; font-weight:800; color:#059669; margin-bottom:2px; display:block;">✅ OK QTY</label>
-                                <input type="number" id="f-sup-ok" name="ok" value="${r.ok || ''}" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:700;" placeholder="0" oninput="WapSupportLogs.calcNG()" title="OK Qty" aria-label="OK Qty">
+                                <label style="font-size:10.5px; font-weight:800; color:#10b981; margin-bottom:4px; display:block;">✅ OK QTY</label>
+                                <input type="number" id="f-sup-ok" name="ok" value="${r.ok || ''}" class="form-input" style="width:100%; height:34px; font-size:13px; font-weight:800; font-family:'DM Mono', monospace; color:#10b981;" placeholder="0" oninput="WapSupportLogs.calcNG()" title="OK Qty" aria-label="OK Qty">
                             </div>
+
+                            <!-- NG QTY (Auto) -->
                             <div>
-                                <label style="font-size:10px; font-weight:800; color:#ef4444; margin-bottom:2px; display:block;">❌ NG QTY (Auto)</label>
-                                <input type="number" id="f-sup-ng" name="ng" value="${r.ng || ''}" class="form-input" style="width:100%; height:32px; font-size:11px; font-weight:800; background:#fff1f2; color:#e11d48;" readonly placeholder="0" title="NG Qty" aria-label="NG Qty">
+                                <label style="font-size:10.5px; font-weight:800; color:#ef4444; margin-bottom:4px; display:block;">❌ NG QTY (Auto)</label>
+                                <input type="number" id="f-sup-ng" name="ng" value="${r.ng || ''}" class="form-input" style="width:100%; height:34px; font-size:13px; font-weight:900; font-family:'DM Mono', monospace; background:rgba(239,68,68,0.06); color:#ef4444; border-color:rgba(239,68,68,0.3);" readonly placeholder="0" title="NG Qty" aria-label="NG Qty">
                             </div>
                         </div>
 
                         <!-- Conditional RP Report Row: P/O# & INV.# (แสดงเฉพาะเมื่อเลือก RP Report) -->
-                        <div id="rp-fields-row" style="display:none; grid-template-columns:1fr 1fr; gap:8px; margin-top:2px;">
-                            <!-- 1. P/O# (ก่อน บันทึกเป็นภารกิจพิเศษ) -->
+                        <div id="rp-fields-row" style="display:none; grid-template-columns:1fr 1fr; gap:10px; margin-top:2px;">
                             <div id="f-po-input" style="display:none;">
-                                <label style="font-size:10px; font-weight:800; color:#2563eb; margin-bottom:2px; display:flex; align-items:center; gap:4px;">
+                                <label style="font-size:10.5px; font-weight:800; color:#2563eb; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
                                     <span>📑 P/O# (Purchase Order)</span>
                                 </label>
                                 <div style="position:relative;">
@@ -18219,15 +18349,14 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                                            value="${r.po_no || r.po || (r.report_data && r.report_data.vf_data ? r.report_data.vf_data.po_no : '') || ''}" 
                                            placeholder="ระบุหมายเลข P/O#..." 
                                            class="form-input" 
-                                           style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" 
+                                           style="width:100%; height:34px; font-size:11.5px; font-weight:750; font-family:'DM Mono', monospace;" 
                                            autocomplete="off" 
                                            title="P/O#" aria-label="P/O#">
                                 </div>
                             </div>
 
-                            <!-- 2. INV.# (ก่อน เปิดเคสวิเคราะห์ 8D Report) -->
                             <div id="f-inv-input" style="display:none;">
-                                <label style="font-size:10px; font-weight:800; color:#e11d48; margin-bottom:2px; display:flex; align-items:center; gap:4px;">
+                                <label style="font-size:10.5px; font-weight:800; color:#e11d48; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
                                     <span>🧾 INV.# (Invoice No.)</span>
                                 </label>
                                 <div style="position:relative;">
@@ -18235,38 +18364,37 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                                            value="${r.inv_no || r.inv || (r.report_data && r.report_data.vf_data ? r.report_data.vf_data.inv_no : '') || ''}" 
                                            placeholder="ระบุหมายเลข INV.#..." 
                                            class="form-input" 
-                                           style="width:100%; height:32px; font-size:11px; font-weight:700; font-family:monospace;" 
+                                           style="width:100%; height:34px; font-size:11.5px; font-weight:750; font-family:'DM Mono', monospace;" 
                                            autocomplete="off" 
                                            title="INV.#" aria-label="INV.#">
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Row 3: Integrated Toggles Side-by-Side right after Quantities -->
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:2px;">
+                        <!-- Integrated Toggles Side-by-Side (Special Job & 8D) -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:2px;">
                             <!-- 1. Toggle: Special Jobs (Blue Theme) -->
-                            <div style="padding:8px 12px; background:rgba(59, 130, 246, 0.08); border:1px dashed rgba(59, 130, 246, 0.45); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;" id="sync-container">
+                            <div id="sync-container" style="padding:10px 14px; background:#f0f7ff; border:1.5px dashed #93c5fd; border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
                                 <div style="display:flex; align-items:center; gap:8px; flex:1;">
-                                    <div class="toggle-icon-badge" style="width:28px; height:28px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#3b82f6; flex-shrink:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                    <div class="toggle-icon-box" style="width:32px; height:32px; background:#ffffff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#2563eb; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,0.1);">
+                                        <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.6"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                     </div>
                                     <div style="flex:1;">
-                                        <p class="special-mission-label" style="font-size:10.5px; font-weight:800; color:#0f172a; margin:0; text-transform:uppercase; letter-spacing:0.01em;">บันทึกเป็นภารกิจพิเศษ</p>
-<div style="margin-top:3px; display:none;" id="commander-input-wrap">
-    <!-- ใช้โครงสร้างเดียวกับ Part No เพื่อให้ Dropdown แสดงผลตรงตำแหน่ง -->
-    <div class="form-input-wrap" style="position:relative;">
-        <input type="text" id="sync-commander-name" 
-               value="${r.assigned_by || ''}" 
-               placeholder="🔍 ค้นหาหรือเลือกชื่อผู้สั่งงาน..." 
-               class="form-input" 
-               style="width:100%; height:32px; font-size:11px; font-weight:700; color:#1e40af;" 
-               oninput="renderModalAC('commander', this)" 
-               onfocus="renderModalAC('commander', this)"
-               onclick="renderModalAC('commander', this)"
-               autocomplete="off" 
-               title="Commander" aria-label="Commander">
-    </div>
-</div>
+                                        <p class="special-mission-label" style="font-size:11.5px; font-weight:800; margin:0; color:#1e40af;">บันทึกเป็นภารกิจพิเศษ</p>
+                                        <div style="margin-top:4px; display:none;" id="commander-input-wrap">
+                                            <div class="form-input-wrap" style="position:relative;">
+                                                <input type="text" id="sync-commander-name" 
+                                                       value="${r.assigned_by || ''}" 
+                                                       placeholder="🔍 ระบุชื่อผู้สั่งงาน..." 
+                                                       class="form-input" 
+                                                       style="width:100%; height:28px; font-size:11px; font-weight:700; color:#1e40af;" 
+                                                       oninput="renderModalAC('commander', this)" 
+                                                       onfocus="renderModalAC('commander', this)"
+                                                       onclick="renderModalAC('commander', this)"
+                                                       autocomplete="off" 
+                                                       title="Commander" aria-label="Commander">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <label class="premium-toggle">
@@ -18276,13 +18404,13 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                             </div>
 
                             <!-- 2. Toggle: 8D Report (Red Theme) -->
-                            <div style="padding:8px 12px; background:rgba(225, 29, 72, 0.08); border:1px dashed rgba(225, 29, 72, 0.45); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;" id="8d-container">
+                            <div id="8d-container" style="padding:10px 14px; background:#fff1f2; border:1.5px dashed #fecdd3; border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
                                 <div style="display:flex; align-items:center; gap:8px; flex:1;">
-                                    <div class="toggle-icon-badge" style="width:28px; height:28px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#e11d48; flex-shrink:0; font-weight:950; font-size:12px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                                    <div class="toggle-icon-box" style="width:32px; height:32px; background:#ffffff; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#e11d48; flex-shrink:0; font-weight:900; font-size:13px; box-shadow:0 1px 4px rgba(0,0,0,0.1);">
                                         8D
                                     </div>
                                     <div style="flex:1;">
-                                        <p class="d8-report-label" style="font-size:10.5px; font-weight:800; color:#0f172a; margin:0; text-transform:uppercase; letter-spacing:0.01em;">เปิดเคสวิเคราะห์ 8D Report</p>
+                                        <p class="d8-report-label" style="font-size:11.5px; font-weight:800; margin:0; color:#9f1239;">เปิดเคสวิเคราะห์ 8D Report</p>
                                     </div>
                                 </div>
                                 <label class="premium-toggle">
@@ -18296,13 +18424,14 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                     <!-- ==========================================================
                          หมวดหมู่ 3: รูปภาพหลักฐาน (Evidence Image Upload - 2 Modes)
                          ========================================================== -->
-                    <div id="evidence-section-container" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+                    <div id="evidence-section-container" class="claim-section-card" style="display:flex; flex-direction:column; gap:10px;">
                         <!-- Header & Status Badge -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                            <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
-                                📸 3. รูปภาพหลักฐาน (EVIDENCE)
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; border-bottom:1px solid rgba(226,232,240,0.8); padding-bottom:6px;">
+                            <label style="font-size:11.5px; font-weight:800; color:#1e40af; text-transform:uppercase; display:flex; align-items:center; gap:7px; margin:0; letter-spacing:0.3px;">
+                                <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:6px; background:rgba(99,102,241,0.15); color:#6366f1; font-size:12px;">📸</span>
+                                <span>3. รูปภาพหลักฐาน (EVIDENCE)</span>
                             </label>
-                            <span id="img-status-badge" style="font-size:9.5px; font-weight:800; padding:2px 8px; border-radius:6px; transition:all 0.25s ease;"></span>
+                            <span id="img-status-badge" style="font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; transition:all 0.25s ease;"></span>
                         </div>
 
                         <!-- Mode Switcher Tabs (แบบที่ 1 / แบบที่ 2) -->
@@ -18321,12 +18450,12 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
 
                         <!-- Mode 1: Single File Upload Area -->
                         <div id="evidence-mode-single-pane" style="display:flex; flex-direction:column; gap:6px;">
-                            <div id="img-dropzone" style="border:1.5px dashed #cbd5e1; border-radius:12px; background:#ffffff; position:relative; padding:12px; min-height:80px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease; cursor:pointer;" title="คลิกเพื่อเลือกไฟล์รูปภาพจากเครื่อง หรือลากไฟล์มาวาง">
+                            <div id="img-dropzone" style="border:1.5px dashed #cbd5e1; border-radius:12px; background:transparent; position:relative; padding:14px; min-height:85px; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease; cursor:pointer;" title="คลิกเพื่อเลือกไฟล์รูปภาพจากเครื่อง หรือลากไฟล์มาวาง">
                                 <input type="file" id="img-input" accept="image/*" style="display:none;" title="Img Input" aria-label="Img Input">
                                 <div id="img-preview-area" style="text-align:center; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; position:relative;">
                                     ${r.imageUrl ? `
                                         <div class="evidence-single-preview-wrap">
-                                            <img src="${r.imageUrl}" style="max-height:95px; max-width:100%; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" alt="Evidence Single" />
+                                            <img src="${r.imageUrl}" style="max-height:100px; max-width:100%; border-radius:8px; box-shadow:0 3px 12px rgba(0,0,0,0.2);" alt="Evidence Single" />
                                             <div class="evidence-single-actions">
                                                 <button type="button" class="evidence-preview-btn btn-rotate-single" title="หมุนรูปภาพ 90°">↻ หมุน</button>
                                                 <button type="button" class="evidence-preview-btn btn-zoom-single" title="ขยายดูภาพใหญ่">🔍 ขยาย</button>
@@ -18334,14 +18463,14 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                                             </div>
                                         </div>
                                     ` : `
-                                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#475569; pointer-events:none; padding:4px 0; text-align:center;">
-                                            <div style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#1e293b;">
+                                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; pointer-events:none; padding:4px 0; text-align:center;">
+                                            <div style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:750;">
                                                 <svg width="22" height="22" fill="none" stroke="#2563eb" viewBox="0 0 24 24" stroke-width="2.2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                                 <span style="color:#2563eb; font-weight:800; text-decoration:underline;">คลิกเลือกรูปภาพจากเครื่อง</span>
-                                                <span style="color:#64748b;">หรือ ลากวางไฟล์ภาพที่นี่</span>
+                                                <span style="opacity:0.8;">หรือ ลากวางไฟล์ภาพที่นี่</span>
                                             </div>
                                             <div style="display:inline-flex; align-items:center; gap:6px; margin-top:2px;">
-                                                <span style="background:#eff6ff; color:#2563eb; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid #bfdbfe;">📋 หรือกด Ctrl + V วางรูปจากคลิปบอร์ดได้ทันที</span>
+                                                <span style="background:rgba(59,130,246,0.1); color:#2563eb; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid #bfdbfe;">📋 วางภาพจากคลิปบอร์ดได้ทันที (Ctrl + V)</span>
                                             </div>
                                         </div>
                                     `}
@@ -18351,8 +18480,8 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
 
                         <!-- Mode 2: Multi-File (3-5 Photos) Upload & Auto-Stitch Area -->
                         <div id="evidence-mode-multi-pane" style="display:none; flex-direction:column; gap:8px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:6px 10px;">
-                                <div style="font-size:10.5px; font-weight:700; color:#1e40af; display:flex; align-items:center; gap:5px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:6px 10px;">
+                                <div style="font-size:11px; font-weight:750; color:#1e40af; display:flex; align-items:center; gap:5px;">
                                     <span>💡 อัปโหลดภาพแยก <strong>3 - 5 รูป</strong> (เช่น ภาพเต็มชิ้นงาน, จุด NG, ตัวอย่าง OK, ป้าย Label)</span>
                                 </div>
                                 <span id="evidence-multi-count-badge" style="font-size:9.5px; font-weight:800; background:#d97706; color:#fff; padding:2px 8px; border-radius:6px;">(อัปโหลดแล้ว 0/5 รูป)</span>
@@ -18371,7 +18500,6 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                                     <span class="evidence-composite-title">
                                         ✨ ภาพหลักฐานรวมอัตโนมัติ (Composite Preview)
                                     </span>
-                                    <!-- Action Buttons บนภาพ Preview ที่รวมเสร็จแล้ว -->
                                     <div id="evidence-composite-actions" class="evidence-composite-actions" style="display:none;">
                                         <button type="button" id="btn-zoom-composite" class="evidence-preview-btn btn-zoom" title="ขยายดูภาพใหญ่แบบเต็มจอ">
                                             <span>🔍</span> ขยายดูภาพใหญ่
@@ -18389,63 +18517,68 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
                     </div>
 
                     <!-- ==========================================================
-                         หมวดหมู่ 4: หมายเหตุ (Remark - Auto Expand Textarea & Quick Presets)
+                         หมวดหมู่ 4: หมายเหตุ (Remark - Quick Presets & Auto Summary)
                          ========================================================== -->
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                            <label style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin:0;">
-                                💬 4. หมายเหตุเพิ่มเติม (REMARK)
+                    <div class="claim-section-card" style="display:flex; flex-direction:column; gap:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; border-bottom:1px solid rgba(226,232,240,0.8); padding-bottom:6px;">
+                            <label style="font-size:11.5px; font-weight:850; color:#1e40af; text-transform:uppercase; display:flex; align-items:center; gap:7px; margin:0; letter-spacing:0.3px;">
+                                <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:6px; background:rgba(16,185,129,0.15); color:#10b981; font-size:12px;">💬</span>
+                                <span>4. หมายเหตุเพิ่มเติม (REMARK)</span>
                             </label>
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <button type="button" id="btn-quick-lot-summary" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800; color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:3px 8px; cursor:pointer; transition:all 0.15s ease;" title="ดึงข้อมูล Lot, OK, NG, Defect มาสร้างข้อความสรุปผลตรวจอัตโนมัติ">
-                                    <span>📦</span> สรุปผลตรวจ Lot อัตโนมัติ
+                                <button type="button" id="btn-quick-lot-summary" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800; color:#2563eb; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:3px 8px; cursor:pointer; transition:all 0.15s ease;" title="ดึงข้อมูล Lot, OK, NG, Defect มาสร้างข้อความสรุปผลตรวจอัตโนมัติ">
+                                    <span>📦 สรุปผลตรวจ Lot อัตโนมัติ</span>
                                 </button>
-                                <button type="button" id="btn-clear-remark-text" style="display:inline-flex; align-items:center; gap:3px; font-size:9.5px; font-weight:700; color:#64748b; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:2.5px 6px; cursor:pointer;" title="ล้างข้อความในช่องหมายเหตุ">
-                                    <span>🗑️</span> ล้าง
+                                <button type="button" id="btn-clear-remark-text" style="display:inline-flex; align-items:center; gap:3px; font-size:9.5px; font-weight:700; background:transparent; border:1px solid rgba(148,163,184,0.4); border-radius:6px; padding:2.5px 6px; cursor:pointer;" title="ล้างข้อความในช่องหมายเหตุ">
+                                    <span>🗑️ ล้าง</span>
                                 </button>
                             </div>
                         </div>
 
                         <!-- Quick Remark Preset Tags / Template Buttons -->
                         <div id="remark-preset-chips-wrap" style="display:flex; flex-wrap:wrap; gap:5px;">
-                            <button type="button" class="sup-remark-chip" data-type="lot-summary" style="background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="สร้างข้อความสรุปผลตรวจ Lot / OK / NG / อาการ">
+                            <button type="button" class="sup-remark-chip" data-type="lot-summary" style="background:#ecfdf5; border:1px solid #a7f3d0; color:#059669; font-size:10px; font-weight:750; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="สร้างข้อความสรุปผลตรวจ Lot / OK / NG / อาการ">
                                 📦 สรุปผลตรวจ Lot (Auto)
                             </button>
-                            <button type="button" class="sup-remark-chip" data-preset="• Sorting 100% at Line / WIP Stock เพื่อคัดแยกชิ้นงาน" style="background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                            <button type="button" class="sup-remark-chip" data-preset="• Sorting 100% at Line / WIP Stock เพื่อคัดแยกชิ้นงาน" style="background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; font-size:10px; font-weight:750; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
                                 ⚡ Sorting 100% at Line
                             </button>
-                            <button type="button" class="sup-remark-chip" data-preset="• ประสานงาน Supplier ให้ดำเนินการวิเคราะห์หาสาเหตุ (Root Cause) และมาตรการป้องกัน" style="background:#fefce8; border:1px solid #fef08a; color:#a16207; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                            <button type="button" class="sup-remark-chip" data-preset="• ประสานงาน Supplier ให้ดำเนินการวิเคราะห์หาสาเหตุ (Root Cause) และมาตรการป้องกัน" style="background:#fffbeb; border:1px solid #fde68a; color:#b45309; font-size:10px; font-weight:750; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
                                 🔍 ติดตาม Root Cause
                             </button>
-                            <button type="button" class="sup-remark-chip" data-preset="• คัดแยกชิ้นงาน NG ส่งคืน Supplier เพื่อดำเนินการเคลม/เปลี่ยนชิ้นงานใหม่" style="background:#fff1f2; border:1px solid #fecdd3; color:#be123c; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                            <button type="button" class="sup-remark-chip" data-preset="• คัดแยกชิ้นงาน NG ส่งคืน Supplier เพื่อดำเนินการเคลม/เปลี่ยนชิ้นงานใหม่" style="background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; font-size:10px; font-weight:750; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
                                 ⚠️ คัดแยก NG ส่งคืน
                             </button>
-                            <button type="button" class="sup-remark-chip" data-preset="• ตรวจสอบสภาพชิ้นงานแล้ว สามารถใช้งานต่อได้ภายใต้การควบคุมพิเศษ (Can Use with Special Control)" style="background:#f5f3ff; border:1px solid #ddd6fe; color:#6d28d9; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                            <button type="button" class="sup-remark-chip" data-preset="• ตรวจสอบสภาพชิ้นงานแล้ว สามารถใช้งานต่อได้ภายใต้การควบคุมพิเศษ (Can Use with Special Control)" style="background:#faf5ff; border:1px solid #e9d5ff; color:#7e22ce; font-size:10px; font-weight:750; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
                                 ✅ ตรวจสอบแล้วใช้ได้ (Can Use)
                             </button>
-                            <button type="button" class="sup-remark-chip" data-preset="• ออกเอกสารร้องเรียนและรอรับเอกสาร 8D Report มาตรการแก้ไขจาก Supplier ภายในกำหนด" style="background:#fdf2f8; border:1px solid #fbcfe8; color:#be185d; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                            <button type="button" class="sup-remark-chip" data-preset="• ออกเอกสารร้องเรียนและรอรับเอกสาร 8D Report มาตรการแก้ไขจาก Supplier ภายในกำหนด" style="background:#fdf2f8; border:1px solid #fbcfe8; color:#be185d; font-size:10px; font-weight:750; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
                                 📋 รอเอกสาร 8D Report
-                            </button>
-                            <button type="button" class="sup-remark-chip" data-preset="• ติดสติกเกอร์ระบุสถานะและแยกจัดเก็บ Lot งานที่ผ่านการคัดกรองเรียบร้อยแล้ว" style="background:#f8fafc; border:1px solid #cbd5e1; color:#334155; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
-                                🏷️ ติดสติกเกอร์แยก Lot
-                            </button>
-                            <button type="button" class="sup-remark-chip" data-preset="• ดำเนินการแก้ไข/Rework ชิ้นงานตามมาตรฐานที่กำหนดก่อนส่งเข้าไลน์ผลิต" style="background:#fffbeb; border:1px solid #fde68a; color:#b45309; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
-                                🔧 ดำเนินการ Rework
                             </button>
                         </div>
 
                         <textarea name="remark" id="f-sup-remark-input" class="form-input" 
-                                  style="width:100%; min-height:42px; max-height:140px; font-size:11px; font-weight:600; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; line-height:1.45; outline:none; resize:none; overflow-y:auto;" 
+                                  style="width:100%; min-height:44px; max-height:140px; font-size:11.5px; font-weight:600; padding:8px 12px; border-radius:8px; line-height:1.5; outline:none; resize:none; overflow-y:auto;" 
                                   placeholder="พิมพ์รายละเอียดหรือหมายเหตุเพิ่มเติม (หรือคลิกเลือกปุ่มแม่แบบด้านบน)..." 
                                   title="Remark" 
                                   aria-label="Remark"
-                                  oninput="this.style.height='42px'; this.style.height=(this.scrollHeight)+'px';">${_esc(r.remark || '')}</textarea>
+                                  oninput="this.style.height='44px'; this.style.height=(this.scrollHeight)+'px';">${_esc(r.remark || '')}</textarea>
                     </div>
 
-                    <!-- ปุ่มดำเนินการ -->
-                    <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:8px; border-top:1px solid #f1f5f9; margin-top:2px;">
-                        <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding:8px 20px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; font-weight:700; color:#64748b; font-size:12px; cursor:pointer;" title="Cancel" aria-label="Cancel">ยกเลิก</button>
-                        <button type="submit" id="sup-form-submit-btn" style="padding:8px 28px; border-radius:10px; border:none; background:linear-gradient(135deg,#1e293b,#2563eb); color:#fff; font-weight:900; font-size:12px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em;" title="Save Report" aria-label="Save Report">บันทึกรายงาน</button>
+                    <!-- 5. Footer & Action Bar -->
+                    <div id="sup-form-footer" style="display:flex; justify-content:space-between; align-items:center; padding:10px 4px 4px 4px; border-top:1px solid rgba(226,232,240,0.6); margin-top:2px;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="font-size:10.5px; font-weight:700; color:#64748b; display:inline-flex; align-items:center; gap:4px;">
+                                <kbd style="background:rgba(0,0,0,0.06); border:1px solid rgba(148,163,184,0.4); border-radius:4px; padding:1px 5px; font-size:9.5px; font-family:monospace;">Ctrl</kbd> + <kbd style="background:rgba(0,0,0,0.06); border:1px solid rgba(148,163,184,0.4); border-radius:4px; padding:1px 5px; font-size:9.5px; font-family:monospace;">Enter</kbd> บันทึกทันที
+                            </span>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <button type="button" onclick="this.closest('.modal-overlay').remove()" style="padding:8px 20px; border-radius:10px; border:1px solid rgba(148,163,184,0.5); background:transparent; font-weight:750; font-size:12px; cursor:pointer; transition:all 0.15s ease;" title="Cancel" aria-label="Cancel">ยกเลิก</button>
+                            <button type="submit" id="sup-form-submit-btn" style="padding:9px 30px; border-radius:10px; border:none; color:#ffffff; font-weight:900; font-size:12.5px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em; display:inline-flex; align-items:center; gap:6px;" title="Save Report" aria-label="Save Report">
+                                <span>💾</span>
+                                <span>บันทึกรายงาน</span>
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>`;
@@ -18702,6 +18835,110 @@ const commanderOptionsHtml = sortedStaffList.map(name =>
         modal._syncProblemSentence = syncProblemSentence;
         modal._handleReportChange = handleReportChange;
         modal._toggleRpFieldsVisibility = toggleRpFieldsVisibility;
+
+        // Minimal Typing & Gimmick Methods attached to modal
+        modal._quickFillPart = function(pNo, pName, supp, cat) {
+            const pNoInput = modal.querySelector('#prob-partno');
+            const pNameInput = modal.querySelector('#prob-part');
+            const suppInput = modal.querySelector('#prob-supplier');
+            const catInput = modal.querySelector('#f-sup-part-cat');
+            if (pNoInput) pNoInput.value = pNo;
+            if (pNameInput) pNameInput.value = pName;
+            if (suppInput && supp) suppInput.value = supp;
+            if (catInput && cat) catInput.value = cat;
+            handleSmartPartLookup('partno');
+            if (typeof updateSupportFormValidation === 'function') updateSupportFormValidation();
+        };
+
+        modal._quickSetField = function(fieldId, val) {
+            const el = modal.querySelector('#' + fieldId);
+            if (el) {
+                el.value = val;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                syncProblemSentence();
+                if (typeof updateSupportFormValidation === 'function') updateSupportFormValidation();
+            }
+        };
+
+        modal._quickAdjustQty = function(fieldId, delta) {
+            const el = modal.querySelector('#' + fieldId);
+            if (!el) return;
+            let cur = parseInt(el.value, 10);
+            if (isNaN(cur) || cur < 0) cur = 0;
+            if (delta === 'clear') {
+                el.value = '';
+            } else if (delta === 'all_lot') {
+                const lotEl = modal.querySelector('#f-sup-lot');
+                el.value = lotEl ? (lotEl.value || 0) : 0;
+            } else if (delta === 'zero') {
+                el.value = 0;
+            } else {
+                el.value = Math.max(0, cur + delta);
+            }
+            WapSupportLogs.calcNG();
+            syncProblemSentence();
+            if (typeof updateSupportFormValidation === 'function') updateSupportFormValidation();
+        };
+
+        modal._copyProblemSentence = function() {
+            const textEl = modal.querySelector('#prob-preview-text');
+            const txt = textEl ? textEl.textContent.trim() : '';
+            if (!txt) return;
+
+            const indicateSuccess = () => {
+                const btn = modal.querySelector('#btn-copy-problem-sentence');
+                if (btn) {
+                    const prev = btn.innerHTML;
+                    btn.innerHTML = '<span>✓ คัดลอกแล้ว</span>';
+                    btn.style.color = '#10b981';
+                    setTimeout(() => { btn.innerHTML = prev; btn.style.color = ''; }, 1600);
+                }
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(txt).then(indicateSuccess).catch(() => {
+                    // Fallback to textarea copy
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = txt;
+                        ta.style.position = 'fixed';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.focus();
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        indicateSuccess();
+                    } catch (_) {}
+                });
+            } else {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = txt;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    indicateSuccess();
+                } catch (_) {}
+            }
+        };
+
+        // Hotkey Ctrl+Enter to save immediately
+        modal.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                const form = modal.querySelector('#sup-form');
+                if (form) {
+                    if (typeof form.requestSubmit === 'function') form.requestSubmit();
+                    else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                }
+            }
+        });
 
         ['prob-user', 'prob-supplier', 'prob-defect', 'prob-part', 'prob-partno', 'f-sup-report', 'f-sup-lot', 'f-sup-ok', 'f-sup-ng', 'f-sup-po', 'f-sup-inv'].forEach(fieldId => {
             const el = modal.querySelector('#' + fieldId);
@@ -19634,8 +19871,9 @@ function moveImageInArray(index, direction) {
             } else if (savedRaw) {
                 offlineBanner.style.display = 'flex';
                 offlineBanner.style.background = isDark ? 'rgba(30, 58, 138, 0.35)' : '#eff6ff';
-                offlineBanner.style.border = isDark ? '1px solid #1d4ed8' : '1px solid #bfdbfe';
+                offlineBanner.style.border = isDark ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid #bfdbfe';
                 offlineBanner.style.color = isDark ? '#93c5fd' : '#1e40af';
+                offlineBanner.style.boxShadow = isDark ? '0 4px 14px rgba(0,0,0,0.35)' : '0 2px 8px rgba(37,99,235,0.08)';
                 if (offlineIcon) offlineIcon.textContent = '💾';
 
                 let timeStr = 'ก่อนหน้า';
@@ -19644,11 +19882,15 @@ function moveImageInArray(index, direction) {
                     if (d.savedAt) timeStr = d.savedAt;
                 } catch(e){}
 
-                if (offlineText) offlineText.innerHTML = `<strong>พบแบบร่างออฟไลน์ที่ถูกบันทึกไว้:</strong> (บันทึกเมื่อ ${timeStr})`;
+                if (offlineText) offlineText.innerHTML = `<span style="font-weight:800;">พบแบบร่างออฟไลน์ที่ถูกบันทึกไว้</span> <span style="opacity:0.75; font-weight:600; font-size:11px;">(บันทึกเมื่อ ${timeStr})</span>`;
                 if (offlineActions) {
                     offlineActions.innerHTML = `
-                        <button type="button" id="btn-restore-draft" style="background:#2563eb; color:#fff; border:none; padding:3px 10px; border-radius:6px; font-size:10px; font-weight:800; cursor:pointer; transition:background 0.2s;">เรียกคืนข้อมูล</button>
-                        <button type="button" id="btn-discard-draft" style="background:transparent; color:${isDark ? '#cbd5e1' : '#64748b'}; border:1px solid ${isDark ? '#475569' : '#cbd5e1'}; padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; cursor:pointer;">ลบแบบร่าง</button>
+                        <button type="button" id="btn-restore-draft" style="background:linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color:#ffffff; border:none; padding:4px 12px; border-radius:8px; font-size:11px; font-weight:800; cursor:pointer; box-shadow:0 2px 6px rgba(37,99,235,0.25); display:inline-flex; align-items:center; gap:4px; transition:all 0.15s ease;">
+                            <span>📥</span> เรียกคืนข้อมูล
+                        </button>
+                        <button type="button" id="btn-discard-draft" style="background:transparent; color:${isDark ? '#cbd5e1' : '#64748b'}; border:1px solid ${isDark ? 'rgba(148,163,184,0.35)' : '#cbd5e1'}; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.15s ease;">
+                            ลบแบบร่าง
+                        </button>
                     `;
 
                     const restoreBtn = offlineActions.querySelector('#btn-restore-draft');
@@ -20402,6 +20644,9 @@ function _openViewModal(id) {
                 ? `
                 <div style="width:100%; border:1px solid ${theme.imgBorder}; border-radius:10px; overflow:hidden; margin-bottom:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); background:${theme.imgBg};">
                     <img src="${escapeHtml(typeof formatImageUrl === 'function' ? formatImageUrl(item.imageUrl) : item.imageUrl)}" 
+                        loading="lazy"
+                        decoding="async"
+                        referrerpolicy="no-referrer"
                         onerror="handleImgError(this)"
                         onclick="WapSupportLogs._openLightbox(this.getAttribute('data-img-url'))"
                         data-img-url="${escapeHtml(item.imageUrl)}"
@@ -20610,7 +20855,7 @@ function _openViewModal(id) {
                     </div>
                 </div>
                 <div class="lightbox-img-wrapper" style="overflow:auto; max-height:82vh; text-align:center;">
-                    <img src="${escapeHtml(safeUrl)}" onerror="handleImgError(this)" id="lb-main-image" class="lightbox-img" alt="Evidence Photo Full Screen" title="รูปภาพหลักฐานขนาดเต็ม" style="transition:transform 0.15s ease; cursor:grab; transform-origin:center center;">
+                    <img src="${escapeHtml(safeUrl)}" referrerpolicy="no-referrer" onerror="handleImgError(this)" id="lb-main-image" class="lightbox-img" alt="Evidence Photo Full Screen" title="รูปภาพหลักฐานขนาดเต็ม" style="transition:transform 0.15s ease; cursor:grab; transform-origin:center center;">
                 </div>
                 <div style="text-align:center; color:white; margin-top:8px;">
                     <p style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; opacity:0.9; margin:0;">Case Image Preview (Full Screen HD)</p>
@@ -23683,14 +23928,15 @@ function renderCharts() {
                 }
             ];
 
+            const isSparse = sorted.length <= 3;
             assignorEl.innerHTML = `
-                <div class="sj-workload-list" style="width:100%; height:100%; display:flex; flex-direction:column; justify-content:space-evenly; gap:8px; padding:2px 4px; box-sizing:border-box;">
+                <div class="sj-workload-list ${isSparse ? 'sparse' : ''}" style="width:100%; height:100%; max-height:100%; display:flex; flex-direction:column; ${isSparse ? 'justify-content:space-evenly;' : 'justify-content:flex-start;'} gap:7px; padding:2px 4px 6px 4px; box-sizing:border-box; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; -ms-overflow-style:none; overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch;">
                     ${sorted.map(([name, count], idx) => {
                         const theme = rankThemes[idx] || rankThemes[4];
                         const widthPct = Math.max(6, Math.round((count / maxVal) * 100));
                         const sharePct = Math.round((count / totalTasks) * 100);
                         return `
-                            <div class="sj-workload-item" style="width:100%; display:flex; flex-direction:column; gap:4px; padding:4px 8px; border-radius:10px; box-sizing:border-box;" title="${name}: ${count} งาน (${sharePct}%)">
+                            <div class="sj-workload-item" style="width:100%; flex-shrink:0; display:flex; flex-direction:column; gap:4px; padding:4px 8px; border-radius:10px; box-sizing:border-box;" title="${name}: ${count} งาน (${sharePct}%)">
                                 <div class="sj-workload-header" style="display:flex; align-items:center; justify-content:space-between; width:100%; box-sizing:border-box;">
                                     <div class="sj-workload-person" style="display:flex; align-items:center; gap:8px; min-width:0;">
                                         <span class="sj-rank-badge" style="width:18px; height:18px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; color:#ffffff; flex-shrink:0; background:${theme.badgeBg}; box-shadow:${theme.badgeShadow};">${idx + 1}</span>
@@ -24342,7 +24588,15 @@ async function uploadToSupabaseStorage(fileOrBase64, bucketName = 'evidences') {
 
     } catch (err) {
         console.error("❌ Storage Upload Error:", err.message);
-        // หากส่งไม่สำเร็จ ให้ส่งค่าเดิมกลับไป (Base64) เพื่อให้ระบบทำงานต่อได้แต่อาจจะโหลดช้าในอนาคต
+        // หากส่งไม่สำเร็จ ให้บีบอัด Base64 ให้กะทัดรัด (~50KB) เพื่อประหยัดพื้นที่ฐานข้อมูลและลื่นไหลในทุกอุปกรณ์
+        try {
+            if (typeof fileOrBase64 === 'string' && fileOrBase64.startsWith('data:')) {
+                const mini = await compressImageToDataUrl(fileOrBase64, 900, 0.65);
+                return mini || fileOrBase64;
+            }
+        } catch (compErr) {
+            console.warn('[Storage Fallback Compression Warning]', compErr);
+        }
         return fileOrBase64; 
     }
 }
@@ -25195,6 +25449,863 @@ async function updateIDBMetricsDisplay() {
     }
 }
 window.updateIDBMetricsDisplay = updateIDBMetricsDisplay;
+
+/**
+ * ══════════════════════════════════════════════════════════════════
+ *  WAP DOCUMENT TEMPLATE SYSTEM (DOCUMENT TEMPLATE SETTINGS)
+ *  Manages dynamic Header, Footer, Logo, and Branding for 8D & VF/RP
+ * ══════════════════════════════════════════════════════════════════
+ */
+const WapDocTemplate = (function() {
+    const STORAGE_KEY = 'carrier_doc_template_settings';
+    
+    const DEFAULT_SETTINGS = {
+        company_name_en: "CARRIER AIR CONDITIONING (THAILAND) CO., LTD.",
+        company_name_th: "บริษัท แคเรียร์ แอร์คอนดิชั่นนิ่ง (ประเทศไทย) จำกัด",
+        company_short_name: "CTC",
+        department_name: "Supplier Quality Assurance (SQE) & IQC",
+        default_from_dept: "[ SQ ] / SQE",
+        brand_accent_color: "#003366",
+        company_logo_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Carrier_Global_Logo.svg/1280px-Carrier_Global_Logo.svg.png",
+        company_logo_data: "",
+        show_logo_vfrp: true,
+        show_logo_8d: true,
+
+        vf_format_header: "Format-2 (150-60-07): Vendor Failure Report",
+        vf_banner_title: "VENDOR FAILURE REPORT",
+        vf_footer_text: "Format-2 (150-60-07): Vendor Failure Report",
+
+        rp_format_header: "Format-1 (TS0-60-07): Incoming Inspection Rejection Report",
+        rp_banner_title: "INCOMING INSPECTION REJECTION REPORT",
+        rp_footer_text: "Format-1 (TS0-60-07): Incoming Inspection Rejection Report",
+
+        doc_retention: "5 Year",
+        revision_text: "Revision No.00: 1/07/2024",
+
+        eight_d_title: "8D Report",
+        eight_d_warning: "Suppliers can use any format of the report as long as all mandatory information is present.",
+        eight_d_tag_rp: "[IQC Rejected, RP]",
+        eight_d_tag_vf: "[Line claim, VF]",
+        eight_d_supplier_label: "Suppliers submit",
+        eight_d_company_label: "CTC confirm",
+        eight_d_footer_text: "Proprietary and Confidential",
+
+        updated_at: new Date().toISOString()
+    };
+
+    let _settings = { ...DEFAULT_SETTINGS };
+    let _activePreviewTab = 'vf';
+    let _isInitialized = false;
+
+    function getClients() {
+        const clients = [];
+        const mainSb = (typeof getSupabase === 'function' ? getSupabase() : null) || 
+                       (typeof window !== 'undefined' && window.sqeClient) || 
+                       (typeof sqeClient !== 'undefined' ? sqeClient : null) || 
+                       (typeof window !== 'undefined' && window.supabaseClient) ||
+                       (typeof supabaseClient !== 'undefined' ? supabaseClient : null);
+        if (mainSb) clients.push(mainSb);
+        const wapSb = (typeof getWapSupabase === 'function' ? getWapSupabase() : null) || 
+                      (typeof window !== 'undefined' && window.wapClient) || 
+                      (typeof wapClient !== 'undefined' ? wapClient : null);
+        if (wapSb && wapSb !== mainSb) clients.push(wapSb);
+        return clients;
+    }
+
+    function getSettings() {
+        return { ..._settings };
+    }
+
+    async function init() {
+        if (_isInitialized) return _settings;
+        try {
+            const cached = localStorage.getItem(STORAGE_KEY);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    _settings = { ...DEFAULT_SETTINGS, ...parsed };
+                } catch (e) {
+                    console.warn("WapDocTemplate cache parse notice:", e);
+                }
+            }
+            await fetchRemoteSettings();
+            _isInitialized = true;
+        } catch (err) {
+            console.warn("WapDocTemplate init notice:", err);
+        }
+        return _settings;
+    }
+
+    async function fetchRemoteSettings() {
+        try {
+            const clients = getClients();
+            for (const client of clients) {
+                if (!client) continue;
+                try {
+                    const { data, error } = await client
+                        .from('system_settings')
+                        .select('*')
+                        .eq('id', 'doc_template_settings')
+                        .maybeSingle();
+
+                    if (!error && data && data.data) {
+                        _settings = { ...DEFAULT_SETTINGS, ...data.data };
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(_settings));
+                        return _settings;
+                    }
+                } catch (_) {}
+            }
+        } catch (e) {
+            console.warn("WapDocTemplate fetchRemoteSettings notice:", e);
+        }
+        return _settings;
+    }
+
+    async function saveSettings(newSettings, showToastAlert = true) {
+        try {
+            _settings = {
+                ..._settings,
+                ...newSettings,
+                updated_at: new Date().toISOString()
+            };
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(_settings));
+
+            const clients = getClients();
+            let synced = false;
+            for (const client of clients) {
+                if (!client) continue;
+                try {
+                    const { error } = await client.from('system_settings').upsert({
+                        id: 'doc_template_settings',
+                        data: _settings,
+                        updated_at: _settings.updated_at
+                    });
+                    if (!error) synced = true;
+                } catch (_) {}
+            }
+
+            if (showToastAlert && typeof toast === 'function') {
+                toast(synced 
+                    ? "✅ บันทึกเทมเพลตเอกสารและซิงค์สู่ Cloud เรียบร้อยแล้ว" 
+                    : "✅ บันทึกการตั้งค่าเทมเพลตลงแคชเรียบร้อยแล้ว (ออฟไลน์)", 
+                    synced ? "success" : "info"
+                );
+            }
+
+            if (typeof logUserActivity === 'function') {
+                logUserActivity('UPDATE_DOC_TEMPLATES', {
+                    updated_by: (typeof getCurrentUserEmail === 'function') ? getCurrentUserEmail() : 'Admin',
+                    updated_at: _settings.updated_at
+                });
+            }
+
+            updateLivePreview();
+            return true;
+        } catch (err) {
+            console.error("WapDocTemplate saveSettings error:", err);
+            if (showToastAlert && typeof toast === 'function') {
+                toast("❌ เกิดข้อผิดพลาดในการบันทึกเทมเพลต", "error");
+            }
+            return false;
+        }
+    }
+
+    function onRemoteUpdate(remoteData) {
+        if (!remoteData) return;
+        _settings = { ...DEFAULT_SETTINGS, ...remoteData };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(_settings));
+        updateLivePreview();
+        const panel = document.getElementById('admin-template-settings-panel');
+        if (panel && !panel.classList.contains('hidden')) {
+            renderSettingsForm(panel);
+        }
+    }
+
+    async function resetToDefaults() {
+        if (!confirm("⚠️ ต้องการคืนค่าเทมเพลตเอกสารทั้งหมดเป็นค่าเริ่มต้นมาตรฐานหรือไม่?")) {
+            return;
+        }
+        await saveSettings(DEFAULT_SETTINGS, true);
+        const panel = document.getElementById('admin-template-settings-panel');
+        if (panel) renderSettingsForm(panel);
+    }
+
+    function clearUploadedLogo() {
+        _settings.company_logo_data = "";
+        const logoImgEl = document.getElementById('tpl-logo-preview-img');
+        if (logoImgEl) {
+            const url = _settings.company_logo_url;
+            if (url) {
+                logoImgEl.src = url;
+                logoImgEl.classList.remove('hidden');
+            } else {
+                logoImgEl.classList.add('hidden');
+            }
+        }
+        const emptyTxt = document.getElementById('tpl-logo-empty-txt');
+        if (emptyTxt && !_settings.company_logo_url) emptyTxt.classList.remove('hidden');
+        updateLivePreview();
+        if (typeof toast === 'function') toast("🗑️ ลบรูปอัปโหลดแล้ว (ใช้ URL หรือค่าเริ่มต้น)", "info");
+    }
+
+    function handleLogoUpload(inputEl) {
+        if (!inputEl || !inputEl.files || !inputEl.files[0]) return;
+        const file = inputEl.files[0];
+        if (file.size > 5 * 1024 * 1024) {
+            if (typeof toast === 'function') toast("❌ ไฟล์รูปภาพมีขนาดใหญ่เกิน 5MB", "error");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxW = 420;
+                const maxH = 140;
+
+                if (width > maxW || height > maxH) {
+                    const ratio = Math.min(maxW / width, maxH / height);
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const base64Data = canvas.toDataURL('image/png');
+                _settings.company_logo_data = base64Data;
+                
+                const logoImgEl = document.getElementById('tpl-logo-preview-img');
+                if (logoImgEl) {
+                    logoImgEl.src = base64Data;
+                    logoImgEl.classList.remove('hidden');
+                }
+                const emptyTxt = document.getElementById('tpl-logo-empty-txt');
+                if (emptyTxt) emptyTxt.classList.add('hidden');
+
+                updateLivePreview();
+                if (typeof toast === 'function') toast("✅ อัปโหลดและประมวลผลโลโก้เรียบร้อย (คลิกบันทึกเพื่อ Sync)", "success");
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function saveSettingsFromForm() {
+        const getVal = (id) => {
+            const el = document.getElementById(id);
+            return el ? el.value.trim() : '';
+        };
+        const getCheck = (id) => {
+            const el = document.getElementById(id);
+            return el ? el.checked : false;
+        };
+
+        const newSettings = {
+            company_name_en: getVal('tpl-input-comp-en') || DEFAULT_SETTINGS.company_name_en,
+            company_name_th: getVal('tpl-input-comp-th') || DEFAULT_SETTINGS.company_name_th,
+            company_short_name: getVal('tpl-input-comp-short') || DEFAULT_SETTINGS.company_short_name,
+            department_name: getVal('tpl-input-dept') || DEFAULT_SETTINGS.department_name,
+            default_from_dept: getVal('tpl-input-from') || DEFAULT_SETTINGS.default_from_dept,
+            brand_accent_color: getVal('tpl-input-brand-color') || DEFAULT_SETTINGS.brand_accent_color,
+            company_logo_url: getVal('tpl-input-logo-url') || DEFAULT_SETTINGS.company_logo_url,
+            company_logo_data: _settings.company_logo_data || '',
+            show_logo_vfrp: getCheck('tpl-check-logo-vfrp'),
+            show_logo_8d: getCheck('tpl-check-logo-8d'),
+
+            vf_format_header: getVal('tpl-input-vf-header') || DEFAULT_SETTINGS.vf_format_header,
+            vf_banner_title: getVal('tpl-input-vf-title') || DEFAULT_SETTINGS.vf_banner_title,
+            vf_footer_text: getVal('tpl-input-vf-footer') || DEFAULT_SETTINGS.vf_footer_text,
+
+            rp_format_header: getVal('tpl-input-rp-header') || DEFAULT_SETTINGS.rp_format_header,
+            rp_banner_title: getVal('tpl-input-rp-title') || DEFAULT_SETTINGS.rp_banner_title,
+            rp_footer_text: getVal('tpl-input-rp-footer') || DEFAULT_SETTINGS.rp_footer_text,
+
+            doc_retention: getVal('tpl-input-retention') || DEFAULT_SETTINGS.doc_retention,
+            revision_text: getVal('tpl-input-revision') || DEFAULT_SETTINGS.revision_text,
+
+            eight_d_title: getVal('tpl-input-8d-title') || DEFAULT_SETTINGS.eight_d_title,
+            eight_d_warning: getVal('tpl-input-8d-warning') || DEFAULT_SETTINGS.eight_d_warning,
+            eight_d_tag_rp: getVal('tpl-input-8d-tag-rp') || DEFAULT_SETTINGS.eight_d_tag_rp,
+            eight_d_tag_vf: getVal('tpl-input-8d-tag-vf') || DEFAULT_SETTINGS.eight_d_tag_vf,
+            eight_d_supplier_label: getVal('tpl-input-8d-supp-label') || DEFAULT_SETTINGS.eight_d_supplier_label,
+            eight_d_company_label: getVal('tpl-input-8d-comp-label') || DEFAULT_SETTINGS.eight_d_company_label,
+            eight_d_footer_text: getVal('tpl-input-8d-footer') || DEFAULT_SETTINGS.eight_d_footer_text
+        };
+
+        return saveSettings(newSettings, true);
+    }
+
+    function setPreviewTab(tab) {
+        _activePreviewTab = tab;
+        ['vf', 'rp', '8d'].forEach(t => {
+            const btn = document.getElementById(`tpl-preview-btn-${t}`);
+            if (btn) {
+                if (t === tab) {
+                    btn.className = "px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-slate-700 transition-all";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded-md text-[10.5px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-all";
+                }
+            }
+        });
+        updateLivePreview();
+    }
+
+    function updateLivePreview() {
+        const previewBox = document.getElementById('tpl-live-preview-box');
+        if (!previewBox) return;
+
+        const getVal = (id, fallback) => {
+            const el = document.getElementById(id);
+            return (el && el.value.trim()) ? el.value.trim() : fallback;
+        };
+        const getCheck = (id, fallback) => {
+            const el = document.getElementById(id);
+            return el ? el.checked : fallback;
+        };
+
+        const compEn = getVal('tpl-input-comp-en', _settings.company_name_en);
+        const compShort = getVal('tpl-input-comp-short', _settings.company_short_name);
+        const brandColor = getVal('tpl-input-brand-color', _settings.brand_accent_color);
+        const logoUrl = _settings.company_logo_data || getVal('tpl-input-logo-url', _settings.company_logo_url);
+        const showLogoVfRp = getCheck('tpl-check-logo-vfrp', _settings.show_logo_vfrp !== false);
+        const showLogo8d = getCheck('tpl-check-logo-8d', _settings.show_logo_8d !== false);
+
+        const vfHeader = getVal('tpl-input-vf-header', _settings.vf_format_header);
+        const vfTitle = getVal('tpl-input-vf-title', _settings.vf_banner_title);
+        const vfFooter = getVal('tpl-input-vf-footer', _settings.vf_footer_text);
+
+        const rpHeader = getVal('tpl-input-rp-header', _settings.rp_format_header);
+        const rpTitle = getVal('tpl-input-rp-title', _settings.rp_banner_title);
+        const rpFooter = getVal('tpl-input-rp-footer', _settings.rp_footer_text);
+
+        const retention = getVal('tpl-input-retention', _settings.doc_retention);
+        const revision = getVal('tpl-input-revision', _settings.revision_text);
+        const defaultFrom = getVal('tpl-input-from', _settings.default_from_dept);
+
+        const d8Title = getVal('tpl-input-8d-title', _settings.eight_d_title);
+        const d8Warning = getVal('tpl-input-8d-warning', _settings.eight_d_warning);
+        const d8TagRp = getVal('tpl-input-8d-tag-rp', _settings.eight_d_tag_rp);
+        const d8TagVf = getVal('tpl-input-8d-tag-vf', _settings.eight_d_tag_vf);
+        const d8SuppLabel = getVal('tpl-input-8d-supp-label', _settings.eight_d_supplier_label);
+        const d8CompLabel = getVal('tpl-input-8d-comp-label', _settings.eight_d_company_label);
+        const d8Footer = getVal('tpl-input-8d-footer', _settings.eight_d_footer_text);
+
+        let previewHtml = '';
+
+        if (_activePreviewTab === 'vf' || _activePreviewTab === 'rp') {
+            const isRP = _activePreviewTab === 'rp';
+            const curHeader = isRP ? rpHeader : vfHeader;
+            const curTitle = isRP ? rpTitle : vfTitle;
+            const curFooter = isRP ? rpFooter : vfFooter;
+
+            previewHtml = `
+            <div class="bg-white text-slate-900 p-4 rounded-lg shadow-sm border border-slate-300 text-[10px] font-sans">
+                <!-- Top Doc Header Bar -->
+                <div class="flex justify-between items-center border-b-2 border-black pb-2 mb-2">
+                    <div class="flex items-center gap-2">
+                        ${(showLogoVfRp && logoUrl) ? `<img src="${logoUrl}" alt="Logo" class="h-6 max-w-[80px] object-contain block" onerror="this.style.display='none'">` : ''}
+                        <span class="font-black text-[11px] tracking-tight">${curHeader}</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="border border-black px-2 py-0.5 font-black text-[10px] bg-white">Retention</span>
+                        <span class="border border-black px-2 py-0.5 font-black text-[10px] bg-white">${retention}</span>
+                    </div>
+                </div>
+
+                <!-- Main Banner Title -->
+                <div class="text-center py-2 border-b-2 border-black mb-3">
+                    <h2 class="text-base font-black tracking-wide leading-tight">${curTitle}</h2>
+                    <p class="text-[10px] font-extrabold text-slate-800 mt-0.5 tracking-wide">${compEn}</p>
+                </div>
+
+                <!-- Meta Table Snippet -->
+                <table class="w-full border-collapse border border-black mb-3 text-[9.5px]">
+                    <tr>
+                        <td class="border border-black px-2 py-1 bg-cyan-100 font-bold w-1/4">TO</td>
+                        <td class="border border-black px-2 py-1">K.Mathira Ch--> VENDOR</td>
+                        <td class="border border-black px-2 py-1 bg-cyan-100 font-bold w-1/4">CONTROL NO.</td>
+                        <td class="border border-black px-2 py-1 font-mono font-bold">${isRP ? 'RP-2026-001' : 'VF-2026-001'}</td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black px-2 py-1 bg-cyan-100 font-bold">FROM</td>
+                        <td class="border border-black px-2 py-1">${defaultFrom}</td>
+                        <td class="border border-black px-2 py-1 bg-cyan-100 font-bold">ISSUED DATE</td>
+                        <td class="border border-black px-2 py-1">15 Jul 26</td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black px-2 py-1 bg-cyan-100 font-bold">SUBJ.</td>
+                        <td class="border border-black px-2 py-1">${isRP ? 'QAP Incoming inspection' : 'OSA'}</td>
+                        <td class="border border-black px-2 py-1 bg-cyan-100 font-bold">ISSUE BY</td>
+                        <td class="border border-black px-2 py-1 text-blue-700 font-bold">KOMSON N.</td>
+                    </tr>
+                </table>
+
+                <div class="border border-slate-300 bg-slate-50 p-3 rounded text-center text-[10px] text-slate-400 font-medium mb-3">
+                    [ ส่วนเนื้อหาและตารางอาการเสีย รายละเอียดชิ้นส่วน และมาตรการแก้ไข ]
+                </div>
+
+                <!-- Bottom Footer -->
+                <div class="flex justify-between items-center pt-2 border-t border-slate-300 text-[8.5px] font-bold text-slate-600">
+                    <span>${revision}</span>
+                    <span class="truncate max-w-[240px]">${curFooter}</span>
+                </div>
+            </div>
+            `;
+        } else {
+            // 8D Preview
+            previewHtml = `
+            <div class="bg-white text-slate-900 p-4 rounded-lg shadow-sm border border-slate-300 text-[10px] font-sans flex flex-col justify-between min-h-[360px]">
+                <div>
+                    <!-- 8D Header -->
+                    <div class="flex justify-between items-start mb-2">
+                        <h2 class="text-2xl font-black tracking-tight text-black">${d8Title}</h2>
+                        <div class="bg-amber-100 border border-amber-300 px-2.5 py-1 text-rose-700 font-extrabold text-[9px] max-w-[200px] leading-tight rounded">
+                            ${d8Warning}
+                        </div>
+                    </div>
+
+                    <!-- Accent Line -->
+                    <div class="w-full h-1.5 rounded-full mb-3" style="background-color: ${brandColor};"></div>
+
+                    <!-- Type Tag Box -->
+                    <div class="flex justify-end mb-3">
+                        <div class="border border-black px-3 py-1 bg-white font-black text-[10px] flex items-center gap-3">
+                            <span class="flex items-center gap-1">
+                                <span class="w-3 h-3 bg-black text-white inline-flex items-center justify-center font-bold text-[9px]">✓</span>
+                                ${d8TagRp}
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <span class="w-3 h-3 border border-black inline-block"></span>
+                                ${d8TagVf}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Problem Title -->
+                    <div class="mb-3">
+                        <span class="text-[9px] font-extrabold text-slate-400 uppercase">PROBLEM :</span>
+                        <p class="text-xs font-black text-slate-900 mt-0.5">Found defect Scratch on ASM-PL-COVER</p>
+                    </div>
+
+                    <!-- Approvals Table Snippet -->
+                    <div class="flex justify-end mb-3">
+                        <table class="border-collapse border border-black text-center text-[9px] w-64">
+                            <tr class="bg-blue-200 font-black">
+                                <td colspan="2" class="border border-black py-0.5 uppercase">${d8SuppLabel}</td>
+                                <td colspan="2" class="border border-black py-0.5 uppercase">${d8CompLabel}</td>
+                            </tr>
+                            <tr class="bg-slate-100 font-bold">
+                                <td class="border border-black py-0.5 w-1/4">Confirmed</td>
+                                <td class="border border-black py-0.5 w-1/4">Approved</td>
+                                <td class="border border-black py-0.5 w-1/4">Confirmed</td>
+                                <td class="border border-black py-0.5 w-1/4">Approved</td>
+                            </tr>
+                            <tr class="h-6">
+                                <td class="border border-black"></td>
+                                <td class="border border-black"></td>
+                                <td class="border border-black"></td>
+                                <td class="border border-black"></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 8D Slide Footer -->
+                <div class="pt-2 border-t border-slate-200 flex justify-between items-center text-[9.5px]">
+                    <div class="w-20 h-5 flex items-center">
+                        ${(showLogo8d && logoUrl) ? `<img src="${logoUrl}" alt="Logo" class="max-h-5 max-w-full object-contain block" onerror="this.style.display='none'">` : `<span class="font-bold font-serif italic text-blue-900">${compShort}</span>`}
+                    </div>
+                    <div class="text-slate-400 font-bold tracking-widest uppercase text-[8.5px]">
+                        ${d8Footer}
+                    </div>
+                    <div class="font-bold text-slate-700">1 / 16</div>
+                </div>
+            </div>
+            `;
+        }
+
+        previewBox.innerHTML = previewHtml;
+    }
+
+    function renderSettingsForm(container) {
+        if (!container) return;
+        const s = _settings;
+
+        container.innerHTML = `
+        <div class="space-y-4">
+            <!-- Top Header Banner & Actions -->
+            <div class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-4 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 border border-blue-800/60">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/30 text-blue-200 border border-blue-400/40 uppercase">Template Master</span>
+                        <h3 class="text-sm font-black text-white tracking-wide flex items-center gap-1.5">
+                            📑 ระบบจัดการเทมเพลตเอกสาร (Document Template & Branding)
+                        </h3>
+                    </div>
+                    <p class="text-xs text-blue-200/80 mt-1">
+                        กำหนดชื่อองค์กร, แผนก, โลโก้, Header และ Footer ของรายงาน 8D และ VF/RP ได้โดยตรง ข้อมูลซิงค์สู่ระบบคลาวด์แบบเรียลไทม์
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" onclick="WapDocTemplate.resetToDefaults()" 
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        คืนค่าเริ่มต้น
+                    </button>
+                    <button type="button" onclick="WapDocTemplate.saveSettingsFromForm()" 
+                            class="px-4 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white border border-blue-400 transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/20 active:scale-95">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+                        บันทึกการตั้งค่าเทมเพลต
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Grid: Form Inputs (Left) and Live Preview (Right) -->
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                
+                <!-- Left Column: Form Controls (7 cols) -->
+                <div class="xl:col-span-7 space-y-4">
+                    
+                    <!-- Section 1: Company & Logo Card -->
+                    <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/80 p-4 shadow-2xs space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2.5">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold text-xs">🏢</span>
+                                <h4 class="text-xs font-black uppercase text-slate-800 dark:text-slate-100">ข้อมูลองค์กรและโลโก้ (Company & Logo)</h4>
+                            </div>
+                            <span class="text-[10px] text-slate-400 font-medium">GLOBAL BRANDING</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ชื่อบริษัทภาษาอังกฤษ (Company Name EN - แสดงในหัวเอกสาร) <span class="text-rose-500">*</span>
+                                </label>
+                                <input type="text" id="tpl-input-comp-en" value="${s.company_name_en || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ชื่อบริษัทภาษาไทย (Company Name TH)
+                                </label>
+                                <input type="text" id="tpl-input-comp-th" value="${s.company_name_th || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ชื่อย่อ / รหัสหน่วยงาน (Short Name เช่น CTC, Carrier)
+                                </label>
+                                <input type="text" id="tpl-input-comp-short" value="${s.company_short_name || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ชื่อฝ่าย / แผนก (Department)
+                                </label>
+                                <input type="text" id="tpl-input-dept" value="${s.department_name || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    หน่วยงานผู้ส่งเริ่มต้น (FROM ในรายงาน เช่น [ SQ ] / SQE)
+                                </label>
+                                <input type="text" id="tpl-input-from" value="${s.default_from_dept || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    สีประจำองค์กร / เส้นขอบ (Brand Accent Color)
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <input type="color" id="tpl-input-brand-color-picker" value="${s.brand_accent_color || '#003366'}" 
+                                           onchange="document.getElementById('tpl-input-brand-color').value = this.value; WapDocTemplate.updateLivePreview()" 
+                                           class="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0">
+                                    <input type="text" id="tpl-input-brand-color" value="${s.brand_accent_color || '#003366'}" 
+                                           oninput="document.getElementById('tpl-input-brand-color-picker').value = this.value; WapDocTemplate.updateLivePreview()" 
+                                           class="flex-1 h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Logo Section -->
+                        <div class="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2.5">
+                            <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                โลโก้บริษัท (Company Logo)
+                            </label>
+                            
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                <div class="w-32 h-12 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-1 overflow-hidden shrink-0 shadow-2xs">
+                                    <img id="tpl-logo-preview-img" src="${s.company_logo_data || s.company_logo_url || ''}" 
+                                         class="${(s.company_logo_data || s.company_logo_url) ? '' : 'hidden'} max-h-full max-w-full object-contain" 
+                                         alt="Logo Preview" onerror="this.classList.add('hidden')">
+                                    <span id="tpl-logo-empty-txt" class="${(s.company_logo_data || s.company_logo_url) ? 'hidden' : ''} text-[10px] text-slate-400 font-medium">ไม่มีโลโก้</span>
+                                </div>
+                                
+                                <div class="flex-1 w-full space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        <label class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/80 hover:bg-blue-100 transition-all cursor-pointer inline-flex items-center gap-1.5 active:scale-95 shadow-2xs">
+                                            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                            📁 เลือกไฟล์รูปภาพโลโก้
+                                            <input type="file" id="tpl-file-logo" accept="image/*" class="hidden" onchange="WapDocTemplate.handleLogoUpload(this)">
+                                        </label>
+                                        ${(s.company_logo_data) ? `
+                                        <button type="button" onclick="WapDocTemplate.clearUploadedLogo()" class="text-[11px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer">
+                                            ลบรูปอัปโหลด
+                                        </button>` : ''}
+                                    </div>
+                                    <input type="text" id="tpl-input-logo-url" value="${s.company_logo_url || ''}" placeholder="หรือกรอก URL โลโก้..." oninput="WapDocTemplate.updateLivePreview()" 
+                                           class="w-full h-7 px-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-[11px] text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none">
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-4 pt-1 text-xs">
+                                <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 dark:text-slate-300">
+                                    <input type="checkbox" id="tpl-check-logo-vfrp" ${s.show_logo_vfrp !== false ? 'checked' : ''} onchange="WapDocTemplate.updateLivePreview()" 
+                                           class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                                    แสดงโลโก้ในหัวรายงาน VF / RP
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 dark:text-slate-300">
+                                    <input type="checkbox" id="tpl-check-logo-8d" ${s.show_logo_8d !== false ? 'checked' : ''} onchange="WapDocTemplate.updateLivePreview()" 
+                                           class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                                    แสดงโลโก้ในสไลด์และ Footer 8D
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: VF & RP Report Card -->
+                    <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/80 p-4 shadow-2xs space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2.5">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-300 flex items-center justify-center font-bold text-xs">📑</span>
+                                <h4 class="text-xs font-black uppercase text-slate-800 dark:text-slate-100">เทมเพลตรายงาน VF & RP (Vendor Failure & Rejection)</h4>
+                            </div>
+                            <span class="text-[10px] text-slate-400 font-medium">OFFICIAL FORMAT</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    รหัสหัวกระดาษ VF (Format Header)
+                                </label>
+                                <input type="text" id="tpl-input-vf-header" value="${s.vf_format_header || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-mono text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    หัวข้อแบนเนอร์หลัก VF (Banner Title)
+                                </label>
+                                <input type="text" id="tpl-input-vf-title" value="${s.vf_banner_title || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-black text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    รหัสหัวกระดาษ RP (Format Header)
+                                </label>
+                                <input type="text" id="tpl-input-rp-header" value="${s.rp_format_header || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-mono text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    หัวข้อแบนเนอร์หลัก RP (Banner Title)
+                                </label>
+                                <input type="text" id="tpl-input-rp-title" value="${s.rp_banner_title || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-black text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ระยะเวลาจัดเก็บเอกสาร (Retention Period)
+                                </label>
+                                <input type="text" id="tpl-input-retention" value="${s.doc_retention || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    หมายเลขการทบทวน (Revision Text ท้ายกระดาษ)
+                                </label>
+                                <input type="text" id="tpl-input-revision" value="${s.revision_text || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ข้อความท้ายกระดาษ VF (Footer Text)
+                                </label>
+                                <input type="text" id="tpl-input-vf-footer" value="${s.vf_footer_text || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ข้อความท้ายกระดาษ RP (Footer Text)
+                                </label>
+                                <input type="text" id="tpl-input-rp-footer" value="${s.rp_footer_text || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: 8D Report Card -->
+                    <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/80 p-4 shadow-2xs space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2.5">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-xs">📊</span>
+                                <h4 class="text-xs font-black uppercase text-slate-800 dark:text-slate-100">เทมเพลตรายงาน 8D Report (8D Presentation)</h4>
+                            </div>
+                            <span class="text-[10px] text-slate-400 font-medium">8D STANDARD</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    หัวข้อหน้าปก 8D (Main Title)
+                                </label>
+                                <input type="text" id="tpl-input-8d-title" value="${s.eight_d_title || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-black text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ข้อความท้ายสไลด์ (Footer / Confidentiality)
+                                </label>
+                                <input type="text" id="tpl-input-8d-footer" value="${s.eight_d_footer_text || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    กล่องแจ้งเตือนคำแนะนำซัพพลายเออร์ (Supplier Guidance Warning Box)
+                                </label>
+                                <input type="text" id="tpl-input-8d-warning" value="${s.eight_d_warning || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-rose-600 font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ข้อความประเภท RP (เช่น [IQC Rejected, RP])
+                                </label>
+                                <input type="text" id="tpl-input-8d-tag-rp" value="${s.eight_d_tag_rp || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    ข้อความประเภท VF (เช่น [Line claim, VF])
+                                </label>
+                                <input type="text" id="tpl-input-8d-tag-vf" value="${s.eight_d_tag_vf || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    หัวตารางส่วนซัพพลายเออร์ส่ง (เช่น Suppliers submit)
+                                </label>
+                                <input type="text" id="tpl-input-8d-supp-label" value="${s.eight_d_supplier_label || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    หัวตารางส่วนบริษัทตรวจสอบ (เช่น CTC confirm)
+                                </label>
+                                <input type="text" id="tpl-input-8d-comp-label" value="${s.eight_d_company_label || ''}" oninput="WapDocTemplate.updateLivePreview()" 
+                                       class="w-full h-8 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Live Interactive Preview (5 cols) -->
+                <div class="xl:col-span-5 flex flex-col gap-3">
+                    <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/80 p-4 shadow-2xs flex-1 flex flex-col">
+                        
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2.5 mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <h4 class="text-xs font-black uppercase text-slate-800 dark:text-slate-100">ตัวอย่างเอกสารสด (Live Preview)</h4>
+                            </div>
+                            
+                            <!-- Preview Switcher -->
+                            <div class="flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <button type="button" onclick="WapDocTemplate.setPreviewTab('vf')" id="tpl-preview-btn-vf" 
+                                        class="px-2.5 py-1 rounded-md text-[10.5px] font-bold ${_activePreviewTab === 'vf' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-slate-700' : 'text-slate-500'}">
+                                    VF
+                                </button>
+                                <button type="button" onclick="WapDocTemplate.setPreviewTab('rp')" id="tpl-preview-btn-rp" 
+                                        class="px-2.5 py-1 rounded-md text-[10.5px] font-bold ${_activePreviewTab === 'rp' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-slate-700' : 'text-slate-500'}">
+                                    RP
+                                </button>
+                                <button type="button" onclick="WapDocTemplate.setPreviewTab('8d')" id="tpl-preview-btn-8d" 
+                                        class="px-2.5 py-1 rounded-md text-[10.5px] font-bold ${_activePreviewTab === '8d' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-slate-700' : 'text-slate-500'}">
+                                    8D
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Preview Box Canvas Container -->
+                        <div id="tpl-live-preview-box" class="flex-1 bg-slate-100 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200 dark:border-slate-700/60 overflow-y-auto max-h-[580px] custom-scrollbar">
+                            <!-- JavaScript dynamically updates live preview -->
+                        </div>
+
+                        <!-- Quick Preview Action Links -->
+                        <div class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-xs">
+                            <span class="text-[10px] text-slate-400">คลิกทดสอบหน้าจริง</span>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="if(typeof switchPage === 'function') switchPage('cases')" class="text-blue-600 dark:text-blue-400 hover:underline font-bold text-[11px] cursor-pointer">
+                                    เปิดดู 8D
+                                </button>
+                                <span class="text-slate-300">•</span>
+                                <button type="button" onclick="if(typeof switchPage === 'function') switchPage('cases')" class="text-blue-600 dark:text-blue-400 hover:underline font-bold text-[11px] cursor-pointer">
+                                    เปิดดู VF/RP
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+
+        updateLivePreview();
+    }
+
+    return {
+        init,
+        getSettings,
+        saveSettings,
+        saveSettingsFromForm,
+        resetToDefaults,
+        handleLogoUpload,
+        clearUploadedLogo,
+        setPreviewTab,
+        updateLivePreview,
+        renderSettingsForm,
+        onRemoteUpdate
+    };
+})();
+window.WapDocTemplate = WapDocTemplate;
+
+// Auto-boot settings
+if (typeof window !== 'undefined') {
+    WapDocTemplate.init().catch(() => {});
+}
 
 /**
  * ═══════════════════════════════════════════════════════
@@ -31377,6 +32488,55 @@ const LocalBackupSystem = (function() {
                             </div>
                         </div>
 
+                        <!-- Weekly Automated CSV & Images Backup System Card -->
+                        <div class="bg-gradient-to-br from-indigo-950/80 via-slate-900 to-cyan-950/80 border border-indigo-500/50 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3.5">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-500/30 pb-3">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center justify-center font-black">
+                                        📦
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-black text-white tracking-wide uppercase">WEEKLY AUTO-BACKUP (CSV + IMAGES)</span>
+                                            <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-500/40">7-DAY CYCLE</span>
+                                        </div>
+                                        <p class="text-[10.5px] text-slate-300 mt-0.5">สำรอง CSV ของงานแต่ละคนทุกหน้าอย่างละเอียด + ดึงรูปภาพหลักฐานทั้งหมดลง ZIP อัตโนมัติ</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2.5 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-indigo-500/30 self-start sm:self-auto">
+                                    <span class="text-[9.5px] font-bold text-slate-300 uppercase">Auto Weekly</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="toggle-auto-weekly-backup" class="sr-only peer" ${typeof WeeklyAutomatedBackupSystem !== 'undefined' && WeeklyAutomatedBackupSystem.isEnabled() ? 'checked' : ''} onchange="WeeklyAutomatedBackupSystem.setEnabled(this.checked)" title="Auto Weekly Backup Toggle">
+                                        <div class="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600 border border-slate-700"></div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Timing Status -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono bg-black/40 p-2.5 rounded-xl border border-slate-800">
+                                <div class="flex items-center gap-1.5 text-slate-300">
+                                    <span class="text-indigo-400 font-bold">📅 สำรองล่าสุด:</span>
+                                    <span>${typeof WeeklyAutomatedBackupSystem !== 'undefined' ? WeeklyAutomatedBackupSystem.getLastRunTimeDisplay() : '-'}</span>
+                                </div>
+                                <div class="flex items-center gap-1.5 text-slate-300">
+                                    <span class="text-cyan-400 font-bold">⏳ รอบถัดไป:</span>
+                                    <span>${typeof WeeklyAutomatedBackupSystem !== 'undefined' ? WeeklyAutomatedBackupSystem.getNextRunTimeDisplay() : '-'}</span>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons for Weekly System -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                <button onclick="WeeklyAutomatedBackupSystem.executeWeeklyBackup({ includeImages: true })" class="p-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl flex items-center justify-center gap-2 font-bold text-xs shadow-lg shadow-indigo-950/50 active:scale-95 transition-all">
+                                    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    <span>⚡ สำรองสัปดาห์นี้ทันที (CSV ทุกคน + รูปภาพครบ)</span>
+                                </button>
+                                <button onclick="WeeklyAutomatedBackupSystem.executeWeeklyBackup({ includeImages: false })" class="p-2.5 bg-slate-800/90 hover:bg-slate-800 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-xl flex items-center justify-center gap-2 font-bold text-xs active:scale-95 transition-all">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                    <span>📊 ส่งออกเฉพาะไฟล์ CSV ทุกคน (ZIP)</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Action Grid (Export / Import / Excel) -->
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             
@@ -31590,6 +32750,709 @@ setInterval(() => {
         LocalBackupSystem.checkAndRunDailyBackup();
     }
 }, 1800000);
+
+/**
+ * =========================================================================
+ * [MODULE]: WEEKLY AUTOMATED BACKUP SYSTEM (CSV & DETAILED IMAGES)
+ * =========================================================================
+ * ระบบสำรองข้อมูล CSV ของงานแต่ละคนทุกหน้าอย่างละเอียด ทุกๆ อาทิตย์ อัตโนมัติ รวมถึงรูปภาพอย่างละเอียด
+ * - รวบรวมรายชื่อพนักงานทุกคน
+ * - สร้างไฟล์ CSV แยกตามบุคคลสำหรับทุกหน้างาน (Claims, Support Logs, 8D, Special Jobs, OT, Attendance, 5S, Skills, Calibration)
+ * - Master Consolidated CSVs สำหรับภาพรวมองค์กร
+ * - ดึงและบีบอัดรูปภาพหลักฐานอย่างละเอียด (Evidence Photos) จัดเก็บลงโฟลเดอร์แยกตามบุคคล
+ * - สร้าง images_manifest.csv แค็ตตาล็อกรูปภาพ
+ * - รวมเป็นไฟล์ ZIP ด้วย JSZip
+ * - ตรวจสอบและรันอัตโนมัติทุก 7 วัน (Weekly Automated Cycle)
+ */
+const WeeklyAutomatedBackupSystem = (function() {
+    const STORAGE_KEY_LAST_WEEKLY_TIME = 'carrier_auto_weekly_csv_img_backup_last_time';
+    const STORAGE_KEY_WEEKLY_ENABLED = 'carrier_auto_weekly_csv_img_backup_enabled';
+    const STORAGE_KEY_WEEKLY_HISTORY = 'carrier_weekly_csv_img_backup_history';
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+    let _isProcessing = false;
+
+    function isEnabled() {
+        const val = localStorage.getItem(STORAGE_KEY_WEEKLY_ENABLED);
+        return val === null ? true : (val === 'true' || val === '1');
+    }
+
+    function setEnabled(enabled) {
+        localStorage.setItem(STORAGE_KEY_WEEKLY_ENABLED, enabled ? 'true' : 'false');
+        toast(enabled ? "✅ เปิดระบบสำรองข้อมูลประจำสัปดาห์อัตโนมัติแล้ว" : "⏸️ ปิดระบบสำรองข้อมูลประจำสัปดาห์อัตโนมัติแล้ว", "info");
+    }
+
+    function getLastRunTime() {
+        return parseInt(localStorage.getItem(STORAGE_KEY_LAST_WEEKLY_TIME) || '0', 10);
+    }
+
+    function getLastRunTimeDisplay() {
+        const last = getLastRunTime();
+        if (!last) return 'ยังไม่เคยสำรองข้อมูล';
+        try {
+            return new Date(last).toLocaleString('th-TH');
+        } catch (e) {
+            return new Date(last).toISOString();
+        }
+    }
+
+    function getNextRunTimeDisplay() {
+        const last = getLastRunTime();
+        if (!last) return 'ถึงกำหนดสำรองรอบแรกทันที';
+        const nextTime = last + SEVEN_DAYS_MS;
+        const diffHours = Math.round((nextTime - Date.now()) / (1000 * 60 * 60));
+        if (diffHours <= 0) return 'ถึงกำหนดสำรองข้อมูลแล้ว (วันนี้)';
+        const days = Math.floor(diffHours / 24);
+        const hrs = diffHours % 24;
+        return `ในอีก ${days > 0 ? `${days} วัน ` : ''}${hrs} ชั่วโมง (${new Date(nextTime).toLocaleDateString('th-TH')})`;
+    }
+
+    function getHistory() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY_WEEKLY_HISTORY) || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function recordHistory(entry) {
+        try {
+            const list = getHistory();
+            list.unshift(entry);
+            if (list.length > 30) list.pop();
+            localStorage.setItem(STORAGE_KEY_WEEKLY_HISTORY, JSON.stringify(list));
+        } catch (e) {}
+    }
+
+    function toCsvString(headers, rows) {
+        const escapeCell = (val) => {
+            if (val === null || val === undefined) return '';
+            let str = String(val);
+            if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+                str = '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        };
+        const headerLine = headers.map(escapeCell).join(',');
+        const dataLines = (rows || []).map(row => row.map(escapeCell).join(','));
+        return '\uFEFF' + [headerLine, ...dataLines].join('\r\n');
+    }
+
+    function getAllStaffUsers() {
+        const userSet = new Set();
+        if (S.currentUser) userSet.add(S.currentUser);
+        if (S.viewingUser) userSet.add(S.viewingUser);
+
+        try {
+            const staffRaw = localStorage.getItem('carrier_staff_members');
+            if (staffRaw) {
+                const arr = JSON.parse(staffRaw);
+                arr.forEach(s => {
+                    if (typeof s === 'string') userSet.add(s.trim());
+                    else if (s && s.email) userSet.add(s.email.trim());
+                });
+            }
+        } catch (e) {}
+
+        (S.records || []).forEach(r => {
+            const u = r.user || r.informer || r._user || r.user_id;
+            if (u) userSet.add(String(u).trim());
+        });
+
+        if (typeof WapSupportLogs !== 'undefined' && Array.isArray(WapSupportLogs._records)) {
+            WapSupportLogs._records.forEach(r => {
+                const u = r._user || r.user_id;
+                if (u) userSet.add(String(u).trim());
+            });
+        }
+
+        ((S.wapData && S.wapData.specialJobs) || []).forEach(j => {
+            if (j.user_id) userSet.add(String(j.user_id).trim());
+            if (j.assigned_by) userSet.add(String(j.assigned_by).trim());
+        });
+
+        (S.attLeaveRecords || []).forEach(a => {
+            const u = a.user || a.user_id;
+            if (u) userSet.add(String(u).trim());
+        });
+
+        if (userSet.size === 0) {
+            ['kannika.p@carrier.com', 'rattikan.s@carrier.com', 'chalisa.k@carrier.com', 'user.sqe@carrier.com'].forEach(u => userSet.add(u));
+        }
+        return Array.from(userSet).filter(Boolean);
+    }
+
+    async function fetchImageBlob(url) {
+        if (!url || typeof url !== 'string') return null;
+        const trimmed = url.trim();
+        if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null;
+
+        // 1. Data URL (Base64)
+        if (trimmed.startsWith('data:')) {
+            try {
+                const parts = trimmed.split(',');
+                const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+                const bstr = atob(parts[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while (n--) u8arr[n] = bstr.charCodeAt(n);
+                return new Blob([u8arr], { type: mime });
+            } catch (e) {
+                console.warn('[WeeklyBackup] Base64 conversion warning:', e.message);
+                return null;
+            }
+        }
+
+        // Helper fetch with timeout
+        const tryFetch = async (targetUrl) => {
+            const ctrl = new AbortController();
+            const tid = setTimeout(() => ctrl.abort(), 6000);
+            try {
+                const res = await fetch(targetUrl, { signal: ctrl.signal, mode: 'cors' });
+                clearTimeout(tid);
+                if (res.ok) return await res.blob();
+            } catch (e) {
+                clearTimeout(tid);
+            }
+            return null;
+        };
+
+        let resolvedUrl = typeof formatImageUrl === 'function' ? formatImageUrl(trimmed) : trimmed;
+        let blob = await tryFetch(resolvedUrl);
+        if (blob) return blob;
+
+        // Fallback with proxy
+        if (resolvedUrl.startsWith('http') && !resolvedUrl.includes('images.weserv.nl')) {
+            const proxy = `https://images.weserv.nl/?url=${encodeURIComponent(resolvedUrl)}&w=1200&output=jpg`;
+            blob = await tryFetch(proxy);
+        }
+        return blob;
+    }
+
+    function showProgressModal(title) {
+        let modal = document.getElementById('weekly-backup-progress-modal');
+        if (modal) modal.remove();
+
+        const html = `
+            <div id="weekly-backup-progress-modal" class="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in font-sans">
+                <div class="bg-slate-900 border border-indigo-500/50 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-5 text-center">
+                    <div class="w-16 h-16 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center justify-center mx-auto text-2xl animate-pulse">
+                        📦
+                    </div>
+                    <div>
+                        <h3 class="text-base font-black text-white uppercase tracking-wider">${escapeHtml(title || 'กำลังสำรองข้อมูลประจำสัปดาห์')}</h3>
+                        <p id="wb-status-text" class="text-xs text-indigo-300 mt-1 font-mono">กำลังรวบรวมข้อมูลทุกโมดูล...</p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
+                            <div id="wb-progress-bar" class="bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 h-full rounded-full transition-all duration-300" style="width: 5%;"></div>
+                        </div>
+                        <div class="flex justify-between text-[11px] font-mono text-slate-400">
+                            <span id="wb-step-text">ขั้นตอน: 1/4</span>
+                            <span id="wb-percent-text">5%</span>
+                        </div>
+                    </div>
+                    <div class="text-[10px] text-slate-500 font-mono">
+                        แบคอัพ CSV ของงานแต่ละคนทุกหน้า + ดาวน์โหลดรูปภาพทั้งหมด
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    function updateProgress(stepText, statusText, percent) {
+        const bar = document.getElementById('wb-progress-bar');
+        const st = document.getElementById('wb-status-text');
+        const sp = document.getElementById('wb-step-text');
+        const pt = document.getElementById('wb-percent-text');
+        if (bar) bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+        if (st) st.textContent = statusText;
+        if (sp) sp.textContent = stepText;
+        if (pt) pt.textContent = `${Math.round(percent)}%`;
+    }
+
+    function closeProgressModal() {
+        const modal = document.getElementById('weekly-backup-progress-modal');
+        if (modal) modal.remove();
+    }
+
+    async function executeWeeklyBackup(options = {}) {
+        if (_isProcessing) {
+            toast("⚠️ ระบบกำลังสำรองข้อมูลอยู่แล้ว กรุณารอสักครู่", "warning");
+            return;
+        }
+
+        const includeImages = options.includeImages !== false;
+        const silent = options.silent === true;
+        const autoDownload = options.autoDownload !== false;
+
+        _isProcessing = true;
+        if (!silent) {
+            showProgressModal("ระบบสำรองข้อมูลประจำสัปดาห์ (Weekly Backup)");
+        }
+
+        try {
+            updateProgress("ขั้นตอน: 1/4", "กำลังรวบรวมข้อมูลทุกโมดูลจากฐานข้อมูลและระบบ...", 15);
+
+            // 1. ดึงข้อมูลจากทุกตาราง
+            let claimsData = S.records || [];
+            let supportData = (typeof WapSupportLogs !== 'undefined' && Array.isArray(WapSupportLogs._records)) ? WapSupportLogs._records : [];
+            let casesData = S.eightDCases || [];
+            let specialJobsData = (S.wapData && S.wapData.specialJobs) || [];
+            let otData = [];
+            let attData = S.attLeaveRecords || [];
+            let s5Data = [];
+            let skillsData = [];
+            let calData = [];
+
+            try {
+                if (typeof sqeClient !== 'undefined') {
+                    const [resClaims, resSupport, res8D, resSj, resOt, resAtt, resS5, resSkills, resCal] = await Promise.allSettled([
+                        sqeClient.from('records').select('*').limit(2000),
+                        typeof wapClient !== 'undefined' ? wapClient.from('support_records').select('*').limit(2000) : Promise.resolve({ data: [] }),
+                        sqeClient.from('eight_d_cases').select('*').limit(1000),
+                        typeof wapClient !== 'undefined' ? wapClient.from('special_jobs').select('*').limit(1000) : Promise.resolve({ data: [] }),
+                        typeof wapClient !== 'undefined' ? wapClient.from('ot_records').select('*').limit(1000) : Promise.resolve({ data: [] }),
+                        typeof wapClient !== 'undefined' ? wapClient.from('attendance').select('*').limit(1000) : Promise.resolve({ data: [] }),
+                        typeof wapClient !== 'undefined' ? wapClient.from('s5_records').select('*').limit(1000) : Promise.resolve({ data: [] }),
+                        typeof wapClient !== 'undefined' ? wapClient.from('skill_matrix').select('*').limit(1000) : Promise.resolve({ data: [] }),
+                        typeof wapClient !== 'undefined' ? wapClient.from('calibration_tools').select('*').limit(1000) : Promise.resolve({ data: [] })
+                    ]);
+
+                    if (resClaims.status === 'fulfilled' && resClaims.value.data?.length) claimsData = resClaims.value.data;
+                    if (resSupport.status === 'fulfilled' && resSupport.value.data?.length) supportData = resSupport.value.data;
+                    if (res8D.status === 'fulfilled' && res8D.value.data?.length) casesData = res8D.value.data;
+                    if (resSj.status === 'fulfilled' && resSj.value.data?.length) specialJobsData = resSj.value.data;
+                    if (resOt.status === 'fulfilled' && resOt.value.data?.length) otData = resOt.value.data;
+                    if (resAtt.status === 'fulfilled' && resAtt.value.data?.length) attData = resAtt.value.data;
+                    if (resS5.status === 'fulfilled' && resS5.value.data?.length) s5Data = resS5.value.data;
+                    if (resSkills.status === 'fulfilled' && resSkills.value.data?.length) skillsData = resSkills.value.data;
+                    if (resCal.status === 'fulfilled' && resCal.value.data?.length) calData = resCal.value.data;
+                }
+            } catch (fetchErr) {
+                console.warn('[WeeklyBackup] DB query fallback to memory:', fetchErr.message);
+            }
+
+            // Fallback for calibration if not in DB
+            if (calData.length === 0 && typeof WapCalibrationSystem !== 'undefined' && Array.isArray(WapCalibrationSystem._records)) {
+                calData = WapCalibrationSystem._records;
+            }
+
+            const staffList = getAllStaffUsers();
+            updateProgress("ขั้นตอน: 2/4", `กำลังสร้างไฟล์ CSV ของพนักงานทั้งหมด (${staffList.length} ท่าน) ทุกหน้าอย่างละเอียด...`, 35);
+
+            if (typeof JSZip === 'undefined') {
+                throw new Error("JSZip library is not loaded. Please refresh the page.");
+            }
+
+            const zip = new JSZip();
+            const dateIso = new Date().toISOString().split('T')[0];
+            const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
+            const rootFolderName = `SQE_WAP_Weekly_Backup_${dateIso}`;
+            const zipRoot = zip.folder(rootFolderName);
+
+            const usersFolder = zipRoot.folder("01_Individual_Staff_Reports_CSV");
+            const mastersFolder = zipRoot.folder("02_Master_Company_Reports_CSV");
+            const imagesFolder = zipRoot.folder("03_Evidence_Photos");
+
+            const allImagesToDownload = [];
+
+            // 2. สร้างไฟล์ CSV แยกรายบุคคล
+            for (let i = 0; i < staffList.length; i++) {
+                const user = staffList[i];
+                const safeUserName = user.replace(/[^a-zA-Z0-9._-]/g, '_');
+                const userSubFolder = usersFolder.folder(safeUserName);
+
+                // A. Part Line Claim ของบุคคลนี้
+                const userClaims = claimsData.filter(r => (r.user === user || r.informer === user || r._user === user || r.user_id === user));
+                const claimHeaders = ["Claim ID", "Date", "Informer / User", "Supplier / Vendor", "Part Name", "Part No", "Lot No", "Defect Detail", "Defect Category", "OK QTY", "NG QTY", "Total QTY", "Claim Type", "Action", "PO No", "Invoice No", "Image File in Backup", "Original Image URL", "Status", "Created At"];
+                const claimRows = userClaims.map((r, idx) => {
+                    const imgUrl = r.evidence_img || r.imageUrl || r.image_url || r.image || '';
+                    let imgFilename = 'No Image';
+                    if (imgUrl && includeImages) {
+                        imgFilename = `${safeUserName}_Claim_${r.id || idx + 1}.jpg`;
+                        allImagesToDownload.push({
+                            module: 'PartLineClaim',
+                            user: safeUserName,
+                            filename: imgFilename,
+                            url: imgUrl,
+                            recordId: r.id || idx + 1,
+                            partNo: r.partNo || r.part_no || ''
+                        });
+                    }
+                    return [
+                        r.id || `CLM-${idx+1}`,
+                        r.date || r.eventDate || '-',
+                        user,
+                        r.vendor || r.supplier || '-',
+                        r.partName || r.part_name || '-',
+                        r.partNo || r.part_no || '-',
+                        r.lotNo || r.lot_no || '-',
+                        r.defectDetail || r.defect || '-',
+                        r.defectCategory || '-',
+                        r.ok || r.ok_qty || 0,
+                        r.ng || r.ng_qty || 0,
+                        (Number(r.ok || 0) + Number(r.ng || 0)),
+                        r.claimType || r.type || 'VF',
+                        r.action || '-',
+                        r.poNo || r.po_no || '-',
+                        r.invNo || r.invoice_no || '-',
+                        imgFilename,
+                        imgUrl.startsWith('data:') ? 'Base64 Data' : imgUrl,
+                        r.status || 'Active',
+                        r.createdAt || r.created_at || '-'
+                    ];
+                });
+                userSubFolder.file(`${safeUserName}_01_PartLineClaim.csv`, toCsvString(claimHeaders, claimRows));
+
+                // B. Line Support Logs ของบุคคลนี้
+                const userSupport = supportData.filter(r => (r._user === user || r.user_id === user || r.user === user));
+                const supportHeaders = ["Support ID", "Event Date", "Specialist User", "Problem Description", "Action Taken", "Part Category / Group", "Lot No", "OK QTY", "NG QTY", "Report Type (VF/RP/RECORDS)", "PO No", "Invoice No", "Remark / Notes", "Image File in Backup", "Original Image URL", "Created At"];
+                const supportRows = userSupport.map((r, idx) => {
+                    const imgUrl = r.imageUrl || r.image_url || r.image || '';
+                    let imgFilename = 'No Image';
+                    if (imgUrl && includeImages) {
+                        imgFilename = `${safeUserName}_Support_${r.id || idx + 1}.jpg`;
+                        allImagesToDownload.push({
+                            module: 'LineSupportLogs',
+                            user: safeUserName,
+                            filename: imgFilename,
+                            url: imgUrl,
+                            recordId: r.id || idx + 1,
+                            partNo: r.part || ''
+                        });
+                    }
+                    return [
+                        r.id || `SUP-${idx+1}`,
+                        r.eventDate || r.date || '-',
+                        user,
+                        r.problem || '-',
+                        r.action || '-',
+                        r.part || '-',
+                        r.lot || '-',
+                        r.ok || 0,
+                        r.ng || 0,
+                        r.report || 'VF',
+                        r.poNo || r.po_no || '-',
+                        r.invNo || r.inv_no || '-',
+                        r.remark || '-',
+                        imgFilename,
+                        imgUrl.startsWith('data:') ? 'Base64 Data' : imgUrl,
+                        r.createdAt || r.created_at || '-'
+                    ];
+                });
+                userSubFolder.file(`${safeUserName}_02_LineSupportLogs.csv`, toCsvString(supportHeaders, supportRows));
+
+                // C. 8D Reports ของบุคคลนี้
+                const user8D = casesData.filter(c => (c.owner === user || c.user === user || c.informer === user || (c.team && String(c.team).includes(user))));
+                const eightDHeaders = ["Case ID", "Title", "Owner / Engineer", "Supplier", "Part No", "Defect Description", "Status", "D1 Team", "D2 Problem", "D3 Containment", "D4 Root Cause", "D5 Corrective Action", "D6 Validation", "D7 Prevention", "D8 Congratulation", "Due Date", "Created At"];
+                const eightDRows = user8D.map((c, idx) => [
+                    c.id || `8D-${idx+1}`,
+                    c.title || '-',
+                    user,
+                    c.supplier || c.vendor || '-',
+                    c.partNo || c.part_no || '-',
+                    c.defect || c.description || '-',
+                    c.status || 'Active',
+                    c.team || '-',
+                    c.problemDesc || c.problem || '-',
+                    c.containment || '-',
+                    c.rootCause || '-',
+                    c.correctiveAction || '-',
+                    c.validation || '-',
+                    c.prevention || '-',
+                    c.congratulation || '-',
+                    c.targetDate || c.dueDate || '-',
+                    c.createdAt || c.created_at || '-'
+                ]);
+                userSubFolder.file(`${safeUserName}_03_8D_Problem_Solving.csv`, toCsvString(eightDHeaders, eightDRows));
+
+                // D. Special Jobs ของบุคคลนี้
+                const userSj = specialJobsData.filter(j => (j.user_id === user || j.assigned_to === user));
+                const sjHeaders = ["Job ID", "User ID", "Project / Mission", "Assigned By (Commander)", "Date", "Result / Status", "Full Timestamp"];
+                const sjRows = userSj.map((j, idx) => [
+                    j.id || `SJ-${idx+1}`,
+                    user,
+                    j.title || j.task || j.project || '-',
+                    j.assigned_by || 'Management',
+                    j.date || '-',
+                    j.result || j.status || 'Done',
+                    j.timestamp || j.created_at || '-'
+                ]);
+                userSubFolder.file(`${safeUserName}_04_SpecialJobs.csv`, toCsvString(sjHeaders, sjRows));
+
+                // E. OT Management ของบุคคลนี้
+                const userOt = otData.filter(o => (o.user === user || o.user_id === user));
+                const otHeaders = ["OT ID", "User ID", "Date", "Shift", "OT Hours", "Task Description", "Reason", "Approval Status", "Created At"];
+                const otRows = userOt.map((o, idx) => [
+                    o.id || `OT-${idx+1}`,
+                    user,
+                    o.date || '-',
+                    o.shift || '-',
+                    o.hours || o.ot_hours || 0,
+                    o.task || o.description || '-',
+                    o.reason || '-',
+                    o.status || 'Approved',
+                    o.createdAt || o.created_at || '-'
+                ]);
+                userSubFolder.file(`${safeUserName}_05_OT_Management.csv`, toCsvString(otHeaders, otRows));
+
+                // F. Attendance & Leave ของบุคคลนี้
+                const userAtt = attData.filter(a => (a.user === user || a.user_id === user));
+                const attHeaders = ["Log ID", "User ID", "Date", "Shift", "Work Status", "Leave Type", "Note", "Timestamp"];
+                const attRows = userAtt.map((a, idx) => [
+                    a.id || `ATT-${idx+1}`,
+                    user,
+                    a.date || '-',
+                    a.shift || '-',
+                    a.status || a.workStatus || 'Present',
+                    a.leaveType || '-',
+                    a.note || '-',
+                    a.timestamp || a.created_at || '-'
+                ]);
+                userSubFolder.file(`${safeUserName}_06_Attendance_Leave.csv`, toCsvString(attHeaders, attRows));
+
+                // G. 5S Excellence ของบุคคลนี้
+                const userS5 = s5Data.filter(s => (s.user === user || s.auditor === user));
+                const s5Headers = ["Audit ID", "Auditor / User", "Area / Zone", "Date", "Score", "Findings", "Status"];
+                const s5Rows = userS5.map((s, idx) => [
+                    s.id || `5S-${idx+1}`,
+                    user,
+                    s.area || s.zone || '-',
+                    s.date || '-',
+                    s.score || 0,
+                    s.findings || s.notes || '-',
+                    s.status || 'Completed'
+                ]);
+                userSubFolder.file(`${safeUserName}_07_5S_Excellence.csv`, toCsvString(s5Headers, s5Rows));
+
+                // H. Skill Matrix ของบุคคลนี้
+                const userSkills = skillsData.filter(k => (k.user === user || k.user_id === user));
+                const skillHeaders = ["Skill ID", "User ID", "Category", "Skill Name", "Level", "Certification", "Updated At"];
+                const skillRows = userSkills.map((k, idx) => [
+                    k.id || `SK-${idx+1}`,
+                    user,
+                    k.category || '-',
+                    k.skill_name || k.skillName || '-',
+                    k.level || 0,
+                    k.certification || '-',
+                    k.updated_at || '-'
+                ]);
+                userSubFolder.file(`${safeUserName}_08_SkillMatrix.csv`, toCsvString(skillHeaders, skillRows));
+
+                // I. Consolidated Person Summary
+                const summaryHeaders = ["Metric Item", "Total Records", "User ID", "Export Date"];
+                const summaryRows = [
+                    ["Part Line Claims", userClaims.length, user, dateIso],
+                    ["Line Support Logs", userSupport.length, user, dateIso],
+                    ["8D Reports", user8D.length, user, dateIso],
+                    ["Special Jobs Completed", userSj.length, user, dateIso],
+                    ["OT Records", userOt.length, user, dateIso],
+                    ["Attendance Records", userAtt.length, user, dateIso],
+                    ["5S Audits", userS5.length, user, dateIso],
+                    ["Skill Matrix Entries", userSkills.length, user, dateIso]
+                ];
+                userSubFolder.file(`${safeUserName}_00_Consolidated_Summary.csv`, toCsvString(summaryHeaders, summaryRows));
+            }
+
+            // 3. สร้าง Master CSVs
+            // Master Claims
+            mastersFolder.file(`Master_All_PartLineClaims_${dateIso}.csv`, toCsvString(
+                ["Claim ID", "Date", "User", "Vendor", "Part Name", "Part No", "Lot No", "Defect", "OK", "NG", "Claim Type", "Action", "PO No", "Invoice No"],
+                claimsData.map(r => [r.id, r.date || r.eventDate, r.user || r.informer, r.vendor || r.supplier, r.partName || r.part_name, r.partNo || r.part_no, r.lotNo || r.lot_no, r.defectDetail || r.defect, r.ok || 0, r.ng || 0, r.claimType || 'VF', r.action, r.poNo, r.invNo])
+            ));
+
+            // Master Support Logs
+            mastersFolder.file(`Master_All_LineSupportLogs_${dateIso}.csv`, toCsvString(
+                ["Support ID", "Event Date", "User", "Problem", "Action", "Part", "Lot", "OK", "NG", "Report Type", "PO No", "Invoice No", "Remark"],
+                supportData.map(r => [r.id, r.eventDate || r.date, r._user || r.user_id, r.problem, r.action, r.part, r.lot, r.ok || 0, r.ng || 0, r.report, r.poNo, r.invNo, r.remark])
+            ));
+
+            // Master 8D
+            mastersFolder.file(`Master_All_8D_Reports_${dateIso}.csv`, toCsvString(
+                ["Case ID", "Title", "Owner", "Supplier", "Part No", "Defect", "Status", "Target Date"],
+                casesData.map(c => [c.id, c.title, c.owner, c.supplier, c.partNo, c.defect, c.status, c.targetDate])
+            ));
+
+            // Master Special Jobs
+            mastersFolder.file(`Master_All_SpecialJobs_${dateIso}.csv`, toCsvString(
+                ["Job ID", "User ID", "Project", "Assigned By", "Date", "Result"],
+                specialJobsData.map(j => [j.id, j.user_id, j.title || j.task, j.assigned_by, j.date, j.result || j.status])
+            ));
+
+            // Master Calibration Equipment
+            mastersFolder.file(`Master_All_Calibration_${dateIso}.csv`, toCsvString(
+                ["Equipment ID", "Control No", "Instrument Name", "Model", "Serial No", "Department", "Last Cal", "Next Due", "Status", "Cal Agency", "Image URL"],
+                calData.map(c => [c.id, c.controlNo || c.control_no, c.name || c.instrumentName, c.model, c.serialNo, c.dept || c.department, c.lastCal || c.last_cal, c.nextDue || c.next_due, c.status, c.calAgency, c.imageUrl || c.image_url])
+            ));
+
+            // 4. จัดการรูปภาพอย่างละเอียด (Evidence Photos)
+            const imagesManifestRows = [];
+            if (includeImages && allImagesToDownload.length > 0) {
+                const totalImgs = allImagesToDownload.length;
+                updateProgress("ขั้นตอน: 3/4", `กำลังดึงและบีบอัดรูปภาพหลักฐานอย่างละเอียด (0/${totalImgs} รูป)...`, 50);
+
+                for (let idx = 0; idx < allImagesToDownload.length; idx++) {
+                    const item = allImagesToDownload[idx];
+                    const pct = 50 + Math.round((idx / totalImgs) * 35);
+                    updateProgress("ขั้นตอน: 3/4", `กำลังดึงรูปภาพ (${idx + 1}/${totalImgs}): ${item.filename}...`, pct);
+
+                    try {
+                        const blob = await fetchImageBlob(item.url);
+                        if (blob) {
+                            const subUserFolder = imagesFolder.folder(item.user);
+                            subUserFolder.file(item.filename, blob);
+                            imagesManifestRows.push([
+                                item.module,
+                                item.recordId,
+                                item.user,
+                                item.partNo || '-',
+                                `${item.user}/${item.filename}`,
+                                'Saved OK',
+                                `${(blob.size / 1024).toFixed(1)} KB`,
+                                item.url.startsWith('data:') ? 'Base64 Data' : item.url
+                            ]);
+                        } else {
+                            imagesManifestRows.push([
+                                item.module,
+                                item.recordId,
+                                item.user,
+                                item.partNo || '-',
+                                'Failed to fetch',
+                                'Fetch Error',
+                                '0 KB',
+                                item.url.startsWith('data:') ? 'Base64 Data' : item.url
+                            ]);
+                        }
+                    } catch (imgErr) {
+                        console.warn('[WeeklyBackup] Image download error:', imgErr.message);
+                    }
+                }
+            } else {
+                updateProgress("ขั้นตอน: 3/4", "ข้ามการดาวน์โหลดรูปภาพตามคำขอ หรือไม่พบรูปภาพ...", 75);
+            }
+
+            // Write Image Manifest
+            imagesFolder.file("00_images_manifest.csv", toCsvString(
+                ["Module", "Record ID", "User", "Part No", "File Path in ZIP", "Status", "Size", "Original URL / Data"],
+                imagesManifestRows
+            ));
+
+            // README file explaining backup contents
+            zipRoot.file("README_BACKUP_INFO.txt", 
+                `SQE & WAP SUPPORT PORTAL - WEEKLY AUTOMATED BACKUP\r\n` +
+                `Export Date: ${new Date().toLocaleString('th-TH')}\r\n` +
+                `Cycle: Weekly (Every 7 Days)\r\n` +
+                `Total Staff Members: ${staffList.length}\r\n` +
+                `Total Claims: ${claimsData.length}\r\n` +
+                `Total Support Logs: ${supportData.length}\r\n` +
+                `Total 8D Cases: ${casesData.length}\r\n` +
+                `Total Special Jobs: ${specialJobsData.length}\r\n` +
+                `Total Calibration Tools: ${calData.length}\r\n` +
+                `Evidence Photos Captured: ${imagesManifestRows.filter(r => r[5] === 'Saved OK').length} / ${allImagesToDownload.length}\r\n` +
+                `Generated Automatically by WeeklyAutomatedBackupSystem v3.7.0`
+            );
+
+            updateProgress("ขั้นตอน: 4/4", "กำลังบีบอัดไฟล์ ZIP ทั้งหมด...", 90);
+
+            const zipBlob = await zip.generateAsync({
+                type: "blob",
+                compression: "DEFLATE",
+                compressionOptions: { level: 6 }
+            }, (meta) => {
+                updateProgress("ขั้นตอน: 4/4", `กำลังสร้างแพ็กเกจ ZIP (${meta.percent.toFixed(0)}%)...`, 90 + (meta.percent * 0.08));
+            });
+
+            const fileName = `SQE_WAP_Weekly_Backup_${dateIso}_${includeImages ? 'Complete' : 'CsvOnly'}.zip`;
+            const sizeMb = (zipBlob.size / (1024 * 1024)).toFixed(2);
+
+            // Trigger Download
+            if (autoDownload) {
+                const url = URL.createObjectURL(zipBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 1000);
+            }
+
+            // Record execution time
+            const now = Date.now();
+            localStorage.setItem(STORAGE_KEY_LAST_WEEKLY_TIME, String(now));
+
+            recordHistory({
+                date: dateIso,
+                time: new Date().toLocaleTimeString('th-TH'),
+                filename: fileName,
+                sizeMb: `${sizeMb} MB`,
+                usersCount: staffList.length,
+                imagesCount: imagesManifestRows.filter(r => r[5] === 'Saved OK').length,
+                type: silent ? 'auto_weekly' : 'manual_weekly'
+            });
+
+            updateProgress("เสร็จสิ้น 100%", `✅ สำรองข้อมูลเรียบร้อยแล้ว (${sizeMb} MB)`, 100);
+            setTimeout(() => {
+                closeProgressModal();
+                toast(`✅ สำรองข้อมูลประจำสัปดาห์สำเร็จ (${fileName} - ${sizeMb} MB)`, "success");
+            }, 1200);
+
+            // Refresh backup modal if currently open
+            if (document.getElementById('local-backup-modal')) {
+                LocalBackupSystem.openBackupModal();
+            }
+
+        } catch (err) {
+            console.error('[WeeklyBackup Error]:', err);
+            closeProgressModal();
+            toast(`❌ การสำรองข้อมูลประจำสัปดาห์ล้มเหลว: ${err.message}`, "error");
+        } finally {
+            _isProcessing = false;
+        }
+    }
+
+    function checkAndRunWeeklyBackup() {
+        if (!isEnabled()) return;
+        const now = Date.now();
+        const last = getLastRunTime();
+        if (!last || (now - last >= SEVEN_DAYS_MS)) {
+            console.log("⏰ [WeeklyAutomatedBackupSystem] 7 days reached, executing automated weekly backup...");
+            executeWeeklyBackup({ silent: true, autoDownload: true, includeImages: true });
+        }
+    }
+
+    return {
+        isEnabled,
+        setEnabled,
+        getLastRunTime,
+        getLastRunTimeDisplay,
+        getNextRunTimeDisplay,
+        executeWeeklyBackup,
+        checkAndRunWeeklyBackup,
+        getHistory,
+        getAllStaffUsers
+    };
+})();
+
+window.WeeklyAutomatedBackupSystem = WeeklyAutomatedBackupSystem;
+
+// รันตรวจสอบสัปดาห์อัตโนมัติทุกๆ 15 นาที
+setInterval(() => {
+    if (typeof WeeklyAutomatedBackupSystem !== 'undefined') {
+        WeeklyAutomatedBackupSystem.checkAndRunWeeklyBackup();
+    }
+}, 900000);
+
+// ตรวจสอบทันทีหลังโหลดหน้าเว็บ (ถ้าครบรอบ 7 วันแล้วให้สำรองทันที)
+setTimeout(() => {
+    if (typeof WeeklyAutomatedBackupSystem !== 'undefined') {
+        WeeklyAutomatedBackupSystem.checkAndRunWeeklyBackup();
+    }
+}, 4000);
 
 
 async function performArchive() {

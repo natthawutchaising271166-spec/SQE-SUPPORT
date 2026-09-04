@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
     <title>SQE & WAP Support Portal</title>
+    <meta name="description" content="Enterprise Quality Engineering Portal for Part Line Claims, 8D Reports, Vendor Quality Metrics, and Operations Cockpit">
+    <meta property="og:title" content="SQE & WAP Support Portal">
+    <meta property="og:description" content="Enterprise Quality Engineering Portal for Part Line Claims, 8D Reports, Vendor Quality Metrics, and Operations Cockpit">
 
     <!-- 1. Scripts & External Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,15 +19,31 @@
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Comic+Neue:ital,wght@0,700;1,700&family=Dancing+Script:wght@600;700&family=Great+Vibes&family=Inter:wght@300;400;500;600;700;800;900&family=Kalam:wght@700&family=Patrick+Hand&family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&family=Satisfy&family=Style+Script&display=swap" rel="stylesheet">
+    <!-- App Icons & Favicons for all devices -->
+    <link rel="icon" type="image/x-icon" href="./favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="./icon-48.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="./icon-96.png">
     <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="./apple-touch-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="./apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="./apple-touch-icon-152x152.png">
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-180.png">
-    <link rel="apple-touch-icon" href="./apple-touch-icon-180.png">
-    <link rel="shortcut icon" href="./icon-192.png" type="image/png">
+    <link rel="mask-icon" href="./icon-512.png" color="#1e40af">
+    <meta name="msapplication-TileColor" content="#1e40af">
+    <meta name="msapplication-TileImage" content="./icon-144.png">
+    <meta property="og:image" content="./icon-512.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:image" content="./icon-512.png">
 
     <!-- 3. Progressive Web App (PWA) Settings -->
     <link rel="manifest" href="./manifest.json">
@@ -95,13 +111,12 @@
     </script>
 
     <!-- 4. Local Stylesheet -->
-    <link rel="stylesheet" href="styles.css?v=3.7.3">
+    <link rel="stylesheet" href="styles.css?v=3.7.0">
     <script>
         // Automatic Service Worker version synchronization & cache flush
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 console.log('⚡ New Service Worker activated, reloading for latest build...');
-                window.location.reload();
             });
             window.addEventListener('load', () => {
                 navigator.serviceWorker.getRegistration().then(reg => {
@@ -506,9 +521,9 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
         }
 
-        .dark-mode #8d-container,
-        .dark #8d-container,
-        body.dark-mode #8d-container {
+        .dark-mode [id="8d-container"],
+        .dark [id="8d-container"],
+        body.dark-mode [id="8d-container"] {
             background: rgba(225, 29, 72, 0.16) !important;
             border-color: rgba(251, 113, 133, 0.6) !important;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
@@ -1856,12 +1871,9 @@
             </div>
 
             <div id="vendor-divider" class="hidden w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
-            <div id="vendor-filter-container" class="relative flex items-center">
-                <select id="claim-vendor-filter" onchange="updateAllModuleFilters()" class="hidden bg-slate-50 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80 hover:border-blue-400 dark:hover:border-blue-500 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-200 outline-none h-6 pl-2 pr-5 cursor-pointer max-w-[125px] truncate shrink-0 shadow-xs transition-colors" title="Claim Vendor Filter" aria-label="Claim Vendor Filter">
-                    <option value="ALL">ALL VENDORS</option>
-                </select>
-                <svg id="vendor-filter-arrow" class="hidden w-2.5 h-2.5 text-slate-400 dark:text-slate-400 absolute right-1.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
-            </div>
+            <select  id="claim-vendor-filter" onchange="updateAllModuleFilters()" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-extrabold text-blue-600 dark:text-blue-400 outline-none h-6 px-1.5 cursor-pointer max-w-[100px] truncate shrink-0" title="Claim Vendor Filter" aria-label="Claim Vendor Filter">
+                <option value="ALL">ALL VENDORS</option>
+            </select>
 
             <div class="w-[1px] h-3.5 bg-slate-300 dark:bg-slate-600 shrink-0"></div>
 
@@ -3205,23 +3217,11 @@
             <!-- Analytics Side -->
             <div class="sj-analytics-col flex-[0.9]">
                 <div class="sj-glass-card h-[49%]">
-                    <div class="card-head-flex">
-                        <div class="flex items-center gap-2">
-                            <div class="header-indicator bg-indigo-500"></div>
-                            <h3>Workload Distribution</h3>
-                        </div>
-                        <span class="sj-record-badge">BY ASSIGNOR</span>
-                    </div>
+                    <div class="card-head"><h3>Workload Distribution</h3></div>
                     <div class="card-body"><div id="sj-assignor-chart"></div></div>
                 </div>
                 <div class="sj-glass-card h-[49%]">
-                    <div class="card-head-flex">
-                        <div class="flex items-center gap-2">
-                            <div class="header-indicator bg-blue-500"></div>
-                            <h3>Volume Frequency</h3>
-                        </div>
-                        <span class="sj-record-badge">MONTHLY TREND</span>
-                    </div>
+                    <div class="card-head"><h3>Volume Frequency</h3></div>
                     <div class="card-body"><div id="sj-volume-chart"></div></div>
                 </div>
             </div>
@@ -3402,13 +3402,7 @@
                 <!-- Bottom Split -->
                 <div class="analytics-bottom-split h-[40%]">
                     <div class="analytics-card-white flex-[1]">
-                        <div class="flex justify-between items-center mb-2">
-                            <div class="flex items-center gap-2">
-                                <div class="w-1.5 h-3.5 bg-blue-600 rounded-full"></div>
-                                <h3 class="chart-title-v2">OT TYPE DISTRIBUTION</h3>
-                            </div>
-                            <span class="text-[9px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full" id="ot-dist-badge">TYPE RATIO</span>
-                        </div>
+                        <h3 class="chart-title-v2">OT TYPE DISTRIBUTION</h3>
                         <div class="chart-wrap-v2"><div id="ot-dist-chart"></div></div>
                     </div>
                     <div class="analytics-card-white flex-[1.4]">
@@ -3725,6 +3719,10 @@
                         <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                         VF & RP Email
                     </button>
+                    <button onclick="WapAdminSystem.switchTab('template')" id="cyber-tab-template" class="cyber-admin-tab" title="ตั้งค่าเทมเพลตเอกสาร (Header, Footer, Logo สำหรับ 8D และ VF/RP)">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/><circle cx="8" cy="8" r="1.5"/><path d="M4 8a4 4 0 014-4h8"/></svg>
+                        Doc Templates
+                    </button>
                 </div>
 
                 <!-- Live Search Filter Input & Counter -->
@@ -3749,7 +3747,7 @@
 
             <!-- Scrollable Data Grid Table -->
             <div class="flex-1 overflow-auto p-2 sm:p-4 max-h-[580px] custom-scrollbar">
-                <table class="w-full border-collapse text-xs">
+                <table id="admin-main-table" class="w-full border-collapse text-xs">
                     <thead id="admin-table-head" class="sticky top-0 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-[11px] font-bold uppercase tracking-wider z-10 border-b border-slate-200 dark:border-slate-700">
                         <!-- JS renders table header -->
                     </thead>
@@ -3757,6 +3755,10 @@
                         <!-- JS renders rows -->
                     </tbody>
                 </table>
+                <!-- [DOCUMENT TEMPLATE SETTINGS CONTAINER] -->
+                <div id="admin-template-settings-panel" class="hidden">
+                    <!-- JS renders document template settings form & preview -->
+                </div>
             </div>
         </div>
 
@@ -3932,6 +3934,7 @@
     </div> <!-- /#dashboard-view -->
 
     <!-- วาง script ไว้ก่อนปิด body เสมอเพื่อให้โหลด DOM เสร็จก่อน -->
-    <script src="script.js?v=3.7.3"></script>
+    <script src="vf_rp_seed_rules.js?v=3.7.0"></script>
+    <script src="script.js?v=3.7.0"></script>
 </body>
 </html>

@@ -8768,6 +8768,20 @@ body.dark .field-glow-filled {
     background: #fff;
     box-shadow: 0 4px 12px rgba(0,0,0,0.03);
     border-left: 5px solid #cbd5e1;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                border-color 0.25s ease;
+    cursor: default;
+    will-change: transform, box-shadow;
+}
+
+.kpi-card-modern:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03);
+}
+
+.kpi-card-modern:active {
+    transform: translateY(-1px) scale(0.995);
 }
 
 /* Colors for KPI borders */
@@ -9248,9 +9262,27 @@ body.dark .field-glow-filled {
 
 /* Card Styling */
 .kpi-card {
-    background: #fff; border-radius: 12px; padding: 12px;
-    border-top: 4px solid #e2e8f0; display: flex; flex-direction: column;
-    justify-content: space-between; min-height: 140px;
+    background: #fff; 
+    border-radius: 12px; 
+    padding: 12px;
+    border-top: 4px solid #e2e8f0; 
+    display: flex; 
+    flex-direction: column;
+    justify-content: space-between; 
+    min-height: 140px;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: default;
+    will-change: transform, box-shadow;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03);
+}
+
+.kpi-card:active {
+    transform: translateY(-1px) scale(0.995);
 }
 
 .glass-box {
@@ -9685,7 +9717,7 @@ body.dark .field-glow-filled {
     border: 1px solid #fef3c7 !important;
     border-radius: 10px !important;
 }
-/* KPI Card Version 2 */
+/* KPI Card Version 2 with Interactive Hover Animation */
 .kpi-card-v2 {
     background: #ffffff;
     border: 1px solid #f1f5f9;
@@ -9696,7 +9728,92 @@ body.dark .field-glow-filled {
     min-height: 155px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                border-color 0.25s ease;
+    cursor: default;
+    will-change: transform, box-shadow;
+}
+
+.kpi-card-v2:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03);
+}
+
+.kpi-card-v2:active {
+    transform: translateY(-1px) scale(0.995);
+    transition-duration: 0.1s;
+}
+
+/* Subtle Shimmer Sheen on Hover */
+.kpi-card-v2::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -130%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    z-index: 5;
+}
+
+.kpi-card-v2:hover::after {
+    left: 170%;
+}
+
+/* Color-specific subtle border glow on hover */
+.kpi-card-v2.border-emerald-100:hover {
+    border-color: #10b981 !important;
+    box-shadow: 0 10px 24px -4px rgba(16, 185, 129, 0.15), 0 4px 8px -2px rgba(16, 185, 129, 0.06);
+}
+
+.kpi-card-v2.border-orange-100:hover {
+    border-color: #f97316 !important;
+    box-shadow: 0 10px 24px -4px rgba(249, 115, 22, 0.15), 0 4px 8px -2px rgba(249, 115, 22, 0.06);
+}
+
+.kpi-card-v2.border-red-100:hover {
+    border-color: #ef4444 !important;
+    box-shadow: 0 10px 24px -4px rgba(239, 68, 68, 0.15), 0 4px 8px -2px rgba(239, 68, 68, 0.06);
+}
+
+.kpi-card-v2.border-blue-100:hover {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 10px 24px -4px rgba(59, 130, 246, 0.15), 0 4px 8px -2px rgba(59, 130, 246, 0.06);
+}
+
+/* Micro-interaction on header icon/indicator */
+.kpi-card-v2 .w-6.h-6,
+.kpi-card-v2 .text-orange-500,
+.kpi-card-v2 .text-red-500,
+.kpi-card-v2 .text-emerald-500,
+.kpi-card-v2 .text-blue-500 {
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.kpi-card-v2:hover .w-6.h-6,
+.kpi-card-v2:hover .text-orange-500,
+.kpi-card-v2:hover .text-red-500,
+.kpi-card-v2:hover .text-emerald-500,
+.kpi-card-v2:hover .text-blue-500 {
+    transform: scale(1.18);
+}
+
+/* Value text subtle hover response */
+.kpi-card-v2 .kpi-v2-val {
+    transition: transform 0.2s ease, color 0.2s ease;
+    transform-origin: left center;
+}
+
+.kpi-card-v2:hover .kpi-v2-val {
+    transform: scale(1.02);
 }
 
 .kpi-v2-label {
@@ -9868,9 +9985,45 @@ body.dark-mode .text-slate-400, body.dark-mode .text-slate-300 {
     color: #94a3b8 !important;
 }
 
-/* 3. ≒ｸｲ｣ｸ  KPI (SF, CTC, OK, Vendor) */
+/* 3. KPI Cards (SF, CTC, OK, Vendor, Production) */
 body.dark-mode .kpi-card-v2 {
     border-color: #1e293b !important;
+}
+
+body.dark-mode .kpi-card-v2::after {
+    background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.14), transparent);
+}
+
+body.dark-mode .kpi-card-v2:hover {
+    transform: translateY(-3px) !important;
+    border-color: rgba(56, 189, 248, 0.4) !important;
+    box-shadow: 0 16px 32px -4px rgba(0, 0, 0, 0.7), 0 0 16px rgba(56, 189, 248, 0.12) !important;
+}
+
+body.dark-mode .kpi-card-v2.border-emerald-100:hover {
+    border-color: rgba(52, 211, 153, 0.6) !important;
+    box-shadow: 0 16px 32px -4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(52, 211, 153, 0.22) !important;
+}
+
+body.dark-mode .kpi-card-v2.border-orange-100:hover {
+    border-color: rgba(251, 146, 60, 0.6) !important;
+    box-shadow: 0 16px 32px -4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(251, 146, 60, 0.22) !important;
+}
+
+body.dark-mode .kpi-card-v2.border-red-100:hover {
+    border-color: rgba(248, 113, 113, 0.6) !important;
+    box-shadow: 0 16px 32px -4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(248, 113, 113, 0.22) !important;
+}
+
+body.dark-mode .kpi-card-v2.border-blue-100:hover {
+    border-color: rgba(96, 165, 250, 0.6) !important;
+    box-shadow: 0 16px 32px -4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(96, 165, 250, 0.22) !important;
+}
+
+body.dark-mode .kpi-card-v2:hover .ppm-bar-v2 {
+    background: #1e293b !important;
+    border-color: #475569 !important;
+    color: #f1f5f9 !important;
 }
 body.dark-mode .ppm-bar-v2 {
     background: #1e293b !important;
@@ -12083,14 +12236,22 @@ body.dark-mode .float-toggle {
     min-height: 104px !important;
     max-height: 104px !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                border-color 0.25s ease;
     box-sizing: border-box;
     overflow: hidden;
+    cursor: default;
+    will-change: transform, box-shadow;
 }
 
 .sm-kpi-card-styled:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03);
+}
+
+.sm-kpi-card-styled:active {
+    transform: translateY(-1px) scale(0.995);
 }
 
 .sm-kpi-blue { border-top: 4px solid #3b82f6 !important; }
@@ -12643,6 +12804,21 @@ body.dark-mode .sj-cyber-table thead th {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                border-color 0.25s ease;
+    cursor: default;
+    will-change: transform, box-shadow;
+}
+
+.sj-kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03);
+    border-color: #cbd5e1;
+}
+
+.sj-kpi-card:active {
+    transform: translateY(-1px) scale(0.995);
 }
 
 
@@ -12853,19 +13029,37 @@ body.dark-mode .sj-kpi-val, body.dark-mode h3, body.dark-mode .sj-mission-text {
 .sj-workload-list {
     width: 100%;
     height: 100%;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: space-evenly;
-    gap: 8px;
-    padding: 2px 4px;
+    justify-content: flex-start;
+    gap: 7px;
+    padding: 2px 4px 6px 4px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.sj-workload-list::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
 }
 .sj-workload-item {
+    width: 100%;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
     padding: 4px 8px;
     border-radius: 10px;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
 }
 .sj-workload-item:hover {
     background: rgba(241, 245, 249, 0.7);
@@ -13298,6 +13492,20 @@ body.dark-mode .ot-progress-circle circle.bg {
     min-width: 0 !important;
     box-sizing: border-box;
     overflow: hidden;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                border-color 0.25s ease;
+    cursor: default;
+    will-change: transform, box-shadow;
+}
+
+.ot-card-v2:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03);
+}
+
+.ot-card-v2:active {
+    transform: translateY(-1px) scale(0.995);
 }
 
 .border-t-blue {
@@ -13332,11 +13540,34 @@ body.dark-mode .ot-progress-circle circle.bg {
     box-sizing: border-box;
     overflow: hidden;
     height: 100%;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), 
+                border-color 0.25s ease;
+    cursor: default;
+    will-change: transform, box-shadow;
 }
+
+.s5-kpi-card-styled:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03);
+    border-color: #cbd5e1;
+}
+
+.s5-kpi-card-styled:active {
+    transform: translateY(-1px) scale(0.995);
+}
+
 body.dark-mode .s5-kpi-card-styled {
     background-color: #0f172a !important;
     border-color: #1e293b !important;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.dark-mode .s5-kpi-card-styled:hover,
+body.dark-mode .ot-card-v2:hover {
+    transform: translateY(-3px) !important;
+    border-color: rgba(56, 189, 248, 0.4) !important;
+    box-shadow: 0 16px 32px -4px rgba(0, 0, 0, 0.7), 0 0 16px rgba(56, 189, 248, 0.12) !important;
 }
 
 /* Progress Circle Big */
@@ -16167,390 +16398,280 @@ body.dark-mode #attendance-logs #att-records-tbody .text-slate-500 {
     color: #94a3b8 !important;
 }
 /* ============================================================
-   🌙 PREMIUM DARK MODE FOR SUPPORT FORM MODAL (LINE SUPPORT)
+   💎 CYBER-MODERN LINE CLAIM FORM MODAL (MATCHING RECORD DETAILS)
    ============================================================ */
 
+/* Modal Container & Dialog Card */
+#support-form-modal {
+    transition: opacity 0.2s ease;
+}
+
+#support-form-modal > div {
+    max-width: 740px !important;
+    width: 100% !important;
+    border-radius: 16px !important;
+    overflow: hidden !important;
+    transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
+}
+
 body.dark-mode #support-form-modal > div {
-    background: #0f172a !important; /* พื้นหลังตัวกล่อง */
-    border: 1px solid #1e293b !important;
-    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.9) !important;
+    background: #060a14 !important;
+    border: 1px solid rgba(56, 189, 248, 0.35) !important;
+    box-shadow: 0 0 60px rgba(14, 165, 233, 0.22), 0 35px 85px rgba(0, 0, 0, 0.95) !important;
 }
 
-/* 1. ส่วนหัว (Header) */
-body.dark-mode #support-form-modal > div > div:first-child {
-    background: linear-gradient(90deg, #020617 0%, #1e3a8a 100%) !important;
-    border-bottom: 2px solid #2563eb !important;
+/* 1. Header */
+#support-form-modal .claim-modal-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 45%, #2563eb 100%) !important;
+    position: relative;
+    overflow: hidden;
+    padding: 14px 22px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.25) !important;
 }
 
-/* 2. กล่องแจ้งเตือนแบบร่าง (Offline Draft Banner) */
-body.dark-mode #offline-draft-banner {
-    background: rgba(30, 41, 59, 0.5) !important;
-    border: 1px solid #334155 !important;
-    color: #e2e8f0 !important;
+#support-form-modal .claim-modal-header::before {
+    content: '';
+    position: absolute;
+    top: -60%;
+    right: -10%;
+    width: 280px;
+    height: 280px;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.28) 0%, rgba(37, 99, 235, 0.12) 45%, transparent 70%);
+    pointer-events: none;
+    z-index: 1;
 }
 
-body.dark-mode #btn-restore-draft {
-    background: #2563eb !important;
-    box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
+#support-form-modal .claim-modal-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.45) 50%, transparent 100%);
+    pointer-events: none;
+    z-index: 2;
 }
 
-/* 3. กล่องส่วนเนื้อหา (Section Containers) */
-body.dark-mode #sup-form > div {
-    background: #1e293b !important; /* สี Slate-800 */
-    border: 1px solid #334155 !important;
+body.dark-mode #support-form-modal .claim-modal-header {
+    background: linear-gradient(135deg, #030712 0%, #0c1830 50%, #172d5c 100%) !important;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.35) !important;
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6) !important;
+}
+
+body.dark-mode #support-form-modal .claim-modal-header::before {
+    background: radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, rgba(30, 58, 138, 0.15) 50%, transparent 75%) !important;
+}
+
+body.dark-mode #support-form-modal .claim-modal-header::after {
+    background: linear-gradient(90deg, transparent 0%, rgba(56, 189, 248, 0.7) 50%, transparent 100%) !important;
+}
+
+/* 2. Problem Preview Banner */
+.problem-preview-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+#prob-preview-text {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    font-family: 'DM Mono', monospace, Consolas, monospace !important;
+    color: #1e293b !important;
+    line-height: 1.65 !important;
+    word-break: break-word !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+}
+
+body.dark-mode .problem-preview-card {
+    background: rgba(15, 23, 42, 0.75) !important;
+    border: 1px solid rgba(56, 189, 248, 0.25) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25) !important;
+}
+
+body.dark-mode #prob-preview-text {
     color: #f1f5f9 !important;
 }
 
-body.dark-mode label {
-    color: #94a3b8 !important; /* สี Label เทาจางๆ */
+body.dark-mode #btn-copy-problem-sentence {
+    background: rgba(15, 23, 42, 0.85) !important;
+    border-color: rgba(56, 189, 248, 0.35) !important;
+    color: #93c5fd !important;
 }
 
-body.dark-mode label b, 
-body.dark-mode label strong {
-    color: #f8fafc !important; /* ตัวหนังสือเน้นหนักสีขาว */
-}
-
-/* 4. ช่องพิมพ์ข้อมูล (Inputs) */
-body.dark-mode .form-input,
-body.dark-mode #sup-form input,
-body.dark-mode #sup-form select,
-body.dark-mode #sup-form textarea {
-    background-color: #020617 !important; /* พื้นหลังช่องพิมพ์มืดสนิท */
-    border-color: #334155 !important;
+body.dark-mode #btn-copy-problem-sentence:hover {
+    background: rgba(30, 58, 138, 0.5) !important;
+    border-color: #38bdf8 !important;
     color: #ffffff !important;
 }
 
-body.dark-mode .form-input:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 12px rgba(59, 130, 246, 0.25) !important;
+/* 3. Section Containers / Panels */
+.claim-section-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* 5. แถบ Preview ข้อความด้านล่าง */
-body.dark-mode #prob-preview-text {
-    color: #60a5fa !important; /* สีฟ้าเรืองแสง */
-    background: transparent !important;
+body.dark-mode .claim-section-card {
+    background: #0b1329 !important;
+    border: 1px solid rgba(56, 189, 248, 0.18) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
 }
 
-body.dark-mode #sup-form div[style*="background:#ffffff"] {
-    background: #020617 !important; /* เปลี่ยนพื้นหลัง Preview เป็นสีมืด */
-    border-color: #334155 !important;
+/* 4. Form Inputs */
+body.dark-mode #sup-form .form-input,
+body.dark-mode #sup-form input[type="text"],
+body.dark-mode #sup-form input[type="number"],
+body.dark-mode #sup-form input[type="date"],
+body.dark-mode #sup-form select,
+body.dark-mode #sup-form textarea {
+    background-color: #030712 !important;
+    border-color: rgba(56, 189, 248, 0.25) !important;
+    color: #ffffff !important;
 }
 
-/* 6. ปุ่มเลือกโหมดรูปภาพ (Evidence Mode Switcher) */
+body.dark-mode #sup-form .form-input:focus,
+body.dark-mode #sup-form input:focus,
+body.dark-mode #sup-form select:focus,
+body.dark-mode #sup-form textarea:focus {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.35) !important;
+}
+
+/* 5. Evidence Section */
 body.dark-mode .evidence-mode-switcher {
-    background: #020617 !important;
-    border-color: #334155 !important;
+    background: #030712 !important;
+    border: 1px solid rgba(56, 189, 248, 0.25) !important;
 }
 
 body.dark-mode .evidence-mode-tab-btn {
-    color: #64748b !important;
+    color: #94a3b8 !important;
 }
 
 body.dark-mode .evidence-mode-tab-btn.active {
-    background: #1e293b !important;
+    background: #0f172a !important;
     color: #38bdf8 !important;
-    border-color: #3b82f6 !important;
+    border: 1.5px solid #38bdf8 !important;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
 }
 
-/* 7. พื้นที่อัปโหลดรูป (Dropzone) */
 body.dark-mode #img-dropzone {
-    background: #090d16 !important;
-    border-color: #334155 !important;
+    background: #040814 !important;
+    border: 2px dashed rgba(56, 189, 248, 0.3) !important;
 }
 
 body.dark-mode #img-dropzone:hover {
-    border-color: #3b82f6 !important;
-    background: #0f172a !important;
+    border-color: #38bdf8 !important;
+    background: #081026 !important;
 }
 
-body.dark-mode #img-dropzone span[style*="color:#2563eb"] {
-    color: #60a5fa !important;
+/* 6. Remark Chips */
+.sup-remark-chip {
+    border-radius: 7px !important;
+    font-weight: 750 !important;
+    font-size: 11px !important;
+    transition: all 0.15s ease !important;
 }
 
-/* 8. กล่องปุ่มลัดหมายเหตุ (Remark Chips) */
 body.dark-mode .sup-remark-chip {
-    background: #1e293b !important;
-    border-color: #334155 !important;
+    background: rgba(15, 23, 42, 0.8) !important;
+    border: 1px solid rgba(56, 189, 248, 0.25) !important;
     color: #cbd5e1 !important;
 }
 
 body.dark-mode .sup-remark-chip:hover {
-    background: #334155 !important;
+    background: rgba(30, 58, 138, 0.4) !important;
     color: #ffffff !important;
-    border-color: #475569 !important;
+    border-color: #38bdf8 !important;
 }
 
-/* 9. ส่วนล่าง (Footer) และปุ่มบันทึก */
-body.dark-mode #sup-form > div:last-child {
-    background: #020617 !important;
-    border-top: 1px solid #1e293b !important;
+/* 7. Footer & Submit */
+body.dark-mode #sup-form-footer {
+    background: #030712 !important;
+    border-top: 1px solid rgba(56, 189, 248, 0.2) !important;
 }
 
-body.dark-mode #sup-form-submit-btn {
-    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%) !important;
-    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3) !important;
+#sup-form-submit-btn {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #0284c7 100%) !important;
+    box-shadow: 0 4px 18px rgba(37, 99, 235, 0.45) !important;
+    transition: all 0.2s ease !important;
 }
 
-/* 10. แถบเลื่อน (Scrollbar) ของ Modal */
-body.dark-mode #sup-form::-webkit-scrollbar-track {
-    background: #020617;
+#sup-form-submit-btn:hover {
+    box-shadow: 0 6px 24px rgba(37, 99, 235, 0.6) !important;
+    transform: translateY(-1px) !important;
 }
 
-body.dark-mode #sup-form::-webkit-scrollbar-thumb {
-    background: #1e293b;
-    border: 2px solid #020617;
-}
-
-/* 11. แก้ไขสีกรอบ Special Jobs & 8D Toggles */
-body.dark-mode #sync-container, 
-body.dark-mode #8d-container {
-    background: rgba(30, 41, 59, 0.3) !important;
-    border: 1px dashed #334155 !important;
-}
-
-body.dark-mode #sync-container p, 
-body.dark-mode #8d-container p {
-    color: #e2e8f0 !important;
-}
-/* ============================================================
-   🌑 ULTIMATE DARK MODE: SUPPORT FORM MODAL (100% IMAGE MATCH)
-   ============================================================ */
-
-body.dark-mode #support-form-modal > div {
-    background: #0b1220 !important; /* พื้นหลังสีเข้มสนิทตามภาพ */
-    border: 1px solid #1e293b !important;
+/* 8. Tactical Toggle Containers (Special Job & 8D) */
+#sync-container,
+[id="8d-container"] {
+    padding: 10px 14px !important;
     border-radius: 12px !important;
-    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.9) !important;
-}
-
-/* 1. Header & Title */
-body.dark-mode #support-form-modal > div > div:first-child {
-    background: #111827 !important;
-    border-bottom: 2px solid #1e293b !important;
-    padding: 12px 18px !important;
-}
-
-body.dark-mode #support-form-modal h3 {
-    color: #ffffff !important;
-    font-weight: 900 !important;
-    font-size: 14px !important;
-}
-
-/* 2. บล็อกแจ้งเตือนแบบร่าง (Draft Banner) */
-body.dark-mode #offline-draft-banner {
-    background: #0f172a !important;
-    border: 1.5px solid #1e40af !important;
-    color: #93c5fd !important;
-    border-radius: 10px !important;
-}
-
-body.dark-mode #btn-restore-draft {
-    background: #2563eb !important;
-    color: #fff !important;
-    border-radius: 6px !important;
-}
-
-/* 3. กล่องส่วนเนื้อหา (Section Containers) */
-body.dark-mode #sup-form > div {
-    background: #0f172a !important;
-    border: 1.5px solid #1e293b !important;
-    border-radius: 12px !important;
-}
-
-/* 4. Labels & Badges */
-body.dark-mode .s5-label,
-body.dark-mode label {
-    color: #94a3b8 !important; /* สีเทาอมฟ้าจางๆ */
-    font-size: 10px !important;
-    font-weight: 800 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
-}
-
-body.dark-mode #prob-date-badge {
-    background: rgba(59, 130, 246, 0.1) !important;
-    color: #60a5fa !important;
-    border: 1px solid rgba(59, 130, 246, 0.3) !important;
-}
-
-/* 5. Inputs & Textarea */
-body.dark-mode .form-input,
-body.dark-mode #sup-form input,
-body.dark-mode #sup-form select,
-body.dark-mode #sup-form textarea {
-    background-color: #040914 !important; /* พื้นหลังช่องพิมพ์มืดเข้ม */
-    border: 1.5px solid #1e293b !important;
-    color: #ffffff !important;
-    border-radius: 8px !important;
-}
-
-body.dark-mode .form-input:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2) !important;
-}
-
-/* ช่อง NG QTY (Auto) บังคับสีแดงตามภาพ */
-body.dark-mode #f-sup-ng {
-    background: rgba(225, 29, 72, 0.05) !important;
-    border-color: #450a0a !important;
-    color: #f87171 !important;
-}
-
-/* 6. Preview Text Area */
-body.dark-mode #prob-preview-text {
-    color: #f1f5f9 !important;
-    font-family: 'DM Mono', monospace !important;
-}
-
-body.dark-mode #sup-form div[style*="background:#ffffff"] {
-    background: #020617 !important; /* พื้นหลัง Preview Box */
-    border: 1px solid #1e293b !important;
-}
-
-/* 7. Special & 8D Toggles */
-body.dark-mode #sync-container,
-body.dark-mode #8d-container {
-    background: rgba(30, 41, 59, 0.4) !important;
-    border: 1px dashed #334155 !important;
-}
-
-body.dark-mode #sync-container p,
-body.dark-mode #8d-container p {
-    color: #f1f5f9 !important;
-}
-
-/* 8. Evidence Section & Dropzone */
-body.dark-mode .evidence-mode-switcher {
-    background: #020617 !important;
-    border: 1px solid #1e293b !important;
-}
-
-body.dark-mode .evidence-mode-tab-btn {
-    color: #64748b !important;
-}
-
-body.dark-mode .evidence-mode-tab-btn.active {
-    background: #1e293b !important;
-    color: #38bdf8 !important;
-    border: 1.5px solid #3b82f6 !important;
-}
-
-body.dark-mode #img-dropzone {
-    background: #040914 !important;
-    border: 2px dashed #1e293b !important;
-}
-
-body.dark-mode #img-dropzone span {
-    color: #60a5fa !important;
-}
-
-/* 9. Remark & Preset Chips (ปุ่มสีด้านล่าง) */
-body.dark-mode #f-sup-remark-input {
-    background: #020617 !important;
-}
-
-body.dark-mode .sup-remark-chip {
-    border-radius: 6px !important;
-    font-weight: 800 !important;
-}
-
-/* ตั้งค่าสี Chip ตามภาพ */
-body.dark-mode .sup-remark-chip[data-type="lot-summary"] { background: #064e3b !important; color: #10b981 !important; border-color: #065f46 !important; }
-body.dark-mode .sup-remark-chip[data-preset*="Sorting"] { background: #1e3a8a !important; color: #60a5fa !important; border-color: #1e40af !important; }
-body.dark-mode .sup-remark-chip[data-preset*="Root Cause"] { background: #451a03 !important; color: #f59e0b !important; border-color: #78350f !important; }
-body.dark-mode .sup-remark-chip[data-preset*="NG"] { background: #450a0a !important; color: #f87171 !important; border-color: #7f1d1d !important; }
-
-/* 10. Footer Buttons */
-body.dark-mode #sup-form-submit-btn {
-    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%) !important;
-    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4) !important;
-    color: #ffffff !important;
-}
-
-/* 11. Scrollbar for Modal */
-body.dark-mode #sup-form::-webkit-scrollbar-thumb {
-    background: #1e293b;
-    border: 2px solid #0b1220;
-}
-/* ============================================================
-   ⚡ SPECIAL JOBS & 8D REPORT TOGGLE EFFECT (DARK MODE)
-   ============================================================ */
-
-/* ปรับแต่ง Container ทั้งสองตัวให้เป็นขอบเส้นประและพื้นหลังมืด */
-body.dark-mode #sync-container,
-body.dark-mode #8d-container {
-    padding: 10px 15px !important;
-    border-radius: 14px !important;
-    height: 58px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    transition: all 0.3s ease;
-    background: rgba(15, 23, 42, 0.4) !important; /* พื้นหลังมืดโปร่งแสง */
+    transition: all 0.25s ease !important;
 }
 
-/* เอฟเฟกต์เส้นประสีฟ้าสำหรับ Special Job */
 body.dark-mode #sync-container {
-    border: 1.5px dashed rgba(59, 130, 246, 0.6) !important;
+    background: rgba(15, 23, 42, 0.5) !important;
+    border: 1.5px dashed rgba(59, 130, 246, 0.5) !important;
 }
 
-/* เอฟเฟกต์เส้นประสีแดงสำหรับ 8D Report */
-body.dark-mode #8d-container {
-    border: 1.5px dashed rgba(239, 68, 68, 0.6) !important;
+body.dark-mode [id="8d-container"] {
+    background: rgba(15, 23, 42, 0.5) !important;
+    border: 1.5px dashed rgba(239, 68, 68, 0.5) !important;
 }
 
-/* ปรับแต่งกล่องไอคอนให้เป็นสีขาวโค้งมน (White Rounded Icon Box) */
+body.dark-mode #sync-container p,
+body.dark-mode [id="8d-container"] p {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    font-size: 11.5px !important;
+    margin: 0 0 0 12px !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
 body.dark-mode #sync-container div[style*="width:28px"],
-body.dark-mode #8d-container div[style*="width:28px"] {
-    width: 36px !important;
-    height: 36px !important;
-    background: #ffffff !important;
-    border-radius: 10px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+body.dark-mode [id="8d-container"] div[style*="width:28px"],
+body.dark-mode #sync-container .toggle-icon-box,
+body.dark-mode [id="8d-container"] .toggle-icon-box {
+    background-color: #ffffff !important;
+    border-radius: 9px !important;
+    width: 34px !important;
+    height: 34px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    flex-shrink: 0;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35) !important;
 }
 
-/* ปรับไอคอนสายฟ้าให้เป็นสีน้ำเงิน */
-body.dark-mode #sync-container svg {
-    color: #3b82f6 !important;
-}
-
-/* ปรับข้อความ 8D ให้เป็นสีแดงเข้ม */
-body.dark-mode #8d-container div[style*="color:#e11d48"] {
-    color: #e11d48 !important;
-    font-weight: 950 !important;
-}
-
-/* ⚪ ปรับตัวหนังสือข้างในให้เป็นสีขาวทั้งหมด */
-body.dark-mode #sync-container p,
-body.dark-mode #8d-container p {
-    color: #ffffff !important; /* ตัวหนังสือขาว */
-    font-size: 11.5px !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.02em;
-    margin: 0 0 0 12px !important; /* ดันระยะห่างจากไอคอน */
-}
-
-/* ปรับแต่ง Checkbox ให้เป็นสี่เหลี่ยมสีขาวตามภาพ */
 body.dark-mode .premium-toggle input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    width: 19px;
+    height: 19px;
     appearance: none;
     -webkit-appearance: none;
     background: transparent;
-    border: 2px solid #ffffff; /* ขอบขาว */
-    border-radius: 4px;
+    border: 2px solid #ffffff !important;
+    border-radius: 4px !important;
     cursor: pointer;
     position: relative;
     transition: all 0.2s;
 }
 
-/* เมื่อติ๊ก Checkbox ให้มีพื้นหลังสีขาวและเครื่องหมายถูก */
 body.dark-mode .premium-toggle input[type="checkbox"]:checked {
-    background: #ffffff;
+    background: #ffffff !important;
 }
 
 body.dark-mode .premium-toggle input[type="checkbox"]:checked::after {
@@ -16560,93 +16681,10 @@ body.dark-mode .premium-toggle input[type="checkbox"]:checked::after {
     left: 50%;
     transform: translate(-50%, -55%);
     color: #0f172a;
-    font-size: 14px;
-    font-weight: 900;
-}
-
-/* ลบเอฟเฟกต์ Toggle Slider เดิมออก (ถ้ามี) เพื่อให้เหลือแค่สี่เหลี่ยมขาว */
-body.dark-mode .toggle-slider {
-    display: none !important;
-}
-/* ============================================================
-   🎯 FORCE WHITE TEXT FOR SPECIAL JOB & 8D TOGGLES
-   ============================================================ */
-
-/* ปรับพื้นหลังและขอบประ */
-body.dark-mode #sync-container,
-body.dark-mode #8d-container {
-    background: rgba(15, 23, 42, 0.6) !important; /* พื้นหลังมืด */
-    padding: 10px 15px !important;
-    border-radius: 14px !important;
-    display: flex !important;
-    align-items: center !important;
-    transition: all 0.3s ease;
-}
-
-/* ขอบประสีฟ้าสำหรับภารกิจพิเศษ */
-body.dark-mode #sync-container {
-    border: 1.5px dashed rgba(59, 130, 246, 0.6) !important;
-}
-
-/* ขอบประสีแดงสำหรับ 8D Report */
-body.dark-mode #8d-container {
-    border: 1.5px dashed rgba(239, 68, 68, 0.6) !important;
-}
-
-/* ⚪ บังคับตัวหนังสือเป็นสีขาว (Force White Text) */
-body.dark-mode #sync-container p,
-body.dark-mode #8d-container p {
-    color: #ffffff !important; /* บังคับสีขาว */
-    font-weight: 800 !important;
-    font-size: 11.5px !important;
-    margin: 0 0 0 12px !important; /* ระยะห่างจากไอคอน */
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); /* เพิ่มเงาให้อ่านง่ายขึ้น */
-}
-
-/* ปรับแต่งกล่องไอคอนให้เด่นชัด (White Background Icon Box) */
-body.dark-mode #sync-container div[style*="width:28px"],
-body.dark-mode #8d-container div[style*="width:28px"] {
-    background-color: #ffffff !important;
-    border-radius: 10px !important;
-    width: 36px !important;
-    height: 36px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* ปรับแต่ง Checkbox ให้เป็นสี่เหลี่ยมขาว (White Square Checkbox) */
-body.dark-mode .premium-toggle input[type="checkbox"] {
-    width: 19px;
-    height: 19px;
-    appearance: none;
-    -webkit-appearance: none;
-    background: transparent;
-    border: 2px solid #ffffff !important; /* ขอบขาว */
-    border-radius: 4px !important;
-    cursor: pointer;
-    position: relative;
-    transition: all 0.2s;
-}
-
-/* เมื่อติ๊กถูกให้กลายเป็นกล่องขาวและมีเครื่องหมายดำ */
-body.dark-mode .premium-toggle input[type="checkbox"]:checked {
-    background: #ffffff !important;
-}
-
-body.dark-mode .premium-toggle input[type="checkbox"]:checked::after {
-    content: '✓';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -55%);
-    color: #0f172a; /* สีเครื่องหมายถูกเข้ม */
     font-size: 15px;
     font-weight: 900;
 }
 
-/* ลบตัวสไลด์เดิมออก (ถ้ามี) */
 body.dark-mode .toggle-slider {
     display: none !important;
 }
@@ -16786,7 +16824,7 @@ body.dark-mode .evidence-thumb-card.drag-over,
     gap: 4px;
 }
 /* ============================================================
-   FIX WORKLOAD DISTRIBUTION FULL-WIDTH LAYOUT
+   FIX WORKLOAD DISTRIBUTION FULL-WIDTH LAYOUT & INVISIBLE SCROLLBAR
    ============================================================ */
 
 /* 1. บังคับให้ Card Body และ Container กางเต็มความกว้าง 100% เสมอ */
@@ -16795,26 +16833,57 @@ body.dark-mode .evidence-thumb-card.drag-over,
     width: 100% !important;
     min-width: 100% !important;
     max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    align-items: stretch !important; /* สำคัญ: ป้องกันการหดตัวเข้ากลาง */
-    justify-content: center !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
 }
 
-/* 2. บังคับให้รายการทั้งหมดและแต่ละแถวกางเต็ม 100% */
+/* 2. บังคับให้รายการทั้งหมดและแต่ละแถวเลื่อนได้แบบแถบเลื่อนล่องหน (Invisible Scrollbar) */
 .sj-workload-list {
     width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    justify-content: space-evenly !important;
-    gap: 8px !important;
-    padding: 4px 6px !important;
+    justify-content: flex-start !important;
+    gap: 7px !important;
+    padding: 2px 4px 6px 4px !important;
     box-sizing: border-box !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scroll-behavior: smooth !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+
+    /* ซ่อนแถบเลื่อนให้เป็นแถบเลื่อนล่องหน (Invisible Scrollbar) */
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE / Edge */
+}
+
+/* ซ่อนแถบเลื่อนบนเบราว์เซอร์ WebKit (Chrome, Safari, Edge, Android) */
+.sj-workload-list::-webkit-scrollbar,
+#sj-assignor-chart::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+}
+
+/* กรณีมีรายการน้อย (<= 3 รายการ) กระจายห่างกันพอดี */
+.sj-workload-list.sparse {
+    justify-content: space-evenly !important;
 }
 
 .sj-workload-item {
     width: 100% !important;
+    flex-shrink: 0 !important; /* ป้องกันรายการถูกบีบอัดเมื่อมีคนจำนวนมาก */
     display: flex !important;
     flex-direction: column !important;
     gap: 4px !important;
