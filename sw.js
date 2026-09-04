@@ -1,30 +1,18 @@
-// Service Worker for SQE Portal & WAP System with Live Cache Bypass & Instant Update
-const CACHE_NAME = 'sqe-portal-v4.0-live'; 
-const DATA_CACHE_NAME = 'sqe-table-data-v4.0';
-const IMAGE_CACHE_NAME = 'sqe-images-v4.0';
+// Service Worker for SQE Portal & WAP System with Table Data Caching
+const CACHE_NAME = 'sqe-portal-v4.5'; 
+const DATA_CACHE_NAME = 'sqe-table-data-v2.2';
+const IMAGE_CACHE_NAME = 'sqe-images-v2.2';
 
 const STATIC_URLS = [
   './',
   './index.html',
   './styles.css',
   './script.js',
-  './vf_rp_seed_rules.js',
   './favicon.ico',
   './favicon-32x32.png',
   './favicon-16x16.png',
-  './icon-48.png',
-  './icon-72.png',
-  './icon-96.png',
-  './icon-128.png',
-  './icon-144.png',
-  './icon-152.png',
-  './apple-touch-icon.png',
-  './apple-touch-icon-76x76.png',
-  './apple-touch-icon-120x120.png',
-  './apple-touch-icon-152x152.png',
   './apple-touch-icon-180.png',
   './icon-192.png',
-  './icon-384.png',
   './icon-512.png',
   './icon-maskable-512.png',
   './sqe_portal_badge.jpg',
@@ -32,7 +20,7 @@ const STATIC_URLS = [
   './manifest.json'
 ];
 
-// ติดตั้ง Service Worker - Skip Waiting ทันทีเพื่อให้เวอร์ชันใหม่ทำงาน
+// ติดตั้ง Service Worker
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
@@ -42,20 +30,7 @@ self.addEventListener('install', event => {
   );
 });
 
-// Message handler for skip waiting & cache purge
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-  if (event.data && event.data.type === 'PURGE_ALL_CACHES') {
-    event.waitUntil(
-      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
-        .then(() => self.clients.claim())
-    );
-  }
-});
-
-// Activate: ลบ Cache เก่าทั้งหมดทันที และ claim clients เพื่อให้ควบคุมหน้าจอได้ทันที
+// Activate: ลบ Cache เก่าทั้งหมด
 self.addEventListener('activate', event => {
   const currentCaches = [CACHE_NAME, DATA_CACHE_NAME, IMAGE_CACHE_NAME];
   event.waitUntil(
@@ -99,6 +74,7 @@ self.addEventListener('fetch', event => {
           if (cachedResponse) {
             return cachedResponse;
           }
+          // หากพารามิเตอร์ URL ต่างกันเล็กน้อย ค้นหาข้อมูลตารางจาก Cache ที่ตรงกับ Base Endpoint
           const cache = await caches.open(DATA_CACHE_NAME);
           const keys = await cache.keys();
           for (const key of keys) {
@@ -147,18 +123,13 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 3. ไฟล์หลัก App Shell (script.js, styles.css, vf_rp_seed_rules.js, index.html): บังคับดึงข้อมูลสดจากเครือข่ายเสมอ (Network-Always)
+  // 3. ไฟล์หลัก App Shell (script.js, styles.css, index.html): Network-First
   if (
     url.origin === location.origin &&
-    (url.pathname.includes('script.js') || 
-     url.pathname.includes('styles.css') || 
-     url.pathname.includes('vf_rp_seed_rules.js') || 
-     url.pathname.endsWith('index.html') || 
-     url.pathname === '/' ||
-     request.mode === 'navigate')
+    (url.pathname.endsWith('script.js') || url.pathname.endsWith('styles.css') || url.pathname.endsWith('index.html') || url.pathname === '/')
   ) {
     event.respondWith(
-      fetch(request, { cache: 'no-store' })
+      fetch(request)
         .then(networkResponse => {
           if (networkResponse && networkResponse.ok) {
             const responseClone = networkResponse.clone();
@@ -171,16 +142,16 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 4. ทั่วไป: Network First เพื่อความสดใหม่
+  // 4. ทั่วไป: Cache-First
   event.respondWith(
-    fetch(request, { cache: 'no-cache' })
-      .then(networkResponse => {
+    caches.match(request).then(cachedResponse => {
+      return cachedResponse || fetch(request).then(networkResponse => {
         if (networkResponse && networkResponse.ok && url.origin === location.origin) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
         }
         return networkResponse;
-      })
-      .catch(() => caches.match(request))
+      });
+    })
   );
 });
