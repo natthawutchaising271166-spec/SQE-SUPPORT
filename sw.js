@@ -1,7 +1,7 @@
 // Service Worker for SQE Portal & WAP System with Table Data Caching
-const CACHE_NAME = 'sqe-portal-v4.5'; 
-const DATA_CACHE_NAME = 'sqe-table-data-v2.2';
-const IMAGE_CACHE_NAME = 'sqe-images-v2.2';
+const CACHE_NAME = 'sqe-portal-v4.6'; 
+const DATA_CACHE_NAME = 'sqe-table-data-v2.3';
+const IMAGE_CACHE_NAME = 'sqe-images-v2.3';
 
 const STATIC_URLS = [
   './',
